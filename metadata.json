@@ -1,0 +1,8 @@
+{
+  "name": "SGI FV - FORMANDO VALORES",
+  "description": "Sistema de Gestão Integrada para acompanhamento de processos jurídicos, administrativos e tecnológicos.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
