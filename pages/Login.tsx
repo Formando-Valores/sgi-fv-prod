@@ -37,16 +37,44 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
       // no nosso estado local (ou mock) para manter a consistência do dashboard.
       const userProfile = users.find(u => u.email === email);
       
-      if (userProfile) {
-        setCurrentUser(userProfile);
-        // O redirecionamento para o dashboard é controlado pelo estado currentUser no App.tsx
-        // mas aqui forçamos a navegação caso o estado não dispare o re-render imediato.
-        navigate('/dashboard');
-      } else {
-        // Caso o usuário exista no Auth mas não no nosso mock, 
-        // poderíamos criar um perfil básico ou retornar erro.
-        setError('Perfil do usuário não encontrado no sistema SGI.');
+      const userId = data.user.id;
+
+const { data: profiles, error: profileError } = await supabase
+  .from('profiles')
+  .select('*')
+  .eq('id', userId);
+
+if (profileError) {
+  console.error(profileError);
+  setError('Erro ao buscar perfil.');
+  return;
+}
+
+let profile = profiles?.[0] ?? null;
+
+if (!profile) {
+        // se não existir, cria (opcional, mas recomendado)
+        const { data: inserted, error: insertError } = await supabase
+          .from('profiles')
+          .insert([{
+            id: userId,
+            email: data.user.email,
+            role: 'user',
+            nome_completo: data.user.user_metadata?.name ?? null,
+          }])
+          .select('*');
+      
+        if (insertError) {
+          console.error(insertError);
+          setError('Perfil não encontrado e não foi possível criar.');
+          return;
+        }
+      
+        profile = inserted?.[0] ?? null;
       }
+      
+      setCurrentUser(profile as any);
+      navigate('/dashboard');
     }
   };
 
