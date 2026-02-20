@@ -1,80 +1,108 @@
+/**
+ * SGI FV - Login Page
+ * Sistema de Gestão Integrada - Formando Valores
+ */
 
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
-import { User } from '../types';
-import { supabase } from '../App';
+import { Eye, EyeOff, Mail, Lock, AlertCircle } from 'lucide-react';
+import { User, userContextToLegacyUser } from '../types';
+import { supabase } from '../supabase';
+import { getCurrentUserContext, resolveOrgSlug, getOrgIdBySlug, addUserToOrg, upsertProfile } from '../src/lib/tenant';
 
 interface LoginProps {
   setCurrentUser: (user: User) => void;
-  users: User[];
+  users: User[]; // Mantido para compatibilidade, mas não usado
 }
 
-const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
+const Login: React.FC<LoginProps> = ({ setCurrentUser }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setIsLoading(true);
 
-    // Utilizando supabase.auth.signInWithPassword conforme solicitado
-    const { data, error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      // 1. Autenticar com Supabase Auth
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (authError) {
-      setError('Email ou senha inválidos');
-      return;
-    }
+      if (authError) {
+        if (authError.message.includes('Invalid login credentials')) {
+          setError('Email ou senha inválidos');
+        } else {
+          setError(authError.message);
+        }
+        return;
+      }
 
-    if (data.user) {
-      // Se o login for bem-sucedido, buscamos os dados complementares do usuário 
-      // no nosso estado local (ou mock) para manter a consistência do dashboard.
-      const userProfile = users.find(u => u.email === email);
-      
-      const userId = data.user.id;
+      if (!data.user) {
+        setError('Erro ao autenticar. Tente novamente.');
+        return;
+      }
 
-const { data: profiles, error: profileError } = await supabase
-  .from('profiles')
-  .select('*')
-  .eq('id', userId);
+      // 2. Tentar obter contexto do usuário (membership + profile)
+      let userContext = await getCurrentUserContext();
 
-if (profileError) {
-  console.error(profileError);
-  setError('Erro ao buscar perfil.');
-  return;
-}
-
-let profile = profiles?.[0] ?? null;
-
-if (!profile) {
-        // se não existir, cria (opcional, mas recomendado)
-        const { data: inserted, error: insertError } = await supabase
-          .from('profiles')
-          .insert([{
-            id: userId,
-            email: data.user.email,
-            role: 'user',
-            nome_completo: data.user.user_metadata?.name ?? null,
-          }])
-          .select('*');
-      
-        if (insertError) {
-          console.error(insertError);
-          setError('Perfil não encontrado e não foi possível criar.');
+      // 3. Se não tem membership, tentar vincular à organização padrão
+      if (!userContext) {
+        console.log('Usuário sem membership, tentando vincular à org padrão...');
+        
+        // Resolver slug da organização
+        const orgSlug = await resolveOrgSlug();
+        const orgId = await getOrgIdBySlug(orgSlug);
+        
+        if (!orgId) {
+          setError('Organização não encontrada. Contate o administrador.');
+          await supabase.auth.signOut();
           return;
         }
-      
-        profile = inserted?.[0] ?? null;
+
+        // Criar membership como client
+        const membershipCreated = await addUserToOrg(orgId, data.user.id, 'client');
+        
+        if (!membershipCreated) {
+          setError('Erro ao vincular usuário à organização.');
+          await supabase.auth.signOut();
+          return;
+        }
+
+        // Criar perfil mínimo se não existir
+        await upsertProfile(data.user.id, orgId, {
+          email: data.user.email,
+          nome_completo: data.user.user_metadata?.name || email.split('@')[0]
+        });
+
+        // Tentar obter contexto novamente
+        userContext = await getCurrentUserContext();
       }
+
+      if (!userContext) {
+        setError('Usuário não vinculado a nenhuma empresa. Contate o administrador.');
+        await supabase.auth.signOut();
+        return;
+      }
+
+      // 4. Converter para formato legacy e salvar
+      const legacyUser = userContextToLegacyUser(userContext);
+      setCurrentUser(legacyUser);
       
-      setCurrentUser(profile as any);
+      // 5. Navegar para dashboard
       navigate('/dashboard');
+
+    } catch (err) {
+      console.error('Erro no login:', err);
+      setError('Erro inesperado. Tente novamente.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -98,6 +126,7 @@ if (!profile) {
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 bg-gray-900 border border-slate-700 rounded-lg text-white font-bold placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
+                disabled={isLoading}
               />
             </div>
           </div>
@@ -113,6 +142,7 @@ if (!profile) {
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full pl-10 pr-12 py-3 bg-gray-900 border border-slate-700 rounded-lg text-white font-bold placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
+                disabled={isLoading}
               />
               <button
                 type="button"
@@ -124,13 +154,26 @@ if (!profile) {
             </div>
           </div>
 
-          {error && <p className="text-red-500 text-sm font-bold text-center">{error}</p>}
+          {error && (
+            <div className="flex items-center gap-2 p-3 bg-red-900/30 border border-red-800 rounded-lg">
+              <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+              <p className="text-red-200 text-sm font-bold">{error}</p>
+            </div>
+          )}
 
           <button
             type="submit"
-            className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg uppercase tracking-widest transition-all transform active:scale-95 shadow-lg"
+            disabled={isLoading}
+            className="w-full py-4 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:cursor-not-allowed text-white font-bold rounded-lg uppercase tracking-widest transition-all transform active:scale-95 shadow-lg flex items-center justify-center gap-2"
           >
-            Autenticar no SGI
+            {isLoading ? (
+              <>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                <span>Autenticando...</span>
+              </>
+            ) : (
+              'Autenticar no SGI'
+            )}
           </button>
         </form>
 

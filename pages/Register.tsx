@@ -1,10 +1,15 @@
+/**
+ * SGI FV - Register Page
+ * Sistema de Gestão Integrada - Formando Valores
+ */
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, ShieldCheck, AlertCircle } from 'lucide-react';
 import { COUNTRIES } from '../constants';
 import { ServiceUnit, ProcessStatus, User, UserRole } from '../types';
-import { supabase } from '../App';
+import { supabase } from '../supabase';
+import { resolveOrgSlug, getOrgIdBySlug, addUserToOrg, upsertProfile } from '../src/lib/tenant';
 
 interface RegisterProps {
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
@@ -29,6 +34,7 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
   });
 
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const validatePassword = (pass: string) => {
     const hasMinLength = pass.length >= 8;
@@ -41,43 +47,86 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setIsLoading(true);
 
-    if (formData.password !== formData.confirmPassword) {
-      setError('As senhas não coincidem.');
-      return;
-    }
+    try {
+      // 1. Validar senhas
+      if (formData.password !== formData.confirmPassword) {
+        setError('As senhas não coincidem.');
+        return;
+      }
 
-    if (!validatePassword(formData.password)) {
-      setError('A senha deve ter 8 caracteres, uma letra maiúscula, um caractere especial e um número.');
-      return;
-    }
+      if (!validatePassword(formData.password)) {
+        setError('A senha deve ter 8 caracteres, uma letra maiúscula, um caractere especial e um número.');
+        return;
+      }
 
-    // Lógica Supabase Auth conforme solicitado
-    const { data, error: authError } = await supabase.auth.signUp({
-      email: formData.email,
-      password: formData.password,
-    });
-
-    if (authError) {
-      // Mostrar mensagem vinda do Supabase
-      setError(authError.message);
-      return;
-    }
-
-    if (data.user) {
-      // Criar registro na tabela "profiles" para manter consistência dos dados
-      await supabase
-        .from('profiles')
-        .insert([
-          {
-            id: data.user.id,
-            nome: formData.name,
-            email: formData.email,
-            role: 'CLIENTE'
+      // 2. Criar usuário no Supabase Auth
+      const { data, error: authError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            name: formData.name
           }
-        ]);
+        }
+      });
 
-      // Atualiza o estado local para que o login funcione corretamente com os dados extras
+      if (authError) {
+        if (authError.message.includes('already registered')) {
+          setError('Este email já está cadastrado.');
+        } else {
+          setError(authError.message);
+        }
+        return;
+      }
+
+      if (!data.user) {
+        setError('Erro ao criar conta. Tente novamente.');
+        return;
+      }
+
+      // 3. Resolver organização
+      const orgSlug = await resolveOrgSlug();
+      let orgId = await getOrgIdBySlug(orgSlug);
+
+      // Se a organização não existe, usar 'default'
+      if (!orgId) {
+        console.log('Org não encontrada, usando default...');
+        orgId = await getOrgIdBySlug('default');
+      }
+
+      if (!orgId) {
+        setError('Nenhuma organização disponível. Contate o administrador.');
+        return;
+      }
+
+      // 4. Criar membership (client)
+      const membershipCreated = await addUserToOrg(orgId, data.user.id, 'client');
+      
+      if (!membershipCreated) {
+        console.warn('Não foi possível criar membership imediatamente (RLS pode estar ativo)');
+        // Continuar mesmo assim - o login tentará criar
+      }
+
+      // 5. Criar perfil completo
+      const profileCreated = await upsertProfile(data.user.id, orgId, {
+        email: formData.email,
+        nome_completo: formData.name,
+        documento_identidade: formData.documentId,
+        nif_cpf: formData.taxId,
+        estado_civil: formData.maritalStatus,
+        phone: formData.phone,
+        endereco: formData.address,
+        pais: formData.country
+      });
+
+      if (!profileCreated) {
+        console.warn('Não foi possível criar perfil imediatamente');
+        // Continuar mesmo assim - o login tentará criar
+      }
+
+      // 6. Atualizar estado local (compatibilidade com AdminDashboard)
       const prefix = formData.unit === ServiceUnit.JURIDICO ? 'JURA' : 
                      formData.unit === ServiceUnit.ADMINISTRATIVO ? 'ADM' : 'TECAI';
       const protocol = `${prefix}-2026-00${Math.floor(Math.random() * 900) + 100}`;
@@ -86,7 +135,6 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
         id: data.user.id,
         name: formData.name,
         email: formData.email,
-        password: formData.password,
         role: UserRole.CLIENT,
         documentId: formData.documentId,
         taxId: formData.taxId,
@@ -98,18 +146,25 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
         unit: formData.unit,
         status: ProcessStatus.PENDENTE,
         protocol: protocol,
-        registrationDate: new Date().toLocaleString('pt-BR')
+        registrationDate: new Date().toLocaleString('pt-BR'),
+        org_id: orgId
       };
 
       setUsers(prev => [...prev, newUser]);
       
-      // Se sucesso: Mostrar mensagem "Cadastro realizado com sucesso" e redirecionar para tela de Login
-      alert('Cadastro realizado com sucesso');
+      // 7. Sucesso - redirecionar para login
+      alert('Cadastro realizado com sucesso! Faça login para continuar.');
       navigate('/login');
+
+    } catch (err) {
+      console.error('Erro no registro:', err);
+      setError('Erro inesperado. Tente novamente.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const inputClass = "w-full p-3 bg-gray-900 border border-slate-700 rounded-lg text-white font-bold focus:ring-2 focus:ring-blue-500 outline-none";
+  const inputClass = "w-full p-3 bg-gray-900 border border-slate-700 rounded-lg text-white font-bold focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed";
 
   return (
     <div className="min-h-screen bg-slate-950 p-4 md:p-8">
@@ -147,27 +202,70 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
                   <label className="text-xs font-bold text-slate-400 mb-2 block">Nome Completo</label>
-                  <input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className={inputClass} />
+                  <input 
+                    required 
+                    value={formData.name} 
+                    onChange={e => setFormData({...formData, name: e.target.value})} 
+                    className={inputClass}
+                    disabled={isLoading}
+                  />
                 </div>
                 <div>
                   <label className="text-xs font-bold text-slate-400 mb-2 block">E-mail para Login</label>
-                  <input type="email" required value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className={inputClass} placeholder="exemplo@email.com" />
+                  <input 
+                    type="email" 
+                    required 
+                    value={formData.email} 
+                    onChange={e => setFormData({...formData, email: e.target.value})} 
+                    className={inputClass} 
+                    placeholder="exemplo@email.com"
+                    disabled={isLoading}
+                  />
                 </div>
                 <div>
                   <label className="text-xs font-bold text-slate-400 mb-2 block">Documento Identidade</label>
-                  <input required value={formData.documentId} onChange={e => setFormData({...formData, documentId: e.target.value})} className={inputClass} />
+                  <input 
+                    required 
+                    value={formData.documentId} 
+                    onChange={e => setFormData({...formData, documentId: e.target.value})} 
+                    className={inputClass}
+                    disabled={isLoading}
+                  />
                 </div>
                 <div>
                   <label className="text-xs font-bold text-slate-400 mb-2 block">Identificação Fiscal (NIF/CPF)</label>
-                  <input required value={formData.taxId} onChange={e => setFormData({...formData, taxId: e.target.value})} className={inputClass} />
+                  <input 
+                    required 
+                    value={formData.taxId} 
+                    onChange={e => setFormData({...formData, taxId: e.target.value})} 
+                    className={inputClass}
+                    disabled={isLoading}
+                  />
                 </div>
                 <div>
                   <label className="text-xs font-bold text-slate-400 mb-2 block">Senha</label>
-                  <input type="password" required value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className={inputClass} />
+                  <input 
+                    type="password" 
+                    required 
+                    value={formData.password} 
+                    onChange={e => setFormData({...formData, password: e.target.value})} 
+                    className={inputClass}
+                    disabled={isLoading}
+                  />
+                  <p className="text-slate-500 text-[10px] mt-1">
+                    Mínimo 8 caracteres, 1 maiúscula, 1 especial, 1 número
+                  </p>
                 </div>
                 <div>
                   <label className="text-xs font-bold text-slate-400 mb-2 block">Confirmar Senha</label>
-                  <input type="password" required value={formData.confirmPassword} onChange={e => setFormData({...formData, confirmPassword: e.target.value})} className={inputClass} />
+                  <input 
+                    type="password" 
+                    required 
+                    value={formData.confirmPassword} 
+                    onChange={e => setFormData({...formData, confirmPassword: e.target.value})} 
+                    className={inputClass}
+                    disabled={isLoading}
+                  />
                 </div>
               </div>
             </section>
@@ -180,11 +278,22 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
                   <label className="text-xs font-bold text-slate-400 mb-2 block">Endereço Completo</label>
-                  <input required value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className={inputClass} />
+                  <input 
+                    required 
+                    value={formData.address} 
+                    onChange={e => setFormData({...formData, address: e.target.value})} 
+                    className={inputClass}
+                    disabled={isLoading}
+                  />
                 </div>
                 <div>
                   <label className="text-xs font-bold text-slate-400 mb-2 block">Estado Civil</label>
-                  <select value={formData.maritalStatus} onChange={e => setFormData({...formData, maritalStatus: e.target.value})} className={inputClass}>
+                  <select 
+                    value={formData.maritalStatus} 
+                    onChange={e => setFormData({...formData, maritalStatus: e.target.value})} 
+                    className={inputClass}
+                    disabled={isLoading}
+                  >
                     <option value="Solteiro">Solteiro</option>
                     <option value="Casado">Casado</option>
                     <option value="Divorciado">Divorciado</option>
@@ -193,7 +302,12 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
                 </div>
                 <div>
                   <label className="text-xs font-bold text-slate-400 mb-2 block">Selecione o País (DDD)</label>
-                  <select value={formData.country} onChange={e => setFormData({...formData, country: e.target.value})} className={inputClass}>
+                  <select 
+                    value={formData.country} 
+                    onChange={e => setFormData({...formData, country: e.target.value})} 
+                    className={inputClass}
+                    disabled={isLoading}
+                  >
                     {COUNTRIES.map(c => (
                       <option key={c.name} value={c.name}>{c.flag} {c.name} ({c.code})</option>
                     ))}
@@ -201,11 +315,24 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
                 </div>
                 <div>
                   <label className="text-xs font-bold text-slate-400 mb-2 block">Celular / WhatsApp (apenas números)</label>
-                  <input required type="tel" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value.replace(/\D/g, '')})} className={inputClass} placeholder="Ex: 11999999999" />
+                  <input 
+                    required 
+                    type="tel" 
+                    value={formData.phone} 
+                    onChange={e => setFormData({...formData, phone: e.target.value.replace(/\D/g, '')})} 
+                    className={inputClass} 
+                    placeholder="Ex: 11999999999"
+                    disabled={isLoading}
+                  />
                 </div>
                 <div>
                   <label className="text-xs font-bold text-slate-400 mb-2 block">Nº DO PROCESSO JUDICIAL (Opcional)</label>
-                  <input value={formData.processNumber} onChange={e => setFormData({...formData, processNumber: e.target.value})} className={inputClass} />
+                  <input 
+                    value={formData.processNumber} 
+                    onChange={e => setFormData({...formData, processNumber: e.target.value})} 
+                    className={inputClass}
+                    disabled={isLoading}
+                  />
                 </div>
               </div>
             </section>
@@ -217,8 +344,23 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
               </h3>
               <div className="flex flex-wrap gap-4">
                 {Object.values(ServiceUnit).map(unit => (
-                  <label key={unit} className={`flex-1 min-w-[200px] cursor-pointer p-4 rounded-xl border-2 transition-all ${formData.unit === unit ? 'bg-blue-600/20 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)]' : 'bg-gray-900 border-slate-800'}`}>
-                    <input type="radio" name="unit" className="hidden" value={unit} checked={formData.unit === unit} onChange={() => setFormData({...formData, unit})} />
+                  <label 
+                    key={unit} 
+                    className={`flex-1 min-w-[200px] cursor-pointer p-4 rounded-xl border-2 transition-all ${
+                      formData.unit === unit 
+                        ? 'bg-blue-600/20 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)]' 
+                        : 'bg-gray-900 border-slate-800'
+                    } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    <input 
+                      type="radio" 
+                      name="unit" 
+                      className="hidden" 
+                      value={unit} 
+                      checked={formData.unit === unit} 
+                      onChange={() => setFormData({...formData, unit})}
+                      disabled={isLoading}
+                    />
                     <div className="text-center">
                       <p className={`text-sm font-bold ${formData.unit === unit ? 'text-white' : 'text-slate-500'}`}>{unit}</p>
                     </div>
@@ -228,17 +370,28 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
             </section>
 
             {error && (
-              <div className="p-4 bg-red-900/30 border border-red-800 rounded-lg text-red-200 text-sm font-bold text-center">
-                {error}
+              <div className="flex items-center gap-2 p-4 bg-red-900/30 border border-red-800 rounded-lg">
+                <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+                <p className="text-red-200 text-sm font-bold">{error}</p>
               </div>
             )}
 
             <div className="pt-6">
               <button 
                 type="submit"
-                className="w-full py-5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl uppercase tracking-widest transition-all shadow-xl flex items-center justify-center gap-3"
+                disabled={isLoading}
+                className="w-full py-5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 disabled:cursor-not-allowed text-white font-bold rounded-xl uppercase tracking-widest transition-all shadow-xl flex items-center justify-center gap-3"
               >
-                <CheckCircle2 className="w-6 h-6" /> Confirmar Registro
+                {isLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                    <span>Processando...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-6 h-6" /> Confirmar Registro
+                  </>
+                )}
               </button>
             </div>
           </form>
