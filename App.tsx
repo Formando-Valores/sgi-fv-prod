@@ -3,7 +3,7 @@
  * Sistema de Gestão Integrada - Formando Valores
  */
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -14,107 +14,14 @@ import ProcessNew from './src/pages/Processes/ProcessNew';
 import ProcessDetails from './src/pages/Processes/ProcessDetails';
 import ClientList from './src/pages/Clients/ClientList';
 import Members from './src/pages/Settings/Members';
-import { User, UserRole, UserContext, userContextToLegacyUser, isAdmin } from './types';
-import { INITIAL_MOCK_USERS } from './constants';
-import { supabase } from './supabase';
-import { getCurrentUserContext } from './src/lib/tenant';
+import Configuracoes from './src/pages/Configuracoes';
+import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 
-const App: React.FC = () => {
-  // Estado principal do usuário
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('sgi_current_user');
-    return saved ? JSON.parse(saved) : null;
-  });
+// Protected Route wrapper
+const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { session, loading } = useAuth();
 
-  // Estado de loading durante restore de sessão
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Estado de usuários (mantido para compatibilidade com AdminDashboard)
-  // TODO: Migrar para queries Supabase
-  const [users, setUsers] = useState<User[]>(() => {
-    const saved = localStorage.getItem('sgi_users');
-    return saved ? JSON.parse(saved) : INITIAL_MOCK_USERS;
-  });
-
-  // Restaurar sessão do Supabase ao carregar
-  useEffect(() => {
-    const restoreSession = async () => {
-      try {
-        // Verificar se há sessão ativa no Supabase
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (session?.user) {
-          // Tentar carregar contexto completo
-          const userContext = await getCurrentUserContext();
-          
-          if (userContext) {
-            // Converter para formato legacy e salvar
-            const legacyUser = userContextToLegacyUser(userContext);
-            setCurrentUser(legacyUser);
-            localStorage.setItem('sgi_current_user', JSON.stringify(legacyUser));
-          } else {
-            // Usuário autenticado mas sem membership - limpar sessão local
-            console.log('Usuário sem membership - limpando sessão');
-            localStorage.removeItem('sgi_current_user');
-            setCurrentUser(null);
-          }
-        } else {
-          // Sem sessão Supabase - limpar localStorage se existir
-          if (localStorage.getItem('sgi_current_user')) {
-            localStorage.removeItem('sgi_current_user');
-            setCurrentUser(null);
-          }
-        }
-      } catch (error) {
-        console.error('Erro ao restaurar sessão:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    restoreSession();
-
-    // Listener para mudanças de auth
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth state change:', event);
-        
-        if (event === 'SIGNED_OUT') {
-          localStorage.removeItem('sgi_current_user');
-          setCurrentUser(null);
-        }
-      }
-    );
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  // Persistir users no localStorage
-  useEffect(() => {
-    localStorage.setItem('sgi_users', JSON.stringify(users));
-  }, [users]);
-
-  // Persistir currentUser no localStorage
-  useEffect(() => {
-    if (currentUser) {
-      localStorage.setItem('sgi_current_user', JSON.stringify(currentUser));
-    } else {
-      localStorage.removeItem('sgi_current_user');
-    }
-  }, [currentUser]);
-
-  // Handler de logout
-  const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch (error) {
-      console.error('Erro ao fazer logout:', error);
-    }
-    setCurrentUser(null);
-  };
-
-  // Loading screen
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-[#0f172a] text-white font-arial flex items-center justify-center">
         <div className="text-center">
@@ -125,43 +32,87 @@ const App: React.FC = () => {
     );
   }
 
+  if (!session) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+// Public Route wrapper (redirects if authenticated)
+const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { session, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0f172a] text-white font-arial flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-slate-400 text-sm uppercase tracking-widest">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (session) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+// App Routes Component (needs to be inside AuthProvider)
+const AppRoutes: React.FC = () => {
+  return (
+    <Routes>
+      {/* Auth routes - outside layout */}
+      <Route 
+        path="/login" 
+        element={
+          <PublicRoute>
+            <Login />
+          </PublicRoute>
+        } 
+      />
+      <Route 
+        path="/register" 
+        element={
+          <PublicRoute>
+            <Register />
+          </PublicRoute>
+        } 
+      />
+      
+      {/* App routes - inside layout with protection */}
+      <Route element={
+        <ProtectedRoute>
+          <AppLayout />
+        </ProtectedRoute>
+      }>
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/processos" element={<ProcessList />} />
+        <Route path="/processos/novo" element={<ProcessNew />} />
+        <Route path="/processos/:id" element={<ProcessDetails />} />
+        <Route path="/clientes" element={<ClientList />} />
+        <Route path="/configuracoes" element={<Configuracoes />} />
+        <Route path="/configuracoes/membros" element={<Members />} />
+      </Route>
+      
+      {/* Redirects */}
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+    </Routes>
+  );
+};
+
+const App: React.FC = () => {
   return (
     <HashRouter>
-      <div className="min-h-screen bg-[#0f172a] text-white font-arial">
-        <Routes>
-          {/* Auth routes - outside layout */}
-          <Route 
-            path="/login" 
-            element={
-              currentUser 
-                ? <Navigate to="/dashboard" replace /> 
-                : <Login setCurrentUser={setCurrentUser} users={users} />
-            } 
-          />
-          <Route 
-            path="/register" 
-            element={
-              currentUser 
-                ? <Navigate to="/dashboard" replace /> 
-                : <Register setUsers={setUsers} setCurrentUser={setCurrentUser} />
-            } 
-          />
-          
-          {/* App routes - inside layout */}
-          <Route element={<AppLayout isAuthenticated={!!currentUser} onLogout={handleLogout} />}>
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/processos" element={<ProcessList />} />
-            <Route path="/processos/novo" element={<ProcessNew />} />
-            <Route path="/processos/:id" element={<ProcessDetails />} />
-            <Route path="/clientes" element={<ClientList />} />
-            <Route path="/configuracoes/membros" element={<Members />} />
-          </Route>
-          
-          {/* Redirects */}
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Routes>
-      </div>
+      <AuthProvider>
+        <div className="min-h-screen bg-[#0f172a] text-white font-arial">
+          <AppRoutes />
+        </div>
+      </AuthProvider>
     </HashRouter>
   );
 };

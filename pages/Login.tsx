@@ -6,16 +6,9 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, AlertCircle } from 'lucide-react';
-import { User, userContextToLegacyUser } from '../types';
 import { supabase } from '../supabase';
-import { getCurrentUserContext, resolveOrgSlug, getOrgIdBySlug, addUserToOrg, upsertProfile } from '../src/lib/tenant';
 
-interface LoginProps {
-  setCurrentUser: (user: User) => void;
-  users: User[]; // Mantido para compatibilidade, mas não usado
-}
-
-const Login: React.FC<LoginProps> = ({ setCurrentUser }) => {
+const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -29,7 +22,6 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser }) => {
     setIsLoading(true);
 
     try {
-      // 1. Autenticar com Supabase Auth
       const { data, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -49,53 +41,7 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser }) => {
         return;
       }
 
-      // 2. Tentar obter contexto do usuário (membership + profile)
-      let userContext = await getCurrentUserContext();
-
-      // 3. Se não tem membership, tentar vincular à organização padrão
-      if (!userContext) {
-        console.log('Usuário sem membership, tentando vincular à org padrão...');
-        
-        // Resolver slug da organização
-        const orgSlug = await resolveOrgSlug();
-        const orgId = await getOrgIdBySlug(orgSlug);
-        
-        if (!orgId) {
-          setError('Organização não encontrada. Contate o administrador.');
-          await supabase.auth.signOut();
-          return;
-        }
-
-        // Criar membership como client
-        const membershipCreated = await addUserToOrg(orgId, data.user.id, 'client');
-        
-        if (!membershipCreated) {
-          setError('Erro ao vincular usuário à organização.');
-          await supabase.auth.signOut();
-          return;
-        }
-
-        // Criar perfil mínimo se não existir
-        await upsertProfile(data.user.id, orgId, {
-          email: data.user.email,
-          nome_completo: data.user.user_metadata?.name || email.split('@')[0]
-        });
-
-        // Tentar obter contexto novamente
-        userContext = await getCurrentUserContext();
-      }
-
-      if (!userContext) {
-        setError('Usuário não vinculado a nenhuma empresa. Contate o administrador.');
-        await supabase.auth.signOut();
-        return;
-      }
-
-      // 4. Converter para formato legacy e salvar
-      const legacyUser = userContextToLegacyUser(userContext);
-      setCurrentUser(legacyUser);
-      
-      // 5. Navegar para dashboard
+      // Auth state change listener in AuthContext will handle the rest
       navigate('/dashboard');
 
     } catch (err) {
