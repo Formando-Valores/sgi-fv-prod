@@ -77,6 +77,10 @@ ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name;
 -- ============================================
 -- PARTE 4: FUNÇÕES HELPER (RECRIADAS)
 -- ============================================
+-- IMPORTANTE: DROP primeiro para evitar erro de nome de parâmetro
+DROP FUNCTION IF EXISTS public.is_org_member(uuid);
+DROP FUNCTION IF EXISTS public.is_org_admin(uuid);
+DROP FUNCTION IF EXISTS public.get_user_org_id();
 
 -- Função: verificar se é membro
 CREATE OR REPLACE FUNCTION is_org_member(check_org_id uuid)
