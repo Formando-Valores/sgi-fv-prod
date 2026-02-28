@@ -14,7 +14,11 @@ console.log('[APP] ✅ React imported');
 
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
-console.log('[APP] ✅ Login imported');
+import Register from './pages/Register';
+import UserDashboard from './pages/UserDashboard';
+import AdminDashboard from './pages/AdminDashboard';
+import { User, UserRole } from './types';
+import { INITIAL_MOCK_USERS } from './constants';
 
 const parseStorageItem = <T,>(key: string, fallback: T): T => {
   const rawValue = localStorage.getItem(key);
@@ -32,7 +36,7 @@ const parseStorageItem = <T,>(key: string, fallback: T): T => {
   }
 };
 
-const App: React.FC = () => {
+const RootApp: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(() =>
     parseStorageItem<User | null>('sgi_current_user', null)
   );
@@ -163,6 +167,4 @@ const App: React.FC = () => {
   );
 };
 
-console.log('[APP] App component defined, exporting...');
-export default App;
-console.log('[APP] ✅ App exported successfully');
+export default RootApp;

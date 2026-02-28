@@ -9,7 +9,20 @@ import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { ProcessStatus, ServiceUnit, User, UserRole } from '../types';
 import { isSupabaseConfigured, supabase } from '../supabase';
 
-const Login: React.FC = () => {
+interface LoginProps {
+  setCurrentUser: (user: User) => void;
+  users: User[];
+}
+
+const isAdminRole = (value: unknown): boolean => {
+  if (typeof value !== 'string') {
+    return false;
+  }
+
+  return ['admin', 'administrator', UserRole.ADMIN.toLowerCase()].includes(value.toLowerCase());
+};
+
+const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -26,98 +39,139 @@ const Login: React.FC = () => {
       return;
     }
 
-    console.info('[login] iniciando autenticação', { email });
-    const { data, error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      console.info('[login] iniciando autenticação', { email });
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (authError) {
-      console.error('[login] falha na autenticação', authError);
-      setError('Email ou senha inválidos');
-      return;
-    }
-
-    if (data.user) {
-      const userId = data.user.id;
-      console.info('[login] autenticado, buscando profile', { userId });
-
-      const { data: profiles, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
-
-      if (profileError) {
-        console.error('[login] erro ao buscar profile', profileError);
-        setError('Erro ao buscar perfil.');
+      if (authError) {
+        console.error('[login] falha na autenticação', authError);
+        setError('Email ou senha inválidos');
         return;
       }
 
-      let profile = profiles;
+      if (data.user) {
+        const userId = data.user.id;
+        console.info('[login] autenticado, buscando profile', { userId });
 
-      if (!profile) {
-        const { data: inserted, error: insertError } = await supabase
+        const { data: profiles, error: profileError } = await supabase
           .from('profiles')
-          .insert([
-            {
-              id: userId,
-              email: data.user.email,
-              role: UserRole.CLIENT,
-              nome_completo: data.user.user_metadata?.name ?? null,
-            },
-          ])
           .select('*')
+          .eq('id', userId)
           .maybeSingle();
 
-        if (insertError) {
-          console.error('[login] erro ao criar profile', insertError);
-          setError('Perfil não encontrado e não foi possível criar.');
+        if (profileError) {
+          console.error('[login] erro ao buscar profile', profileError);
+          setError('Erro ao buscar perfil.');
           return;
         }
 
-        profile = inserted;
+        let profile = profiles;
+
+        if (!profile) {
+          const { data: inserted, error: insertError } = await supabase
+            .from('profiles')
+            .insert([
+              {
+                id: userId,
+                email: data.user.email,
+                role: UserRole.CLIENT,
+                nome_completo: data.user.user_metadata?.name ?? null,
+              },
+            ])
+            .select('*')
+            .maybeSingle();
+
+          if (insertError) {
+            console.error('[login] erro ao criar profile', insertError);
+            setError('Perfil não encontrado e não foi possível criar.');
+            return;
+          }
+
+          profile = inserted;
+        }
+
+        const existingUser = users.find((user) => user.id === userId || user.email === email);
+
+        const { data: contextData, error: contextError } = await supabase
+          .from('v_user_context')
+          .select('org_role')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        if (contextError) {
+          console.warn('[login] erro ao buscar contexto organizacional por user_id', contextError);
+        }
+
+        let contextRole = contextData?.org_role;
+
+        if (!contextRole && data.user.email) {
+          const { data: contextByEmail, error: contextByEmailError } = await supabase
+            .from('v_user_context')
+            .select('org_role')
+            .eq('email', data.user.email)
+            .maybeSingle();
+
+          if (contextByEmailError) {
+            console.warn('[login] erro ao buscar contexto organizacional por email', contextByEmailError);
+          }
+
+          contextRole = contextByEmail?.org_role ?? contextRole;
+        }
+
+        const hasAdminRole =
+          isAdminRole(profile?.role) ||
+          isAdminRole(contextRole) ||
+          isAdminRole(existingUser?.role);
+
+        const normalizedRole = hasAdminRole ? UserRole.ADMIN : UserRole.CLIENT;
+
+        const normalizedUser: User = {
+          id: userId,
+          name: profile?.nome ?? profile?.nome_completo ?? existingUser?.name ?? data.user.email?.split('@')[0] ?? 'Usuário',
+          email: data.user.email ?? existingUser?.email ?? email,
+          role: normalizedRole,
+          documentId: existingUser?.documentId ?? '-',
+          taxId: existingUser?.taxId ?? '-',
+          address: existingUser?.address ?? '-',
+          maritalStatus: existingUser?.maritalStatus ?? 'Não informado',
+          country: existingUser?.country ?? 'Brasil',
+          phone: existingUser?.phone ?? '-',
+          processNumber: existingUser?.processNumber ?? '',
+          unit: existingUser?.unit ?? ServiceUnit.JURIDICO,
+          status: existingUser?.status ?? ProcessStatus.PENDENTE,
+          protocol: existingUser?.protocol ?? `JURA-${new Date().getFullYear()}-000`,
+          registrationDate: existingUser?.registrationDate ?? new Date().toLocaleString('pt-BR'),
+          notes: existingUser?.notes,
+          deadline: existingUser?.deadline,
+          serviceManager: existingUser?.serviceManager,
+        };
+
+        console.info('[login] profile carregado, redirecionando para dashboard', {
+          profileId: profile?.id,
+          role: normalizedUser.role,
+        });
+
+        setCurrentUser(normalizedUser);
+
+        const mergedUsers = [
+          ...users.filter((user) => user.id !== normalizedUser.id),
+          normalizedUser,
+        ];
+        localStorage.setItem('sgi_users', JSON.stringify(mergedUsers));
+
+        navigate('/dashboard');
       }
-
-      const existingUser = users.find((user) => user.id === userId || user.email === email);
-      const normalizedRole = profile?.role === UserRole.ADMIN ? UserRole.ADMIN : UserRole.CLIENT;
-
-      const normalizedUser: User = {
-        id: userId,
-        name: profile?.nome ?? profile?.nome_completo ?? existingUser?.name ?? data.user.email?.split('@')[0] ?? 'Usuário',
-        email: data.user.email ?? existingUser?.email ?? email,
-        role: normalizedRole,
-        documentId: existingUser?.documentId ?? '-',
-        taxId: existingUser?.taxId ?? '-',
-        address: existingUser?.address ?? '-',
-        maritalStatus: existingUser?.maritalStatus ?? 'Não informado',
-        country: existingUser?.country ?? 'Brasil',
-        phone: existingUser?.phone ?? '-',
-        processNumber: existingUser?.processNumber ?? '',
-        unit: existingUser?.unit ?? ServiceUnit.JURIDICO,
-        status: existingUser?.status ?? ProcessStatus.PENDENTE,
-        protocol: existingUser?.protocol ?? `JURA-${new Date().getFullYear()}-000`,
-        registrationDate: existingUser?.registrationDate ?? new Date().toLocaleString('pt-BR'),
-        notes: existingUser?.notes,
-        deadline: existingUser?.deadline,
-        serviceManager: existingUser?.serviceManager,
-      };
-
-      console.info('[login] profile carregado, redirecionando para dashboard', {
-        profileId: profile?.id,
-        role: normalizedUser.role,
-      });
-
-      setCurrentUser(normalizedUser);
-      navigate('/dashboard');
-
     } catch (err) {
-      console.error('Erro no login:', err);
+      console.error('[login] erro inesperado', err);
       setError('Erro inesperado. Tente novamente.');
-    } finally {
-      setIsLoading(false);
     }
   };
+
+
+
 
 
 
