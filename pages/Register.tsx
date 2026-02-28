@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { COUNTRIES } from '../constants';
 import { ServiceUnit, ProcessStatus, User, UserRole } from '../types';
-import { supabase } from '../App';
+import { isSupabaseConfigured, supabase } from '../supabase';
 
 interface RegisterProps {
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
@@ -12,7 +12,7 @@ interface RegisterProps {
 }
 
 const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
-  const navigate = useNavigate();
+  const goToRoute = useNavigate();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -38,9 +38,13 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
     return hasMinLength && hasUpper && hasSpecial && hasNumber;
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleRegister = async () => {
     setError('');
+
+    if (!isSupabaseConfigured) {
+      setError('Configuração do sistema incompleta. Contate o suporte para ajustar as variáveis do Supabase.');
+      return;
+    }
 
     if (formData.password !== formData.confirmPassword) {
       setError('As senhas não coincidem.');
@@ -52,60 +56,72 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
       return;
     }
 
-    // Lógica Supabase Auth conforme solicitado
-    const { data, error: authError } = await supabase.auth.signUp({
-      email: formData.email,
-      password: formData.password,
-    });
+    try {
+      console.info('[register] iniciando cadastro', { email: formData.email });
 
-    if (authError) {
-      // Mostrar mensagem vinda do Supabase
-      setError(authError.message);
-      return;
-    }
-
-    if (data.user) {
-      // Criar registro na tabela "profiles" para manter consistência dos dados
-      await supabase
-        .from('profiles')
-        .insert([
-          {
-            id: data.user.id,
-            nome: formData.name,
-            email: formData.email,
-            role: 'CLIENTE'
-          }
-        ]);
-
-      // Atualiza o estado local para que o login funcione corretamente com os dados extras
-      const prefix = formData.unit === ServiceUnit.JURIDICO ? 'JURA' : 
-                     formData.unit === ServiceUnit.ADMINISTRATIVO ? 'ADM' : 'TECAI';
-      const protocol = `${prefix}-2026-00${Math.floor(Math.random() * 900) + 100}`;
-
-      const newUser: User = {
-        id: data.user.id,
-        name: formData.name,
+      const { data, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
-        role: UserRole.CLIENT,
-        documentId: formData.documentId,
-        taxId: formData.taxId,
-        address: formData.address,
-        maritalStatus: formData.maritalStatus,
-        country: formData.country,
-        phone: formData.phone,
-        processNumber: formData.processNumber,
-        unit: formData.unit,
-        status: ProcessStatus.PENDENTE,
-        protocol: protocol,
-        registrationDate: new Date().toLocaleString('pt-BR')
-      };
+      });
 
-      setUsers(prev => [...prev, newUser]);
-      
-      // Se sucesso: Mostrar mensagem "Cadastro realizado com sucesso" e redirecionar para tela de Login
-      alert('Cadastro realizado com sucesso');
-      navigate('/login');
+      if (authError) {
+        console.error('[register] falha no cadastro', authError);
+        setError(authError.message);
+        return;
+      }
+
+      if (data.user) {
+        const { error: profileInsertError } = await supabase
+          .from('profiles')
+          .insert([
+            {
+              id: data.user.id,
+              nome: formData.name,
+              email: formData.email,
+              role: UserRole.CLIENT,
+            },
+          ]);
+
+        if (profileInsertError) {
+          console.error('[register] erro ao criar profile', profileInsertError);
+          setError('Cadastro criado, mas houve falha ao criar perfil. Tente entrar novamente.');
+          return;
+        }
+
+        const prefix =
+          formData.unit === ServiceUnit.JURIDICO
+            ? 'JURA'
+            : formData.unit === ServiceUnit.ADMINISTRATIVO
+              ? 'ADM'
+              : 'TECAI';
+        const protocol = `${prefix}-2026-00${Math.floor(Math.random() * 900) + 100}`;
+
+        const newUser: User = {
+          id: data.user.id,
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+          role: UserRole.CLIENT,
+          documentId: formData.documentId,
+          taxId: formData.taxId,
+          address: formData.address,
+          maritalStatus: formData.maritalStatus,
+          country: formData.country,
+          phone: formData.phone,
+          processNumber: formData.processNumber,
+          unit: formData.unit,
+          status: ProcessStatus.PENDENTE,
+          protocol,
+          registrationDate: new Date().toLocaleString('pt-BR'),
+        };
+
+        setUsers((prev) => [...prev, newUser]);
+        alert('Cadastro realizado com sucesso');
+        goToRoute('/login');
+      }
+    } catch (err) {
+      console.error('[register] erro inesperado', err);
+      setError('Erro inesperado. Tente novamente.');
     }
   };
 
@@ -131,14 +147,14 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
           <div className="flex justify-between items-center mb-10">
             <h2 className="text-3xl font-bold">Solicitar Registro</h2>
             <button 
-              onClick={() => navigate('/login')}
+              onClick={() => goToRoute('/login')}
               className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm font-bold"
             >
               <ArrowLeft className="w-4 h-4" /> VOLTAR AO LOGIN
             </button>
           </div>
 
-          <form onSubmit={handleRegister} className="space-y-8">
+          <div className="space-y-8">
             {/* Secção 1 */}
             <section>
               <h3 className="text-blue-400 font-bold uppercase text-xs tracking-[0.2em] mb-4 flex items-center gap-2">
@@ -235,13 +251,14 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
 
             <div className="pt-6">
               <button 
-                type="submit"
+                type="button"
                 className="w-full py-5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl uppercase tracking-widest transition-all shadow-xl flex items-center justify-center gap-3"
+                onClick={handleRegister}
               >
                 <CheckCircle2 className="w-6 h-6" /> Confirmar Registro
               </button>
             </div>
-          </form>
+          </div>
         </div>
       </div>
     </div>
