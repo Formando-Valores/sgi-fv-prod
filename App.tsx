@@ -1,19 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { createClient } from "@supabase/supabase-js";
 import Login from './pages/Login';
 import Register from './pages/Register';
 import UserDashboard from './pages/UserDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import { User, UserRole } from './types';
 import { INITIAL_MOCK_USERS } from './constants';
-
-// Inicialização do cliente Supabase conforme solicitado
-export const supabase = createClient(
-  "https://ktrrrqaqaljdcmxqdcff.supabase.co",
-  "sb_publishable_ZcEU2_K18A4NU43hO4zPmA_N5SkuqO_"
-);
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
