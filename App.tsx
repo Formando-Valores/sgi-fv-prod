@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { createClient } from "@supabase/supabase-js";
 import Login from './pages/Login';
 import Register from './pages/Register';
 import UserDashboard from './pages/UserDashboard';
@@ -9,22 +8,30 @@ import AdminDashboard from './pages/AdminDashboard';
 import { User, UserRole } from './types';
 import { INITIAL_MOCK_USERS } from './constants';
 
-// Inicialização do cliente Supabase conforme solicitado
-export const supabase = createClient(
-  "https://ktrrrqaqaljdcmxqdcff.supabase.co",
-  "sb_publishable_ZcEU2_K18A4NU43hO4zPmA_N5SkuqO_"
-);
+const parseStorageItem = <T,>(key: string, fallback: T): T => {
+  const rawValue = localStorage.getItem(key);
 
-const App: React.FC = () => {
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('sgi_current_user');
-    return saved ? JSON.parse(saved) : null;
-  });
+  if (!rawValue) {
+    return fallback;
+  }
 
-  const [users, setUsers] = useState<User[]>(() => {
-    const saved = localStorage.getItem('sgi_users');
-    return saved ? JSON.parse(saved) : INITIAL_MOCK_USERS;
-  });
+  try {
+    return JSON.parse(rawValue) as T;
+  } catch (error) {
+    console.error(`[storage] valor inválido para ${key}, limpando item`, error);
+    localStorage.removeItem(key);
+    return fallback;
+  }
+};
+
+const RootApp: React.FC = () => {
+  const [currentUser, setCurrentUser] = useState<User | null>(() =>
+    parseStorageItem<User | null>('sgi_current_user', null)
+  );
+
+  const [users, setUsers] = useState<User[]>(() =>
+    parseStorageItem<User[]>('sgi_users', INITIAL_MOCK_USERS)
+  );
 
   useEffect(() => {
     localStorage.setItem('sgi_users', JSON.stringify(users));
@@ -42,6 +49,31 @@ const App: React.FC = () => {
     setCurrentUser(null);
   };
 
+
+  const renderDashboardRoute = (section: 'dashboard' | 'processos' | 'clientes' | 'configuracoes' = 'dashboard') => {
+    if (!currentUser) {
+      return <Navigate to="/login" />;
+    }
+
+    if (currentUser.role === UserRole.ADMIN) {
+      return (
+        <AdminDashboard
+          currentUser={currentUser}
+          users={users}
+          setUsers={setUsers}
+          onLogout={handleLogout}
+          section={section}
+        />
+      );
+    }
+
+    if (section !== 'dashboard') {
+      return <Navigate to="/dashboard" />;
+    }
+
+    return <UserDashboard currentUser={currentUser} onLogout={handleLogout} />;
+  };
+
   return (
     <HashRouter>
       <div className="min-h-screen bg-[#0f172a] text-white font-arial">
@@ -54,20 +86,10 @@ const App: React.FC = () => {
             path="/register" 
             element={currentUser ? <Navigate to="/dashboard" /> : <Register setUsers={setUsers} setCurrentUser={setCurrentUser} />} 
           />
-          <Route 
-            path="/dashboard" 
-            element={
-              currentUser ? (
-                currentUser.role === UserRole.ADMIN ? (
-                  <AdminDashboard currentUser={currentUser} users={users} setUsers={setUsers} onLogout={handleLogout} />
-                ) : (
-                  <UserDashboard currentUser={currentUser} onLogout={handleLogout} />
-                )
-              ) : (
-                <Navigate to="/login" />
-              )
-            } 
-          />
+          <Route path="/dashboard" element={renderDashboardRoute('dashboard')} />
+          <Route path="/dashboard/processos" element={renderDashboardRoute('processos')} />
+          <Route path="/dashboard/clientes" element={renderDashboardRoute('clientes')} />
+          <Route path="/dashboard/configuracoes" element={renderDashboardRoute('configuracoes')} />
           <Route path="*" element={<Navigate to="/login" />} />
         </Routes>
       </div>
@@ -75,4 +97,4 @@ const App: React.FC = () => {
   );
 };
 
-export default App;
+export default RootApp;
