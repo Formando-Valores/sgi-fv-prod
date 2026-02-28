@@ -3,8 +3,9 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { COUNTRIES } from '../constants';
-import { ServiceUnit, ProcessStatus, User, UserRole } from '../types';
-import { supabase } from '../App';
+import { ServiceUnit, ProcessStatus, User, UserRole, Organization } from '../types';
+import { isSupabaseConfigured, supabase } from '../supabase';
+import { buildOrganizationErrorMessage, loadOrganizations } from '../organizationRepository';
 
 interface RegisterProps {
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
@@ -12,7 +13,7 @@ interface RegisterProps {
 }
 
 const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
-  const navigate = useNavigate();
+  const goToRoute = useNavigate();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -25,10 +26,12 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
     country: 'Brasil',
     phone: '',
     processNumber: '',
-    unit: ServiceUnit.JURIDICO
+    unit: ServiceUnit.JURIDICO,
+    organizationId: ''
   });
 
   const [error, setError] = useState('');
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
 
   const validatePassword = (pass: string) => {
     const hasMinLength = pass.length >= 8;
@@ -38,9 +41,35 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
     return hasMinLength && hasUpper && hasSpecial && hasNumber;
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
+
+  React.useEffect(() => {
+    const fetchOrganizations = async () => {
+      const { organizations: loadedOrganizations, error } = await loadOrganizations();
+
+      if (error) {
+        console.warn('[register] erro ao carregar organizações', error);
+        setError(buildOrganizationErrorMessage(error));
+        return;
+      }
+
+      setOrganizations(loadedOrganizations);
+    };
+
+    fetchOrganizations();
+  }, []);
+
+  const handleRegister = async () => {
     setError('');
+
+    if (!isSupabaseConfigured) {
+      setError('Configuração do sistema incompleta. Contate o suporte para ajustar as variáveis do Supabase.');
+      return;
+    }
+
+    if (!formData.organizationId) {
+      setError('Selecione a organização vinculada ao cliente.');
+      return;
+    }
 
     if (formData.password !== formData.confirmPassword) {
       setError('As senhas não coincidem.');
@@ -52,60 +81,77 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
       return;
     }
 
-    // Lógica Supabase Auth conforme solicitado
-    const { data, error: authError } = await supabase.auth.signUp({
-      email: formData.email,
-      password: formData.password,
-    });
+    try {
+      console.info('[register] iniciando cadastro', { email: formData.email });
 
-    if (authError) {
-      // Mostrar mensagem vinda do Supabase
-      setError(authError.message);
-      return;
-    }
-
-    if (data.user) {
-      // Criar registro na tabela "profiles" para manter consistência dos dados
-      await supabase
-        .from('profiles')
-        .insert([
-          {
-            id: data.user.id,
-            nome: formData.name,
-            email: formData.email,
-            role: 'CLIENTE'
-          }
-        ]);
-
-      // Atualiza o estado local para que o login funcione corretamente com os dados extras
-      const prefix = formData.unit === ServiceUnit.JURIDICO ? 'JURA' : 
-                     formData.unit === ServiceUnit.ADMINISTRATIVO ? 'ADM' : 'TECAI';
-      const protocol = `${prefix}-2026-00${Math.floor(Math.random() * 900) + 100}`;
-
-      const newUser: User = {
-        id: data.user.id,
-        name: formData.name,
+      const { data, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
-        role: UserRole.CLIENT,
-        documentId: formData.documentId,
-        taxId: formData.taxId,
-        address: formData.address,
-        maritalStatus: formData.maritalStatus,
-        country: formData.country,
-        phone: formData.phone,
-        processNumber: formData.processNumber,
-        unit: formData.unit,
-        status: ProcessStatus.PENDENTE,
-        protocol: protocol,
-        registrationDate: new Date().toLocaleString('pt-BR')
-      };
+      });
 
-      setUsers(prev => [...prev, newUser]);
-      
-      // Se sucesso: Mostrar mensagem "Cadastro realizado com sucesso" e redirecionar para tela de Login
-      alert('Cadastro realizado com sucesso');
-      navigate('/login');
+      if (authError) {
+        console.error('[register] falha no cadastro', authError);
+        setError(authError.message);
+        return;
+      }
+
+      if (data.user) {
+        const { error: profileInsertError } = await supabase
+          .from('profiles')
+          .insert([
+            {
+              id: data.user.id,
+              nome: formData.name,
+              email: formData.email,
+              role: UserRole.CLIENT,
+              organization_id: formData.organizationId,
+            },
+          ]);
+
+        if (profileInsertError) {
+          console.error('[register] erro ao criar profile', profileInsertError);
+          setError('Cadastro criado, mas houve falha ao criar perfil. Tente entrar novamente.');
+          return;
+        }
+
+        const prefix =
+          formData.unit === ServiceUnit.JURIDICO
+            ? 'JURA'
+            : formData.unit === ServiceUnit.ADMINISTRATIVO
+              ? 'ADM'
+              : 'TECAI';
+        const protocol = `${prefix}-2026-00${Math.floor(Math.random() * 900) + 100}`;
+
+        const selectedOrganization = organizations.find((organization) => organization.id === formData.organizationId);
+
+        const newUser: User = {
+          id: data.user.id,
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+          role: UserRole.CLIENT,
+          documentId: formData.documentId,
+          taxId: formData.taxId,
+          address: formData.address,
+          maritalStatus: formData.maritalStatus,
+          country: formData.country,
+          phone: formData.phone,
+          processNumber: formData.processNumber,
+          unit: formData.unit,
+          status: ProcessStatus.PENDENTE,
+          protocol,
+          registrationDate: new Date().toLocaleString('pt-BR'),
+          organizationId: formData.organizationId,
+          organizationName: selectedOrganization?.name,
+        };
+
+        setUsers((prev) => [...prev, newUser]);
+        alert('Cadastro realizado com sucesso');
+        goToRoute('/login');
+      }
+    } catch (err) {
+      console.error('[register] erro inesperado', err);
+      setError('Erro inesperado. Tente novamente.');
     }
   };
 
@@ -131,14 +177,14 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
           <div className="flex justify-between items-center mb-10">
             <h2 className="text-3xl font-bold">Solicitar Registro</h2>
             <button 
-              onClick={() => navigate('/login')}
+              onClick={() => goToRoute('/login')}
               className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm font-bold"
             >
               <ArrowLeft className="w-4 h-4" /> VOLTAR AO LOGIN
             </button>
           </div>
 
-          <form onSubmit={handleRegister} className="space-y-8">
+          <div className="space-y-8">
             {/* Secção 1 */}
             <section>
               <h3 className="text-blue-400 font-bold uppercase text-xs tracking-[0.2em] mb-4 flex items-center gap-2">
@@ -215,6 +261,22 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
               <h3 className="text-blue-400 font-bold uppercase text-xs tracking-[0.2em] mb-4 flex items-center gap-2">
                 <span className="w-6 h-px bg-blue-400"></span> 3. Unidade de Atendimento
               </h3>
+
+              <div className="mb-4">
+                <label className="text-xs font-bold text-slate-400 mb-2 block">Organização</label>
+                <select
+                  required
+                  value={formData.organizationId}
+                  onChange={e => setFormData({ ...formData, organizationId: e.target.value })}
+                  className={inputClass}
+                >
+                  <option value="">Selecione a organização</option>
+                  {organizations.map((organization) => (
+                    <option key={organization.id} value={organization.id}>{organization.name}</option>
+                  ))}
+                </select>
+              </div>
+
               <div className="flex flex-wrap gap-4">
                 {Object.values(ServiceUnit).map(unit => (
                   <label key={unit} className={`flex-1 min-w-[200px] cursor-pointer p-4 rounded-xl border-2 transition-all ${formData.unit === unit ? 'bg-blue-600/20 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)]' : 'bg-gray-900 border-slate-800'}`}>
@@ -235,13 +297,14 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
 
             <div className="pt-6">
               <button 
-                type="submit"
+                type="button"
                 className="w-full py-5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl uppercase tracking-widest transition-all shadow-xl flex items-center justify-center gap-3"
+                onClick={handleRegister}
               >
                 <CheckCircle2 className="w-6 h-6" /> Confirmar Registro
               </button>
             </div>
-          </form>
+          </div>
         </div>
       </div>
     </div>
