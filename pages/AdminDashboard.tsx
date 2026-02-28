@@ -127,13 +127,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   return (
     <div className="min-h-screen bg-slate-950 p-4 md:p-8">
       <div className="mx-auto max-w-[1600px] flex flex-col lg:flex-row gap-6">
-        <button
-          onClick={() => setSidebarOpen(true)}
-          className="lg:hidden fixed top-4 left-4 z-40 p-3 rounded-xl bg-slate-900 border border-slate-700 text-slate-100"
-          aria-label="Abrir menu"
-        >
-          <Menu className="w-5 h-5" />
-        </button>
+        <div className="lg:hidden mb-3">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="p-3 rounded-xl bg-slate-900 border border-slate-700 text-slate-100"
+            aria-label="Abrir menu"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        </div>
 
         {sidebarOpen && (
           <button
