@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { COUNTRIES } from '../constants';
 import { ServiceUnit, ProcessStatus, User, UserRole } from '../types';
-import { supabase } from '../App';
+import { supabase } from '../supabase';
 
 interface RegisterProps {
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
@@ -52,30 +52,37 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
       return;
     }
 
-    // Lógica Supabase Auth conforme solicitado
+    console.info('[register] iniciando cadastro', { email: formData.email });
+
     const { data, error: authError } = await supabase.auth.signUp({
       email: formData.email,
       password: formData.password,
     });
 
     if (authError) {
-      // Mostrar mensagem vinda do Supabase
+      console.error('[register] falha no cadastro', authError);
       setError(authError.message);
       return;
     }
 
     if (data.user) {
       // Criar registro na tabela "profiles" para manter consistência dos dados
-      await supabase
+      const { error: profileInsertError } = await supabase
         .from('profiles')
         .insert([
           {
             id: data.user.id,
             nome: formData.name,
             email: formData.email,
-            role: 'CLIENTE'
-          }
+            role: UserRole.CLIENT,
+          },
         ]);
+
+      if (profileInsertError) {
+        console.error('[register] erro ao criar profile', profileInsertError);
+        setError('Cadastro criado, mas houve falha ao criar perfil. Tente entrar novamente.');
+        return;
+      }
 
       // Atualiza o estado local para que o login funcione corretamente com os dados extras
       const prefix = formData.unit === ServiceUnit.JURIDICO ? 'JURA' : 

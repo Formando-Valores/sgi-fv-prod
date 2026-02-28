@@ -2,8 +2,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
-import { User } from '../types';
-import { supabase } from '../App';
+import { ProcessStatus, ServiceUnit, User, UserRole } from '../types';
+import { supabase } from '../supabase';
 
 interface LoginProps {
   setCurrentUser: (user: User) => void;
@@ -21,62 +21,94 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
     e.preventDefault();
     setError('');
 
-    // Utilizando supabase.auth.signInWithPassword conforme solicitado
+    console.info('[login] iniciando autenticação', { email });
     const { data, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     if (authError) {
+      console.error('[login] falha na autenticação', authError);
       setError('Email ou senha inválidos');
       return;
     }
 
     if (data.user) {
-      // Se o login for bem-sucedido, buscamos os dados complementares do usuário 
-      // no nosso estado local (ou mock) para manter a consistência do dashboard.
-      const userProfile = users.find(u => u.email === email);
-      
       const userId = data.user.id;
+      console.info('[login] autenticado, buscando profile', { userId });
 
-const { data: profiles, error: profileError } = await supabase
-  .from('profiles')
-  .select('*')
-  .eq('id', userId);
+      const { data: profiles, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
 
-if (profileError) {
-  console.error(profileError);
-  setError('Erro ao buscar perfil.');
-  return;
-}
+      if (profileError) {
+        console.error('[login] erro ao buscar profile', profileError);
+        setError('Erro ao buscar perfil.');
+        return;
+      }
 
-let profile = profiles?.[0] ?? null;
+      let profile = profiles;
 
-if (!profile) {
-        // se não existir, cria (opcional, mas recomendado)
+      if (!profile) {
         const { data: inserted, error: insertError } = await supabase
           .from('profiles')
-          .insert([{
-            id: userId,
-            email: data.user.email,
-            role: 'user',
-            nome_completo: data.user.user_metadata?.name ?? null,
-          }])
-          .select('*');
-      
+          .insert([
+            {
+              id: userId,
+              email: data.user.email,
+              role: UserRole.CLIENT,
+              nome_completo: data.user.user_metadata?.name ?? null,
+            },
+          ])
+          .select('*')
+          .maybeSingle();
+
         if (insertError) {
-          console.error(insertError);
+          console.error('[login] erro ao criar profile', insertError);
           setError('Perfil não encontrado e não foi possível criar.');
           return;
         }
-      
-        profile = inserted?.[0] ?? null;
+
+        profile = inserted;
       }
-      
-      setCurrentUser(profile as any);
+
+      const existingUser = users.find((user) => user.id === userId || user.email === email);
+      const normalizedRole = profile?.role === UserRole.ADMIN ? UserRole.ADMIN : UserRole.CLIENT;
+
+      const normalizedUser: User = {
+        id: userId,
+        name: profile?.nome ?? profile?.nome_completo ?? existingUser?.name ?? data.user.email?.split('@')[0] ?? 'Usuário',
+        email: data.user.email ?? existingUser?.email ?? email,
+        role: normalizedRole,
+        documentId: existingUser?.documentId ?? '-',
+        taxId: existingUser?.taxId ?? '-',
+        address: existingUser?.address ?? '-',
+        maritalStatus: existingUser?.maritalStatus ?? 'Não informado',
+        country: existingUser?.country ?? 'Brasil',
+        phone: existingUser?.phone ?? '-',
+        processNumber: existingUser?.processNumber ?? '',
+        unit: existingUser?.unit ?? ServiceUnit.JURIDICO,
+        status: existingUser?.status ?? ProcessStatus.PENDENTE,
+        protocol: existingUser?.protocol ?? `JURA-${new Date().getFullYear()}-000`,
+        registrationDate: existingUser?.registrationDate ?? new Date().toLocaleString('pt-BR'),
+        notes: existingUser?.notes,
+        deadline: existingUser?.deadline,
+        serviceManager: existingUser?.serviceManager,
+      };
+
+      console.info('[login] profile carregado, redirecionando para dashboard', {
+        profileId: profile?.id,
+        role: normalizedUser.role,
+      });
+
+      setCurrentUser(normalizedUser);
       navigate('/dashboard');
     }
   };
+
+
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gradient-to-b from-slate-900 to-slate-950">
