@@ -4,6 +4,8 @@ import { Organization } from './types';
 type PostgrestErrorLike = {
   message?: string;
   code?: string;
+  details?: string | null;
+  hint?: string | null;
 };
 
 const configuredSchema = import.meta.env.VITE_SUPABASE_ORG_SCHEMA?.trim();
@@ -80,7 +82,19 @@ export const createOrganization = async (organizationName: string) => {
 
       if (error) {
         lastError = error;
-        continue;
+
+        // Quando a coluna não existe no schema, tentamos a próxima coluna candidata.
+        if (error.code === 'PGRST204') {
+          continue;
+        }
+
+        // Permissão negada (RLS/policy) deve ser retornada imediatamente.
+        if (error.code === '42501') {
+          return { organization: null, resolvedSchema: schema, error };
+        }
+
+        // Para qualquer outro erro não relacionado à coluna, retornamos logo para não mascarar causa raiz.
+        return { organization: null, resolvedSchema: schema, error };
       }
 
       const organization = toOrganization((data ?? {}) as Record<string, unknown>);
@@ -107,6 +121,14 @@ export const buildOrganizationErrorMessage = (error: PostgrestErrorLike | null |
 
   if (isSchemaCacheError(error)) {
     return `Não foi encontrada a tabela ${configuredTable} no schema esperado. Configure VITE_SUPABASE_ORG_SCHEMA com o schema correto no Vercel.`;
+  }
+
+  if (error.code === '42501') {
+    return 'Sem permissão para cadastrar organização. Ajuste as políticas RLS de INSERT na tabela de organizações.';
+  }
+
+  if (error.code === 'PGRST204') {
+    return 'A tabela de organizações foi encontrada, mas a coluna de nome esperada não existe. Verifique se há uma coluna nome/name.';
   }
 
   return error.message ?? 'Erro inesperado ao processar organizações.';
