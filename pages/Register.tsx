@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { COUNTRIES } from '../constants';
 import { ServiceUnit, ProcessStatus, User, UserRole } from '../types';
-import { supabase } from '../supabase';
+import { isSupabaseConfigured, supabase } from '../supabase';
 
 interface RegisterProps {
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
@@ -42,10 +42,13 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
     setError('');
     setIsLoading(true);
 
-    // Validações
-    if (password !== confirmPassword) {
-      setError('As senhas não conferem');
-      setIsLoading(false);
+    if (!isSupabaseConfigured) {
+      setError('Configuração do sistema incompleta. Contate o suporte para ajustar as variáveis do Supabase.');
+      return;
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      setError('As senhas não coincidem.');
       return;
     }
 

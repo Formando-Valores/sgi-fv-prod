@@ -7,7 +7,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { ProcessStatus, ServiceUnit, User, UserRole } from '../types';
-import { supabase } from '../supabase';
+import { isSupabaseConfigured, supabase } from '../supabase';
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -20,6 +20,11 @@ const Login: React.FC = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (!isSupabaseConfigured) {
+      setError('Configuração do sistema incompleta. Contate o suporte para ajustar as variáveis do Supabase.');
+      return;
+    }
 
     console.info('[login] iniciando autenticação', { email });
     const { data, error: authError } = await supabase.auth.signInWithPassword({
