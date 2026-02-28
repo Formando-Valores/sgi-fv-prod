@@ -7,8 +7,9 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { COUNTRIES } from '../constants';
-import { ServiceUnit, ProcessStatus, User, UserRole } from '../types';
+import { ServiceUnit, ProcessStatus, User, UserRole, Organization } from '../types';
 import { isSupabaseConfigured, supabase } from '../supabase';
+import { buildOrganizationErrorMessage, loadOrganizations } from '../organizationRepository';
 
 interface RegisterProps {
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
@@ -29,13 +30,37 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
     country: 'Brasil',
     phone: '',
     processNumber: '',
-    unit: ServiceUnit.JURIDICO
+    unit: ServiceUnit.JURIDICO,
+    organizationId: ''
   });
 
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const navigate = useNavigate();
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+
+  const validatePassword = (pass: string) => {
+    const hasMinLength = pass.length >= 8;
+    const hasUpper = /[A-Z]/.test(pass);
+    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(pass);
+    const hasNumber = /[0-9]/.test(pass);
+    return hasMinLength && hasUpper && hasSpecial && hasNumber;
+  };
+
+
+  React.useEffect(() => {
+    const fetchOrganizations = async () => {
+      const { organizations: loadedOrganizations, error } = await loadOrganizations();
+
+      if (error) {
+        console.warn('[register] erro ao carregar organizações', error);
+        setError(buildOrganizationErrorMessage(error));
+        return;
+      }
+
+      setOrganizations(loadedOrganizations);
+    };
+
+    fetchOrganizations();
+  }, []);
 
   const handleRegister = async () => {
     setError('');
@@ -48,6 +73,16 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
 
     if (!isSupabaseConfigured) {
       setError('Configuração do sistema incompleta. Contate o suporte para ajustar as variáveis do Supabase.');
+      return;
+    }
+
+    if (!isSupabaseConfigured) {
+      setError('Configuração do sistema incompleta. Contate o suporte para ajustar as variáveis do Supabase.');
+      return;
+    }
+
+    if (!formData.organizationId) {
+      setError('Selecione a organização vinculada ao cliente.');
       return;
     }
 
@@ -84,6 +119,7 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
               nome: formData.name,
               email: formData.email,
               role: UserRole.CLIENT,
+              organization_id: formData.organizationId,
             },
           ]);
 
@@ -100,6 +136,8 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
               ? 'ADM'
               : 'TECAI';
         const protocol = `${prefix}-2026-00${Math.floor(Math.random() * 900) + 100}`;
+
+        const selectedOrganization = organizations.find((organization) => organization.id === formData.organizationId);
 
         const newUser: User = {
           id: data.user.id,
@@ -118,6 +156,8 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
           status: ProcessStatus.PENDENTE,
           protocol,
           registrationDate: new Date().toLocaleString('pt-BR'),
+          organizationId: formData.organizationId,
+          organizationName: selectedOrganization?.name,
         };
 
         setUsers((prev) => [...prev, newUser]);
@@ -240,6 +280,22 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
               <h3 className="text-blue-400 font-bold uppercase text-xs tracking-[0.2em] mb-4 flex items-center gap-2">
                 <span className="w-6 h-px bg-blue-400"></span> 3. Unidade de Atendimento
               </h3>
+
+              <div className="mb-4">
+                <label className="text-xs font-bold text-slate-400 mb-2 block">Organização</label>
+                <select
+                  required
+                  value={formData.organizationId}
+                  onChange={e => setFormData({ ...formData, organizationId: e.target.value })}
+                  className={inputClass}
+                >
+                  <option value="">Selecione a organização</option>
+                  {organizations.map((organization) => (
+                    <option key={organization.id} value={organization.id}>{organization.name}</option>
+                  ))}
+                </select>
+              </div>
+
               <div className="flex flex-wrap gap-4">
                 {Object.values(ServiceUnit).map(unit => (
                   <label key={unit} className={`flex-1 min-w-[200px] cursor-pointer p-4 rounded-xl border-2 transition-all ${formData.unit === unit ? 'bg-blue-600/20 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)]' : 'bg-gray-900 border-slate-800'}`}>

@@ -97,7 +97,7 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
 
         const { data: contextData, error: contextError } = await supabase
           .from('v_user_context')
-          .select('org_role')
+          .select('org_role, org_id, org_name')
           .eq('user_id', userId)
           .maybeSingle();
 
@@ -106,13 +106,16 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
         }
 
         let contextRole = contextData?.org_role;
+        let contextByEmailData: { org_role?: string | null; org_id?: string | null; org_name?: string | null } | null = null;
 
         if (!contextRole && data.user.email) {
           const { data: contextByEmail, error: contextByEmailError } = await supabase
             .from('v_user_context')
-            .select('org_role')
+            .select('org_role, org_id, org_name')
             .eq('email', data.user.email)
             .maybeSingle();
+
+          contextByEmailData = contextByEmail;
 
           if (contextByEmailError) {
             console.warn('[login] erro ao buscar contexto organizacional por email', contextByEmailError);
@@ -120,6 +123,10 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
 
           contextRole = contextByEmail?.org_role ?? contextRole;
         }
+
+
+        const contextOrganizationId = contextData?.org_id ?? contextByEmailData?.org_id;
+        const contextOrganizationName = contextData?.org_name ?? contextByEmailData?.org_name;
 
         const hasAdminRole =
           isAdminRole(profile?.role) ||
@@ -147,6 +154,8 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
           notes: existingUser?.notes,
           deadline: existingUser?.deadline,
           serviceManager: existingUser?.serviceManager,
+          organizationId: profile?.organization_id ?? profile?.org_id ?? existingUser?.organizationId ?? contextOrganizationId ?? undefined,
+          organizationName: profile?.organization_name ?? existingUser?.organizationName ?? contextOrganizationName ?? undefined,
         };
 
         console.info('[login] profile carregado, redirecionando para dashboard', {

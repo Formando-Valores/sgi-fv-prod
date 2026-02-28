@@ -1,17 +1,20 @@
 
-import React, { useState } from 'react';
-import { LogOut, Printer, FileDown, Eye, Pencil, Search, Users, ShieldCheck, X, Plus, Trash2, Calendar, MessageSquare, Check, User as UserIcon, UserCheck } from 'lucide-react';
-import { User, ProcessStatus, UserRole, Hierarchy, ServiceUnit } from '../types';
+import React, { useEffect, useState } from 'react';
+import { LogOut, Printer, FileDown, Eye, Pencil, Search, Users, ShieldCheck, X, Plus, Trash2, Calendar, MessageSquare, Check, User as UserIcon, UserCheck, LayoutDashboard, FolderKanban, Users2, Settings, Menu, Building2 } from 'lucide-react';
+import { User, ProcessStatus, UserRole, Hierarchy, ServiceUnit, Organization } from '../types';
+import { NavLink, useLocation } from 'react-router-dom';
 import { SERVICE_MANAGERS } from '../constants';
+import { buildOrganizationErrorMessage, createOrganization, loadOrganizations } from '../organizationRepository';
 
 interface AdminDashboardProps {
   currentUser: User;
   users: User[];
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
   onLogout: () => void;
+  section?: 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes';
 }
 
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, setUsers, onLogout }) => {
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, setUsers, onLogout, section = 'dashboard' }) => {
   const [activeTab, setActiveTab] = useState<'users' | 'management'>('users');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -22,6 +25,36 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [newAdminEmail, setNewAdminEmail] = useState('');
   const [newAdminHierarchy, setNewAdminHierarchy] = useState<Hierarchy>(Hierarchy.FULL);
   const [editingHierarchyUser, setEditingHierarchyUser] = useState<User | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [organizationName, setOrganizationName] = useState('');
+  const [orgError, setOrgError] = useState('');
+
+  const location = useLocation();
+  const currentSection = section ?? (location.pathname.split('/')[2] as 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes') ?? 'dashboard';
+
+  const sidebarLinks = [
+    { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { to: '/dashboard/processos', label: 'Processos', icon: FolderKanban },
+    { to: '/dashboard/clientes', label: 'Clientes', icon: Users2 },
+    { to: '/dashboard/configuracoes', label: 'Configurações', icon: Settings },
+    { to: '/dashboard/organizacoes', label: 'Organizações', icon: Building2 },
+  ];
+
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (currentSection === 'configuracoes') {
+      setActiveTab('management');
+      return;
+    }
+
+    if (currentSection === 'dashboard') {
+      setActiveTab('users');
+    }
+  }, [currentSection]);
 
   const filteredUsers = users.filter(u => 
     u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -96,8 +129,92 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     window.print();
   };
 
+  useEffect(() => {
+    const fetchOrganizations = async () => {
+      const { organizations: loadedOrganizations, error } = await loadOrganizations();
+
+      if (error) {
+        console.warn('[organizacoes] erro ao carregar organizações', error);
+        setOrgError(buildOrganizationErrorMessage(error));
+        return;
+      }
+
+      setOrgError('');
+      setOrganizations(loadedOrganizations);
+    };
+
+    fetchOrganizations();
+  }, []);
+
+  const handleCreateOrganization = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setOrgError('');
+
+    if (!organizationName.trim()) {
+      setOrgError('Informe o nome da organização.');
+      return;
+    }
+
+    const { organization, error } = await createOrganization(organizationName);
+
+    if (error || !organization) {
+      console.error('[organizacoes] erro ao cadastrar organização', error);
+      setOrgError(buildOrganizationErrorMessage(error));
+      return;
+    }
+
+    setOrganizations((prev) => [...prev, organization].sort((left, right) => left.name.localeCompare(right.name, 'pt-BR')));
+    setOrganizationName('');
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 p-4 md:p-8">
+      <div className="mx-auto max-w-[1600px] flex flex-col lg:flex-row gap-6">
+        <div className="lg:hidden mb-3">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="p-3 rounded-xl bg-slate-900 border border-slate-700 text-slate-100"
+            aria-label="Abrir menu"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        </div>
+
+        {sidebarOpen && (
+          <button
+            className="lg:hidden fixed inset-0 bg-black/60 z-40"
+            onClick={() => setSidebarOpen(false)}
+            aria-label="Fechar menu"
+          />
+        )}
+
+        <aside
+          className={`fixed lg:static inset-y-0 left-0 z-50 lg:z-auto w-72 bg-slate-900 border border-slate-800 rounded-r-2xl lg:rounded-2xl p-5 h-full lg:h-fit transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
+        >
+          <h2 className="text-xl font-black mb-1">SGI FV</h2>
+          <p className="text-slate-500 text-xs font-bold uppercase mb-6">Formando Valores</p>
+
+          <div className="mb-6 p-3 rounded-xl bg-slate-800/50 border border-slate-700">
+            <p className="font-bold text-slate-200">{currentUser.name}</p>
+            <p className="text-[10px] uppercase tracking-widest text-slate-400">{currentUser.role === UserRole.ADMIN ? 'ADMIN' : 'CLIENTE'}</p>
+          </div>
+
+          <nav className="space-y-2">
+            {sidebarLinks.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                onClick={() => setSidebarOpen(false)}
+                className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${isActive ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-600'}`}
+              >
+                <item.icon className="w-4 h-4" />
+                <span className="font-bold">{item.label}</span>
+              </NavLink>
+            ))}
+          </nav>
+        </aside>
+
+        <div className="flex-1 lg:pl-0">
       {/* Admin Header */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 no-print">
         <div>
@@ -127,8 +244,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         </div>
       </header>
 
-      {/* Navigation Tabs */}
-      <div className="flex border-b border-slate-800 mb-6 gap-8 no-print">
+      {(currentSection === 'dashboard' || currentSection === 'configuracoes') && (
+        <>
+          {/* Navigation Tabs */}
+          <div className="flex border-b border-slate-800 mb-6 gap-8 no-print">
         <button 
           onClick={() => setActiveTab('users')}
           className={`pb-4 px-2 font-black uppercase text-xs tracking-widest transition-all relative ${activeTab === 'users' ? 'text-blue-500' : 'text-slate-500'}`}
@@ -143,9 +262,74 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           Gestão de Acessos
           {activeTab === 'management' && <div className="absolute bottom-0 left-0 w-full h-1 bg-blue-500 rounded-t-full"></div>}
         </button>
-      </div>
+          </div>
+        </>
+      )}
 
-      {activeTab === 'users' ? (
+
+      {currentSection === 'organizacoes' ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+            <h3 className="text-lg font-black mb-4">CADASTRAR ORGANIZAÇÃO</h3>
+            <form onSubmit={handleCreateOrganization} className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-400 mb-2 block">Nome da organização</label>
+                <input
+                  value={organizationName}
+                  onChange={(event) => setOrganizationName(event.target.value)}
+                  className="w-full p-3 bg-gray-900 border border-slate-700 rounded-lg text-white font-bold"
+                  placeholder="Ex.: Organização Alpha"
+                />
+              </div>
+              {orgError && <p className="text-sm text-red-400 font-bold">{orgError}</p>}
+              <button type="submit" className="px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold">
+                Salvar organização
+              </button>
+            </form>
+          </div>
+
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+            <h3 className="text-lg font-black mb-4">ORGANIZAÇÕES CADASTRADAS</h3>
+            <div className="space-y-3">
+              {organizations.map((organization) => (
+                <div key={organization.id} className="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                  <p className="font-bold">{organization.name}</p>
+                  <p className="text-xs text-slate-400">ID: {organization.id}</p>
+                </div>
+              ))}
+              {organizations.length === 0 && (
+                <p className="text-slate-400 text-sm">Nenhuma organização cadastrada ainda.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : currentSection === 'processos' ? (
+
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+          <h3 className="text-lg font-black mb-4">PROCESSOS</h3>
+          <p className="text-slate-400 text-sm mb-4">Visão rápida dos processos cadastrados.</p>
+          <div className="space-y-3">
+            {users.map((user) => (
+              <div key={user.id} className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+                <span className="font-bold">{user.name}</span>
+                <span className="text-xs text-slate-400">{user.protocol} • {user.status}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : currentSection === 'clientes' ? (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+          <h3 className="text-lg font-black mb-4">CLIENTES</h3>
+          <div className="space-y-3">
+            {users.filter((user) => user.role !== UserRole.ADMIN).map((user) => (
+              <div key={user.id} className="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                <p className="font-bold">{user.name}</p>
+                <p className="text-xs text-slate-400">{user.email}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : activeTab === 'users' ? (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
           <div className="p-6 border-b border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 no-print">
             <div className="relative w-full md:w-96">
@@ -325,7 +509,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
              <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-950">
                <h3 className="text-xl font-black uppercase">Editar Gestor</h3>
                <button onClick={() => setEditingHierarchyUser(null)} className="p-2 bg-slate-800 hover:bg-slate-700 rounded-full">
-                 <X w-5 h-5 />
+                 <X className="w-5 h-5" />
                </button>
              </div>
              <div className="p-8">
@@ -374,7 +558,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
              <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-950">
                <h3 className="text-xl font-black uppercase">Ficha Cadastral do Cliente</h3>
                <button onClick={() => setSelectedUser(null)} className="p-2 bg-slate-800 hover:bg-slate-700 rounded-full">
-                 <X w-5 h-5 />
+                 <X className="w-5 h-5" />
                </button>
              </div>
              <div className="p-8 overflow-y-auto">
@@ -430,6 +614,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           </div>
         </div>
       )}
+        </div>
+      </div>
 
       {/* Edit Status Modal */}
       {editingUser && (
@@ -438,7 +624,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
              <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-950">
                <h3 className="text-xl font-black uppercase">Editar Status: {editingUser.protocol}</h3>
                <button onClick={() => setEditingUser(null)} className="p-2 bg-slate-800 hover:bg-slate-700 rounded-full">
-                 <X w-5 h-5 />
+                 <X className="w-5 h-5" />
                </button>
              </div>
              <div className="p-8">

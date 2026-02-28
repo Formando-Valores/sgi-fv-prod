@@ -61,108 +61,51 @@ const RootApp: React.FC = () => {
     setCurrentUser(null);
   };
 
-  if (!session) {
-    console.log('[ProtectedRoute] No session, redirecting to login');
-    return <Navigate to="/login" replace />;
-  }
 
-  console.log('[ProtectedRoute] Session valid, rendering children');
-  return <>{children}</>;
-};
+  const renderDashboardRoute = (section: 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes' = 'dashboard') => {
+    if (!currentUser) {
+      return <Navigate to="/login" />;
+    }
 
-// Public Route wrapper (redirects if authenticated)
-const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  console.log('[PublicRoute] Rendering...');
-  const { session, loading } = useAuth();
-  console.log('[PublicRoute] Auth state:', { hasSession: !!session, loading });
+    if (currentUser.role === UserRole.ADMIN) {
+      return (
+        <AdminDashboard
+          currentUser={currentUser}
+          users={users}
+          setUsers={setUsers}
+          onLogout={handleLogout}
+          section={section}
+        />
+      );
+    }
 
-  if (loading) {
-    console.log('[PublicRoute] Showing loading state');
-    return (
-      <div className="min-h-screen bg-[#0f172a] text-white font-arial flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-slate-400 text-sm uppercase tracking-widest">Carregando...</p>
-          <p className="text-slate-500 text-xs mt-2">Verificando autenticação...</p>
-        </div>
-      </div>
-    );
-  }
+    if (section !== 'dashboard') {
+      return <Navigate to="/dashboard" />;
+    }
 
-  if (session) {
-    console.log('[PublicRoute] Has session, redirecting to dashboard');
-    return <Navigate to="/dashboard" replace />;
-  }
+    return <UserDashboard currentUser={currentUser} onLogout={handleLogout} />;
+  };
 
-  console.log('[PublicRoute] No session, rendering children');
-  return <>{children}</>;
-};
-
-// App Routes Component (needs to be inside AuthProvider)
-const AppRoutes: React.FC = () => {
-  console.log('[AppRoutes] Rendering...');
-  return (
-    <Routes>
-      {/* Auth routes - outside layout */}
-      <Route 
-        path="/login" 
-        element={
-          <PublicRoute>
-            <Login />
-          </PublicRoute>
-        } 
-      />
-      <Route 
-        path="/register" 
-        element={
-          <PublicRoute>
-            <Register />
-          </PublicRoute>
-        } 
-      />
-      
-      {/* App routes - inside layout with protection */}
-      <Route element={
-        <ProtectedRoute>
-          <AppLayout />
-        </ProtectedRoute>
-      }>
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/processos" element={<ProcessList />} />
-        <Route path="/processos/novo" element={<ProcessNew />} />
-        <Route path="/processos/:id" element={<ProcessDetails />} />
-        <Route path="/clientes" element={<ClientList />} />
-        <Route path="/configuracoes" element={<Configuracoes />} />
-        <Route path="/configuracoes/membros" element={<Members />} />
-      </Route>
-      
-      {/* Redirects */}
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
-    </Routes>
-  );
-};
-
-const App: React.FC = () => {
-  console.log('[App] ========================================');
-  console.log('[App] App component RENDERING!', new Date().toISOString());
-  console.log('[App] ========================================');
-  
   return (
     <HashRouter>
-      {(() => {
-        console.log('[App] HashRouter initialized');
-        return null;
-      })()}
-      <AuthProvider>
-        {(() => {
-          console.log('[App] AuthProvider wrapper rendered');
-          return null;
-        })()}
-        <div className="min-h-screen bg-[#0f172a] text-white font-arial">
-          <AppRoutes />
-        </div>
-      </AuthProvider>
+      <div className="min-h-screen bg-[#0f172a] text-white font-arial">
+        <Routes>
+          <Route 
+            path="/login" 
+            element={currentUser ? <Navigate to="/dashboard" /> : <Login setCurrentUser={setCurrentUser} users={users} />} 
+          />
+          <Route 
+            path="/register" 
+            element={currentUser ? <Navigate to="/dashboard" /> : <Register setUsers={setUsers} setCurrentUser={setCurrentUser} />} 
+          />
+          <Route path="/dashboard" element={renderDashboardRoute('dashboard')} />
+          <Route path="/dashboard/processos" element={renderDashboardRoute('processos')} />
+          <Route path="/dashboard/clientes" element={renderDashboardRoute('clientes')} />
+          <Route path="/dashboard/configuracoes" element={renderDashboardRoute('configuracoes')} />
+          <Route path="/dashboard/organizacoes" element={renderDashboardRoute('organizacoes')} />
+          <Route path="*" element={<Navigate to="/login" />} />
+        </Routes>
+      </div>
     </HashRouter>
   );
 };

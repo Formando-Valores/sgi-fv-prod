@@ -115,12 +115,14 @@ export interface User {
   hierarchy?: Hierarchy;
   notes?: string;
   deadline?: string;
-  serviceManager?: string;
-  // Novos campos multi-tenant
-  org_id?: string;
-  org_slug?: string;
-  org_name?: string;
-  org_role?: OrgRole;
+  serviceManager?: string; // Novo campo: Gestor do Serviço
+  organizationId?: string;
+  organizationName?: string;
+}
+
+export interface Organization {
+  id: string;
+  name: string;
 }
 
 // ============================================
