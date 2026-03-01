@@ -46,6 +46,16 @@ export interface User {
   notes?: string;
   deadline?: string;
   serviceManager?: string; // Novo campo: Gestor do Serviço
+  organizationId?: string;
+  organizationName?: string;
+}
+
+export interface Organization {
+  id: string;
+  name: string;
+  createdAt?: string;
+  subscriptionExpiresAt?: string;
+  slug?: string;
 }
 
 export interface TimelineEntry {
