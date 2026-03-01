@@ -1,17 +1,42 @@
 
-import React, { useState } from 'react';
-import { LogOut, Printer, FileDown, Eye, Pencil, Search, Users, ShieldCheck, X, Plus, Trash2, Calendar, MessageSquare, Check, User as UserIcon, UserCheck } from 'lucide-react';
-import { User, ProcessStatus, UserRole, Hierarchy, ServiceUnit } from '../types';
-import { SERVICE_MANAGERS } from '../constants';
+import React, { useEffect, useState } from 'react';
+import { LogOut, Printer, FileDown, Eye, Pencil, Search, Users, ShieldCheck, X, Plus, Trash2, Calendar, MessageSquare, Check, User as UserIcon, UserCheck, LayoutDashboard, FolderKanban, Users2, Settings, Menu, Building2, PieChart, Wallet } from 'lucide-react';
+import { User, ProcessStatus, UserRole, Hierarchy, ServiceUnit, Organization, AccessLevel } from '../types';
+import { NavLink, useLocation } from 'react-router-dom';
+import { ADMIN_CREDENTIALS, SERVICE_MANAGERS } from '../constants';
+import { buildOrganizationErrorMessage, createOrganization, deleteOrganization, loadOrganizations, updateOrganizationActiveStatus } from '../organizationRepository';
 
 interface AdminDashboardProps {
   currentUser: User;
   users: User[];
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
   onLogout: () => void;
+  section?: 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes' | 'financeiro';
 }
 
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, setUsers, onLogout }) => {
+const ACCESS_LEVEL_OPTIONS = [
+  AccessLevel.GENERAL_ADMIN,
+  AccessLevel.SENIOR_USER,
+  AccessLevel.PLENO_USER,
+  AccessLevel.CLIENT,
+] as const;
+
+const ACCESS_LEVEL_DESCRIPTIONS: Record<AccessLevel, string> = {
+  [AccessLevel.GENERAL_ADMIN]: 'Visão total da plataforma, financeiro e gestão de perfis.',
+  [AccessLevel.SENIOR_USER]: 'Diretoria/Gerência da organização: agenda, equipe e distribuição autorizada.',
+  [AccessLevel.PLENO_USER]: 'Execução técnica: atua nos clientes/processos atribuídos.',
+  [AccessLevel.CLIENT]: 'Acesso restrito ao próprio processo e documentos.',
+};
+
+const mapAccessLevelToRole = (accessLevel: AccessLevel): UserRole => {
+  if (accessLevel === AccessLevel.CLIENT) {
+    return UserRole.CLIENT;
+  }
+
+  return UserRole.ADMIN;
+};
+
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, setUsers, onLogout, section = 'dashboard' }) => {
   const [activeTab, setActiveTab] = useState<'users' | 'management'>('users');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -21,9 +46,151 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [newAdminName, setNewAdminName] = useState('');
   const [newAdminEmail, setNewAdminEmail] = useState('');
   const [newAdminHierarchy, setNewAdminHierarchy] = useState<Hierarchy>(Hierarchy.FULL);
+  const [newUserAccessLevel, setNewUserAccessLevel] = useState<AccessLevel>(AccessLevel.SENIOR_USER);
   const [editingHierarchyUser, setEditingHierarchyUser] = useState<User | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [organizationName, setOrganizationName] = useState('');
+  const [orgError, setOrgError] = useState('');
+  const [orgSuccess, setOrgSuccess] = useState('');
+  const [isCreatingOrganization, setIsCreatingOrganization] = useState(false);
+  const [organizationDeletingId, setOrganizationDeletingId] = useState<string | null>(null);
+  const [organizationTogglingId, setOrganizationTogglingId] = useState<string | null>(null);
+  const [financialOrganizationFilter, setFinancialOrganizationFilter] = useState<string>('all');
+  const [financialUserFilter, setFinancialUserFilter] = useState<string>('all');
+  const [selectedFinancialId, setSelectedFinancialId] = useState<string | null>(null);
 
-  const filteredUsers = users.filter(u => 
+  const location = useLocation();
+  const currentSection = section ?? (location.pathname.split('/')[2] as 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes' | 'financeiro') ?? 'dashboard';
+
+
+
+  const centralOrganization = organizations.find((organization) => {
+    const normalizedSlug = organization.slug?.toLowerCase();
+    const normalizedName = organization.name.toLowerCase();
+
+    return normalizedSlug === 'default' || normalizedName === 'organização padrão';
+  });
+
+  const isCentralAdmin =
+    currentUser.role === UserRole.ADMIN &&
+    Boolean(
+      (currentUser.organizationId && centralOrganization?.id && currentUser.organizationId === centralOrganization.id) ||
+      currentUser.organizationName?.toLowerCase() === 'organização padrão'
+    );
+
+  const getUserAccessLevel = (user: User): AccessLevel => {
+    if (user.accessLevel) {
+      return user.accessLevel;
+    }
+
+    const userEmail = user.email?.toLowerCase();
+    const isBootstrapGeneralAdmin = userEmail ? ADMIN_CREDENTIALS.includes(userEmail) : false;
+
+    if (user.role === UserRole.CLIENT) {
+      return AccessLevel.CLIENT;
+    }
+
+    return isBootstrapGeneralAdmin ? AccessLevel.GENERAL_ADMIN : AccessLevel.SENIOR_USER;
+  };
+
+  const isCurrentUserGeneralAdmin =
+    currentUser.role === UserRole.ADMIN &&
+    (getUserAccessLevel(currentUser) === AccessLevel.GENERAL_ADMIN || isCentralAdmin);
+
+  const organizationScopedUsers = isCentralAdmin
+    ? users
+    : currentUser.organizationId
+      ? users.filter((user) => user.organizationId === currentUser.organizationId)
+      : users;
+
+  const organizationInsights = organizations
+    .map((organization) => {
+      const organizationClients = users.filter(
+        (user) => user.organizationId === organization.id && getUserAccessLevel(user) === AccessLevel.CLIENT
+      );
+
+      const processCount = organizationClients.filter(
+        (user) => Boolean(user.processNumber) || Boolean(user.protocol)
+      ).length;
+
+      return {
+        ...organization,
+        clientsCount: organizationClients.length,
+        processCount,
+      };
+    })
+    .sort((left, right) => right.clientsCount - left.clientsCount);
+
+  const maxClientsCount = Math.max(...organizationInsights.map((item) => item.clientsCount), 1);
+
+  const baseValueByStatus: Record<ProcessStatus, number> = {
+    [ProcessStatus.PENDENTE]: 1800,
+    [ProcessStatus.TRIAGEM]: 2600,
+    [ProcessStatus.ANALISE]: 3400,
+    [ProcessStatus.CONCLUIDO]: 5200,
+  };
+
+  const financialRows = organizationScopedUsers
+    .filter((user) => getUserAccessLevel(user) !== AccessLevel.CLIENT)
+    .map((user) => {
+      const total = baseValueByStatus[user.status] ?? 1800;
+      const paid = user.status === ProcessStatus.CONCLUIDO ? total : user.status === ProcessStatus.ANALISE ? total * 0.6 : total * 0.25;
+      const pending = Math.max(total - paid, 0);
+
+      return {
+        id: user.id,
+        userName: user.name,
+        organizationId: user.organizationId ?? 'sem-org',
+        organizationName: user.organizationName ?? 'Não informado',
+        protocol: user.protocol,
+        status: user.status,
+        total,
+        paid,
+        pending,
+      };
+    });
+
+  const filteredFinancialRows = financialRows.filter((row) => {
+    const byOrg = financialOrganizationFilter === 'all' || row.organizationId === financialOrganizationFilter;
+    const byUser = financialUserFilter === 'all' || row.id === financialUserFilter;
+    return byOrg && byUser;
+  });
+
+  const financialTotal = filteredFinancialRows.reduce((acc, row) => acc + row.total, 0);
+  const financialPaid = filteredFinancialRows.reduce((acc, row) => acc + row.paid, 0);
+  const financialPending = filteredFinancialRows.reduce((acc, row) => acc + row.pending, 0);
+  const selectedFinancialRow = filteredFinancialRows.find((row) => row.id === selectedFinancialId) ?? filteredFinancialRows[0] ?? null;
+
+  const piePaid = financialTotal > 0 ? Math.round((financialPaid / financialTotal) * 100) : 0;
+  const piePending = Math.max(100 - piePaid, 0);
+
+
+  const sidebarLinks = [
+    { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { to: '/dashboard/processos', label: 'Processos', icon: FolderKanban },
+    { to: '/dashboard/clientes', label: 'Clientes', icon: Users2 },
+    { to: '/dashboard/configuracoes', label: 'Configurações', icon: Settings },
+    { to: '/dashboard/organizacoes', label: 'Organizações', icon: Building2 },
+    { to: '/dashboard/financeiro', label: 'Financeiro', icon: Wallet },
+  ];
+
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (currentSection === 'configuracoes') {
+      setActiveTab('management');
+      return;
+    }
+
+    if (currentSection === 'dashboard') {
+      setActiveTab('users');
+    }
+  }, [currentSection]);
+
+  const filteredUsers = organizationScopedUsers.filter(u => 
     u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     u.protocol.toLowerCase().includes(searchTerm.toLowerCase()) ||
     u.email.toLowerCase().includes(searchTerm.toLowerCase())
@@ -39,19 +206,27 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
   const handleCreateUser = (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!isCurrentUserGeneralAdmin) {
+      setOrgError('Somente o Administrador Geral pode alterar nível de acesso de usuários.');
+      setOrgSuccess('');
+      return;
+    }
+
     if (!newAdminEmail || !newAdminName) return;
 
     const existing = users.find(u => u.email === newAdminEmail);
     if (existing) {
        setUsers(prev => prev.map(u => 
-         u.email === newAdminEmail ? { ...u, name: newAdminName, role: UserRole.ADMIN, hierarchy: newAdminHierarchy } : u
+         u.email === newAdminEmail ? { ...u, name: newAdminName, role: mapAccessLevelToRole(newUserAccessLevel), accessLevel: newUserAccessLevel, hierarchy: newAdminHierarchy } : u
        ));
     } else {
        const newUser: User = {
          id: Date.now().toString(),
          name: newAdminName,
          email: newAdminEmail,
-         role: UserRole.ADMIN,
+         role: mapAccessLevelToRole(newUserAccessLevel),
+         accessLevel: newUserAccessLevel,
          hierarchy: newAdminHierarchy,
          documentId: '---',
          taxId: '---',
@@ -69,24 +244,40 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     }
     setNewAdminEmail('');
     setNewAdminName('');
-    alert('Usuário administrativo definido com sucesso.');
+    setNewUserAccessLevel(AccessLevel.SENIOR_USER);
+    alert('Usuário definido com sucesso.');
   };
 
   const handleUpdateHierarchy = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!editingHierarchyUser) return;
-    
+
+    if (!isCurrentUserGeneralAdmin) {
+      setOrgError('Somente o Administrador Geral pode alterar nível de acesso de usuários.');
+      setOrgSuccess('');
+      return;
+    }
+
     const fd = new FormData(e.currentTarget);
     const hierarchy = fd.get('hierarchy') as Hierarchy;
     const name = fd.get('admin_name') as string;
+    const accessLevel = fd.get('access_level') as AccessLevel;
 
-    setUsers(prev => prev.map(u => 
-      u.id === editingHierarchyUser.id ? { ...u, hierarchy, name } : u
+    setUsers(prev => prev.map(u =>
+      u.id === editingHierarchyUser.id
+        ? { ...u, hierarchy, name, accessLevel, role: mapAccessLevelToRole(accessLevel) }
+        : u
     ));
     setEditingHierarchyUser(null);
   };
 
   const handleDeleteUser = (id: string) => {
+    if (!isCurrentUserGeneralAdmin) {
+      setOrgError('Somente o Administrador Geral pode excluir usuários administrativos.');
+      setOrgSuccess('');
+      return;
+    }
+
     if(window.confirm('Deseja realmente excluir este usuário?')) {
       setUsers(prev => prev.filter(u => u.id !== id));
     }
@@ -96,8 +287,170 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     window.print();
   };
 
+  const formatDateTime = (value?: string) => {
+    if (!value) {
+      return 'Não informado';
+    }
+
+    const parsedDate = new Date(value);
+
+    if (Number.isNaN(parsedDate.getTime())) {
+      return value;
+    }
+
+    return parsedDate.toLocaleString('pt-BR');
+  };
+
+  useEffect(() => {
+    const fetchOrganizations = async () => {
+      const { organizations: loadedOrganizations, error } = await loadOrganizations();
+
+      if (error) {
+        console.warn('[organizacoes] erro ao carregar organizações', error);
+        setOrgError(buildOrganizationErrorMessage(error));
+        return;
+      }
+
+      setOrgError('');
+      setOrganizations(loadedOrganizations);
+    };
+
+    fetchOrganizations();
+  }, []);
+
+  const handleCreateOrganization = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setOrgError('');
+    setOrgSuccess('');
+
+    if (!organizationName.trim()) {
+      setOrgError('Informe o nome da organização.');
+      return;
+    }
+
+    setIsCreatingOrganization(true);
+
+    const { organization, error } = await createOrganization(organizationName);
+
+    setIsCreatingOrganization(false);
+
+    if (error || !organization) {
+      console.error('[organizacoes] erro ao cadastrar organização', error);
+      setOrgError(buildOrganizationErrorMessage(error));
+      return;
+    }
+
+    setOrganizations((prev) => [...prev, organization].sort((left, right) => left.name.localeCompare(right.name, 'pt-BR')));
+    setOrganizationName('');
+    setOrgSuccess('Organização cadastrada com sucesso.');
+  };
+
+
+  const isCentralOrganization = (organization: Organization) => organization.id === centralOrganization?.id;
+
+  const handleDeleteOrganization = async (organization: Organization) => {
+    if (isCentralOrganization(organization)) {
+      setOrgError('A organização central (slug default) não pode ser excluída.');
+      setOrgSuccess('');
+      return;
+    }
+
+    if (!window.confirm('Deseja realmente excluir esta organização?')) {
+      return;
+    }
+
+    setOrgError('');
+    setOrgSuccess('');
+    setOrganizationDeletingId(organization.id);
+
+    const { error, deleted } = await deleteOrganization(organization.id);
+
+    setOrganizationDeletingId(null);
+
+    if (error || !deleted) {
+      setOrgError(buildOrganizationErrorMessage(error));
+      return;
+    }
+
+    setOrganizations((prev) => prev.filter((item) => item.id !== organization.id));
+    setOrgSuccess('Organização excluída com sucesso.');
+  };
+
+
+
+  const handleToggleOrganizationStatus = async (organization: Organization) => {
+    if (isCentralOrganization(organization)) {
+      setOrgError('A organização central não pode ser desativada.');
+      setOrgSuccess('');
+      return;
+    }
+
+    setOrgError('');
+    setOrgSuccess('');
+    setOrganizationTogglingId(organization.id);
+
+    const targetActive = organization.active === undefined ? false : !organization.active;
+    const { error, updated } = await updateOrganizationActiveStatus(organization.id, targetActive);
+
+    setOrganizationTogglingId(null);
+
+    if (error || !updated) {
+      setOrgError(buildOrganizationErrorMessage(error));
+      return;
+    }
+
+    setOrganizations((prev) => prev.map((item) => item.id === organization.id ? { ...item, active: targetActive } : item));
+    setOrgSuccess(`Organização ${targetActive ? 'ativada' : 'inativada'} com sucesso.`);
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 p-4 md:p-8">
+      <div className="mx-auto max-w-[1600px] flex flex-col lg:flex-row gap-6">
+        <div className="lg:hidden mb-3">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="p-3 rounded-xl bg-slate-900 border border-slate-700 text-slate-100"
+            aria-label="Abrir menu"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        </div>
+
+        {sidebarOpen && (
+          <button
+            className="lg:hidden fixed inset-0 bg-black/60 z-40"
+            onClick={() => setSidebarOpen(false)}
+            aria-label="Fechar menu"
+          />
+        )}
+
+        <aside
+          className={`fixed lg:static inset-y-0 left-0 z-50 lg:z-auto w-72 bg-slate-900 border border-slate-800 rounded-r-2xl lg:rounded-2xl p-5 h-full lg:h-fit transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
+        >
+          <h2 className="text-xl font-black mb-1">SGI FV</h2>
+          <p className="text-slate-500 text-xs font-bold uppercase mb-6">Formando Valores</p>
+
+          <div className="mb-6 p-3 rounded-xl bg-slate-800/50 border border-slate-700">
+            <p className="font-bold text-slate-200">{currentUser.name}</p>
+            <p className="text-[10px] uppercase tracking-widest text-slate-400">{getUserAccessLevel(currentUser)}</p>
+          </div>
+
+          <nav className="space-y-2">
+            {sidebarLinks.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                onClick={() => setSidebarOpen(false)}
+                className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${isActive ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-600'}`}
+              >
+                <item.icon className="w-4 h-4" />
+                <span className="font-bold">{item.label}</span>
+              </NavLink>
+            ))}
+          </nav>
+        </aside>
+
+        <div className="flex-1 lg:pl-0">
       {/* Admin Header */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 no-print">
         <div>
@@ -127,8 +480,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         </div>
       </header>
 
-      {/* Navigation Tabs */}
-      <div className="flex border-b border-slate-800 mb-6 gap-8 no-print">
+      {(currentSection === 'dashboard' || currentSection === 'configuracoes') && (
+        <>
+          {/* Navigation Tabs */}
+          <div className="flex border-b border-slate-800 mb-6 gap-8 no-print">
         <button 
           onClick={() => setActiveTab('users')}
           className={`pb-4 px-2 font-black uppercase text-xs tracking-widest transition-all relative ${activeTab === 'users' ? 'text-blue-500' : 'text-slate-500'}`}
@@ -143,10 +498,196 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           Gestão de Acessos
           {activeTab === 'management' && <div className="absolute bottom-0 left-0 w-full h-1 bg-blue-500 rounded-t-full"></div>}
         </button>
-      </div>
+          </div>
+        </>
+      )}
 
-      {activeTab === 'users' ? (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+
+      {currentSection === 'organizacoes' ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+            <h3 className="text-lg font-black mb-4">CADASTRAR ORGANIZAÇÃO</h3>
+            <form onSubmit={handleCreateOrganization} className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-400 mb-2 block">Nome da organização</label>
+                <input
+                  value={organizationName}
+                  onChange={(event) => setOrganizationName(event.target.value)}
+                  className="w-full p-3 bg-gray-900 border border-slate-700 rounded-lg text-white font-bold"
+                  placeholder="Ex.: Organização Alpha"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-400 mb-2 block">Expiração da assinatura (em breve)</label>
+                <input
+                  disabled
+                  value="Em breve: integração com pagamento"
+                  className="w-full p-3 bg-slate-800 border border-slate-700 rounded-lg text-slate-400 text-sm"
+                />
+              </div>
+              {isCreatingOrganization && <p className="text-sm text-blue-300 font-bold">Cadastrando organização...</p>}
+              {orgError && <p className="text-sm text-red-400 font-bold">{orgError}</p>}
+              {orgSuccess && <p className="text-sm text-emerald-400 font-bold">{orgSuccess}</p>}
+              <button type="submit" disabled={isCreatingOrganization} className="px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-400 font-bold">
+                {isCreatingOrganization ? 'Cadastrando...' : 'Salvar organização'}
+              </button>
+            </form>
+          </div>
+
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+            <h3 className="text-lg font-black mb-4">ORGANIZAÇÕES CADASTRADAS</h3>
+            <div className="space-y-3">
+              {organizations.map((organization) => (
+                <div key={organization.id} className="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-bold">{organization.name}</p>
+                      <p className="text-xs text-slate-400">Cadastro em: {formatDateTime(organization.createdAt)}</p>
+                      <p className="text-xs text-slate-500">Expiração da assinatura: {formatDateTime(organization.subscriptionExpiresAt)}</p>
+                      <p className="text-xs text-slate-400">Status: <span className={`font-bold ${organization.active === false ? 'text-red-300' : 'text-emerald-300'}`}>{organization.active === false ? 'Inativa' : 'Ativa'}</span></p>
+                      {isCentralOrganization(organization) && (
+                        <p className="text-[11px] text-amber-300 font-bold mt-1">Organização central protegida contra exclusão.</p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleOrganizationStatus(organization)}
+                      disabled={organizationTogglingId === organization.id || isCentralOrganization(organization)}
+                      className={`p-2 rounded-lg disabled:bg-slate-800 disabled:text-slate-500 ${organization.active === false ? 'bg-red-900/30 hover:bg-red-900/50 text-red-300' : 'bg-emerald-900/30 hover:bg-emerald-900/50 text-emerald-300'}`}
+                      title={organization.active === false ? 'Ativar organização' : 'Inativar organização'}
+                    >
+                      <Check className={`w-4 h-4 ${organization.active === false ? 'text-red-300' : 'text-emerald-300'}`} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteOrganization(organization)}
+                      disabled={organizationDeletingId === organization.id || isCentralOrganization(organization)}
+                      className="p-2 rounded-lg bg-red-900/30 hover:bg-red-900/50 disabled:bg-slate-800 disabled:text-slate-500 text-red-300"
+                      title={isCentralOrganization(organization) ? 'Organização central não pode ser excluída' : 'Excluir organização'}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {organizations.length === 0 && (
+                <p className="text-slate-400 text-sm">Nenhuma organização cadastrada ainda.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      
+      ) : currentSection === 'financeiro' ? (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4"><p className="text-xs text-slate-400 uppercase">Valor total</p><p className="text-2xl font-black text-blue-300">R$ {financialTotal.toLocaleString('pt-BR')}</p></div>
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4"><p className="text-xs text-slate-400 uppercase">Recebido</p><p className="text-2xl font-black text-emerald-300">R$ {financialPaid.toLocaleString('pt-BR')}</p></div>
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4"><p className="text-xs text-slate-400 uppercase">Pendente</p><p className="text-2xl font-black text-amber-300">R$ {financialPending.toLocaleString('pt-BR')}</p></div>
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4"><p className="text-xs text-slate-400 uppercase">Registros</p><p className="text-2xl font-black text-slate-100">{filteredFinancialRows.length}</p></div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 lg:col-span-2">
+              <div className="flex flex-col md:flex-row gap-3 mb-4">
+                <select value={financialOrganizationFilter} onChange={(event) => setFinancialOrganizationFilter(event.target.value)} className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+                  <option value="all">Todas as organizações</option>
+                  {organizations.map((org) => (<option key={org.id} value={org.id}>{org.name}</option>))}
+                </select>
+                <select value={financialUserFilter} onChange={(event) => setFinancialUserFilter(event.target.value)} className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+                  <option value="all">Todos os usuários</option>
+                  {financialRows.map((row) => (<option key={row.id} value={row.id}>{row.userName}</option>))}
+                </select>
+              </div>
+
+              <div className="space-y-2 max-h-[420px] overflow-auto pr-1">
+                {filteredFinancialRows.map((row) => (
+                  <button key={row.id} type="button" onClick={() => setSelectedFinancialId(row.id)} className={`w-full text-left p-3 rounded-xl border ${selectedFinancialRow?.id === row.id ? 'border-blue-500 bg-blue-900/20' : 'border-slate-800 bg-slate-950'}`}>
+                    <div className="flex flex-wrap justify-between gap-2">
+                      <p className="font-bold">{row.userName} • {row.organizationName}</p>
+                      <p className="text-xs text-slate-400">{row.protocol}</p>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1">Total: <span className="text-blue-300 font-bold">R$ {row.total.toLocaleString('pt-BR')}</span> • Recebido: <span className="text-emerald-300 font-bold">R$ {row.paid.toLocaleString('pt-BR')}</span> • Pendente: <span className="text-amber-300 font-bold">R$ {row.pending.toLocaleString('pt-BR')}</span></p>
+                  </button>
+                ))}
+                {filteredFinancialRows.length === 0 && <p className="text-sm text-slate-400">Nenhum registro para os filtros selecionados.</p>}
+              </div>
+            </div>
+
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+              <h3 className="font-black uppercase text-sm tracking-wider mb-4 flex items-center gap-2"><PieChart className="w-4 h-4 text-blue-400" /> Proporção financeira</h3>
+              <div className="w-48 h-48 mx-auto rounded-full" style={{ background: `conic-gradient(#34d399 0 ${piePaid}%, #f59e0b ${piePaid}% 100%)` }} />
+              <div className="mt-4 text-sm space-y-1">
+                <p><span className="inline-block w-2 h-2 rounded-full bg-emerald-400 mr-2" />Recebido: <strong>{piePaid}%</strong></p>
+                <p><span className="inline-block w-2 h-2 rounded-full bg-amber-400 mr-2" />Pendente: <strong>{piePending}%</strong></p>
+              </div>
+              {selectedFinancialRow && (
+                <div className="mt-5 pt-4 border-t border-slate-800 text-xs text-slate-300 space-y-1">
+                  <p className="font-bold text-slate-100">Detalhe selecionado</p>
+                  <p>Usuário: {selectedFinancialRow.userName}</p>
+                  <p>Organização: {selectedFinancialRow.organizationName}</p>
+                  <p>Status: {selectedFinancialRow.status}</p>
+                  <p>Protocolo: {selectedFinancialRow.protocol}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+) : currentSection === 'processos' ? (
+
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+          <h3 className="text-lg font-black mb-4">PROCESSOS</h3>
+          <p className="text-slate-400 text-sm mb-4">Visão rápida dos processos cadastrados.</p>
+          <div className="space-y-3">
+            {organizationScopedUsers.map((user) => (
+              <div key={user.id} className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+                <span className="font-bold">{user.name}</span>
+                <span className="text-xs text-slate-400">{user.protocol} • {user.status}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : currentSection === 'clientes' ? (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+          <h3 className="text-lg font-black mb-4">CLIENTES</h3>
+          <div className="space-y-3">
+            {organizationScopedUsers.filter((user) => user.role !== UserRole.ADMIN).map((user) => (
+              <div key={user.id} className="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                <p className="font-bold">{user.name}</p>
+                <p className="text-xs text-slate-400">{user.email}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : activeTab === 'users' ? (
+        <>
+          {isCentralAdmin && currentSection === 'dashboard' && (
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 mb-6">
+              <h3 className="text-lg font-black mb-1">VISÃO GERAL DAS ORGANIZAÇÕES</h3>
+              <p className="text-xs text-slate-400 uppercase tracking-wider mb-5">Clientes, processos e expiração por organização</p>
+              <div className="space-y-4">
+                {organizationInsights.map((organization) => (
+                  <div key={organization.id} className="bg-slate-950 border border-slate-800 rounded-xl p-4">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
+                      <p className="font-bold">{organization.name}</p>
+                      <p className="text-xs text-slate-400">Expiração: {formatDateTime(organization.subscriptionExpiresAt)}</p>
+                    </div>
+                    <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden mb-3">
+                      <div
+                        className="h-full bg-blue-500"
+                        style={{ width: `${Math.max((organization.clientsCount / maxClientsCount) * 100, organization.clientsCount > 0 ? 10 : 0)}%` }}
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                      <p className="text-slate-300">Clientes cadastrados: <span className="font-bold text-blue-300">{organization.clientsCount}</span></p>
+                      <p className="text-slate-300">Processos cadastrados: <span className="font-bold text-emerald-300">{organization.processCount}</span></p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
           <div className="p-6 border-b border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 no-print">
             <div className="relative w-full md:w-96">
               <Search className="absolute left-3 top-2.5 text-slate-500 w-4 h-4" />
@@ -217,13 +758,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               </tbody>
             </table>
           </div>
-        </div>
+          </div>
+        </>
       ) : (
         /* Management Tab Content */
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="space-y-4">
+          {!isCurrentUserGeneralAdmin && (
+            <p className="text-xs font-bold text-amber-300">Somente o Administrador Geral pode promover/rebaixar níveis de usuários.</p>
+          )}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
            <div className="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-2xl p-6">
               <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
-                <Plus className="text-blue-500" /> Cadastrar Usuário Administrativo
+                <Plus className="text-blue-500" /> Cadastrar Usuário e Nível
               </h3>
               <form onSubmit={handleCreateUser} className="space-y-4">
                  <div>
@@ -249,6 +795,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     />
                  </div>
                  <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Perfil de Acesso</label>
+                    <select
+                      value={newUserAccessLevel}
+                      onChange={(event) => setNewUserAccessLevel(event.target.value as AccessLevel)}
+                      disabled={!isCurrentUserGeneralAdmin}
+                      className="w-full bg-gray-900 border border-slate-800 rounded-lg p-3 text-white font-bold disabled:opacity-60"
+                    >
+                      {ACCESS_LEVEL_OPTIONS.map((level) => (
+                        <option key={level} value={level}>{level}</option>
+                      ))}
+                    </select>
+                    <p className="text-[11px] text-slate-400 mt-1">{ACCESS_LEVEL_DESCRIPTIONS[newUserAccessLevel]}</p>
+                  </div>
+                  <div>
                     <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Hierarquia / Nível</label>
                     <div className="space-y-3 mt-2">
                        {Object.values(Hierarchy).map(h => (
@@ -265,7 +825,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                        ))}
                     </div>
                  </div>
-                 <button type="submit" className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg uppercase text-xs tracking-widest mt-4 shadow-lg active:scale-95 transition-transform">
+                 <button type="submit" disabled={!isCurrentUserGeneralAdmin} className="w-full py-4 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-400 text-white font-bold rounded-lg uppercase text-xs tracking-widest mt-4 shadow-lg active:scale-95 transition-transform">
                     Cadastrar / Definir
                  </button>
               </form>
@@ -282,7 +842,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800">
-                    {users.filter(u => u.role === UserRole.ADMIN || u.hierarchy).map(u => (
+                    {organizationScopedUsers.filter(u => getUserAccessLevel(u) !== AccessLevel.CLIENT).map(u => (
                       <tr key={u.id} className="hover:bg-slate-800/30">
                         <td className="px-6 py-4 font-bold flex flex-col">
                            <span>{u.name}</span>
@@ -290,20 +850,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                         </td>
                         <td className="px-6 py-4">
                           <span className="text-[10px] font-black text-blue-400 uppercase border border-blue-900/50 bg-blue-900/10 px-2 py-0.5 rounded">
-                            {u.hierarchy || 'Acesso Total'}
+                            {getUserAccessLevel(u)}
                           </span>
                         </td>
                         <td className="px-6 py-4 text-right">
                            <div className="flex justify-end gap-2">
                               <button 
                                 onClick={() => setEditingHierarchyUser(u)}
-                                className="p-2 bg-slate-800 hover:bg-slate-700 rounded-md text-slate-400 hover:text-white transition-colors"
+                                disabled={!isCurrentUserGeneralAdmin}
+                                className="p-2 bg-slate-800 hover:bg-slate-700 rounded-md text-slate-400 hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                               >
                                 <Pencil className="w-4 h-4" />
                               </button>
                               <button 
                                 onClick={() => handleDeleteUser(u.id)} 
-                                className="p-2 bg-red-900/20 hover:bg-red-900/40 rounded-md text-red-500 transition-colors"
+                                disabled={!isCurrentUserGeneralAdmin}
+                                className="p-2 bg-red-900/20 hover:bg-red-900/40 rounded-md text-red-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
@@ -315,6 +877,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                 </table>
               </div>
            </div>
+          </div>
         </div>
       )}
 
@@ -323,9 +886,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
           <div className="bg-slate-900 w-full max-w-md rounded-3xl border border-slate-800 shadow-2xl overflow-hidden">
              <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-950">
-               <h3 className="text-xl font-black uppercase">Editar Gestor</h3>
+               <h3 className="text-xl font-black uppercase">Editar Perfil de Usuário</h3>
                <button onClick={() => setEditingHierarchyUser(null)} className="p-2 bg-slate-800 hover:bg-slate-700 rounded-full">
-                 <X w-5 h-5 />
+                 <X className="w-5 h-5" />
                </button>
              </div>
              <div className="p-8">
@@ -344,6 +907,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                       />
                     </div>
 
+                    <label className="text-[10px] font-black text-slate-500 uppercase block mb-1">Perfil de acesso</label>
+                    <select
+                      name="access_level"
+                      defaultValue={getUserAccessLevel(editingHierarchyUser)}
+                      className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+                    >
+                      {ACCESS_LEVEL_OPTIONS.map((level) => (
+                        <option key={level} value={level}>{level}</option>
+                      ))}
+                    </select>
+
                     <label className="text-[10px] font-black text-slate-500 uppercase block mb-1">Hierarquia / Nível</label>
                     {Object.values(Hierarchy).map(h => (
                       <label key={h} className="flex items-center gap-3 p-4 bg-gray-900 border border-slate-800 rounded-xl cursor-pointer hover:border-blue-500 transition-colors">
@@ -357,7 +931,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                         <span className="font-bold text-slate-200">{h}</span>
                       </label>
                     ))}
-                    <button type="submit" className="w-full py-5 bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-widest rounded-2xl shadow-xl mt-4">
+                    <button type="submit" disabled={!isCurrentUserGeneralAdmin} className="w-full py-5 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-400 text-white font-black uppercase tracking-widest rounded-2xl shadow-xl mt-4">
                       Confirmar Alteração
                     </button>
                   </div>
@@ -374,7 +948,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
              <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-950">
                <h3 className="text-xl font-black uppercase">Ficha Cadastral do Cliente</h3>
                <button onClick={() => setSelectedUser(null)} className="p-2 bg-slate-800 hover:bg-slate-700 rounded-full">
-                 <X w-5 h-5 />
+                 <X className="w-5 h-5" />
                </button>
              </div>
              <div className="p-8 overflow-y-auto">
@@ -430,6 +1004,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           </div>
         </div>
       )}
+        </div>
+      </div>
 
       {/* Edit Status Modal */}
       {editingUser && (
@@ -438,7 +1014,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
              <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-950">
                <h3 className="text-xl font-black uppercase">Editar Status: {editingUser.protocol}</h3>
                <button onClick={() => setEditingUser(null)} className="p-2 bg-slate-800 hover:bg-slate-700 rounded-full">
-                 <X w-5 h-5 />
+                 <X className="w-5 h-5" />
                </button>
              </div>
              <div className="p-8">
