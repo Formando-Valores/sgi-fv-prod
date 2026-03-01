@@ -442,10 +442,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                       type="button"
                       onClick={() => handleToggleOrganizationStatus(organization)}
                       disabled={organizationTogglingId === organization.id || isCentralOrganization(organization)}
-                      className={`p-2 rounded-lg disabled:bg-slate-800 disabled:text-slate-500 ${organization.active === false ? 'bg-amber-900/30 hover:bg-amber-900/50 text-amber-300' : 'bg-slate-800/70 hover:bg-slate-700/70 text-slate-600'}`}
+                      className={`p-2 rounded-lg disabled:bg-slate-800 disabled:text-slate-500 ${organization.active === false ? 'bg-red-900/30 hover:bg-red-900/50 text-red-300' : 'bg-emerald-900/30 hover:bg-emerald-900/50 text-emerald-300'}`}
                       title={organization.active === false ? 'Ativar organização' : 'Inativar organização'}
                     >
-                      <Check className={`w-4 h-4 ${organization.active === false ? 'text-amber-300' : 'text-slate-600'}`} />
+                      <Check className={`w-4 h-4 ${organization.active === false ? 'text-red-300' : 'text-emerald-300'}`} />
                     </button>
                     <button
                       type="button"
