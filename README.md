@@ -33,3 +33,14 @@ VITE_SUPABASE_ANON_KEY=<sua-chave-anon>
 ```bash
 npm run build
 ```
+
+
+## Integração de formulário externo por organização
+
+Para vincular automaticamente cadastros vindos de um portal externo (ex.: Wix) a uma organização específica, direcione o usuário para a rota de registro com `orgSlug`:
+
+```
+/#/register?orgSlug=associacao-contra-as-injusticas-ai
+```
+
+Quando o `orgSlug` existir na tabela de organizações, o seletor de organização fica bloqueado e o cadastro é salvo somente naquela organização.

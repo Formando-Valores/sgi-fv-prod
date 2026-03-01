@@ -36,6 +36,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const location = useLocation();
   const currentSection = section ?? (location.pathname.split('/')[2] as 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes') ?? 'dashboard';
 
+
+  const organizationScopedUsers = currentUser.organizationId
+    ? users.filter((user) => user.organizationId === currentUser.organizationId)
+    : users;
+
   const sidebarLinks = [
     { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { to: '/dashboard/processos', label: 'Processos', icon: FolderKanban },
@@ -59,7 +64,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     }
   }, [currentSection]);
 
-  const filteredUsers = users.filter(u => 
+  const filteredUsers = organizationScopedUsers.filter(u => 
     u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     u.protocol.toLowerCase().includes(searchTerm.toLowerCase()) ||
     u.email.toLowerCase().includes(searchTerm.toLowerCase())
@@ -395,7 +400,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           <h3 className="text-lg font-black mb-4">PROCESSOS</h3>
           <p className="text-slate-400 text-sm mb-4">Visão rápida dos processos cadastrados.</p>
           <div className="space-y-3">
-            {users.map((user) => (
+            {organizationScopedUsers.map((user) => (
               <div key={user.id} className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
                 <span className="font-bold">{user.name}</span>
                 <span className="text-xs text-slate-400">{user.protocol} • {user.status}</span>
@@ -407,7 +412,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
           <h3 className="text-lg font-black mb-4">CLIENTES</h3>
           <div className="space-y-3">
-            {users.filter((user) => user.role !== UserRole.ADMIN).map((user) => (
+            {organizationScopedUsers.filter((user) => user.role !== UserRole.ADMIN).map((user) => (
               <div key={user.id} className="p-3 rounded-xl bg-slate-950 border border-slate-800">
                 <p className="font-bold">{user.name}</p>
                 <p className="text-xs text-slate-400">{user.email}</p>
@@ -552,7 +557,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800">
-                    {users.filter(u => u.role === UserRole.ADMIN || u.hierarchy).map(u => (
+                    {organizationScopedUsers.filter(u => u.role === UserRole.ADMIN || u.hierarchy).map(u => (
                       <tr key={u.id} className="hover:bg-slate-800/30">
                         <td className="px-6 py-4 font-bold flex flex-col">
                            <span>{u.name}</span>
