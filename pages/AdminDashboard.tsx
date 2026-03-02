@@ -74,18 +74,39 @@ const getOrgRoleCandidates = (accessLevel: AccessLevel): string[] => {
   const base = mapAccessLevelToOrgRole(accessLevel);
 
   if (accessLevel === AccessLevel.SENIOR_USER) {
-    return [base, 'senior', 'gestor', 'diretoria'];
+    return [
+      base,
+      'senior',
+      'gestor',
+      'diretoria',
+      'manager',
+      'member',
+      'membro',
+      'user',
+      'usuario',
+      'usuário',
+    ];
   }
 
   if (accessLevel === AccessLevel.PLENO_USER) {
-    return [base, 'pleno', 'técnico'];
+    return [
+      base,
+      'pleno',
+      'técnico',
+      'tecnico',
+      'member',
+      'membro',
+      'user',
+      'usuario',
+      'usuário',
+    ];
   }
 
   if (accessLevel === AccessLevel.GENERAL_ADMIN) {
-    return [base, 'owner', 'administrator'];
+    return [base, 'owner', 'administrator', 'administrador'];
   }
 
-  return [base];
+  return [base, 'client', 'cliente'];
 };
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, setUsers, onLogout, section = 'dashboard' }) => {
