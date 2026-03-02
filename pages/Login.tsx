@@ -7,6 +7,7 @@ import { isSupabaseConfigured, supabase } from '../supabase';
 
 interface LoginProps {
   setCurrentUser: (user: User) => void;
+  setUsers: React.Dispatch<React.SetStateAction<User[]>>;
   users: User[];
 }
 
@@ -27,7 +28,7 @@ const deriveAccessLevel = (isAdmin: boolean): AccessLevel => {
   return AccessLevel.SENIOR_USER;
 };
 
-const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
+const Login: React.FC<LoginProps> = ({ setCurrentUser, setUsers, users }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -176,7 +177,7 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
           ...users.filter((user) => user.id !== normalizedUser.id),
           normalizedUser,
         ];
-        localStorage.setItem('sgi_users', JSON.stringify(mergedUsers));
+        setUsers(mergedUsers);
 
         navigate('/dashboard');
       }

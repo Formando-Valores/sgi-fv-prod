@@ -80,7 +80,7 @@ const RootApp: React.FC = () => {
         <Routes>
           <Route 
             path="/login" 
-            element={currentUser ? <Navigate to="/dashboard" /> : <Login setCurrentUser={setCurrentUser} users={users} />} 
+            element={currentUser ? <Navigate to="/dashboard" /> : <Login setCurrentUser={setCurrentUser} setUsers={setUsers} users={users} />} 
           />
           <Route 
             path="/register" 
