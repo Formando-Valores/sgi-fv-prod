@@ -1,5 +1,5 @@
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { LogOut, Printer, FileDown, Eye, Pencil, Search, Users, ShieldCheck, X, Plus, Trash2, Calendar, MessageSquare, Check, User as UserIcon, UserCheck, LayoutDashboard, FolderKanban, Users2, Settings, Menu, Building2, PieChart, Wallet } from 'lucide-react';
 import { User, ProcessStatus, UserRole, Hierarchy, ServiceUnit, Organization, AccessLevel } from '../types';
 import { NavLink, useLocation } from 'react-router-dom';
@@ -258,6 +258,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   };
 
 
+
+  const usersRef = useRef<User[]>(users);
+
+  useEffect(() => {
+    usersRef.current = users;
+  }, [users]);
+
   const sidebarLinks = [
     { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { to: '/dashboard/processos', label: 'Processos', icon: FolderKanban },
@@ -306,7 +313,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     }
 
     const syncedUsers: User[] = data.map((row) => {
-      const existing = users.find((user) => user.id === row.user_id || user.email === row.email);
+      const existing = usersRef.current.find((user) => user.id === row.user_id || user.email === row.email);
       const accessLevel = toAccessLevel(row.org_role);
 
       return {
@@ -337,7 +344,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     });
 
     setUsers(syncedUsers);
-  }, [canManageAccess, setUsers, users]);
+  }, [canManageAccess, setUsers]);
 
   useEffect(() => {
     loadUsersFromDatabase();
