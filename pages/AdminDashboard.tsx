@@ -5,6 +5,7 @@ import { User, ProcessStatus, UserRole, Hierarchy, ServiceUnit, Organization, Ac
 import { NavLink, useLocation } from 'react-router-dom';
 import { ADMIN_CREDENTIALS, SERVICE_MANAGERS } from '../constants';
 import { buildOrganizationErrorMessage, createOrganization, deleteOrganization, loadOrganizations, updateOrganizationActiveStatus } from '../organizationRepository';
+import { isSupabaseConfigured, supabase } from '../supabase';
 
 interface AdminDashboardProps {
   currentUser: User;
@@ -36,6 +37,24 @@ const mapAccessLevelToRole = (accessLevel: AccessLevel): UserRole => {
   return UserRole.ADMIN;
 };
 
+const toAccessLevel = (orgRole: string | null | undefined): AccessLevel => {
+  const value = (orgRole ?? '').toLowerCase();
+
+  if (['admin', 'administrator', 'administrador', 'owner'].includes(value)) {
+    return AccessLevel.GENERAL_ADMIN;
+  }
+
+  if (['senior', 'manager', 'gestor', 'diretoria'].includes(value)) {
+    return AccessLevel.SENIOR_USER;
+  }
+
+  if (['pleno', 'tecnico', 'técnico'].includes(value)) {
+    return AccessLevel.PLENO_USER;
+  }
+
+  return AccessLevel.CLIENT;
+};
+
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, setUsers, onLogout, section = 'dashboard' }) => {
   const [activeTab, setActiveTab] = useState<'users' | 'management'>('users');
   const [searchTerm, setSearchTerm] = useState('');
@@ -63,6 +82,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [managementSearchTerm, setManagementSearchTerm] = useState('');
   const [managementPageSize, setManagementPageSize] = useState<number>(10);
   const [managementPage, setManagementPage] = useState<number>(1);
+  const [isLoadingRemoteUsers, setIsLoadingRemoteUsers] = useState(false);
 
   const location = useLocation();
   const currentSection = section ?? (location.pathname.split('/')[2] as 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes' | 'financeiro') ?? 'dashboard';
@@ -252,6 +272,63 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   useEffect(() => {
     setManagementPage(1);
   }, [managementSearchTerm, managementPageSize]);
+
+  useEffect(() => {
+    const loadUsersFromDatabase = async () => {
+      if (!canManageAccess || !isSupabaseConfigured) {
+        return;
+      }
+
+      setIsLoadingRemoteUsers(true);
+
+      const { data, error } = await supabase
+        .from('v_user_context')
+        .select('user_id, email, nome_completo, org_id, org_name, org_role')
+        .order('email', { ascending: true });
+
+      setIsLoadingRemoteUsers(false);
+
+      if (error || !data) {
+        console.warn('[management] não foi possível carregar usuários do banco', error);
+        return;
+      }
+
+      const syncedUsers: User[] = data.map((row) => {
+        const existing = users.find((user) => user.id === row.user_id || user.email === row.email);
+        const accessLevel = existing?.accessLevel ?? toAccessLevel(row.org_role);
+
+        return {
+          id: row.user_id,
+          name: row.nome_completo ?? existing?.name ?? row.email?.split('@')[0] ?? 'Usuário',
+          email: row.email ?? existing?.email ?? 'sem-email',
+          role: mapAccessLevelToRole(accessLevel),
+          accessLevel,
+          documentId: existing?.documentId ?? '-',
+          taxId: existing?.taxId ?? '-',
+          address: existing?.address ?? '-',
+          maritalStatus: existing?.maritalStatus ?? 'Não informado',
+          country: existing?.country ?? 'Brasil',
+          phone: existing?.phone ?? '-',
+          processNumber: existing?.processNumber ?? '',
+          unit: existing?.unit ?? ServiceUnit.ADMINISTRATIVO,
+          status: existing?.status ?? ProcessStatus.PENDENTE,
+          protocol: existing?.protocol ?? `USR-${new Date().getFullYear()}-000`,
+          registrationDate: existing?.registrationDate ?? new Date().toLocaleString('pt-BR'),
+          notes: existing?.notes,
+          deadline: existing?.deadline,
+          serviceManager: existing?.serviceManager,
+          organizationId: row.org_id ?? existing?.organizationId,
+          organizationName: row.org_name ?? existing?.organizationName,
+          hierarchy: existing?.hierarchy,
+          lastUpdate: existing?.lastUpdate,
+        };
+      });
+
+      setUsers(syncedUsers);
+    };
+
+    loadUsersFromDatabase();
+  }, [canManageAccess, setUsers]);
 
   const filteredUsers = organizationScopedUsers.filter(u => 
     u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -959,6 +1036,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
            <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
               <div className="p-4 border-b border-slate-800 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
+                {isLoadingRemoteUsers && <p className="text-xs text-blue-300">Sincronizando usuários do banco...</p>}
                 <div className="flex items-center gap-2 text-sm text-slate-300">
                   <span>Mostrar</span>
                   <select
