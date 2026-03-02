@@ -60,6 +60,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [financialUserFilter, setFinancialUserFilter] = useState<string>('all');
   const [selectedFinancialId, setSelectedFinancialId] = useState<string | null>(null);
   const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
+  const [managementSearchTerm, setManagementSearchTerm] = useState('');
+  const [managementPageSize, setManagementPageSize] = useState<number>(10);
+  const [managementPage, setManagementPage] = useState<number>(1);
 
   const location = useLocation();
   const currentSection = section ?? (location.pathname.split('/')[2] as 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes' | 'financeiro') ?? 'dashboard';
@@ -104,6 +107,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       : users;
 
   const managementScopedUsers = canManageAccess ? users : organizationScopedUsers;
+
+  const managementFilteredUsers = managementScopedUsers.filter((user) => {
+    const term = managementSearchTerm.trim().toLowerCase();
+
+    if (!term) {
+      return true;
+    }
+
+    return (
+      user.name.toLowerCase().includes(term) ||
+      user.email.toLowerCase().includes(term) ||
+      getUserAccessLevel(user).toLowerCase().includes(term)
+    );
+  });
+
+  const managementTotalPages = Math.max(Math.ceil(managementFilteredUsers.length / managementPageSize), 1);
+  const managementSafePage = Math.min(managementPage, managementTotalPages);
+  const managementPageStart = (managementSafePage - 1) * managementPageSize;
+  const managementPagedUsers = managementFilteredUsers.slice(
+    managementPageStart,
+    managementPageStart + managementPageSize
+  );
 
   const organizationInsights = organizations
     .map((organization) => {
@@ -223,6 +248,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       setActiveTab('users');
     }
   }, [currentSection]);
+
+  useEffect(() => {
+    setManagementPage(1);
+  }, [managementSearchTerm, managementPageSize]);
 
   const filteredUsers = organizationScopedUsers.filter(u => 
     u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -929,6 +958,30 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
            </div>
 
            <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+              <div className="p-4 border-b border-slate-800 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
+                <div className="flex items-center gap-2 text-sm text-slate-300">
+                  <span>Mostrar</span>
+                  <select
+                    value={managementPageSize}
+                    onChange={(event) => setManagementPageSize(Number(event.target.value))}
+                    className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm"
+                  >
+                    {[5, 10, 20, 50].map((size) => (
+                      <option key={size} value={size}>{size}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="relative w-full md:w-72">
+                  <Search className="absolute left-3 top-2.5 text-slate-500 w-4 h-4" />
+                  <input
+                    type="text"
+                    placeholder="Pesquisar..."
+                    value={managementSearchTerm}
+                    onChange={(event) => setManagementSearchTerm(event.target.value)}
+                    className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm"
+                  />
+                </div>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead>
@@ -939,7 +992,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800">
-                    {managementScopedUsers.map(u => (
+                    {managementPagedUsers.map(u => (
                       <tr key={u.id} className="hover:bg-slate-800/30">
                         <td className="px-6 py-4 font-bold flex flex-col">
                            <span>{u.name}</span>
@@ -972,6 +1025,32 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     ))}
                   </tbody>
                 </table>
+              </div>
+              <div className="px-4 py-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+                <span>
+                  {managementFilteredUsers.length === 0
+                    ? '0 usuários'
+                    : `${managementPageStart + 1} - ${Math.min(managementPageStart + managementPageSize, managementFilteredUsers.length)} de ${managementFilteredUsers.length} usuários`}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setManagementPage((prev) => Math.max(prev - 1, 1))}
+                    disabled={managementSafePage <= 1}
+                    className="px-2 py-1 rounded bg-slate-800 disabled:opacity-40"
+                  >
+                    {'<'}
+                  </button>
+                  <span>{managementSafePage}/{managementTotalPages}</span>
+                  <button
+                    type="button"
+                    onClick={() => setManagementPage((prev) => Math.min(prev + 1, managementTotalPages))}
+                    disabled={managementSafePage >= managementTotalPages}
+                    className="px-2 py-1 rounded bg-slate-800 disabled:opacity-40"
+                  >
+                    {'>'}
+                  </button>
+                </div>
               </div>
            </div>
           </div>
