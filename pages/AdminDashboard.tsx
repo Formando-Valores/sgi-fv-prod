@@ -42,9 +42,10 @@ const mapAccessLevelToOrgRole = (accessLevel: AccessLevel): string => {
     case AccessLevel.GENERAL_ADMIN:
       return 'admin';
     case AccessLevel.SENIOR_USER:
-      return 'senior';
+      // O check constraint do banco usa o vocabulário legado.
+      return 'manager';
     case AccessLevel.PLENO_USER:
-      return 'pleno';
+      return 'tecnico';
     default:
       return 'client';
   }
