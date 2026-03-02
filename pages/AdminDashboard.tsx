@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { LogOut, Printer, FileDown, Eye, Pencil, Search, Users, ShieldCheck, X, Plus, Trash2, Calendar, MessageSquare, Check, User as UserIcon, UserCheck, LayoutDashboard, FolderKanban, Users2, Settings, Menu, Building2, PieChart, Wallet } from 'lucide-react';
 import { User, ProcessStatus, UserRole, Hierarchy, ServiceUnit, Organization, AccessLevel } from '../types';
 import { NavLink, useLocation } from 'react-router-dom';
@@ -35,6 +35,19 @@ const mapAccessLevelToRole = (accessLevel: AccessLevel): UserRole => {
   }
 
   return UserRole.ADMIN;
+};
+
+const mapAccessLevelToOrgRole = (accessLevel: AccessLevel): string => {
+  switch (accessLevel) {
+    case AccessLevel.GENERAL_ADMIN:
+      return 'admin';
+    case AccessLevel.SENIOR_USER:
+      return 'senior';
+    case AccessLevel.PLENO_USER:
+      return 'pleno';
+    default:
+      return 'client';
+  }
 };
 
 const toAccessLevel = (orgRole: string | null | undefined): AccessLevel => {
@@ -273,62 +286,62 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     setManagementPage(1);
   }, [managementSearchTerm, managementPageSize]);
 
+  const loadUsersFromDatabase = useCallback(async () => {
+    if (!canManageAccess || !isSupabaseConfigured) {
+      return;
+    }
+
+    setIsLoadingRemoteUsers(true);
+
+    const { data, error } = await supabase
+      .from('v_user_context')
+      .select('user_id, email, nome_completo, org_id, org_name, org_role')
+      .order('email', { ascending: true });
+
+    setIsLoadingRemoteUsers(false);
+
+    if (error || !data) {
+      console.warn('[management] não foi possível carregar usuários do banco', error);
+      return;
+    }
+
+    const syncedUsers: User[] = data.map((row) => {
+      const existing = users.find((user) => user.id === row.user_id || user.email === row.email);
+      const accessLevel = toAccessLevel(row.org_role);
+
+      return {
+        id: row.user_id,
+        name: row.nome_completo ?? existing?.name ?? row.email?.split('@')[0] ?? 'Usuário',
+        email: row.email ?? existing?.email ?? 'sem-email',
+        role: mapAccessLevelToRole(accessLevel),
+        accessLevel,
+        documentId: existing?.documentId ?? '-',
+        taxId: existing?.taxId ?? '-',
+        address: existing?.address ?? '-',
+        maritalStatus: existing?.maritalStatus ?? 'Não informado',
+        country: existing?.country ?? 'Brasil',
+        phone: existing?.phone ?? '-',
+        processNumber: existing?.processNumber ?? '',
+        unit: existing?.unit ?? ServiceUnit.ADMINISTRATIVO,
+        status: existing?.status ?? ProcessStatus.PENDENTE,
+        protocol: existing?.protocol ?? `USR-${new Date().getFullYear()}-000`,
+        registrationDate: existing?.registrationDate ?? new Date().toLocaleString('pt-BR'),
+        notes: existing?.notes,
+        deadline: existing?.deadline,
+        serviceManager: existing?.serviceManager,
+        organizationId: row.org_id ?? existing?.organizationId,
+        organizationName: row.org_name ?? existing?.organizationName,
+        hierarchy: existing?.hierarchy,
+        lastUpdate: existing?.lastUpdate,
+      };
+    });
+
+    setUsers(syncedUsers);
+  }, [canManageAccess, setUsers, users]);
+
   useEffect(() => {
-    const loadUsersFromDatabase = async () => {
-      if (!canManageAccess || !isSupabaseConfigured) {
-        return;
-      }
-
-      setIsLoadingRemoteUsers(true);
-
-      const { data, error } = await supabase
-        .from('v_user_context')
-        .select('user_id, email, nome_completo, org_id, org_name, org_role')
-        .order('email', { ascending: true });
-
-      setIsLoadingRemoteUsers(false);
-
-      if (error || !data) {
-        console.warn('[management] não foi possível carregar usuários do banco', error);
-        return;
-      }
-
-      const syncedUsers: User[] = data.map((row) => {
-        const existing = users.find((user) => user.id === row.user_id || user.email === row.email);
-        const accessLevel = existing?.accessLevel ?? toAccessLevel(row.org_role);
-
-        return {
-          id: row.user_id,
-          name: row.nome_completo ?? existing?.name ?? row.email?.split('@')[0] ?? 'Usuário',
-          email: row.email ?? existing?.email ?? 'sem-email',
-          role: mapAccessLevelToRole(accessLevel),
-          accessLevel,
-          documentId: existing?.documentId ?? '-',
-          taxId: existing?.taxId ?? '-',
-          address: existing?.address ?? '-',
-          maritalStatus: existing?.maritalStatus ?? 'Não informado',
-          country: existing?.country ?? 'Brasil',
-          phone: existing?.phone ?? '-',
-          processNumber: existing?.processNumber ?? '',
-          unit: existing?.unit ?? ServiceUnit.ADMINISTRATIVO,
-          status: existing?.status ?? ProcessStatus.PENDENTE,
-          protocol: existing?.protocol ?? `USR-${new Date().getFullYear()}-000`,
-          registrationDate: existing?.registrationDate ?? new Date().toLocaleString('pt-BR'),
-          notes: existing?.notes,
-          deadline: existing?.deadline,
-          serviceManager: existing?.serviceManager,
-          organizationId: row.org_id ?? existing?.organizationId,
-          organizationName: row.org_name ?? existing?.organizationName,
-          hierarchy: existing?.hierarchy,
-          lastUpdate: existing?.lastUpdate,
-        };
-      });
-
-      setUsers(syncedUsers);
-    };
-
     loadUsersFromDatabase();
-  }, [canManageAccess, setUsers]);
+  }, [loadUsersFromDatabase]);
 
   const filteredUsers = organizationScopedUsers.filter(u => 
     u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -344,57 +357,104 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     setEditingUser(null);
   };
 
-  const handleCreateUser = (e: React.FormEvent) => {
+  const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
+    setOrgError('');
+    setOrgSuccess('');
 
     if (!canManageAccess) {
       setOrgError('Somente o Administrador Geral pode alterar nível de acesso de usuários.');
-      setOrgSuccess('');
+      return;
+    }
+
+    if (!isSupabaseConfigured) {
+      setOrgError('Supabase não está configurado. Não foi possível salvar no banco.');
       return;
     }
 
     if (!newAdminEmail || !newAdminName) return;
 
-    const existing = users.find(u => u.email === newAdminEmail);
-    if (existing) {
-       setUsers(prev => prev.map(u => 
-         u.email === newAdminEmail ? { ...u, name: newAdminName, role: mapAccessLevelToRole(newUserAccessLevel), accessLevel: newUserAccessLevel, hierarchy: newAdminHierarchy } : u
-       ));
-    } else {
-       const newUser: User = {
-         id: Date.now().toString(),
-         name: newAdminName,
-         email: newAdminEmail,
-         role: mapAccessLevelToRole(newUserAccessLevel),
-         accessLevel: newUserAccessLevel,
-         hierarchy: newAdminHierarchy,
-         documentId: '---',
-         taxId: '---',
-         address: '---',
-         maritalStatus: '---',
-         country: '---',
-         phone: '---',
-         unit: ServiceUnit.ADMINISTRATIVO,
-         status: ProcessStatus.PENDENTE,
-         protocol: `ADM-2026-ADM`,
-         registrationDate: new Date().toLocaleString('pt-BR'),
-         lastUpdate: new Date().toLocaleString('pt-BR'),
-       };
-       setUsers(prev => [...prev, newUser]);
+    const email = newAdminEmail.trim().toLowerCase();
+    const existing = users.find((u) => u.email.toLowerCase() === email);
+    const fallbackOrgId = existing?.organizationId ?? currentUser.organizationId;
+    const orgRole = mapAccessLevelToOrgRole(newUserAccessLevel);
+
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('id')
+      .ilike('email', email)
+      .limit(1)
+      .maybeSingle();
+
+    if (profileError) {
+      setOrgError(`Erro ao localizar perfil no banco: ${profileError.message}`);
+      return;
     }
+
+    if (!profileData?.id) {
+      setOrgError('Usuário não encontrado em profiles. Peça para ele se cadastrar primeiro.');
+      return;
+    }
+
+    const { data: memberData, error: memberError } = await supabase
+      .from('org_members')
+      .update({ role: orgRole, org_id: fallbackOrgId })
+      .eq('user_id', profileData.id)
+      .select('id');
+
+    if (memberError) {
+      setOrgError(`Erro ao atualizar permissões: ${memberError.message}`);
+      return;
+    }
+
+    if (!memberData || memberData.length === 0) {
+      if (!fallbackOrgId) {
+        setOrgError('Usuário sem organização definida. Defina uma organização para prosseguir.');
+        return;
+      }
+
+      const { error: insertMemberError } = await supabase.from('org_members').insert({
+        user_id: profileData.id,
+        org_id: fallbackOrgId,
+        role: orgRole,
+      });
+
+      if (insertMemberError) {
+        setOrgError(`Erro ao criar vínculo em org_members: ${insertMemberError.message}`);
+        return;
+      }
+    }
+
+    const { error: updateNameError } = await supabase
+      .from('profiles')
+      .update({ nome_completo: newAdminName })
+      .eq('id', profileData.id);
+
+    if (updateNameError) {
+      console.warn('[management] não foi possível atualizar nome do perfil', updateNameError.message);
+    }
+
+    await loadUsersFromDatabase();
+
     setNewAdminEmail('');
     setNewAdminName('');
     setNewUserAccessLevel(AccessLevel.SENIOR_USER);
-    alert('Usuário definido com sucesso.');
+    setOrgSuccess('Perfil atualizado com sucesso no banco de dados.');
   };
 
-  const handleUpdateHierarchy = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleUpdateHierarchy = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!editingHierarchyUser) return;
+    setOrgError('');
+    setOrgSuccess('');
 
     if (!canManageAccess) {
       setOrgError('Somente o Administrador Geral pode alterar nível de acesso de usuários.');
-      setOrgSuccess('');
+      return;
+    }
+
+    if (!isSupabaseConfigured) {
+      setOrgError('Supabase não está configurado. Não foi possível salvar no banco.');
       return;
     }
 
@@ -402,24 +462,62 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const hierarchy = fd.get('hierarchy') as Hierarchy;
     const name = fd.get('admin_name') as string;
     const accessLevel = fd.get('access_level') as AccessLevel;
+    const orgRole = mapAccessLevelToOrgRole(accessLevel);
 
+    const { error: memberError } = await supabase
+      .from('org_members')
+      .update({ role: orgRole, org_id: editingHierarchyUser.organizationId ?? currentUser.organizationId })
+      .eq('user_id', editingHierarchyUser.id);
+
+    if (memberError) {
+      setOrgError(`Erro ao atualizar perfil no banco: ${memberError.message}`);
+      return;
+    }
+
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .update({ nome_completo: name })
+      .eq('id', editingHierarchyUser.id);
+
+    if (profileError) {
+      console.warn('[management] não foi possível atualizar nome do perfil', profileError.message);
+    }
+
+    await loadUsersFromDatabase();
     setUsers(prev => prev.map(u =>
       u.id === editingHierarchyUser.id
         ? { ...u, hierarchy, name, accessLevel, role: mapAccessLevelToRole(accessLevel) }
         : u
     ));
+    setOrgSuccess('Alteração salva com sucesso no banco de dados.');
     setEditingHierarchyUser(null);
   };
 
-  const handleDeleteUser = (id: string) => {
+  const handleDeleteUser = async (id: string) => {
+    setOrgError('');
+    setOrgSuccess('');
+
     if (!canManageAccess) {
       setOrgError('Somente o Administrador Geral pode excluir usuários administrativos.');
-      setOrgSuccess('');
+      return;
+    }
+
+    if (!isSupabaseConfigured) {
+      setOrgError('Supabase não está configurado. Não foi possível salvar no banco.');
       return;
     }
 
     if(window.confirm('Deseja realmente excluir este usuário?')) {
+      const { error } = await supabase.from('org_members').delete().eq('user_id', id);
+
+      if (error) {
+        setOrgError(`Erro ao remover vínculo de acesso: ${error.message}`);
+        return;
+      }
+
+      await loadUsersFromDatabase();
       setUsers(prev => prev.filter(u => u.id !== id));
+      setOrgSuccess('Vínculo de acesso removido com sucesso no banco de dados.');
     }
   };
 
