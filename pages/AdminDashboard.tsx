@@ -59,6 +59,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [financialOrganizationFilter, setFinancialOrganizationFilter] = useState<string>('all');
   const [financialUserFilter, setFinancialUserFilter] = useState<string>('all');
   const [selectedFinancialId, setSelectedFinancialId] = useState<string | null>(null);
+  const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
 
   const location = useLocation();
   const currentSection = section ?? (location.pathname.split('/')[2] as 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes' | 'financeiro') ?? 'dashboard';
@@ -164,6 +165,39 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
   const piePaid = financialTotal > 0 ? Math.round((financialPaid / financialTotal) * 100) : 0;
   const piePending = Math.max(100 - piePaid, 0);
+
+  const dashboardUserRows = organizationScopedUsers.slice(0, 6);
+  const dashboardProcessRows = organizationScopedUsers.map((user) => ({
+    id: user.id,
+    userName: user.name,
+    protocol: user.protocol,
+    status: user.status,
+    value: baseValueByStatus[user.status] ?? 1800,
+  }));
+
+  const selectedDashboardProcess =
+    dashboardProcessRows.find((row) => row.id === selectedProcessId) ?? dashboardProcessRows[0] ?? null;
+
+  const dashboardStats = {
+    activeUsers: organizationScopedUsers.filter((user) => getUserAccessLevel(user) !== AccessLevel.CLIENT).length,
+    activeProcesses: organizationScopedUsers.filter((user) => user.status !== ProcessStatus.CONCLUIDO).length,
+    completedProcesses: organizationScopedUsers.filter((user) => user.status === ProcessStatus.CONCLUIDO).length,
+    totalValue: dashboardProcessRows.reduce((acc, row) => acc + row.value, 0),
+  };
+
+  const processStatusTotal = Math.max(dashboardProcessRows.length, 1);
+  const processDistribution = {
+    triagem: Math.round((dashboardProcessRows.filter((row) => row.status === ProcessStatus.TRIAGEM).length / processStatusTotal) * 100),
+    analise: Math.round((dashboardProcessRows.filter((row) => row.status === ProcessStatus.ANALISE).length / processStatusTotal) * 100),
+    concluido: Math.round((dashboardProcessRows.filter((row) => row.status === ProcessStatus.CONCLUIDO).length / processStatusTotal) * 100),
+    pendente: Math.round((dashboardProcessRows.filter((row) => row.status === ProcessStatus.PENDENTE).length / processStatusTotal) * 100),
+  };
+
+  const processPieSlices = {
+    triagem: processDistribution.triagem,
+    analise: processDistribution.triagem + processDistribution.analise,
+    concluido: processDistribution.triagem + processDistribution.analise + processDistribution.concluido,
+  };
 
 
   const sidebarLinks = [
@@ -660,107 +694,170 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         </div>
       ) : activeTab === 'users' ? (
         <>
-          {isCentralAdmin && currentSection === 'dashboard' && (
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 mb-6">
-              <h3 className="text-lg font-black mb-1">VISÃO GERAL DAS ORGANIZAÇÕES</h3>
-              <p className="text-xs text-slate-400 uppercase tracking-wider mb-5">Clientes, processos e expiração por organização</p>
-              <div className="space-y-4">
-                {organizationInsights.map((organization) => (
-                  <div key={organization.id} className="bg-slate-950 border border-slate-800 rounded-xl p-4">
-                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
-                      <p className="font-bold">{organization.name}</p>
-                      <p className="text-xs text-slate-400">Expiração: {formatDateTime(organization.subscriptionExpiresAt)}</p>
-                    </div>
-                    <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden mb-3">
-                      <div
-                        className="h-full bg-blue-500"
-                        style={{ width: `${Math.max((organization.clientsCount / maxClientsCount) * 100, organization.clientsCount > 0 ? 10 : 0)}%` }}
-                      />
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                      <p className="text-slate-300">Clientes cadastrados: <span className="font-bold text-blue-300">{organization.clientsCount}</span></p>
-                      <p className="text-slate-300">Processos cadastrados: <span className="font-bold text-emerald-300">{organization.processCount}</span></p>
-                    </div>
+          {currentSection === 'dashboard' ? (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+                  <p className="text-xs uppercase tracking-wider text-slate-400">Usuários Ativos</p>
+                  <p className="text-3xl font-black text-blue-300 mt-2">{dashboardStats.activeUsers}</p>
+                </div>
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+                  <p className="text-xs uppercase tracking-wider text-slate-400">Processos Ativos</p>
+                  <p className="text-3xl font-black text-amber-300 mt-2">{dashboardStats.activeProcesses}</p>
+                </div>
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+                  <p className="text-xs uppercase tracking-wider text-slate-400">Processos Concluídos</p>
+                  <p className="text-3xl font-black text-emerald-300 mt-2">{dashboardStats.completedProcesses}</p>
+                </div>
+                <div className="bg-emerald-900/40 border border-emerald-700 rounded-2xl p-5">
+                  <p className="text-xs uppercase tracking-wider text-emerald-100">Valor Geral</p>
+                  <p className="text-3xl font-black text-emerald-200 mt-2">R$ {dashboardStats.totalValue.toLocaleString('pt-BR')}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+                <div className="xl:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+                  <div className="px-4 py-3 bg-blue-900/50 border-b border-slate-800">
+                    <h3 className="font-black">Gestão de Usuários</h3>
                   </div>
-                ))}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="text-xs uppercase tracking-wider text-slate-400">
+                        <tr>
+                          <th className="px-4 py-2 text-left">Nome</th>
+                          <th className="px-4 py-2 text-left">E-mail</th>
+                          <th className="px-4 py-2 text-left">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800">
+                        {dashboardUserRows.map((user) => (
+                          <tr key={user.id}>
+                            <td className="px-4 py-3 font-bold">{user.name}</td>
+                            <td className="px-4 py-3 text-slate-400">{user.email}</td>
+                            <td className="px-4 py-3">
+                              <span className={`px-2 py-1 rounded text-[10px] font-bold ${user.status === ProcessStatus.CONCLUIDO ? 'bg-emerald-900/40 text-emerald-300' : 'bg-amber-900/40 text-amber-300'}`}>
+                                {user.status === ProcessStatus.CONCLUIDO ? 'Ativo' : 'Em andamento'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="xl:col-span-4 bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+                  <div className="px-4 py-3 bg-blue-900/50 border-b border-slate-800">
+                    <h3 className="font-black">Gestão de Processos</h3>
+                  </div>
+                  <div className="space-y-2 p-4">
+                    {dashboardProcessRows.slice(0, 5).map((row) => (
+                      <button key={row.id} type="button" onClick={() => setSelectedProcessId(row.id)} className={`w-full text-left p-3 rounded-xl border ${selectedProcessId === row.id ? 'border-blue-500 bg-blue-900/20' : 'border-slate-800 bg-slate-950'}`}>
+                        <p className="font-bold text-sm">{row.protocol}</p>
+                        <p className="text-xs text-slate-400">{row.userName}</p>
+                        <p className="text-xs text-emerald-300 font-bold mt-1">R$ {row.value.toLocaleString('pt-BR')}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="xl:col-span-3 bg-slate-900 border border-slate-800 rounded-2xl p-4">
+                  <h3 className="font-black mb-3">Detalhes do Processo</h3>
+                  {selectedDashboardProcess ? (
+                    <div className="text-sm space-y-2">
+                      <p className="font-bold">{selectedDashboardProcess.protocol}</p>
+                      <p className="text-slate-400">Responsável: {selectedDashboardProcess.userName}</p>
+                      <p>Status: <span className="font-bold text-blue-300">{selectedDashboardProcess.status}</span></p>
+                      <p>Valor: <span className="font-bold text-emerald-300">R$ {selectedDashboardProcess.value.toLocaleString('pt-BR')}</span></p>
+                      <button type="button" className="mt-3 w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-500 font-bold">Gerar Gráfico de Pizza</button>
+                    </div>
+                  ) : <p className="text-slate-400 text-sm">Selecione um processo para ver detalhes.</p>}
+                </div>
+              </div>
+
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+                <h3 className="font-black mb-4">Distribuição dos Processos</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                  <div className="w-56 h-56 mx-auto rounded-full" style={{ background: `conic-gradient(#3b82f6 0 ${processPieSlices.triagem}%, #f59e0b ${processPieSlices.triagem}% ${processPieSlices.analise}%, #22c55e ${processPieSlices.analise}% ${processPieSlices.concluido}%, #8b5cf6 ${processPieSlices.concluido}% 100%)` }} />
+                  <div className="space-y-2 text-sm">
+                    <p><span className="inline-block w-2 h-2 rounded-full bg-blue-500 mr-2" />Triagem: <strong>{processDistribution.triagem}%</strong></p>
+                    <p><span className="inline-block w-2 h-2 rounded-full bg-amber-500 mr-2" />Análise: <strong>{processDistribution.analise}%</strong></p>
+                    <p><span className="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-2" />Concluído: <strong>{processDistribution.concluido}%</strong></p>
+                    <p><span className="inline-block w-2 h-2 rounded-full bg-violet-500 mr-2" />Cadastro: <strong>{processDistribution.pendente}%</strong></p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+              <div className="p-6 border-b border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 no-print">
+                <div className="relative w-full md:w-96">
+                  <Search className="absolute left-3 top-2.5 text-slate-500 w-4 h-4" />
+                  <input 
+                    type="text" 
+                    placeholder="Pesquise Por: Nome, Protocolo ou E-mail"
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 bg-gray-900 border border-slate-800 rounded-full text-white text-sm font-bold placeholder:text-slate-600 focus:ring-1 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-500 text-[10px] font-black uppercase">Total de Registros:</span>
+                  <span className="bg-slate-800 px-2 py-0.5 rounded-md text-blue-400 font-bold text-xs">{filteredUsers.length}</span>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="bg-slate-950 text-slate-400 uppercase text-[10px] font-black tracking-widest">
+                      <th className="px-6 py-4">Nome Completo</th>
+                      <th className="px-6 py-4">Telefone+DDD+País</th>
+                      <th className="px-6 py-4">Protocolo SGI</th>
+                      <th className="px-6 py-4">Status do Processo</th>
+                      <th className="px-6 py-4">Última Alteração</th>
+                      <th className="px-6 py-4 text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800">
+                    {filteredUsers.map(user => (
+                      <tr key={user.id} className="hover:bg-slate-800/50 transition-colors">
+                        <td className="px-6 py-4 font-bold text-slate-200">{user.name}</td>
+                        <td className="px-6 py-4 text-slate-400 font-bold">{user.phone} ({user.country})</td>
+                        <td className="px-6 py-4">
+                          <span className="bg-blue-900/30 text-blue-400 px-2 py-1 rounded-md text-[10px] font-black">{user.protocol}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`px-3 py-1 rounded-full text-[10px] font-black text-white ${
+                            user.status === ProcessStatus.PENDENTE ? 'bg-slate-600' :
+                            user.status === ProcessStatus.TRIAGEM ? 'bg-yellow-600' :
+                            user.status === ProcessStatus.ANALISE ? 'bg-orange-600' : 'bg-emerald-600'
+                          }`}>
+                            {user.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-slate-500 text-[10px] font-bold">
+                          {user.lastUpdate || user.registrationDate}
+                        </td>
+                        <td className="px-6 py-4 text-right no-print">
+                          <div className="flex justify-end gap-2">
+                            <button onClick={() => setSelectedUser(user)} className="p-1.5 bg-slate-800 hover:bg-slate-700 rounded-md text-slate-300">
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => setEditingUser(user)} className="p-1.5 bg-blue-900/30 hover:bg-blue-900/50 rounded-md text-blue-400">
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
-
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
-          <div className="p-6 border-b border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 no-print">
-            <div className="relative w-full md:w-96">
-              <Search className="absolute left-3 top-2.5 text-slate-500 w-4 h-4" />
-              <input 
-                type="text" 
-                placeholder="Pesquise Por: Nome, Protocolo ou E-mail"
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-gray-900 border border-slate-800 rounded-full text-white text-sm font-bold placeholder:text-slate-600 focus:ring-1 focus:ring-blue-500 outline-none"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-slate-500 text-[10px] font-black uppercase">Total de Registros:</span>
-              <span className="bg-slate-800 px-2 py-0.5 rounded-md text-blue-400 font-bold text-xs">{filteredUsers.length}</span>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="bg-slate-950 text-slate-400 uppercase text-[10px] font-black tracking-widest">
-                  <th className="px-6 py-4">Nome Completo</th>
-                  <th className="px-6 py-4">Telefone+DDD+País</th>
-                  <th className="px-6 py-4">Protocolo SGI</th>
-                  <th className="px-6 py-4">Status do Processo</th>
-                  <th className="px-6 py-4">Última Alteração</th>
-                  <th className="px-6 py-4 text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800">
-                {filteredUsers.map(user => (
-                  <tr key={user.id} className="hover:bg-slate-800/50 transition-colors">
-                    <td className="px-6 py-4 font-bold text-slate-200">{user.name}</td>
-                    <td className="px-6 py-4 text-slate-400 font-bold">{user.phone} ({user.country})</td>
-                    <td className="px-6 py-4">
-                      <span className="bg-blue-900/30 text-blue-400 px-2 py-1 rounded-md text-[10px] font-black">{user.protocol}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-3 py-1 rounded-full text-[10px] font-black text-white ${
-                        user.status === ProcessStatus.PENDENTE ? 'bg-slate-600' :
-                        user.status === ProcessStatus.TRIAGEM ? 'bg-yellow-600' :
-                        user.status === ProcessStatus.ANALISE ? 'bg-orange-600' : 'bg-emerald-600'
-                      }`}>
-                        {user.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-slate-500 text-[10px] font-bold">
-                       {user.lastUpdate || user.registrationDate}
-                    </td>
-                    <td className="px-6 py-4 text-right no-print">
-                      <div className="flex justify-end gap-2">
-                        <button 
-                          onClick={() => setSelectedUser(user)}
-                          className="p-1.5 bg-slate-800 hover:bg-slate-700 rounded-md text-slate-300"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => setEditingUser(user)}
-                          className="p-1.5 bg-blue-900/30 hover:bg-blue-900/50 rounded-md text-blue-400"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          </div>
         </>
-      ) : (
+) : (
         /* Management Tab Content */
         <div className="space-y-4">
           {!canManageAccess && (
