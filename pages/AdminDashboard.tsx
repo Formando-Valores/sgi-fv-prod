@@ -94,15 +94,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     return isBootstrapGeneralAdmin ? AccessLevel.GENERAL_ADMIN : AccessLevel.SENIOR_USER;
   };
 
-  const isCurrentUserGeneralAdmin =
-    currentUser.role === UserRole.ADMIN &&
-    (getUserAccessLevel(currentUser) === AccessLevel.GENERAL_ADMIN || isCentralAdmin);
+  const canManageAccess = currentUser.role === UserRole.ADMIN;
 
   const organizationScopedUsers = isCentralAdmin
     ? users
     : currentUser.organizationId
       ? users.filter((user) => user.organizationId === currentUser.organizationId)
       : users;
+
+  const managementScopedUsers = canManageAccess ? users : organizationScopedUsers;
 
   const organizationInsights = organizations
     .map((organization) => {
@@ -207,7 +207,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const handleCreateUser = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!isCurrentUserGeneralAdmin) {
+    if (!canManageAccess) {
       setOrgError('Somente o Administrador Geral pode alterar nível de acesso de usuários.');
       setOrgSuccess('');
       return;
@@ -252,7 +252,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     e.preventDefault();
     if (!editingHierarchyUser) return;
 
-    if (!isCurrentUserGeneralAdmin) {
+    if (!canManageAccess) {
       setOrgError('Somente o Administrador Geral pode alterar nível de acesso de usuários.');
       setOrgSuccess('');
       return;
@@ -272,7 +272,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   };
 
   const handleDeleteUser = (id: string) => {
-    if (!isCurrentUserGeneralAdmin) {
+    if (!canManageAccess) {
       setOrgError('Somente o Administrador Geral pode excluir usuários administrativos.');
       setOrgSuccess('');
       return;
@@ -763,8 +763,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       ) : (
         /* Management Tab Content */
         <div className="space-y-4">
-          {!isCurrentUserGeneralAdmin && (
-            <p className="text-xs font-bold text-amber-300">Somente o Administrador Geral pode promover/rebaixar níveis de usuários.</p>
+          {!canManageAccess && (
+            <p className="text-xs font-bold text-amber-300">Somente usuários ADMIN podem promover/rebaixar níveis de usuários.</p>
           )}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
            <div className="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-2xl p-6">
@@ -799,7 +799,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     <select
                       value={newUserAccessLevel}
                       onChange={(event) => setNewUserAccessLevel(event.target.value as AccessLevel)}
-                      disabled={!isCurrentUserGeneralAdmin}
+                      disabled={!canManageAccess}
                       className="w-full bg-gray-900 border border-slate-800 rounded-lg p-3 text-white font-bold disabled:opacity-60"
                     >
                       {ACCESS_LEVEL_OPTIONS.map((level) => (
@@ -825,7 +825,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                        ))}
                     </div>
                  </div>
-                 <button type="submit" disabled={!isCurrentUserGeneralAdmin} className="w-full py-4 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-400 text-white font-bold rounded-lg uppercase text-xs tracking-widest mt-4 shadow-lg active:scale-95 transition-transform">
+                 <button type="submit" disabled={!canManageAccess} className="w-full py-4 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-400 text-white font-bold rounded-lg uppercase text-xs tracking-widest mt-4 shadow-lg active:scale-95 transition-transform">
                     Cadastrar / Definir
                  </button>
               </form>
@@ -842,7 +842,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800">
-                    {organizationScopedUsers.filter(u => getUserAccessLevel(u) !== AccessLevel.CLIENT).map(u => (
+                    {managementScopedUsers.map(u => (
                       <tr key={u.id} className="hover:bg-slate-800/30">
                         <td className="px-6 py-4 font-bold flex flex-col">
                            <span>{u.name}</span>
@@ -857,14 +857,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                            <div className="flex justify-end gap-2">
                               <button 
                                 onClick={() => setEditingHierarchyUser(u)}
-                                disabled={!isCurrentUserGeneralAdmin}
+                                disabled={!canManageAccess}
                                 className="p-2 bg-slate-800 hover:bg-slate-700 rounded-md text-slate-400 hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                               >
                                 <Pencil className="w-4 h-4" />
                               </button>
                               <button 
                                 onClick={() => handleDeleteUser(u.id)} 
-                                disabled={!isCurrentUserGeneralAdmin}
+                                disabled={!canManageAccess}
                                 className="p-2 bg-red-900/20 hover:bg-red-900/40 rounded-md text-red-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                               >
                                 <Trash2 className="w-4 h-4" />
@@ -931,7 +931,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                         <span className="font-bold text-slate-200">{h}</span>
                       </label>
                     ))}
-                    <button type="submit" disabled={!isCurrentUserGeneralAdmin} className="w-full py-5 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-400 text-white font-black uppercase tracking-widest rounded-2xl shadow-xl mt-4">
+                    <button type="submit" disabled={!canManageAccess} className="w-full py-5 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-400 text-white font-black uppercase tracking-widest rounded-2xl shadow-xl mt-4">
                       Confirmar Alteração
                     </button>
                   </div>
