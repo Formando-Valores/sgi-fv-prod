@@ -69,6 +69,25 @@ const toAccessLevel = (orgRole: string | null | undefined): AccessLevel => {
   return AccessLevel.CLIENT;
 };
 
+
+const getOrgRoleCandidates = (accessLevel: AccessLevel): string[] => {
+  const base = mapAccessLevelToOrgRole(accessLevel);
+
+  if (accessLevel === AccessLevel.SENIOR_USER) {
+    return [base, 'senior', 'gestor', 'diretoria'];
+  }
+
+  if (accessLevel === AccessLevel.PLENO_USER) {
+    return [base, 'pleno', 'técnico'];
+  }
+
+  if (accessLevel === AccessLevel.GENERAL_ADMIN) {
+    return [base, 'owner', 'administrator'];
+  }
+
+  return [base];
+};
+
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, setUsers, onLogout, section = 'dashboard' }) => {
   const [activeTab, setActiveTab] = useState<'users' | 'management'>('users');
   const [searchTerm, setSearchTerm] = useState('');
@@ -385,7 +404,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const email = newAdminEmail.trim().toLowerCase();
     const existing = users.find((u) => u.email.toLowerCase() === email);
     const fallbackOrgId = existing?.organizationId ?? currentUser.organizationId;
-    const orgRole = mapAccessLevelToOrgRole(newUserAccessLevel);
 
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
@@ -404,55 +422,81 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       return;
     }
 
-    let memberData: { id: string }[] | null = null;
+    const orgRoleCandidates = getOrgRoleCandidates(newUserAccessLevel);
+    let persisted = false;
+    let lastMemberErrorMessage: string | null = null;
 
-    if (fallbackOrgId) {
-      const { data: scopedMemberData, error: scopedMemberError } = await supabase
-        .from('org_members')
-        .update({ role: orgRole })
-        .eq('user_id', profileData.id)
-        .eq('org_id', fallbackOrgId)
-        .select('id');
+    for (const roleCandidate of orgRoleCandidates) {
+      let memberData: { id: string }[] | null = null;
 
-      if (scopedMemberError) {
-        setOrgError(`Erro ao atualizar permissões: ${scopedMemberError.message}`);
-        return;
+      if (fallbackOrgId) {
+        const { data: scopedMemberData, error: scopedMemberError } = await supabase
+          .from('org_members')
+          .update({ role: roleCandidate })
+          .eq('user_id', profileData.id)
+          .eq('org_id', fallbackOrgId)
+          .select('id');
+
+        if (scopedMemberError) {
+          lastMemberErrorMessage = scopedMemberError.message;
+          if (!scopedMemberError.message.includes('org_members_role_check')) {
+            setOrgError(`Erro ao atualizar permissões: ${scopedMemberError.message}`);
+            return;
+          }
+          continue;
+        }
+
+        memberData = scopedMemberData;
       }
 
-      memberData = scopedMemberData;
+      if (!memberData || memberData.length === 0) {
+        const { data: fallbackMemberData, error: fallbackMemberError } = await supabase
+          .from('org_members')
+          .update({ role: roleCandidate })
+          .eq('user_id', profileData.id)
+          .select('id');
+
+        if (fallbackMemberError) {
+          lastMemberErrorMessage = fallbackMemberError.message;
+          if (!fallbackMemberError.message.includes('org_members_role_check')) {
+            setOrgError(`Erro ao atualizar permissões: ${fallbackMemberError.message}`);
+            return;
+          }
+          continue;
+        }
+
+        memberData = fallbackMemberData;
+      }
+
+      if (!memberData || memberData.length === 0) {
+        if (!fallbackOrgId) {
+          setOrgError('Usuário sem organização definida. Defina uma organização para prosseguir.');
+          return;
+        }
+
+        const { error: insertMemberError } = await supabase.from('org_members').insert({
+          user_id: profileData.id,
+          org_id: fallbackOrgId,
+          role: roleCandidate,
+        });
+
+        if (insertMemberError) {
+          lastMemberErrorMessage = insertMemberError.message;
+          if (!insertMemberError.message.includes('org_members_role_check')) {
+            setOrgError(`Erro ao criar vínculo em org_members: ${insertMemberError.message}`);
+            return;
+          }
+          continue;
+        }
+      }
+
+      persisted = true;
+      break;
     }
 
-    if (!memberData || memberData.length === 0) {
-      const { data: fallbackMemberData, error: fallbackMemberError } = await supabase
-        .from('org_members')
-        .update({ role: orgRole })
-        .eq('user_id', profileData.id)
-        .select('id');
-
-      if (fallbackMemberError) {
-        setOrgError(`Erro ao atualizar permissões: ${fallbackMemberError.message}`);
-        return;
-      }
-
-      memberData = fallbackMemberData;
-    }
-
-    if (!memberData || memberData.length === 0) {
-      if (!fallbackOrgId) {
-        setOrgError('Usuário sem organização definida. Defina uma organização para prosseguir.');
-        return;
-      }
-
-      const { error: insertMemberError } = await supabase.from('org_members').insert({
-        user_id: profileData.id,
-        org_id: fallbackOrgId,
-        role: orgRole,
-      });
-
-      if (insertMemberError) {
-        setOrgError(`Erro ao criar vínculo em org_members: ${insertMemberError.message}`);
-        return;
-      }
+    if (!persisted) {
+      setOrgError(`Erro ao atualizar permissões: ${lastMemberErrorMessage ?? `nenhum papel aceito no banco para ${newUserAccessLevel}`}`);
+      return;
     }
 
     const { error: updateNameError } = await supabase
@@ -492,53 +536,82 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const hierarchy = fd.get('hierarchy') as Hierarchy;
     const name = fd.get('admin_name') as string;
     const accessLevel = fd.get('access_level') as AccessLevel;
-    const orgRole = mapAccessLevelToOrgRole(accessLevel);
 
     const targetOrgId = editingHierarchyUser.organizationId ?? currentUser.organizationId;
-    let updatedMemberRows: { id: string }[] | null = null;
+    const orgRoleCandidates = getOrgRoleCandidates(accessLevel);
+    let persisted = false;
+    let lastMemberErrorMessage: string | null = null;
 
-    if (targetOrgId) {
-      const { data: scopedUpdateData, error: scopedUpdateError } = await supabase
-        .from('org_members')
-        .update({ role: orgRole })
-        .eq('user_id', editingHierarchyUser.id)
-        .eq('org_id', targetOrgId)
-        .select('id');
+    for (const roleCandidate of orgRoleCandidates) {
+      let updatedMemberRows: { id: string }[] | null = null;
 
-      if (scopedUpdateError) {
-        setOrgError(`Erro ao atualizar perfil no banco: ${scopedUpdateError.message}`);
-        return;
+      if (targetOrgId) {
+        const { data: scopedUpdateData, error: scopedUpdateError } = await supabase
+          .from('org_members')
+          .update({ role: roleCandidate })
+          .eq('user_id', editingHierarchyUser.id)
+          .eq('org_id', targetOrgId)
+          .select('id');
+
+        if (scopedUpdateError) {
+          lastMemberErrorMessage = scopedUpdateError.message;
+          if (!scopedUpdateError.message.includes('org_members_role_check')) {
+            setOrgError(`Erro ao atualizar perfil no banco: ${scopedUpdateError.message}`);
+            setEditingHierarchyUser(null);
+            return;
+          }
+          continue;
+        }
+
+        updatedMemberRows = scopedUpdateData;
       }
 
-      updatedMemberRows = scopedUpdateData;
+      if (!updatedMemberRows || updatedMemberRows.length === 0) {
+        const { data: fallbackUpdateData, error: fallbackUpdateError } = await supabase
+          .from('org_members')
+          .update({ role: roleCandidate })
+          .eq('user_id', editingHierarchyUser.id)
+          .select('id');
+
+        if (fallbackUpdateError) {
+          lastMemberErrorMessage = fallbackUpdateError.message;
+          if (!fallbackUpdateError.message.includes('org_members_role_check')) {
+            setOrgError(`Erro ao atualizar perfil no banco: ${fallbackUpdateError.message}`);
+            setEditingHierarchyUser(null);
+            return;
+          }
+          continue;
+        }
+
+        updatedMemberRows = fallbackUpdateData;
+      }
+
+      if ((!updatedMemberRows || updatedMemberRows.length === 0) && targetOrgId) {
+        const { error: insertMemberError } = await supabase.from('org_members').insert({
+          user_id: editingHierarchyUser.id,
+          org_id: targetOrgId,
+          role: roleCandidate,
+        });
+
+        if (insertMemberError) {
+          lastMemberErrorMessage = insertMemberError.message;
+          if (!insertMemberError.message.includes('org_members_role_check')) {
+            setOrgError(`Erro ao criar vínculo de acesso no banco: ${insertMemberError.message}`);
+            setEditingHierarchyUser(null);
+            return;
+          }
+          continue;
+        }
+      }
+
+      persisted = true;
+      break;
     }
 
-    if (!updatedMemberRows || updatedMemberRows.length === 0) {
-      const { data: fallbackUpdateData, error: fallbackUpdateError } = await supabase
-        .from('org_members')
-        .update({ role: orgRole })
-        .eq('user_id', editingHierarchyUser.id)
-        .select('id');
-
-      if (fallbackUpdateError) {
-        setOrgError(`Erro ao atualizar perfil no banco: ${fallbackUpdateError.message}`);
-        return;
-      }
-
-      updatedMemberRows = fallbackUpdateData;
-    }
-
-    if ((!updatedMemberRows || updatedMemberRows.length === 0) && targetOrgId) {
-      const { error: insertMemberError } = await supabase.from('org_members').insert({
-        user_id: editingHierarchyUser.id,
-        org_id: targetOrgId,
-        role: orgRole,
-      });
-
-      if (insertMemberError) {
-        setOrgError(`Erro ao criar vínculo de acesso no banco: ${insertMemberError.message}`);
-        return;
-      }
+    if (!persisted) {
+      setOrgError(`Erro ao atualizar perfil no banco: ${lastMemberErrorMessage ?? `nenhum papel aceito no banco para ${accessLevel}`}`);
+      setEditingHierarchyUser(null);
+      return;
     }
 
     const { error: profileError } = await supabase
