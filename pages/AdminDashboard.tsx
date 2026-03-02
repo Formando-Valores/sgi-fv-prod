@@ -555,7 +555,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         ? { ...u, hierarchy, name, accessLevel, role: mapAccessLevelToRole(accessLevel) }
         : u
     ));
-    setOrgSuccess('Alteração salva com sucesso no banco de dados.');
+    setOrgSuccess(`Alteração concluída com sucesso para ${name}. Dados gravados no banco.`);
     setEditingHierarchyUser(null);
   };
 
@@ -1133,6 +1133,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           {!canManageAccess && (
             <p className="text-xs font-bold text-amber-300">Somente usuários ADMIN podem promover/rebaixar níveis de usuários.</p>
           )}
+          {orgError && (
+            <div className="rounded-xl border border-red-900/60 bg-red-900/20 px-4 py-3 text-sm font-bold text-red-300">
+              {orgError}
+            </div>
+          )}
+          {orgSuccess && (
+            <div className="rounded-xl border border-emerald-900/60 bg-emerald-900/20 px-4 py-3 text-sm font-bold text-emerald-300">
+              {orgSuccess}
+            </div>
+          )}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
            <div className="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-2xl p-6">
               <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
@@ -1248,7 +1258,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                         <td className="px-6 py-4 text-right">
                            <div className="flex justify-end gap-2">
                               <button 
-                                onClick={() => setEditingHierarchyUser(u)}
+                                onClick={() => { setOrgError(''); setOrgSuccess(''); setEditingHierarchyUser(u); }}
                                 disabled={!canManageAccess}
                                 className="p-2 bg-slate-800 hover:bg-slate-700 rounded-md text-slate-400 hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                               >
