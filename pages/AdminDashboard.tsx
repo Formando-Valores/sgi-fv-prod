@@ -169,6 +169,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [organizationName, setOrganizationName] = useState('');
+  const [organizationSearchTerm, setOrganizationSearchTerm] = useState('');
   const [orgError, setOrgError] = useState('');
   const [orgSuccess, setOrgSuccess] = useState('');
   const [isCreatingOrganization, setIsCreatingOrganization] = useState(false);
@@ -187,13 +188,29 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const currentSection = section ?? (location.pathname.split('/')[2] as 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes' | 'financeiro') ?? 'dashboard';
 
 
-
-  const centralOrganization = organizations.find((organization) => {
+  const isDefaultOrganization = (organization: Organization) => {
     const normalizedSlug = organization.slug?.toLowerCase();
     const normalizedName = organization.name.toLowerCase();
-
     return normalizedSlug === 'default' || normalizedName === 'organização padrão';
+  };
+
+  const sortedOrganizations = [...organizations].sort((left, right) => {
+    const leftDefault = isDefaultOrganization(left);
+    const rightDefault = isDefaultOrganization(right);
+
+    if (leftDefault && !rightDefault) return -1;
+    if (!leftDefault && rightDefault) return 1;
+
+    return left.name.localeCompare(right.name, 'pt-BR');
   });
+
+  const filteredOrganizations = sortedOrganizations.filter((organization) =>
+    organization.name.toLowerCase().includes(organizationSearchTerm.trim().toLowerCase())
+  );
+
+
+
+  const centralOrganization = organizations.find((organization) => isDefaultOrganization(organization));
 
   const isCentralAdmin =
     currentUser.role === UserRole.ADMIN &&
@@ -822,7 +839,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       return;
     }
 
-    setOrganizations((prev) => [...prev, organization].sort((left, right) => left.name.localeCompare(right.name, 'pt-BR')));
+    setOrganizations((prev) => [...prev, organization]);
     setOrganizationName('');
     setOrgSuccess('Organização cadastrada com sucesso.');
   };
@@ -1018,8 +1035,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
             <h3 className="text-lg font-black mb-4">ORGANIZAÇÕES CADASTRADAS</h3>
+            <div className="mb-4 relative">
+              <Search className="absolute left-3 top-3 w-4 h-4 text-slate-500" />
+              <input
+                type="text"
+                value={organizationSearchTerm}
+                onChange={(event) => setOrganizationSearchTerm(event.target.value)}
+                placeholder="Buscar organização por nome..."
+                className="w-full pl-9 pr-3 py-2.5 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white"
+              />
+            </div>
             <div className="space-y-3">
-              {organizations.map((organization) => (
+              {filteredOrganizations.map((organization) => (
                 <div key={organization.id} className="p-3 rounded-xl bg-slate-950 border border-slate-800">
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -1054,6 +1081,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               ))}
               {organizations.length === 0 && (
                 <p className="text-slate-400 text-sm">Nenhuma organização cadastrada ainda.</p>
+              )}
+              {organizations.length > 0 && filteredOrganizations.length === 0 && (
+                <p className="text-slate-400 text-sm">Nenhuma organização encontrada para essa busca.</p>
               )}
             </div>
           </div>
