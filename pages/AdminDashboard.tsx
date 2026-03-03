@@ -76,37 +76,56 @@ const getOrgRoleCandidates = (accessLevel: AccessLevel): string[] => {
   if (accessLevel === AccessLevel.SENIOR_USER) {
     return [
       base,
-      'senior',
-      'gestor',
-      'diretoria',
-      'manager',
-      'member',
-      'membro',
-      'user',
-      'usuario',
-      'usuário',
+      'senior', 'SENIOR',
+      'gestor', 'GESTOR',
+      'diretoria', 'DIRETORIA',
+      'manager', 'MANAGER',
+      'member', 'MEMBER',
+      'membro', 'MEMBRO',
+      'user', 'USER',
+      'usuario', 'USUARIO',
+      'usuário', 'USUÁRIO',
+      'supervisor', 'SUPERVISOR',
+      'coordenador', 'COORDENADOR',
+      'staff', 'STAFF',
     ];
   }
 
   if (accessLevel === AccessLevel.PLENO_USER) {
     return [
       base,
-      'pleno',
-      'técnico',
-      'tecnico',
-      'member',
-      'membro',
-      'user',
-      'usuario',
-      'usuário',
+      'pleno', 'PLENO',
+      'técnico', 'TÉCNICO',
+      'tecnico', 'TECNICO',
+      'member', 'MEMBER',
+      'membro', 'MEMBRO',
+      'user', 'USER',
+      'usuario', 'USUARIO',
+      'usuário', 'USUÁRIO',
+      'staff', 'STAFF',
+      'operator', 'OPERATOR',
+      'operador', 'OPERADOR',
     ];
   }
 
   if (accessLevel === AccessLevel.GENERAL_ADMIN) {
-    return [base, 'owner', 'administrator', 'administrador'];
+    return [
+      base,
+      'owner', 'OWNER',
+      'administrator', 'ADMINISTRATOR',
+      'administrador', 'ADMINISTRADOR',
+      'admin', 'ADMIN',
+      'super_admin', 'SUPER_ADMIN',
+    ];
   }
 
-  return [base, 'client', 'cliente'];
+  return [
+    base,
+    'client', 'CLIENT',
+    'cliente', 'CLIENTE',
+    'member', 'MEMBER',
+    'user', 'USER',
+  ];
 };
 
 
@@ -580,7 +599,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     }
 
     if (!persisted) {
-      setOrgError(`Erro ao atualizar permissões: ${lastMemberErrorMessage ?? `nenhum papel aceito no banco para ${newUserAccessLevel}`}`);
+      setOrgError(`Erro ao atualizar permissões: ${lastMemberErrorMessage ?? `nenhum papel aceito no banco para ${newUserAccessLevel}`}. Papéis tentados: ${orgRoleCandidates.join(', ')}`);
       return;
     }
 
@@ -694,7 +713,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     }
 
     if (!persisted) {
-      setOrgError(`Erro ao atualizar perfil no banco: ${lastMemberErrorMessage ?? `nenhum papel aceito no banco para ${accessLevel}`}`);
+      setOrgError(`Erro ao atualizar perfil no banco: ${lastMemberErrorMessage ?? `nenhum papel aceito no banco para ${accessLevel}`}. Papéis tentados: ${orgRoleCandidates.join(', ')}`);
       setEditingHierarchyUser(null);
       return;
     }
