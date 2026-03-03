@@ -109,6 +109,32 @@ const getOrgRoleCandidates = (accessLevel: AccessLevel): string[] => {
   return [base, 'client', 'cliente'];
 };
 
+
+const scoreRoleForAccessLevel = (accessLevel: AccessLevel, role: string): number => {
+  const normalizedRole = role.toLowerCase();
+
+  if (accessLevel === AccessLevel.GENERAL_ADMIN) {
+    if (['admin', 'administrator', 'administrador', 'owner'].includes(normalizedRole)) return 100;
+    return normalizedRole.includes('admin') ? 80 : 0;
+  }
+
+  if (accessLevel === AccessLevel.SENIOR_USER) {
+    if (['manager', 'senior', 'gestor', 'diretoria'].includes(normalizedRole)) return 100;
+    if (['member', 'membro', 'user', 'usuario', 'usuário'].includes(normalizedRole)) return 70;
+    return 0;
+  }
+
+  if (accessLevel === AccessLevel.PLENO_USER) {
+    if (['tecnico', 'técnico', 'pleno'].includes(normalizedRole)) return 100;
+    if (['member', 'membro', 'user', 'usuario', 'usuário'].includes(normalizedRole)) return 70;
+    return 0;
+  }
+
+  if (['client', 'cliente'].includes(normalizedRole)) return 100;
+  if (['member', 'membro', 'user', 'usuario', 'usuário'].includes(normalizedRole)) return 60;
+  return 0;
+};
+
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, setUsers, onLogout, section = 'dashboard' }) => {
   const [activeTab, setActiveTab] = useState<'users' | 'management'>('users');
   const [searchTerm, setSearchTerm] = useState('');
@@ -391,6 +417,44 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     loadUsersFromDatabase();
   }, [loadUsersFromDatabase]);
 
+
+  const resolveRoleCandidates = async (accessLevel: AccessLevel, orgId?: string): Promise<string[]> => {
+    const baseCandidates = getOrgRoleCandidates(accessLevel);
+
+    if (!isSupabaseConfigured) {
+      return baseCandidates;
+    }
+
+    const roleQuery = supabase
+      .from('org_members')
+      .select('role')
+      .not('role', 'is', null)
+      .limit(200);
+
+    const scopedRoleQuery = orgId ? roleQuery.eq('org_id', orgId) : roleQuery;
+    const { data: scopedRoles } = await scopedRoleQuery;
+
+    const fallbackRoles = scopedRoles && scopedRoles.length > 0
+      ? scopedRoles
+      : (await roleQuery).data;
+
+    const normalizedDbRoles = Array.from(
+      new Set((fallbackRoles ?? []).map((item) => (item.role ?? '').trim()).filter(Boolean))
+    );
+
+    if (normalizedDbRoles.length === 0) {
+      return baseCandidates;
+    }
+
+    const rankedDbRoles = normalizedDbRoles
+      .map((role) => ({ role, score: scoreRoleForAccessLevel(accessLevel, role) }))
+      .filter((entry) => entry.score > 0)
+      .sort((left, right) => right.score - left.score)
+      .map((entry) => entry.role);
+
+    return Array.from(new Set([...rankedDbRoles, ...baseCandidates]));
+  };
+
   const filteredUsers = organizationScopedUsers.filter(u => 
     u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     u.protocol.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -443,7 +507,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       return;
     }
 
-    const orgRoleCandidates = getOrgRoleCandidates(newUserAccessLevel);
+    const orgRoleCandidates = await resolveRoleCandidates(newUserAccessLevel, fallbackOrgId);
     let persisted = false;
     let lastMemberErrorMessage: string | null = null;
 
@@ -559,7 +623,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const accessLevel = fd.get('access_level') as AccessLevel;
 
     const targetOrgId = editingHierarchyUser.organizationId ?? currentUser.organizationId;
-    const orgRoleCandidates = getOrgRoleCandidates(accessLevel);
+    const orgRoleCandidates = await resolveRoleCandidates(accessLevel, targetOrgId);
     let persisted = false;
     let lastMemberErrorMessage: string | null = null;
 
