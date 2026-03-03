@@ -24,12 +24,21 @@ export enum Hierarchy {
   NOTES_ONLY = 'Somente Anotações'
 }
 
+
+export enum AccessLevel {
+  GENERAL_ADMIN = 'ADMINISTRADOR GERAL',
+  SENIOR_USER = 'USUÁRIO SÊNIOR',
+  PLENO_USER = 'USUÁRIO PLENO',
+  CLIENT = 'CLIENTE'
+}
+
 export interface User {
   id: string;
   name: string;
   email: string;
   password?: string;
   role: UserRole;
+  accessLevel?: AccessLevel;
   documentId: string;
   taxId: string;
   address: string;
@@ -46,6 +55,17 @@ export interface User {
   notes?: string;
   deadline?: string;
   serviceManager?: string; // Novo campo: Gestor do Serviço
+  organizationId?: string;
+  organizationName?: string;
+}
+
+export interface Organization {
+  id: string;
+  name: string;
+  createdAt?: string;
+  subscriptionExpiresAt?: string;
+  slug?: string;
+  active?: boolean;
 }
 
 export interface TimelineEntry {
