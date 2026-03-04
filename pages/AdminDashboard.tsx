@@ -6,6 +6,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { ADMIN_CREDENTIALS, SERVICE_MANAGERS } from '../constants';
 import { buildOrganizationErrorMessage, createOrganization, deleteOrganization, loadOrganizations, updateOrganizationActiveStatus } from '../organizationRepository';
 import { isSupabaseConfigured, supabase } from '../supabase';
+import ProcessosPage from './ProcessosPage';
 
 interface AdminDashboardProps {
   currentUser: User;
@@ -1141,19 +1142,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           </div>
         </div>
 ) : currentSection === 'processos' ? (
-
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-          <h3 className="text-lg font-black mb-4">PROCESSOS</h3>
-          <p className="text-slate-400 text-sm mb-4">Visão rápida dos processos cadastrados.</p>
-          <div className="space-y-3">
-            {organizationScopedUsers.map((user) => (
-              <div key={user.id} className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
-                <span className="font-bold">{user.name}</span>
-                <span className="text-xs text-slate-400">{user.protocol} • {user.status}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+        <ProcessosPage users={organizationScopedUsers} />
       ) : currentSection === 'clientes' ? (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
           <h3 className="text-lg font-black mb-4">CLIENTES</h3>
