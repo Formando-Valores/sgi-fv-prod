@@ -238,6 +238,38 @@ const ProcessosPage: React.FC<ProcessosPageProps> = ({ users }) => {
 
   const visibleColumnsList = useMemo(() => ALL_COLUMNS.filter((c) => visibleCols[c.key]), [visibleCols]);
 
+
+  const renderCell = (row: ProcessRow, key: typeof ALL_COLUMNS[number]['key']) => {
+    switch (key) {
+      case 'id':
+        return <td className="td td--mono">{row.id}</td>;
+      case 'cliente':
+        return <td className="td">{row.cliente}</td>;
+      case 'tipo':
+        return <td className="td">{row.tipo}</td>;
+      case 'responsavel':
+        return <td className="td">{row.responsavel}</td>;
+      case 'dataInicio':
+        return <td className="td">{formatDateBR(row.dataInicio)}</td>;
+      case 'prazo':
+        return <td className="td">{formatDateBR(row.prazo)}</td>;
+      case 'status':
+        return <td className="td"><Chip tone={STATUS[row.status].tone}>{STATUS[row.status].label}</Chip></td>;
+      case 'etapaAtual':
+        return <td className="td">{row.etapaAtual}</td>;
+      case 'financeiro':
+        return <td className="td"><Chip tone={row.financeiro === 'Pago' ? 'success' : 'warning'}>{row.financeiro}</Chip></td>;
+      case 'prioridade':
+        return <td className="td"><Chip tone={PRIORIDADE[row.prioridade].tone}>{PRIORIDADE[row.prioridade].label}</Chip></td>;
+      case 'valor':
+        return <td className="td td--right">{formatBRL(row.valor)}</td>;
+      case '_actions':
+        return <td className="td td--actions"><IconButton title="Ver detalhes" onClick={() => window.alert(`Abrir detalhes do processo ${row.id}`)}>👁</IconButton><IconButton title="Editar" onClick={() => window.alert(`Editar processo ${row.id}`)}>✎</IconButton></td>;
+      default:
+        return <td className="td">—</td>;
+    }
+  };
+
   const toggleSort = (key: keyof ProcessRow | '_actions') => {
     if (key === '_actions') return;
     if (sortKey === key) {
@@ -313,18 +345,11 @@ const ProcessosPage: React.FC<ProcessosPageProps> = ({ users }) => {
             <tbody>
               {paged.length === 0 ? <tr><td className="empty" colSpan={visibleColumnsList.length}>Nenhum processo encontrado com os filtros atuais.</td></tr> : paged.map((r) => (
                 <tr key={r.id} className="tr">
-                  {visibleCols.id && <td className="td td--mono">{r.id}</td>}
-                  {visibleCols.cliente && <td className="td">{r.cliente}</td>}
-                  {visibleCols.tipo && <td className="td">{r.tipo}</td>}
-                  {visibleCols.responsavel && <td className="td">{r.responsavel}</td>}
-                  {visibleCols.dataInicio && <td className="td">{formatDateBR(r.dataInicio)}</td>}
-                  {visibleCols.prazo && <td className="td">{formatDateBR(r.prazo)}</td>}
-                  {visibleCols.status && <td className="td"><Chip tone={STATUS[r.status].tone}>{STATUS[r.status].label}</Chip></td>}
-                  {visibleCols.etapaAtual && <td className="td">{r.etapaAtual}</td>}
-                  {visibleCols.financeiro && <td className="td"><Chip tone={r.financeiro === 'Pago' ? 'success' : 'warning'}>{r.financeiro}</Chip></td>}
-                  {visibleCols.prioridade && <td className="td"><Chip tone={PRIORIDADE[r.prioridade].tone}>{PRIORIDADE[r.prioridade].label}</Chip></td>}
-                  {visibleCols.valor && <td className="td td--right">{formatBRL(r.valor)}</td>}
-                  {visibleCols._actions && <td className="td td--actions"><IconButton title="Ver detalhes" onClick={() => window.alert(`Abrir detalhes do processo ${r.id}`)}>👁</IconButton><IconButton title="Editar" onClick={() => window.alert(`Editar processo ${r.id}`)}>✎</IconButton></td>}
+                  {visibleColumnsList.map((column) => (
+                    <React.Fragment key={`${r.id}-${column.key}`}>
+                      {renderCell(r, column.key)}
+                    </React.Fragment>
+                  ))}
                 </tr>
               ))}
             </tbody>
