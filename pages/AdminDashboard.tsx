@@ -535,6 +535,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     return Boolean((count ?? 0) > 0);
   };
 
+
+  const hasAnyOrgMembership = async (userId: string): Promise<boolean> => {
+    const { count, error } = await supabase
+      .from('org_members')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId);
+
+    if (error) {
+      console.warn('[management] erro ao validar vínculo global em org_members', error.message);
+      return false;
+    }
+
+    return Boolean((count ?? 0) > 0);
+  };
+
   const filteredUsers = organizationScopedUsers.filter(u => 
     u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     u.protocol.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -577,10 +592,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       return;
     }
 
-    const hasMembership = await hasOrgMembership(targetUserId, fallbackOrgId);
+    const hasMembership = await hasAnyOrgMembership(targetUserId);
 
     if (!hasMembership) {
-      setOrgError('Não foi possível alterar o nível: usuário sem vínculo em org_members para esta organização. Crie/vincule o membro primeiro no banco.');
+      setOrgError('Não foi possível alterar o nível: usuário sem vínculo em org_members. Vincule o usuário a uma organização no banco antes de promover/rebaixar.');
       return;
     }
 
@@ -682,10 +697,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const accessLevel = fd.get('access_level') as AccessLevel;
 
     const targetOrgId = editingHierarchyUser.organizationId ?? currentUser.organizationId;
-    const hasMembership = await hasOrgMembership(editingHierarchyUser.id, targetOrgId);
+    const hasMembership = await hasAnyOrgMembership(editingHierarchyUser.id);
 
     if (!hasMembership) {
-      setOrgError('Não foi possível alterar o nível: usuário sem vínculo em org_members para esta organização.');
+      setOrgError('Não foi possível alterar o nível: usuário sem vínculo em org_members.');
       setEditingHierarchyUser(null);
       return;
     }
