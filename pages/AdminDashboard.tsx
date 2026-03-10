@@ -516,6 +516,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     return contextByEmail?.user_id ?? null;
   };
 
+
+  const hasOrgMembership = async (userId: string, orgId?: string): Promise<boolean> => {
+    const baseQuery = supabase
+      .from('org_members')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId);
+
+    const { count, error } = orgId
+      ? await baseQuery.eq('org_id', orgId)
+      : await baseQuery;
+
+    if (error) {
+      console.warn('[management] erro ao validar vínculo em org_members', error.message);
+      return false;
+    }
+
+    return Boolean((count ?? 0) > 0);
+  };
+
   const filteredUsers = organizationScopedUsers.filter(u => 
     u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     u.protocol.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -555,6 +574,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
     if (!targetUserId) {
       setOrgError('Usuário sem vínculo válido de autenticação (auth.users). Peça para ele entrar no sistema ao menos 1 vez antes de alterar o nível.');
+      return;
+    }
+
+    const hasMembership = await hasOrgMembership(targetUserId, fallbackOrgId);
+
+    if (!hasMembership) {
+      setOrgError('Não foi possível alterar o nível: usuário sem vínculo em org_members para esta organização. Crie/vincule o membro primeiro no banco.');
       return;
     }
 
@@ -605,25 +631,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       }
 
       if (!memberData || memberData.length === 0) {
-        if (!fallbackOrgId) {
-          setOrgError('Usuário sem organização definida. Defina uma organização para prosseguir.');
-          return;
-        }
-
-        const { error: insertMemberError } = await supabase.from('org_members').insert({
-          user_id: targetUserId,
-          org_id: fallbackOrgId,
-          role: roleCandidate,
-        });
-
-        if (insertMemberError) {
-          lastMemberErrorMessage = insertMemberError.message;
-          if (!insertMemberError.message.includes('org_members_role_check')) {
-            setOrgError(insertMemberError.message.includes('org_members_user_id_fkey') ? 'Não foi possível vincular acesso: este e-mail ainda não possui usuário válido no Auth/Supabase. Peça para o usuário entrar no sistema ao menos 1 vez.' : `Erro ao criar vínculo em org_members: ${insertMemberError.message}`);
-            return;
-          }
-          continue;
-        }
+        continue;
       }
 
       persisted = true;
@@ -674,6 +682,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const accessLevel = fd.get('access_level') as AccessLevel;
 
     const targetOrgId = editingHierarchyUser.organizationId ?? currentUser.organizationId;
+    const hasMembership = await hasOrgMembership(editingHierarchyUser.id, targetOrgId);
+
+    if (!hasMembership) {
+      setOrgError('Não foi possível alterar o nível: usuário sem vínculo em org_members para esta organização.');
+      setEditingHierarchyUser(null);
+      return;
+    }
+
     const orgRoleCandidates = await resolveRoleCandidates(accessLevel, targetOrgId);
     let persisted = false;
     let lastMemberErrorMessage: string | null = null;
@@ -722,22 +738,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         updatedMemberRows = fallbackUpdateData;
       }
 
-      if ((!updatedMemberRows || updatedMemberRows.length === 0) && targetOrgId) {
-        const { error: insertMemberError } = await supabase.from('org_members').insert({
-          user_id: editingHierarchyUser.id,
-          org_id: targetOrgId,
-          role: roleCandidate,
-        });
-
-        if (insertMemberError) {
-          lastMemberErrorMessage = insertMemberError.message;
-          if (!insertMemberError.message.includes('org_members_role_check')) {
-            setOrgError(insertMemberError.message.includes('org_members_user_id_fkey') ? 'Não foi possível vincular acesso: usuário sem vínculo válido no Auth/Supabase.' : `Erro ao criar vínculo de acesso no banco: ${insertMemberError.message}`);
-            setEditingHierarchyUser(null);
-            return;
-          }
-          continue;
-        }
+      if (!updatedMemberRows || updatedMemberRows.length === 0) {
+        continue;
       }
 
       persisted = true;
