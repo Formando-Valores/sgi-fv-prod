@@ -507,7 +507,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const resolvedUserId = contextByEmail?.[0]?.user_id;
 
     if (!resolvedUserId) {
-      return null;
+      const { data: profileByEmail, error: profileByEmailError } = await supabase
+        .from('profiles')
+        .select('id')
+        .ilike('email', normalizedEmail)
+        .not('id', 'is', null)
+        .limit(1);
+
+      if (profileByEmailError) {
+        console.warn('[management] erro ao buscar profile.id por email', profileByEmailError.message);
+        return null;
+      }
+
+      return profileByEmail?.[0]?.id ?? null;
     }
 
     return resolvedUserId;
@@ -717,7 +729,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const accessLevel = fd.get('access_level') as AccessLevel;
 
     const targetOrgId = editingHierarchyUser.organizationId ?? currentUser.organizationId;
-    const hasMembership = await hasAnyOrgMembership(editingHierarchyUser.id);
+    const targetUserId = await resolveTargetUserIdByEmail(editingHierarchyUser.email);
+
+    if (!targetUserId) {
+      setOrgError('Não foi possível alterar o nível: este e-mail ainda não possui vínculo válido no Auth/Supabase. Peça para o usuário realizar o primeiro login.');
+      setEditingHierarchyUser(null);
+      return;
+    }
+
+    const hasMembership = await hasAnyOrgMembership(targetUserId);
 
     if (!hasMembership && !targetOrgId) {
       setOrgError('Não foi possível alterar o nível: usuário sem vínculo em org_members e sem organização de destino.');
@@ -736,7 +756,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         const { data: scopedUpdateData, error: scopedUpdateError } = await supabase
           .from('org_members')
           .update({ role: roleCandidate })
-          .eq('user_id', editingHierarchyUser.id)
+          .eq('user_id', targetUserId)
           .eq('org_id', targetOrgId)
           .select('id');
 
@@ -757,7 +777,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         const { data: fallbackUpdateData, error: fallbackUpdateError } = await supabase
           .from('org_members')
           .update({ role: roleCandidate })
-          .eq('user_id', editingHierarchyUser.id)
+          .eq('user_id', targetUserId)
           .select('id');
 
         if (fallbackUpdateError) {
@@ -777,7 +797,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         if (!hasMembership && targetOrgId) {
           const { error: insertMemberError } = await supabase
             .from('org_members')
-            .insert({ user_id: editingHierarchyUser.id, org_id: targetOrgId, role: roleCandidate });
+            .insert({ user_id: targetUserId, org_id: targetOrgId, role: roleCandidate });
 
           if (insertMemberError) {
             lastMemberErrorMessage = insertMemberError.message;
@@ -814,7 +834,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const { error: profileError } = await supabase
       .from('profiles')
       .update({ nome_completo: name })
-      .eq('id', editingHierarchyUser.id);
+      .eq('id', targetUserId);
 
     if (profileError) {
       console.warn('[management] não foi possível atualizar nome do perfil', profileError.message);
@@ -822,7 +842,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
     await loadUsersFromDatabase();
     setUsers(prev => prev.map(u =>
-      u.id === editingHierarchyUser.id
+      u.id === editingHierarchyUser.id || u.id === targetUserId
         ? { ...u, hierarchy, name, accessLevel, role: mapAccessLevelToRole(accessLevel) }
         : u
     ));
