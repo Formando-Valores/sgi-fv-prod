@@ -1,5 +1,5 @@
 
-import { Country, ServiceUnit, ProcessStatus, User, UserRole } from './types';
+import { AccessLevel, Country, ServiceUnit, ProcessStatus, User, UserRole } from './types';
 
 export const COUNTRIES: Country[] = [
   { name: 'Brasil', code: '+55', flag: '🇧🇷' },
@@ -39,6 +39,7 @@ export const INITIAL_MOCK_USERS: User[] = [
     name: 'João Silva Teste',
     email: 'joao@exemplo.com',
     role: UserRole.CLIENT,
+    accessLevel: AccessLevel.CLIENT,
     documentId: '12.345.678-9',
     taxId: '123.456.789-00',
     address: 'Rua dos Pinheiros, 123, São Paulo - SP',
@@ -58,6 +59,7 @@ export const INITIAL_MOCK_USERS: User[] = [
     name: 'Maria Oliveira Admin',
     email: 'contato@vainaai.com',
     role: UserRole.ADMIN,
+    accessLevel: AccessLevel.GENERAL_ADMIN,
     documentId: '98.765.432-1',
     taxId: '000.000.000-00',
     address: 'Escritório Central SGI',
