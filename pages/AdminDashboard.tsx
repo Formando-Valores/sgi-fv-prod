@@ -492,29 +492,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const resolveTargetUserIdByEmail = async (email: string): Promise<string | null> => {
     const normalizedEmail = email.trim().toLowerCase();
 
+    const localUserMatch = usersRef.current.find(
+      (user) => user.email?.trim().toLowerCase() === normalizedEmail && Boolean(user.id)
+    );
+
+    if (localUserMatch?.id) {
+      return localUserMatch.id;
+    }
+
     const { data: contextByEmail, error: contextByEmailError } = await supabase
       .from('v_user_context')
       .select('user_id')
       .ilike('email', normalizedEmail)
+      .not('user_id', 'is', null)
       .limit(1)
       .maybeSingle();
 
-    if (!contextByEmailError && contextByEmail?.user_id) {
-      return contextByEmail.user_id;
+    if (contextByEmailError) {
+      console.warn('[management] erro ao buscar user_id em v_user_context por email', contextByEmailError.message);
+      return null;
     }
 
-    const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
-      .select('id')
-      .ilike('email', normalizedEmail)
-      .limit(1)
-      .maybeSingle();
-
-    if (profileError) {
-      console.warn('[management] erro ao buscar profile por email', profileError.message);
-    }
-
-    return profileData?.id ?? null;
+    return contextByEmail?.user_id ?? null;
   };
 
   const filteredUsers = organizationScopedUsers.filter(u => 
@@ -555,7 +554,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const targetUserId = await resolveTargetUserIdByEmail(email);
 
     if (!targetUserId) {
-      setOrgError('Usuário não encontrado. Peça para ele fazer login/cadastro antes de alterar o nível de acesso.');
+      setOrgError('Usuário sem vínculo válido de autenticação (auth.users). Peça para ele entrar no sistema ao menos 1 vez antes de alterar o nível.');
       return;
     }
 
