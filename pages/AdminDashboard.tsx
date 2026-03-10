@@ -492,28 +492,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const resolveTargetUserIdByEmail = async (email: string): Promise<string | null> => {
     const normalizedEmail = email.trim().toLowerCase();
 
-    const localUserMatch = usersRef.current.find(
-      (user) => user.email?.trim().toLowerCase() === normalizedEmail && Boolean(user.id)
-    );
-
-    if (localUserMatch?.id) {
-      return localUserMatch.id;
-    }
-
     const { data: contextByEmail, error: contextByEmailError } = await supabase
       .from('v_user_context')
       .select('user_id')
       .ilike('email', normalizedEmail)
       .not('user_id', 'is', null)
-      .limit(1)
-      .maybeSingle();
+      .limit(1);
 
     if (contextByEmailError) {
       console.warn('[management] erro ao buscar user_id em v_user_context por email', contextByEmailError.message);
       return null;
     }
 
-    return contextByEmail?.user_id ?? null;
+    const resolvedUserId = contextByEmail?.[0]?.user_id;
+
+    if (!resolvedUserId) {
+      return null;
+    }
+
+    return resolvedUserId;
   };
 
 
@@ -588,7 +585,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const targetUserId = await resolveTargetUserIdByEmail(email);
 
     if (!targetUserId) {
-      setOrgError('Usuário sem vínculo válido de autenticação (auth.users). Peça para ele entrar no sistema ao menos 1 vez antes de alterar o nível.');
+      setOrgError('Usuário sem vínculo válido no Auth/Supabase para este e-mail. Faça login com esse usuário e tente novamente.');
       return;
     }
 
