@@ -593,13 +593,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     }
 
     const hasMembership = await hasAnyOrgMembership(targetUserId);
+    const orgRoleCandidates = await resolveRoleCandidates(newUserAccessLevel, fallbackOrgId);
 
-    if (!hasMembership) {
-      setOrgError('Não foi possível alterar o nível: usuário sem vínculo em org_members. Vincule o usuário a uma organização no banco antes de promover/rebaixar.');
+    if (!hasMembership && !fallbackOrgId) {
+      setOrgError('Não foi possível alterar o nível: usuário sem vínculo em org_members e sem organização de destino para criar o vínculo.');
       return;
     }
 
-    const orgRoleCandidates = await resolveRoleCandidates(newUserAccessLevel, fallbackOrgId);
     let persisted = false;
     let lastMemberErrorMessage: string | null = null;
 
@@ -646,6 +646,29 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       }
 
       if (!memberData || memberData.length === 0) {
+        if (!hasMembership && fallbackOrgId) {
+          const { error: insertMemberError } = await supabase
+            .from('org_members')
+            .insert({ user_id: targetUserId, org_id: fallbackOrgId, role: roleCandidate });
+
+          if (insertMemberError) {
+            lastMemberErrorMessage = insertMemberError.message;
+
+            if (
+              insertMemberError.message.includes('org_members_role_check') ||
+              insertMemberError.code === '23505'
+            ) {
+              continue;
+            }
+
+            setOrgError(`Erro ao criar vínculo em org_members: ${insertMemberError.message}`);
+            return;
+          }
+
+          persisted = true;
+          break;
+        }
+
         continue;
       }
 
@@ -699,8 +722,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const targetOrgId = editingHierarchyUser.organizationId ?? currentUser.organizationId;
     const hasMembership = await hasAnyOrgMembership(editingHierarchyUser.id);
 
-    if (!hasMembership) {
-      setOrgError('Não foi possível alterar o nível: usuário sem vínculo em org_members.');
+    if (!hasMembership && !targetOrgId) {
+      setOrgError('Não foi possível alterar o nível: usuário sem vínculo em org_members e sem organização de destino.');
       setEditingHierarchyUser(null);
       return;
     }
@@ -754,6 +777,30 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       }
 
       if (!updatedMemberRows || updatedMemberRows.length === 0) {
+        if (!hasMembership && targetOrgId) {
+          const { error: insertMemberError } = await supabase
+            .from('org_members')
+            .insert({ user_id: editingHierarchyUser.id, org_id: targetOrgId, role: roleCandidate });
+
+          if (insertMemberError) {
+            lastMemberErrorMessage = insertMemberError.message;
+
+            if (
+              insertMemberError.message.includes('org_members_role_check') ||
+              insertMemberError.code === '23505'
+            ) {
+              continue;
+            }
+
+            setOrgError(`Erro ao criar vínculo em org_members: ${insertMemberError.message}`);
+            setEditingHierarchyUser(null);
+            return;
+          }
+
+          persisted = true;
+          break;
+        }
+
         continue;
       }
 
