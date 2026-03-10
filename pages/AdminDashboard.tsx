@@ -488,6 +488,35 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     return Array.from(new Set([...rankedDbRoles, ...baseCandidates]));
   };
 
+
+  const resolveTargetUserIdByEmail = async (email: string): Promise<string | null> => {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const { data: contextByEmail, error: contextByEmailError } = await supabase
+      .from('v_user_context')
+      .select('user_id')
+      .ilike('email', normalizedEmail)
+      .limit(1)
+      .maybeSingle();
+
+    if (!contextByEmailError && contextByEmail?.user_id) {
+      return contextByEmail.user_id;
+    }
+
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('id')
+      .ilike('email', normalizedEmail)
+      .limit(1)
+      .maybeSingle();
+
+    if (profileError) {
+      console.warn('[management] erro ao buscar profile por email', profileError.message);
+    }
+
+    return profileData?.id ?? null;
+  };
+
   const filteredUsers = organizationScopedUsers.filter(u => 
     u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     u.protocol.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -523,20 +552,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const existing = users.find((u) => u.email.toLowerCase() === email);
     const fallbackOrgId = existing?.organizationId ?? currentUser.organizationId;
 
-    const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
-      .select('id')
-      .ilike('email', email)
-      .limit(1)
-      .maybeSingle();
+    const targetUserId = await resolveTargetUserIdByEmail(email);
 
-    if (profileError) {
-      setOrgError(`Erro ao localizar perfil no banco: ${profileError.message}`);
-      return;
-    }
-
-    if (!profileData?.id) {
-      setOrgError('Usuário não encontrado em profiles. Peça para ele se cadastrar primeiro.');
+    if (!targetUserId) {
+      setOrgError('Usuário não encontrado. Peça para ele fazer login/cadastro antes de alterar o nível de acesso.');
       return;
     }
 
@@ -551,7 +570,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         const { data: scopedMemberData, error: scopedMemberError } = await supabase
           .from('org_members')
           .update({ role: roleCandidate })
-          .eq('user_id', profileData.id)
+          .eq('user_id', targetUserId)
           .eq('org_id', fallbackOrgId)
           .select('id');
 
@@ -571,7 +590,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         const { data: fallbackMemberData, error: fallbackMemberError } = await supabase
           .from('org_members')
           .update({ role: roleCandidate })
-          .eq('user_id', profileData.id)
+          .eq('user_id', targetUserId)
           .select('id');
 
         if (fallbackMemberError) {
@@ -593,7 +612,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         }
 
         const { error: insertMemberError } = await supabase.from('org_members').insert({
-          user_id: profileData.id,
+          user_id: targetUserId,
           org_id: fallbackOrgId,
           role: roleCandidate,
         });
@@ -601,7 +620,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         if (insertMemberError) {
           lastMemberErrorMessage = insertMemberError.message;
           if (!insertMemberError.message.includes('org_members_role_check')) {
-            setOrgError(`Erro ao criar vínculo em org_members: ${insertMemberError.message}`);
+            setOrgError(insertMemberError.message.includes('org_members_user_id_fkey') ? 'Não foi possível vincular acesso: este e-mail ainda não possui usuário válido no Auth/Supabase. Peça para o usuário entrar no sistema ao menos 1 vez.' : `Erro ao criar vínculo em org_members: ${insertMemberError.message}`);
             return;
           }
           continue;
@@ -620,7 +639,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const { error: updateNameError } = await supabase
       .from('profiles')
       .update({ nome_completo: newAdminName })
-      .eq('id', profileData.id);
+      .ilike('email', email);
 
     if (updateNameError) {
       console.warn('[management] não foi possível atualizar nome do perfil', updateNameError.message);
@@ -714,7 +733,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         if (insertMemberError) {
           lastMemberErrorMessage = insertMemberError.message;
           if (!insertMemberError.message.includes('org_members_role_check')) {
-            setOrgError(`Erro ao criar vínculo de acesso no banco: ${insertMemberError.message}`);
+            setOrgError(insertMemberError.message.includes('org_members_user_id_fkey') ? 'Não foi possível vincular acesso: usuário sem vínculo válido no Auth/Supabase.' : `Erro ao criar vínculo de acesso no banco: ${insertMemberError.message}`);
             setEditingHierarchyUser(null);
             return;
           }
