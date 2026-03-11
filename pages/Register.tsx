@@ -48,7 +48,7 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
     const normalizedMessage = message.toLowerCase();
 
     if (normalizedMessage.includes('database error saving new user')) {
-      return 'Erro interno ao criar usuário no Auth do Supabase. Verifique no Supabase se existe trigger/policy bloqueando criação em auth.users ou profiles.';
+      return 'Erro interno ao criar usuário no Auth do Supabase. Geralmente é problema de trigger/policy/constraint no banco (ex.: registro residual em profiles após exclusão manual). Revise auth.users, profiles e triggers de signup.';
     }
 
     if (normalizedMessage.includes('user already registered')) {

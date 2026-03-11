@@ -84,3 +84,12 @@ Esse script contempla:
 O projeto atual está em **React + Vite** com Supabase. As integrações de produção para
 **Amazon S3**, **SendGrid**, **Stripe** e logs centralizados devem ser feitas no backend
 (Node.js) via APIs seguras (service role), mantendo o frontend desacoplado.
+
+
+### SQL de diagnóstico para erro 500 no signup
+
+Foi adicionado um roteiro SQL para investigar e limpar resíduos de cadastro:
+
+- `supabase/auth_signup_diagnostics.sql`
+
+Ele ajuda a validar inconsistência entre `auth.users`, `profiles` e `org_members` (caso comum após exclusão manual de e-mail e tentativa de novo cadastro).
