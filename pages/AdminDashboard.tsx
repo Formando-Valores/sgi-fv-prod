@@ -777,33 +777,60 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
       if (!memberData || memberData.length === 0) {
         if (fallbackOrgId) {
-          const { error: insertMemberError } = await supabase
+          const { data: migrateMemberData, error: migrateMemberError } = await supabase
             .from('org_members')
-            .insert({ user_id: targetUserId, org_id: fallbackOrgId, role: roleCandidate });
+            .update({ org_id: fallbackOrgId, role: roleCandidate })
+            .eq('user_id', targetUserId)
+            .select('id');
 
-          if (insertMemberError) {
-            lastMemberErrorMessage = insertMemberError.message;
+          if (migrateMemberError) {
+            lastMemberErrorMessage = migrateMemberError.message;
 
             if (
-              insertMemberError.message.includes('org_members_role_check') ||
-              insertMemberError.code === '23505'
+              !migrateMemberError.message.includes('org_members_role_check') &&
+              !migrateMemberError.message.toLowerCase().includes('row-level security')
             ) {
-              continue;
+              setOrgError(`Erro ao alterar organização do usuário: ${migrateMemberError.message}`);
+              return;
             }
+          }
 
-            if (
-              insertMemberError.code === '23503' ||
-              insertMemberError.message.includes('org_members_user_id_fkey')
-            ) {
-              setOrgError('Não foi possível vincular este usuário à organização porque o ID não está válido no Auth. Peça para o usuário concluir cadastro/login no Supabase e tente novamente.');
+          memberData = migrateMemberData;
+
+          if (!memberData || memberData.length === 0) {
+            const { error: insertMemberError } = await supabase
+              .from('org_members')
+              .insert({ user_id: targetUserId, org_id: fallbackOrgId, role: roleCandidate });
+
+            if (insertMemberError) {
+              lastMemberErrorMessage = insertMemberError.message;
+
+              if (
+                insertMemberError.message.includes('org_members_role_check') ||
+                insertMemberError.code === '23505'
+              ) {
+                continue;
+              }
+
+              if (
+                insertMemberError.code === '23503' ||
+                insertMemberError.message.includes('org_members_user_id_fkey')
+              ) {
+                setOrgError('Não foi possível vincular este usuário à organização porque o ID não está válido no Auth. Peça para o usuário concluir cadastro/login no Supabase e tente novamente.');
+                return;
+              }
+
+              if (insertMemberError.message.toLowerCase().includes('row-level security')) {
+                setOrgError('Sem permissão para criar novo vínculo em org_members (RLS). O usuário precisa já ter vínculo prévio, ou a política RLS deve permitir INSERT para este administrador.');
+                return;
+              }
+
+              setOrgError(`Erro ao criar vínculo em org_members: ${insertMemberError.message}`);
               return;
             }
 
-            setOrgError(`Erro ao criar vínculo em org_members: ${insertMemberError.message}`);
-            return;
+            memberData = [{ id: targetUserId }];
           }
-
-          memberData = [{ id: targetUserId }];
         }
       }
 
@@ -930,35 +957,64 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
       if (!updatedMemberRows || updatedMemberRows.length === 0) {
         if (targetOrgId) {
-          const { error: insertMemberError } = await supabase
+          const { data: migrateMemberData, error: migrateMemberError } = await supabase
             .from('org_members')
-            .insert({ user_id: targetUserId, org_id: targetOrgId, role: roleCandidate });
+            .update({ org_id: targetOrgId, role: roleCandidate })
+            .eq('user_id', targetUserId)
+            .select('id');
 
-          if (insertMemberError) {
-            lastMemberErrorMessage = insertMemberError.message;
+          if (migrateMemberError) {
+            lastMemberErrorMessage = migrateMemberError.message;
 
             if (
-              insertMemberError.message.includes('org_members_role_check') ||
-              insertMemberError.code === '23505'
+              !migrateMemberError.message.includes('org_members_role_check') &&
+              !migrateMemberError.message.toLowerCase().includes('row-level security')
             ) {
-              continue;
+              setOrgError(`Erro ao alterar organização do usuário: ${migrateMemberError.message}`);
+              setEditingHierarchyUser(null);
+              return;
             }
+          }
 
-            if (
-              insertMemberError.code === '23503' ||
-              insertMemberError.message.includes('org_members_user_id_fkey')
-            ) {
-              setOrgError('Não foi possível vincular este usuário à organização porque o ID não está válido no Auth. Peça para o usuário concluir cadastro/login no Supabase e tente novamente.');
+          updatedMemberRows = migrateMemberData;
+
+          if (!updatedMemberRows || updatedMemberRows.length === 0) {
+            const { error: insertMemberError } = await supabase
+              .from('org_members')
+              .insert({ user_id: targetUserId, org_id: targetOrgId, role: roleCandidate });
+
+            if (insertMemberError) {
+              lastMemberErrorMessage = insertMemberError.message;
+
+              if (
+                insertMemberError.message.includes('org_members_role_check') ||
+                insertMemberError.code === '23505'
+              ) {
+                continue;
+              }
+
+              if (
+                insertMemberError.code === '23503' ||
+                insertMemberError.message.includes('org_members_user_id_fkey')
+              ) {
+                setOrgError('Não foi possível vincular este usuário à organização porque o ID não está válido no Auth. Peça para o usuário concluir cadastro/login no Supabase e tente novamente.');
+                setEditingHierarchyUser(null);
+                return;
+              }
+
+              if (insertMemberError.message.toLowerCase().includes('row-level security')) {
+                setOrgError('Sem permissão para criar novo vínculo em org_members (RLS). Ajuste a política RLS para INSERT ou mova o usuário a partir de um vínculo existente.');
+                setEditingHierarchyUser(null);
+                return;
+              }
+
+              setOrgError(`Erro ao criar vínculo em org_members: ${insertMemberError.message}`);
               setEditingHierarchyUser(null);
               return;
             }
 
-            setOrgError(`Erro ao criar vínculo em org_members: ${insertMemberError.message}`);
-            setEditingHierarchyUser(null);
-            return;
+            updatedMemberRows = [{ id: targetUserId }];
           }
-
-          updatedMemberRows = [{ id: targetUserId }];
         }
       }
 
