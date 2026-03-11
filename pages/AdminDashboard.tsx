@@ -233,6 +233,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     left.name.localeCompare(right.name, 'pt-BR')
   );
 
+  const sortedOrganizationsForAccessManagement = [...organizations].sort((left, right) =>
+    left.name.localeCompare(right.name, 'pt-BR')
+  );
+
   const filteredOrganizations = sortedOrganizations.filter((organization) =>
     organization.name.toLowerCase().includes(organizationSearchTerm.trim().toLowerCase())
   );
@@ -1685,7 +1689,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                       className="w-full bg-gray-900 border border-slate-800 rounded-lg p-3 text-white font-bold disabled:opacity-60"
                     >
                       <option value="">Selecione a organização</option>
-                      {sortedOrganizations.map((organization) => (
+                      {sortedOrganizationsForAccessManagement.map((organization) => (
                         <option key={organization.id} value={organization.id}>{organization.name}</option>
                       ))}
                     </select>
@@ -1864,7 +1868,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                       className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500 mb-4"
                     >
                       <option value="">Sem organização definida</option>
-                      {sortedOrganizations.map((organization) => (
+                      {sortedOrganizationsForAccessManagement.map((organization) => (
                         <option key={organization.id} value={organization.id}>{organization.name}</option>
                       ))}
                     </select>
