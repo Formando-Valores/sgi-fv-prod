@@ -1,17 +1,167 @@
 
-import React, { useState } from 'react';
-import { LogOut, Printer, FileDown, Eye, Pencil, Search, Users, ShieldCheck, X, Plus, Trash2, Calendar, MessageSquare, Check, User as UserIcon, UserCheck } from 'lucide-react';
-import { User, ProcessStatus, UserRole, Hierarchy, ServiceUnit } from '../types';
-import { SERVICE_MANAGERS } from '../constants';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { LogOut, Printer, FileDown, Eye, Pencil, Search, Users, ShieldCheck, X, Plus, Trash2, Calendar, MessageSquare, Check, User as UserIcon, UserCheck, LayoutDashboard, FolderKanban, Users2, Settings, Menu, Building2, PieChart, Wallet } from 'lucide-react';
+import { User, ProcessStatus, UserRole, Hierarchy, ServiceUnit, Organization, AccessLevel } from '../types';
+import { NavLink, useLocation } from 'react-router-dom';
+import { ADMIN_CREDENTIALS, SERVICE_MANAGERS } from '../constants';
+import { buildOrganizationErrorMessage, createOrganization, deleteOrganization, loadOrganizations, updateOrganizationActiveStatus } from '../organizationRepository';
+import { isSupabaseConfigured, supabase } from '../supabase';
+import ProcessosPage from './ProcessosPage';
+import { buildClientRegistrationErrorMessage, createClientAndProcess, type AssociationType, type DocumentType, type MaritalStatus } from '../clientProcessRepository';
 
 interface AdminDashboardProps {
   currentUser: User;
   users: User[];
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
   onLogout: () => void;
+  section?: 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes' | 'financeiro';
 }
 
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, setUsers, onLogout }) => {
+const ACCESS_LEVEL_OPTIONS = [
+  AccessLevel.GENERAL_ADMIN,
+  AccessLevel.SENIOR_USER,
+  AccessLevel.PLENO_USER,
+  AccessLevel.CLIENT,
+] as const;
+
+
+const DOCUMENT_TYPE_OPTIONS: DocumentType[] = ['Bilhete de Identidade', 'Cartão de Cidadão', 'Passaporte'];
+const MARITAL_STATUS_OPTIONS: MaritalStatus[] = ['Solteiro', 'Casado', 'Divorciado', 'Viúvo', 'União de Facto'];
+const ASSOCIATION_TYPE_OPTIONS: AssociationType[] = ['Cliente', 'Prestador de Serviços'];
+
+const ACCESS_LEVEL_DESCRIPTIONS: Record<AccessLevel, string> = {
+  [AccessLevel.GENERAL_ADMIN]: 'Visão total da plataforma, financeiro e gestão de perfis.',
+  [AccessLevel.SENIOR_USER]: 'Diretoria/Gerência da organização: agenda, equipe e distribuição autorizada.',
+  [AccessLevel.PLENO_USER]: 'Execução técnica: atua nos clientes/processos atribuídos.',
+  [AccessLevel.CLIENT]: 'Acesso restrito ao próprio processo e documentos.',
+};
+
+const mapAccessLevelToRole = (accessLevel: AccessLevel): UserRole => {
+  if (accessLevel === AccessLevel.CLIENT) {
+    return UserRole.CLIENT;
+  }
+
+  return UserRole.ADMIN;
+};
+
+const mapAccessLevelToOrgRole = (accessLevel: AccessLevel): string => {
+  switch (accessLevel) {
+    case AccessLevel.GENERAL_ADMIN:
+      return 'admin';
+    case AccessLevel.SENIOR_USER:
+      // O check constraint do banco usa o vocabulário legado.
+      return 'manager';
+    case AccessLevel.PLENO_USER:
+      return 'tecnico';
+    default:
+      return 'client';
+  }
+};
+
+const toAccessLevel = (orgRole: string | null | undefined): AccessLevel => {
+  const value = (orgRole ?? '').toLowerCase();
+
+  if (['admin', 'administrator', 'administrador', 'owner'].includes(value)) {
+    return AccessLevel.GENERAL_ADMIN;
+  }
+
+  if (['senior', 'manager', 'gestor', 'diretoria'].includes(value)) {
+    return AccessLevel.SENIOR_USER;
+  }
+
+  if (['pleno', 'tecnico', 'técnico'].includes(value)) {
+    return AccessLevel.PLENO_USER;
+  }
+
+  return AccessLevel.CLIENT;
+};
+
+
+const getOrgRoleCandidates = (accessLevel: AccessLevel): string[] => {
+  const base = mapAccessLevelToOrgRole(accessLevel);
+
+  if (accessLevel === AccessLevel.SENIOR_USER) {
+    return [
+      base,
+      'senior', 'SENIOR',
+      'gestor', 'GESTOR',
+      'diretoria', 'DIRETORIA',
+      'manager', 'MANAGER',
+      'member', 'MEMBER',
+      'membro', 'MEMBRO',
+      'user', 'USER',
+      'usuario', 'USUARIO',
+      'usuário', 'USUÁRIO',
+      'supervisor', 'SUPERVISOR',
+      'coordenador', 'COORDENADOR',
+      'staff', 'STAFF',
+    ];
+  }
+
+  if (accessLevel === AccessLevel.PLENO_USER) {
+    return [
+      base,
+      'pleno', 'PLENO',
+      'técnico', 'TÉCNICO',
+      'tecnico', 'TECNICO',
+      'member', 'MEMBER',
+      'membro', 'MEMBRO',
+      'user', 'USER',
+      'usuario', 'USUARIO',
+      'usuário', 'USUÁRIO',
+      'staff', 'STAFF',
+      'operator', 'OPERATOR',
+      'operador', 'OPERADOR',
+    ];
+  }
+
+  if (accessLevel === AccessLevel.GENERAL_ADMIN) {
+    return [
+      base,
+      'owner', 'OWNER',
+      'administrator', 'ADMINISTRATOR',
+      'administrador', 'ADMINISTRADOR',
+      'admin', 'ADMIN',
+      'super_admin', 'SUPER_ADMIN',
+    ];
+  }
+
+  return [
+    base,
+    'client', 'CLIENT',
+    'cliente', 'CLIENTE',
+    'member', 'MEMBER',
+    'user', 'USER',
+  ];
+};
+
+
+const scoreRoleForAccessLevel = (accessLevel: AccessLevel, role: string): number => {
+  const normalizedRole = role.toLowerCase();
+
+  if (accessLevel === AccessLevel.GENERAL_ADMIN) {
+    if (['admin', 'administrator', 'administrador', 'owner'].includes(normalizedRole)) return 100;
+    return normalizedRole.includes('admin') ? 80 : 0;
+  }
+
+  if (accessLevel === AccessLevel.SENIOR_USER) {
+    if (['manager', 'senior', 'gestor', 'diretoria'].includes(normalizedRole)) return 100;
+    if (['member', 'membro', 'user', 'usuario', 'usuário'].includes(normalizedRole)) return 70;
+    return 0;
+  }
+
+  if (accessLevel === AccessLevel.PLENO_USER) {
+    if (['tecnico', 'técnico', 'pleno'].includes(normalizedRole)) return 100;
+    if (['member', 'membro', 'user', 'usuario', 'usuário'].includes(normalizedRole)) return 70;
+    return 0;
+  }
+
+  if (['client', 'cliente'].includes(normalizedRole)) return 100;
+  if (['member', 'membro', 'user', 'usuario', 'usuário'].includes(normalizedRole)) return 60;
+  return 0;
+};
+
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, setUsers, onLogout, section = 'dashboard' }) => {
   const [activeTab, setActiveTab] = useState<'users' | 'management'>('users');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -21,9 +171,423 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [newAdminName, setNewAdminName] = useState('');
   const [newAdminEmail, setNewAdminEmail] = useState('');
   const [newAdminHierarchy, setNewAdminHierarchy] = useState<Hierarchy>(Hierarchy.FULL);
+  const [newUserAccessLevel, setNewUserAccessLevel] = useState<AccessLevel>(AccessLevel.SENIOR_USER);
   const [editingHierarchyUser, setEditingHierarchyUser] = useState<User | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [organizationName, setOrganizationName] = useState('');
+  const [organizationSearchTerm, setOrganizationSearchTerm] = useState('');
+  const [orgError, setOrgError] = useState('');
+  const [orgSuccess, setOrgSuccess] = useState('');
+  const [isCreatingOrganization, setIsCreatingOrganization] = useState(false);
+  const [organizationDeletingId, setOrganizationDeletingId] = useState<string | null>(null);
+  const [organizationTogglingId, setOrganizationTogglingId] = useState<string | null>(null);
+  const [financialOrganizationFilter, setFinancialOrganizationFilter] = useState<string>('all');
+  const [financialUserFilter, setFinancialUserFilter] = useState<string>('all');
+  const [selectedFinancialId, setSelectedFinancialId] = useState<string | null>(null);
+  const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
+  const [managementSearchTerm, setManagementSearchTerm] = useState('');
+  const [managementPageSize, setManagementPageSize] = useState<number>(10);
+  const [managementPage, setManagementPage] = useState<number>(1);
+  const [isLoadingRemoteUsers, setIsLoadingRemoteUsers] = useState(false);
+  const [isSubmittingClientForm, setIsSubmittingClientForm] = useState(false);
+  const [clientFormError, setClientFormError] = useState('');
+  const [clientFormSuccess, setClientFormSuccess] = useState('');
+  const [clientForm, setClientForm] = useState({
+    fullName: '',
+    documentType: DOCUMENT_TYPE_OPTIONS[0],
+    documentNumber: '',
+    taxIdentifier: '',
+    address: '',
+    postalCode: '',
+    phone: '',
+    email: '',
+    maritalStatus: MARITAL_STATUS_OPTIONS[0],
+    profession: '',
+    nationality: 'Angolana',
+    associationType: ASSOCIATION_TYPE_OPTIONS[0],
+  });
 
-  const filteredUsers = users.filter(u => 
+  const location = useLocation();
+  const currentSection = section ?? (location.pathname.split('/')[2] as 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes' | 'financeiro') ?? 'dashboard';
+
+
+  const isDefaultOrganization = (organization: Organization) => {
+    const normalizedSlug = organization.slug?.toLowerCase();
+    const normalizedName = organization.name.toLowerCase();
+    return normalizedSlug === 'default' || normalizedName === 'organização padrão';
+  };
+
+  const organizationsForDisplay = organizations.filter((organization) => !isDefaultOrganization(organization));
+
+  const sortedOrganizations = [...organizationsForDisplay].sort((left, right) =>
+    left.name.localeCompare(right.name, 'pt-BR')
+  );
+
+  const filteredOrganizations = sortedOrganizations.filter((organization) =>
+    organization.name.toLowerCase().includes(organizationSearchTerm.trim().toLowerCase())
+  );
+
+
+
+  const centralOrganization = organizations.find((organization) => isDefaultOrganization(organization));
+
+  const isCentralAdmin =
+    currentUser.role === UserRole.ADMIN &&
+    Boolean(
+      (currentUser.organizationId && centralOrganization?.id && currentUser.organizationId === centralOrganization.id) ||
+      currentUser.organizationName?.toLowerCase() === 'organização padrão'
+    );
+
+  const getUserAccessLevel = (user: User): AccessLevel => {
+    if (user.accessLevel) {
+      return user.accessLevel;
+    }
+
+    const userEmail = user.email?.toLowerCase();
+    const isBootstrapGeneralAdmin = userEmail ? ADMIN_CREDENTIALS.includes(userEmail) : false;
+
+    if (user.role === UserRole.CLIENT) {
+      return AccessLevel.CLIENT;
+    }
+
+    return isBootstrapGeneralAdmin ? AccessLevel.GENERAL_ADMIN : AccessLevel.SENIOR_USER;
+  };
+
+  const canManageAccess = currentUser.role === UserRole.ADMIN;
+
+  const organizationScopedUsers = isCentralAdmin
+    ? users
+    : currentUser.organizationId
+      ? users.filter((user) => user.organizationId === currentUser.organizationId)
+      : users;
+
+  const managementScopedUsers = canManageAccess ? users : organizationScopedUsers;
+
+  const managementFilteredUsers = managementScopedUsers.filter((user) => {
+    const term = managementSearchTerm.trim().toLowerCase();
+
+    if (!term) {
+      return true;
+    }
+
+    return (
+      user.name.toLowerCase().includes(term) ||
+      user.email.toLowerCase().includes(term) ||
+      getUserAccessLevel(user).toLowerCase().includes(term)
+    );
+  });
+
+  const managementTotalPages = Math.max(Math.ceil(managementFilteredUsers.length / managementPageSize), 1);
+  const managementSafePage = Math.min(managementPage, managementTotalPages);
+  const managementPageStart = (managementSafePage - 1) * managementPageSize;
+  const managementPagedUsers = managementFilteredUsers.slice(
+    managementPageStart,
+    managementPageStart + managementPageSize
+  );
+
+  const organizationInsights = organizations
+    .map((organization) => {
+      const organizationClients = users.filter(
+        (user) => user.organizationId === organization.id && getUserAccessLevel(user) === AccessLevel.CLIENT
+      );
+
+      const processCount = organizationClients.filter(
+        (user) => Boolean(user.processNumber) || Boolean(user.protocol)
+      ).length;
+
+      return {
+        ...organization,
+        clientsCount: organizationClients.length,
+        processCount,
+      };
+    })
+    .sort((left, right) => right.clientsCount - left.clientsCount);
+
+  const maxClientsCount = Math.max(...organizationInsights.map((item) => item.clientsCount), 1);
+
+  const baseValueByStatus: Record<ProcessStatus, number> = {
+    [ProcessStatus.PENDENTE]: 1800,
+    [ProcessStatus.TRIAGEM]: 2600,
+    [ProcessStatus.ANALISE]: 3400,
+    [ProcessStatus.CONCLUIDO]: 5200,
+  };
+
+  const financialRows = organizationScopedUsers
+    .filter((user) => getUserAccessLevel(user) !== AccessLevel.CLIENT)
+    .map((user) => {
+      const total = baseValueByStatus[user.status] ?? 1800;
+      const paid = user.status === ProcessStatus.CONCLUIDO ? total : user.status === ProcessStatus.ANALISE ? total * 0.6 : total * 0.25;
+      const pending = Math.max(total - paid, 0);
+
+      return {
+        id: user.id,
+        userName: user.name,
+        organizationId: user.organizationId ?? 'sem-org',
+        organizationName: user.organizationName ?? 'Não informado',
+        protocol: user.protocol,
+        status: user.status,
+        total,
+        paid,
+        pending,
+      };
+    });
+
+  const filteredFinancialRows = financialRows.filter((row) => {
+    const byOrg = financialOrganizationFilter === 'all' || row.organizationId === financialOrganizationFilter;
+    const byUser = financialUserFilter === 'all' || row.id === financialUserFilter;
+    return byOrg && byUser;
+  });
+
+  const financialTotal = filteredFinancialRows.reduce((acc, row) => acc + row.total, 0);
+  const financialPaid = filteredFinancialRows.reduce((acc, row) => acc + row.paid, 0);
+  const financialPending = filteredFinancialRows.reduce((acc, row) => acc + row.pending, 0);
+  const selectedFinancialRow = filteredFinancialRows.find((row) => row.id === selectedFinancialId) ?? filteredFinancialRows[0] ?? null;
+
+  const piePaid = financialTotal > 0 ? Math.round((financialPaid / financialTotal) * 100) : 0;
+  const piePending = Math.max(100 - piePaid, 0);
+
+  const dashboardUserRows = organizationScopedUsers.slice(0, 6);
+  const dashboardProcessRows = organizationScopedUsers.map((user) => ({
+    id: user.id,
+    userName: user.name,
+    protocol: user.protocol,
+    status: user.status,
+    value: baseValueByStatus[user.status] ?? 1800,
+  }));
+
+  const selectedDashboardProcess =
+    dashboardProcessRows.find((row) => row.id === selectedProcessId) ?? dashboardProcessRows[0] ?? null;
+
+  const dashboardStats = {
+    activeUsers: organizationScopedUsers.filter((user) => getUserAccessLevel(user) !== AccessLevel.CLIENT).length,
+    activeProcesses: organizationScopedUsers.filter((user) => user.status !== ProcessStatus.CONCLUIDO).length,
+    completedProcesses: organizationScopedUsers.filter((user) => user.status === ProcessStatus.CONCLUIDO).length,
+    totalValue: dashboardProcessRows.reduce((acc, row) => acc + row.value, 0),
+  };
+
+  const processStatusTotal = Math.max(dashboardProcessRows.length, 1);
+  const processDistribution = {
+    triagem: Math.round((dashboardProcessRows.filter((row) => row.status === ProcessStatus.TRIAGEM).length / processStatusTotal) * 100),
+    analise: Math.round((dashboardProcessRows.filter((row) => row.status === ProcessStatus.ANALISE).length / processStatusTotal) * 100),
+    concluido: Math.round((dashboardProcessRows.filter((row) => row.status === ProcessStatus.CONCLUIDO).length / processStatusTotal) * 100),
+    pendente: Math.round((dashboardProcessRows.filter((row) => row.status === ProcessStatus.PENDENTE).length / processStatusTotal) * 100),
+  };
+
+  const processPieSlices = {
+    triagem: processDistribution.triagem,
+    analise: processDistribution.triagem + processDistribution.analise,
+    concluido: processDistribution.triagem + processDistribution.analise + processDistribution.concluido,
+  };
+
+
+
+  const usersRef = useRef<User[]>(users);
+
+  useEffect(() => {
+    usersRef.current = users;
+  }, [users]);
+
+  const sidebarLinks = [
+    { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { to: '/dashboard/processos', label: 'Processos', icon: FolderKanban },
+    { to: '/dashboard/clientes', label: 'Clientes', icon: Users2 },
+    { to: '/dashboard/configuracoes', label: 'Configurações', icon: Settings },
+    { to: '/dashboard/organizacoes', label: 'Organizações', icon: Building2 },
+    { to: '/dashboard/financeiro', label: 'Financeiro', icon: Wallet },
+  ];
+
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (currentSection === 'configuracoes') {
+      setActiveTab('management');
+      return;
+    }
+
+    if (currentSection === 'dashboard') {
+      setActiveTab('users');
+    }
+  }, [currentSection]);
+
+  useEffect(() => {
+    setManagementPage(1);
+  }, [managementSearchTerm, managementPageSize]);
+
+  const loadUsersFromDatabase = useCallback(async () => {
+    if (!canManageAccess || !isSupabaseConfigured) {
+      return;
+    }
+
+    setIsLoadingRemoteUsers(true);
+
+    const { data, error } = await supabase
+      .from('v_user_context')
+      .select('user_id, email, nome_completo, org_id, org_name, org_role')
+      .order('email', { ascending: true });
+
+    setIsLoadingRemoteUsers(false);
+
+    if (error || !data) {
+      console.warn('[management] não foi possível carregar usuários do banco', error);
+      return;
+    }
+
+    const syncedUsers: User[] = data.map((row) => {
+      const existing = usersRef.current.find((user) => user.id === row.user_id || user.email === row.email);
+      const accessLevel = toAccessLevel(row.org_role);
+
+      return {
+        id: row.user_id,
+        name: row.nome_completo ?? existing?.name ?? row.email?.split('@')[0] ?? 'Usuário',
+        email: row.email ?? existing?.email ?? 'sem-email',
+        role: mapAccessLevelToRole(accessLevel),
+        accessLevel,
+        documentId: existing?.documentId ?? '-',
+        taxId: existing?.taxId ?? '-',
+        address: existing?.address ?? '-',
+        maritalStatus: existing?.maritalStatus ?? 'Não informado',
+        country: existing?.country ?? 'Brasil',
+        phone: existing?.phone ?? '-',
+        processNumber: existing?.processNumber ?? '',
+        unit: existing?.unit ?? ServiceUnit.ADMINISTRATIVO,
+        status: existing?.status ?? ProcessStatus.PENDENTE,
+        protocol: existing?.protocol ?? `USR-${new Date().getFullYear()}-000`,
+        registrationDate: existing?.registrationDate ?? new Date().toLocaleString('pt-BR'),
+        notes: existing?.notes,
+        deadline: existing?.deadline,
+        serviceManager: existing?.serviceManager,
+        organizationId: row.org_id ?? existing?.organizationId,
+        organizationName: row.org_name ?? existing?.organizationName,
+        hierarchy: existing?.hierarchy,
+        lastUpdate: existing?.lastUpdate,
+      };
+    });
+
+    setUsers(syncedUsers);
+  }, [canManageAccess, setUsers]);
+
+  useEffect(() => {
+    loadUsersFromDatabase();
+  }, [loadUsersFromDatabase]);
+
+
+  const resolveRoleCandidates = async (accessLevel: AccessLevel, orgId?: string): Promise<string[]> => {
+    const baseCandidates = getOrgRoleCandidates(accessLevel);
+
+    if (!isSupabaseConfigured) {
+      return baseCandidates;
+    }
+
+    const roleQuery = supabase
+      .from('org_members')
+      .select('role')
+      .not('role', 'is', null)
+      .limit(200);
+
+    const scopedRoleQuery = orgId ? roleQuery.eq('org_id', orgId) : roleQuery;
+    const { data: scopedRoles } = await scopedRoleQuery;
+
+    const fallbackRoles = scopedRoles && scopedRoles.length > 0
+      ? scopedRoles
+      : (await roleQuery).data;
+
+    const normalizedDbRoles = Array.from(
+      new Set((fallbackRoles ?? []).map((item) => (item.role ?? '').trim()).filter(Boolean))
+    );
+
+    if (normalizedDbRoles.length === 0) {
+      return baseCandidates;
+    }
+
+    const rankedDbRoles = normalizedDbRoles
+      .map((role) => ({ role, score: scoreRoleForAccessLevel(accessLevel, role) }))
+      .filter((entry) => entry.score > 0)
+      .sort((left, right) => right.score - left.score)
+      .map((entry) => entry.role);
+
+    return Array.from(new Set([...rankedDbRoles, ...baseCandidates]));
+  };
+
+
+  const resolveTargetUserIdByEmail = async (email: string): Promise<{ userId: string | null; source: 'context' | 'profile' | 'none' }> => {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const { data: contextByEmail, error: contextByEmailError } = await supabase
+      .from('v_user_context')
+      .select('user_id')
+      .ilike('email', normalizedEmail)
+      .not('user_id', 'is', null)
+      .limit(1);
+
+    if (contextByEmailError) {
+      console.warn('[management] erro ao buscar user_id em v_user_context por email', contextByEmailError.message);
+      return { userId: null, source: 'none' };
+    }
+
+    const resolvedUserId = contextByEmail?.[0]?.user_id;
+
+    if (resolvedUserId) {
+      return { userId: resolvedUserId, source: 'context' };
+    }
+
+    const { data: profileByEmail, error: profileByEmailError } = await supabase
+      .from('profiles')
+      .select('id')
+      .ilike('email', normalizedEmail)
+      .not('id', 'is', null)
+      .limit(1);
+
+    if (profileByEmailError) {
+      console.warn('[management] erro ao buscar profile.id por email', profileByEmailError.message);
+      return { userId: null, source: 'none' };
+    }
+
+    const profileId = profileByEmail?.[0]?.id ?? null;
+
+    return {
+      userId: profileId,
+      source: profileId ? 'profile' : 'none',
+    };
+  };
+
+
+  const hasOrgMembership = async (userId: string, orgId?: string): Promise<boolean> => {
+    const baseQuery = supabase
+      .from('org_members')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId);
+
+    const { count, error } = orgId
+      ? await baseQuery.eq('org_id', orgId)
+      : await baseQuery;
+
+    if (error) {
+      console.warn('[management] erro ao validar vínculo em org_members', error.message);
+      return false;
+    }
+
+    return Boolean((count ?? 0) > 0);
+  };
+
+
+  const hasAnyOrgMembership = async (userId: string): Promise<boolean> => {
+    const { count, error } = await supabase
+      .from('org_members')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId);
+
+    if (error) {
+      console.warn('[management] erro ao validar vínculo global em org_members', error.message);
+      return false;
+    }
+
+    return Boolean((count ?? 0) > 0);
+  };
+
+  const filteredUsers = organizationScopedUsers.filter(u => 
     u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     u.protocol.toLowerCase().includes(searchTerm.toLowerCase()) ||
     u.email.toLowerCase().includes(searchTerm.toLowerCase())
@@ -37,58 +601,329 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     setEditingUser(null);
   };
 
-  const handleCreateUser = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newAdminEmail || !newAdminName) return;
-
-    const existing = users.find(u => u.email === newAdminEmail);
-    if (existing) {
-       setUsers(prev => prev.map(u => 
-         u.email === newAdminEmail ? { ...u, name: newAdminName, role: UserRole.ADMIN, hierarchy: newAdminHierarchy } : u
-       ));
-    } else {
-       const newUser: User = {
-         id: Date.now().toString(),
-         name: newAdminName,
-         email: newAdminEmail,
-         role: UserRole.ADMIN,
-         hierarchy: newAdminHierarchy,
-         documentId: '---',
-         taxId: '---',
-         address: '---',
-         maritalStatus: '---',
-         country: '---',
-         phone: '---',
-         unit: ServiceUnit.ADMINISTRATIVO,
-         status: ProcessStatus.PENDENTE,
-         protocol: `ADM-2026-ADM`,
-         registrationDate: new Date().toLocaleString('pt-BR'),
-         lastUpdate: new Date().toLocaleString('pt-BR'),
-       };
-       setUsers(prev => [...prev, newUser]);
-    }
-    setNewAdminEmail('');
-    setNewAdminName('');
-    alert('Usuário administrativo definido com sucesso.');
+  const handleClientFormFieldChange = (field: keyof typeof clientForm, value: string) => {
+    setClientForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleUpdateHierarchy = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleClientRegistration = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setClientFormError('');
+    setClientFormSuccess('');
+
+    if (!isSupabaseConfigured) {
+      setClientFormError('Supabase não está configurado. Não foi possível cadastrar cliente/processo.');
+      return;
+    }
+
+    setIsSubmittingClientForm(true);
+
+    try {
+      const result = await createClientAndProcess({
+        fullName: clientForm.fullName,
+        documentType: clientForm.documentType,
+        documentNumber: clientForm.documentNumber,
+        taxIdentifier: clientForm.taxIdentifier,
+        address: clientForm.address,
+        postalCode: clientForm.postalCode,
+        phone: clientForm.phone,
+        email: clientForm.email,
+        maritalStatus: clientForm.maritalStatus,
+        profession: clientForm.profession,
+        nationality: clientForm.nationality,
+        associationType: clientForm.associationType,
+        organizationId: currentUser.organizationId,
+        createdByUserId: currentUser.id,
+      });
+
+      setClientFormSuccess(`Cliente e processo criados com sucesso. Nº do processo: ${result.processNumber}`);
+      setClientForm({
+        fullName: '',
+        documentType: DOCUMENT_TYPE_OPTIONS[0],
+        documentNumber: '',
+        taxIdentifier: '',
+        address: '',
+        postalCode: '',
+        phone: '',
+        email: '',
+        maritalStatus: MARITAL_STATUS_OPTIONS[0],
+        profession: '',
+        nationality: 'Angolana',
+        associationType: ASSOCIATION_TYPE_OPTIONS[0],
+      });
+      await loadUsersFromDatabase();
+    } catch (error) {
+      setClientFormError(buildClientRegistrationErrorMessage(error));
+    } finally {
+      setIsSubmittingClientForm(false);
+    }
+  };
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setOrgError('');
+    setOrgSuccess('');
+
+    if (!canManageAccess) {
+      setOrgError('Somente o Administrador Geral pode alterar nível de acesso de usuários.');
+      return;
+    }
+
+    if (!isSupabaseConfigured) {
+      setOrgError('Supabase não está configurado. Não foi possível salvar no banco.');
+      return;
+    }
+
+    if (!newAdminEmail || !newAdminName) return;
+
+    const email = newAdminEmail.trim().toLowerCase();
+    const existing = users.find((u) => u.email.toLowerCase() === email);
+    const fallbackOrgId = existing?.organizationId ?? currentUser.organizationId;
+
+    const { userId: targetUserId, source: targetUserIdSource } = await resolveTargetUserIdByEmail(email);
+
+    if (!targetUserId) {
+      setOrgError('Usuário sem vínculo válido no Auth/Supabase para este e-mail. Faça login com esse usuário e tente novamente.');
+      return;
+    }
+
+    const hasMembership = await hasAnyOrgMembership(targetUserId);
+
+    if (!hasMembership && targetUserIdSource !== 'context') {
+      setOrgError('Não foi possível criar vínculo em org_members para este e-mail porque o usuário ainda não foi confirmado no Auth. Peça para o usuário fazer login/confirmar conta e tente novamente.');
+      return;
+    }
+    const orgRoleCandidates = await resolveRoleCandidates(newUserAccessLevel, fallbackOrgId);
+
+    if (!hasMembership && !fallbackOrgId) {
+      setOrgError('Não foi possível alterar o nível: usuário sem vínculo em org_members e sem organização de destino para criar o vínculo.');
+      return;
+    }
+
+    let persisted = false;
+    let lastMemberErrorMessage: string | null = null;
+
+    for (const roleCandidate of orgRoleCandidates) {
+      let memberData: { id: string }[] | null = null;
+
+      if (fallbackOrgId) {
+        const { data: scopedMemberData, error: scopedMemberError } = await supabase
+          .from('org_members')
+          .update({ role: roleCandidate })
+          .eq('user_id', targetUserId)
+          .eq('org_id', fallbackOrgId)
+          .select('id');
+
+        if (scopedMemberError) {
+          lastMemberErrorMessage = scopedMemberError.message;
+          if (!scopedMemberError.message.includes('org_members_role_check')) {
+            setOrgError(`Erro ao atualizar permissões: ${scopedMemberError.message}`);
+            return;
+          }
+          continue;
+        }
+
+        memberData = scopedMemberData;
+      }
+
+      if (!memberData || memberData.length === 0) {
+        const { data: fallbackMemberData, error: fallbackMemberError } = await supabase
+          .from('org_members')
+          .update({ role: roleCandidate })
+          .eq('user_id', targetUserId)
+          .select('id');
+
+        if (fallbackMemberError) {
+          lastMemberErrorMessage = fallbackMemberError.message;
+          if (!fallbackMemberError.message.includes('org_members_role_check')) {
+            setOrgError(`Erro ao atualizar permissões: ${fallbackMemberError.message}`);
+            return;
+          }
+          continue;
+        }
+
+        memberData = fallbackMemberData;
+      }
+
+      if (!memberData || memberData.length === 0) {
+        continue;
+      }
+
+      persisted = true;
+      break;
+    }
+
+    if (!persisted) {
+      setOrgError(`Não foi possível alterar o nível deste e-mail porque não existe vínculo válido em org_members para atualização. ${lastMemberErrorMessage ? `Detalhe: ${lastMemberErrorMessage}. ` : ''}Peça para um Administrador Geral vincular este usuário à organização no backend/SQL antes de alterar o perfil.`);
+      return;
+    }
+
+    const { error: updateNameError } = await supabase
+      .from('profiles')
+      .update({ nome_completo: newAdminName })
+      .ilike('email', email);
+
+    if (updateNameError) {
+      console.warn('[management] não foi possível atualizar nome do perfil', updateNameError.message);
+    }
+
+    await loadUsersFromDatabase();
+
+    setNewAdminEmail('');
+    setNewAdminName('');
+    setNewUserAccessLevel(AccessLevel.SENIOR_USER);
+    setOrgSuccess('Perfil atualizado com sucesso no banco de dados.');
+  };
+
+  const handleUpdateHierarchy = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!editingHierarchyUser) return;
-    
+    setOrgError('');
+    setOrgSuccess('');
+
+    if (!canManageAccess) {
+      setOrgError('Somente o Administrador Geral pode alterar nível de acesso de usuários.');
+      return;
+    }
+
+    if (!isSupabaseConfigured) {
+      setOrgError('Supabase não está configurado. Não foi possível salvar no banco.');
+      return;
+    }
+
     const fd = new FormData(e.currentTarget);
     const hierarchy = fd.get('hierarchy') as Hierarchy;
     const name = fd.get('admin_name') as string;
+    const accessLevel = fd.get('access_level') as AccessLevel;
 
-    setUsers(prev => prev.map(u => 
-      u.id === editingHierarchyUser.id ? { ...u, hierarchy, name } : u
+    const targetOrgId = editingHierarchyUser.organizationId ?? currentUser.organizationId;
+    const { userId: targetUserId, source: targetUserIdSource } = await resolveTargetUserIdByEmail(editingHierarchyUser.email);
+
+    if (!targetUserId) {
+      setOrgError('Não foi possível alterar o nível: este e-mail ainda não possui vínculo válido no Auth/Supabase. Peça para o usuário realizar o primeiro login.');
+      setEditingHierarchyUser(null);
+      return;
+    }
+
+    const hasMembership = await hasAnyOrgMembership(targetUserId);
+
+    if (!hasMembership && targetUserIdSource !== 'context') {
+      setOrgError('Não foi possível alterar o nível: usuário sem vínculo válido no Auth para criação em org_members. Peça para o usuário confirmar conta/login primeiro.');
+      setEditingHierarchyUser(null);
+      return;
+    }
+
+    if (!hasMembership && !targetOrgId) {
+      setOrgError('Não foi possível alterar o nível: usuário sem vínculo em org_members e sem organização de destino.');
+      setEditingHierarchyUser(null);
+      return;
+    }
+
+    const orgRoleCandidates = await resolveRoleCandidates(accessLevel, targetOrgId);
+    let persisted = false;
+    let lastMemberErrorMessage: string | null = null;
+
+    for (const roleCandidate of orgRoleCandidates) {
+      let updatedMemberRows: { id: string }[] | null = null;
+
+      if (targetOrgId) {
+        const { data: scopedUpdateData, error: scopedUpdateError } = await supabase
+          .from('org_members')
+          .update({ role: roleCandidate })
+          .eq('user_id', targetUserId)
+          .eq('org_id', targetOrgId)
+          .select('id');
+
+        if (scopedUpdateError) {
+          lastMemberErrorMessage = scopedUpdateError.message;
+          if (!scopedUpdateError.message.includes('org_members_role_check')) {
+            setOrgError(`Erro ao atualizar perfil no banco: ${scopedUpdateError.message}`);
+            setEditingHierarchyUser(null);
+            return;
+          }
+          continue;
+        }
+
+        updatedMemberRows = scopedUpdateData;
+      }
+
+      if (!updatedMemberRows || updatedMemberRows.length === 0) {
+        const { data: fallbackUpdateData, error: fallbackUpdateError } = await supabase
+          .from('org_members')
+          .update({ role: roleCandidate })
+          .eq('user_id', targetUserId)
+          .select('id');
+
+        if (fallbackUpdateError) {
+          lastMemberErrorMessage = fallbackUpdateError.message;
+          if (!fallbackUpdateError.message.includes('org_members_role_check')) {
+            setOrgError(`Erro ao atualizar perfil no banco: ${fallbackUpdateError.message}`);
+            setEditingHierarchyUser(null);
+            return;
+          }
+          continue;
+        }
+
+        updatedMemberRows = fallbackUpdateData;
+      }
+
+      if (!updatedMemberRows || updatedMemberRows.length === 0) {
+        continue;
+      }
+
+      persisted = true;
+      break;
+    }
+
+    if (!persisted) {
+      setOrgError(`Não foi possível alterar o nível deste usuário porque não existe vínculo válido em org_members para atualização. ${lastMemberErrorMessage ? `Detalhe: ${lastMemberErrorMessage}. ` : ''}Solicite o vínculo do usuário com a organização no backend/SQL e tente novamente.`);
+      setEditingHierarchyUser(null);
+      return;
+    }
+
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .update({ nome_completo: name })
+      .eq('id', targetUserId);
+
+    if (profileError) {
+      console.warn('[management] não foi possível atualizar nome do perfil', profileError.message);
+    }
+
+    await loadUsersFromDatabase();
+    setUsers(prev => prev.map(u =>
+      u.id === editingHierarchyUser.id || u.id === targetUserId
+        ? { ...u, hierarchy, name, accessLevel, role: mapAccessLevelToRole(accessLevel) }
+        : u
     ));
+    setOrgSuccess(`Alteração concluída com sucesso para ${name}. Dados gravados no banco.`);
     setEditingHierarchyUser(null);
   };
 
-  const handleDeleteUser = (id: string) => {
+  const handleDeleteUser = async (id: string) => {
+    setOrgError('');
+    setOrgSuccess('');
+
+    if (!canManageAccess) {
+      setOrgError('Somente o Administrador Geral pode excluir usuários administrativos.');
+      return;
+    }
+
+    if (!isSupabaseConfigured) {
+      setOrgError('Supabase não está configurado. Não foi possível salvar no banco.');
+      return;
+    }
+
     if(window.confirm('Deseja realmente excluir este usuário?')) {
+      const { error } = await supabase.from('org_members').delete().eq('user_id', id);
+
+      if (error) {
+        setOrgError(`Erro ao remover vínculo de acesso: ${error.message}`);
+        return;
+      }
+
+      await loadUsersFromDatabase();
       setUsers(prev => prev.filter(u => u.id !== id));
+      setOrgSuccess('Vínculo de acesso removido com sucesso no banco de dados.');
     }
   };
 
@@ -96,8 +931,170 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     window.print();
   };
 
+  const formatDateTime = (value?: string) => {
+    if (!value) {
+      return 'Não informado';
+    }
+
+    const parsedDate = new Date(value);
+
+    if (Number.isNaN(parsedDate.getTime())) {
+      return value;
+    }
+
+    return parsedDate.toLocaleString('pt-BR');
+  };
+
+  useEffect(() => {
+    const fetchOrganizations = async () => {
+      const { organizations: loadedOrganizations, error } = await loadOrganizations();
+
+      if (error) {
+        console.warn('[organizacoes] erro ao carregar organizações', error);
+        setOrgError(buildOrganizationErrorMessage(error));
+        return;
+      }
+
+      setOrgError('');
+      setOrganizations(loadedOrganizations);
+    };
+
+    fetchOrganizations();
+  }, []);
+
+  const handleCreateOrganization = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setOrgError('');
+    setOrgSuccess('');
+
+    if (!organizationName.trim()) {
+      setOrgError('Informe o nome da organização.');
+      return;
+    }
+
+    setIsCreatingOrganization(true);
+
+    const { organization, error } = await createOrganization(organizationName);
+
+    setIsCreatingOrganization(false);
+
+    if (error || !organization) {
+      console.error('[organizacoes] erro ao cadastrar organização', error);
+      setOrgError(buildOrganizationErrorMessage(error));
+      return;
+    }
+
+    setOrganizations((prev) => [...prev, organization]);
+    setOrganizationName('');
+    setOrgSuccess('Organização cadastrada com sucesso.');
+  };
+
+
+  const isCentralOrganization = (organization: Organization) => organization.id === centralOrganization?.id;
+
+  const handleDeleteOrganization = async (organization: Organization) => {
+    if (isCentralOrganization(organization)) {
+      setOrgError('A organização central (slug default) não pode ser excluída.');
+      setOrgSuccess('');
+      return;
+    }
+
+    if (!window.confirm('Deseja realmente excluir esta organização?')) {
+      return;
+    }
+
+    setOrgError('');
+    setOrgSuccess('');
+    setOrganizationDeletingId(organization.id);
+
+    const { error, deleted } = await deleteOrganization(organization.id);
+
+    setOrganizationDeletingId(null);
+
+    if (error || !deleted) {
+      setOrgError(buildOrganizationErrorMessage(error));
+      return;
+    }
+
+    setOrganizations((prev) => prev.filter((item) => item.id !== organization.id));
+    setOrgSuccess('Organização excluída com sucesso.');
+  };
+
+
+
+  const handleToggleOrganizationStatus = async (organization: Organization) => {
+    if (isCentralOrganization(organization)) {
+      setOrgError('A organização central não pode ser desativada.');
+      setOrgSuccess('');
+      return;
+    }
+
+    setOrgError('');
+    setOrgSuccess('');
+    setOrganizationTogglingId(organization.id);
+
+    const targetActive = organization.active === undefined ? false : !organization.active;
+    const { error, updated } = await updateOrganizationActiveStatus(organization.id, targetActive);
+
+    setOrganizationTogglingId(null);
+
+    if (error || !updated) {
+      setOrgError(buildOrganizationErrorMessage(error));
+      return;
+    }
+
+    setOrganizations((prev) => prev.map((item) => item.id === organization.id ? { ...item, active: targetActive } : item));
+    setOrgSuccess(`Organização ${targetActive ? 'ativada' : 'inativada'} com sucesso.`);
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 p-4 md:p-8">
+      <div className="mx-auto max-w-[1600px] flex flex-col lg:flex-row gap-6">
+        <div className="lg:hidden mb-3">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="p-3 rounded-xl bg-slate-900 border border-slate-700 text-slate-100"
+            aria-label="Abrir menu"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        </div>
+
+        {sidebarOpen && (
+          <button
+            className="lg:hidden fixed inset-0 bg-black/60 z-40"
+            onClick={() => setSidebarOpen(false)}
+            aria-label="Fechar menu"
+          />
+        )}
+
+        <aside
+          className={`fixed lg:static inset-y-0 left-0 z-50 lg:z-auto w-72 bg-slate-900 border border-slate-800 rounded-r-2xl lg:rounded-2xl p-5 h-full lg:h-fit transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
+        >
+          <h2 className="text-xl font-black mb-1">SGI FV</h2>
+          <p className="text-slate-500 text-xs font-bold uppercase mb-6">Formando Valores</p>
+
+          <div className="mb-6 p-3 rounded-xl bg-slate-800/50 border border-slate-700">
+            <p className="font-bold text-slate-200">{currentUser.name}</p>
+            <p className="text-[10px] uppercase tracking-widest text-slate-400">{getUserAccessLevel(currentUser)}</p>
+          </div>
+
+          <nav className="space-y-2">
+            {sidebarLinks.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                onClick={() => setSidebarOpen(false)}
+                className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${isActive ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-600'}`}
+              >
+                <item.icon className="w-4 h-4" />
+                <span className="font-bold">{item.label}</span>
+              </NavLink>
+            ))}
+          </nav>
+        </aside>
+
+        <div className="flex-1 lg:pl-0">
       {/* Admin Header */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 no-print">
         <div>
@@ -127,8 +1124,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         </div>
       </header>
 
-      {/* Navigation Tabs */}
-      <div className="flex border-b border-slate-800 mb-6 gap-8 no-print">
+      {(currentSection === 'dashboard' || currentSection === 'configuracoes') && (
+        <>
+          {/* Navigation Tabs */}
+          <div className="flex border-b border-slate-800 mb-6 gap-8 no-print">
         <button 
           onClick={() => setActiveTab('users')}
           className={`pb-4 px-2 font-black uppercase text-xs tracking-widest transition-all relative ${activeTab === 'users' ? 'text-blue-500' : 'text-slate-500'}`}
@@ -143,87 +1142,437 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           Gestão de Acessos
           {activeTab === 'management' && <div className="absolute bottom-0 left-0 w-full h-1 bg-blue-500 rounded-t-full"></div>}
         </button>
-      </div>
+          </div>
+        </>
+      )}
 
-      {activeTab === 'users' ? (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
-          <div className="p-6 border-b border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 no-print">
-            <div className="relative w-full md:w-96">
-              <Search className="absolute left-3 top-2.5 text-slate-500 w-4 h-4" />
-              <input 
-                type="text" 
-                placeholder="Pesquise Por: Nome, Protocolo ou E-mail"
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-gray-900 border border-slate-800 rounded-full text-white text-sm font-bold placeholder:text-slate-600 focus:ring-1 focus:ring-blue-500 outline-none"
+
+      {currentSection === 'organizacoes' ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+            <h3 className="text-lg font-black mb-4">CADASTRAR ORGANIZAÇÃO</h3>
+            <form onSubmit={handleCreateOrganization} className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-400 mb-2 block">Nome da organização</label>
+                <input
+                  value={organizationName}
+                  onChange={(event) => setOrganizationName(event.target.value)}
+                  className="w-full p-3 bg-gray-900 border border-slate-700 rounded-lg text-white font-bold"
+                  placeholder="Ex.: Organização Alpha"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-400 mb-2 block">Expiração da assinatura (em breve)</label>
+                <input
+                  disabled
+                  value="Em breve: integração com pagamento"
+                  className="w-full p-3 bg-slate-800 border border-slate-700 rounded-lg text-slate-400 text-sm"
+                />
+              </div>
+              {isCreatingOrganization && <p className="text-sm text-blue-300 font-bold">Cadastrando organização...</p>}
+              {orgError && <p className="text-sm text-red-400 font-bold">{orgError}</p>}
+              {orgSuccess && <p className="text-sm text-emerald-400 font-bold">{orgSuccess}</p>}
+              <button type="submit" disabled={isCreatingOrganization} className="px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-400 font-bold">
+                {isCreatingOrganization ? 'Cadastrando...' : 'Salvar organização'}
+              </button>
+            </form>
+          </div>
+
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+            <h3 className="text-lg font-black mb-4">ORGANIZAÇÕES CADASTRADAS</h3>
+            <div className="mb-4 relative">
+              <Search className="absolute left-3 top-3 w-4 h-4 text-slate-500" />
+              <input
+                type="text"
+                value={organizationSearchTerm}
+                onChange={(event) => setOrganizationSearchTerm(event.target.value)}
+                placeholder="Buscar organização por nome..."
+                className="w-full pl-9 pr-3 py-2.5 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white"
               />
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-slate-500 text-[10px] font-black uppercase">Total de Registros:</span>
-              <span className="bg-slate-800 px-2 py-0.5 rounded-md text-blue-400 font-bold text-xs">{filteredUsers.length}</span>
+            <div className="space-y-3">
+              {filteredOrganizations.map((organization) => (
+                <div key={organization.id} className="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-bold">{organization.name}</p>
+                      <p className="text-xs text-slate-400">Cadastro em: {formatDateTime(organization.createdAt)}</p>
+                      <p className="text-xs text-slate-500">Expiração da assinatura: {formatDateTime(organization.subscriptionExpiresAt)}</p>
+                      <p className="text-xs text-slate-400">Status: <span className={`font-bold ${organization.active === false ? 'text-red-300' : 'text-emerald-300'}`}>{organization.active === false ? 'Inativa' : 'Ativa'}</span></p>
+                      {isCentralOrganization(organization) && (
+                        <p className="text-[11px] text-amber-300 font-bold mt-1">Organização central protegida contra exclusão.</p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleOrganizationStatus(organization)}
+                      disabled={organizationTogglingId === organization.id || isCentralOrganization(organization)}
+                      className={`p-2 rounded-lg disabled:bg-slate-800 disabled:text-slate-500 ${organization.active === false ? 'bg-red-900/30 hover:bg-red-900/50 text-red-300' : 'bg-emerald-900/30 hover:bg-emerald-900/50 text-emerald-300'}`}
+                      title={organization.active === false ? 'Ativar organização' : 'Inativar organização'}
+                    >
+                      <Check className={`w-4 h-4 ${organization.active === false ? 'text-red-300' : 'text-emerald-300'}`} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteOrganization(organization)}
+                      disabled={organizationDeletingId === organization.id || isCentralOrganization(organization)}
+                      className="p-2 rounded-lg bg-red-900/30 hover:bg-red-900/50 disabled:bg-slate-800 disabled:text-slate-500 text-red-300"
+                      title={isCentralOrganization(organization) ? 'Organização central não pode ser excluída' : 'Excluir organização'}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {organizationsForDisplay.length === 0 && (
+                <p className="text-slate-400 text-sm">Nenhuma organização cadastrada ainda.</p>
+              )}
+              {organizationsForDisplay.length > 0 && filteredOrganizations.length === 0 && (
+                <p className="text-slate-400 text-sm">Nenhuma organização encontrada para essa busca.</p>
+              )}
             </div>
           </div>
+        </div>
+      
+      ) : currentSection === 'financeiro' ? (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4"><p className="text-xs text-slate-400 uppercase">Valor total</p><p className="text-2xl font-black text-blue-300">R$ {financialTotal.toLocaleString('pt-BR')}</p></div>
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4"><p className="text-xs text-slate-400 uppercase">Recebido</p><p className="text-2xl font-black text-emerald-300">R$ {financialPaid.toLocaleString('pt-BR')}</p></div>
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4"><p className="text-xs text-slate-400 uppercase">Pendente</p><p className="text-2xl font-black text-amber-300">R$ {financialPending.toLocaleString('pt-BR')}</p></div>
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4"><p className="text-xs text-slate-400 uppercase">Registros</p><p className="text-2xl font-black text-slate-100">{filteredFinancialRows.length}</p></div>
+          </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="bg-slate-950 text-slate-400 uppercase text-[10px] font-black tracking-widest">
-                  <th className="px-6 py-4">Nome Completo</th>
-                  <th className="px-6 py-4">Telefone+DDD+País</th>
-                  <th className="px-6 py-4">Protocolo SGI</th>
-                  <th className="px-6 py-4">Status do Processo</th>
-                  <th className="px-6 py-4">Última Alteração</th>
-                  <th className="px-6 py-4 text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800">
-                {filteredUsers.map(user => (
-                  <tr key={user.id} className="hover:bg-slate-800/50 transition-colors">
-                    <td className="px-6 py-4 font-bold text-slate-200">{user.name}</td>
-                    <td className="px-6 py-4 text-slate-400 font-bold">{user.phone} ({user.country})</td>
-                    <td className="px-6 py-4">
-                      <span className="bg-blue-900/30 text-blue-400 px-2 py-1 rounded-md text-[10px] font-black">{user.protocol}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-3 py-1 rounded-full text-[10px] font-black text-white ${
-                        user.status === ProcessStatus.PENDENTE ? 'bg-slate-600' :
-                        user.status === ProcessStatus.TRIAGEM ? 'bg-yellow-600' :
-                        user.status === ProcessStatus.ANALISE ? 'bg-orange-600' : 'bg-emerald-600'
-                      }`}>
-                        {user.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-slate-500 text-[10px] font-bold">
-                       {user.lastUpdate || user.registrationDate}
-                    </td>
-                    <td className="px-6 py-4 text-right no-print">
-                      <div className="flex justify-end gap-2">
-                        <button 
-                          onClick={() => setSelectedUser(user)}
-                          className="p-1.5 bg-slate-800 hover:bg-slate-700 rounded-md text-slate-300"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => setEditingUser(user)}
-                          className="p-1.5 bg-blue-900/30 hover:bg-blue-900/50 rounded-md text-blue-400"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 lg:col-span-2">
+              <div className="flex flex-col md:flex-row gap-3 mb-4">
+                <select value={financialOrganizationFilter} onChange={(event) => setFinancialOrganizationFilter(event.target.value)} className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+                  <option value="all">Todas as organizações</option>
+                  {organizations.map((org) => (<option key={org.id} value={org.id}>{org.name}</option>))}
+                </select>
+                <select value={financialUserFilter} onChange={(event) => setFinancialUserFilter(event.target.value)} className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+                  <option value="all">Todos os usuários</option>
+                  {financialRows.map((row) => (<option key={row.id} value={row.id}>{row.userName}</option>))}
+                </select>
+              </div>
+
+              <div className="space-y-2 max-h-[420px] overflow-auto pr-1">
+                {filteredFinancialRows.map((row) => (
+                  <button key={row.id} type="button" onClick={() => setSelectedFinancialId(row.id)} className={`w-full text-left p-3 rounded-xl border ${selectedFinancialRow?.id === row.id ? 'border-blue-500 bg-blue-900/20' : 'border-slate-800 bg-slate-950'}`}>
+                    <div className="flex flex-wrap justify-between gap-2">
+                      <p className="font-bold">{row.userName} • {row.organizationName}</p>
+                      <p className="text-xs text-slate-400">{row.protocol}</p>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1">Total: <span className="text-blue-300 font-bold">R$ {row.total.toLocaleString('pt-BR')}</span> • Recebido: <span className="text-emerald-300 font-bold">R$ {row.paid.toLocaleString('pt-BR')}</span> • Pendente: <span className="text-amber-300 font-bold">R$ {row.pending.toLocaleString('pt-BR')}</span></p>
+                  </button>
                 ))}
-              </tbody>
-            </table>
+                {filteredFinancialRows.length === 0 && <p className="text-sm text-slate-400">Nenhum registro para os filtros selecionados.</p>}
+              </div>
+            </div>
+
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+              <h3 className="font-black uppercase text-sm tracking-wider mb-4 flex items-center gap-2"><PieChart className="w-4 h-4 text-blue-400" /> Proporção financeira</h3>
+              <div className="w-48 h-48 mx-auto rounded-full" style={{ background: `conic-gradient(#34d399 0 ${piePaid}%, #f59e0b ${piePaid}% 100%)` }} />
+              <div className="mt-4 text-sm space-y-1">
+                <p><span className="inline-block w-2 h-2 rounded-full bg-emerald-400 mr-2" />Recebido: <strong>{piePaid}%</strong></p>
+                <p><span className="inline-block w-2 h-2 rounded-full bg-amber-400 mr-2" />Pendente: <strong>{piePending}%</strong></p>
+              </div>
+              {selectedFinancialRow && (
+                <div className="mt-5 pt-4 border-t border-slate-800 text-xs text-slate-300 space-y-1">
+                  <p className="font-bold text-slate-100">Detalhe selecionado</p>
+                  <p>Usuário: {selectedFinancialRow.userName}</p>
+                  <p>Organização: {selectedFinancialRow.organizationName}</p>
+                  <p>Status: {selectedFinancialRow.status}</p>
+                  <p>Protocolo: {selectedFinancialRow.protocol}</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      ) : (
+) : currentSection === 'processos' ? (
+        <ProcessosPage users={organizationScopedUsers} />
+      ) : currentSection === 'clientes' ? (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+            <h3 className="text-lg font-black mb-1">Formulário Eletrônico de Cadastro</h3>
+            <p className="text-xs text-slate-400 mb-5">Cadastro automático de cliente + criação de processo no padrão SIGA-FV-ANO-SEQUENCIAL.</p>
+
+            {clientFormError && <div className="mb-4 bg-red-950/70 border border-red-800 text-red-200 text-sm font-bold rounded-xl px-4 py-3">{clientFormError}</div>}
+            {clientFormSuccess && <div className="mb-4 bg-emerald-950/70 border border-emerald-800 text-emerald-200 text-sm font-bold rounded-xl px-4 py-3">{clientFormSuccess}</div>}
+
+            <form onSubmit={handleClientRegistration} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
+                <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Nome Completo</label>
+                <input required value={clientForm.fullName} onChange={(e) => handleClientFormFieldChange('fullName', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white" />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Tipo de Documento</label>
+                <select required value={clientForm.documentType} onChange={(e) => handleClientFormFieldChange('documentType', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white">
+                  {DOCUMENT_TYPE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Número do Documento</label>
+                <input required value={clientForm.documentNumber} onChange={(e) => handleClientFormFieldChange('documentNumber', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white" />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase block mb-1">TIN/NIF/NIE/CPF</label>
+                <input required value={clientForm.taxIdentifier} onChange={(e) => handleClientFormFieldChange('taxIdentifier', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white" />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Código Postal</label>
+                <input required value={clientForm.postalCode} onChange={(e) => handleClientFormFieldChange('postalCode', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white" />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Morada</label>
+                <input required value={clientForm.address} onChange={(e) => handleClientFormFieldChange('address', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white" />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Telemóvel</label>
+                <input required value={clientForm.phone} onChange={(e) => handleClientFormFieldChange('phone', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white" />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Correio Eletrónico</label>
+                <input type="email" required value={clientForm.email} onChange={(e) => handleClientFormFieldChange('email', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white" />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Estado Civil</label>
+                <select required value={clientForm.maritalStatus} onChange={(e) => handleClientFormFieldChange('maritalStatus', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white">
+                  {MARITAL_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Profissão</label>
+                <input required value={clientForm.profession} onChange={(e) => handleClientFormFieldChange('profession', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white" />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Nacionalidade</label>
+                <input required value={clientForm.nationality} onChange={(e) => handleClientFormFieldChange('nationality', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white" />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Tipo de Associação</label>
+                <select required value={clientForm.associationType} onChange={(e) => handleClientFormFieldChange('associationType', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white">
+                  {ASSOCIATION_TYPE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                </select>
+              </div>
+
+              <div className="md:col-span-2">
+                <button disabled={isSubmittingClientForm} type="submit" className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-60 font-black uppercase tracking-wider">
+                  {isSubmittingClientForm ? 'Processando...' : 'Cadastrar Cliente e Gerar Processo'}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+            <h3 className="text-lg font-black mb-4">Clientes cadastrados</h3>
+            <div className="space-y-3">
+              {organizationScopedUsers.filter((user) => user.role !== UserRole.ADMIN).map((user) => (
+                <div key={user.id} className="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                  <p className="font-bold">{user.name}</p>
+                  <p className="text-xs text-slate-400">{user.email}</p>
+                  <p className="text-[11px] text-blue-300 mt-1">Processo: {user.processNumber || user.protocol || 'Não informado'}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : activeTab === 'users' ? (
+        <>
+          {currentSection === 'dashboard' ? (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+                  <p className="text-xs uppercase tracking-wider text-slate-400">Usuários Ativos</p>
+                  <p className="text-3xl font-black text-blue-300 mt-2">{dashboardStats.activeUsers}</p>
+                </div>
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+                  <p className="text-xs uppercase tracking-wider text-slate-400">Processos Ativos</p>
+                  <p className="text-3xl font-black text-amber-300 mt-2">{dashboardStats.activeProcesses}</p>
+                </div>
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+                  <p className="text-xs uppercase tracking-wider text-slate-400">Processos Concluídos</p>
+                  <p className="text-3xl font-black text-emerald-300 mt-2">{dashboardStats.completedProcesses}</p>
+                </div>
+                <div className="bg-emerald-900/40 border border-emerald-700 rounded-2xl p-5">
+                  <p className="text-xs uppercase tracking-wider text-emerald-100">Valor Geral</p>
+                  <p className="text-3xl font-black text-emerald-200 mt-2">R$ {dashboardStats.totalValue.toLocaleString('pt-BR')}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+                <div className="xl:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+                  <div className="px-4 py-3 bg-blue-900/50 border-b border-slate-800">
+                    <h3 className="font-black">Gestão de Usuários</h3>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="text-xs uppercase tracking-wider text-slate-400">
+                        <tr>
+                          <th className="px-4 py-2 text-left">Nome</th>
+                          <th className="px-4 py-2 text-left">E-mail</th>
+                          <th className="px-4 py-2 text-left">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800">
+                        {dashboardUserRows.map((user) => (
+                          <tr key={user.id}>
+                            <td className="px-4 py-3 font-bold">{user.name}</td>
+                            <td className="px-4 py-3 text-slate-400">{user.email}</td>
+                            <td className="px-4 py-3">
+                              <span className={`px-2 py-1 rounded text-[10px] font-bold ${user.status === ProcessStatus.CONCLUIDO ? 'bg-emerald-900/40 text-emerald-300' : 'bg-amber-900/40 text-amber-300'}`}>
+                                {user.status === ProcessStatus.CONCLUIDO ? 'Ativo' : 'Em andamento'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="xl:col-span-4 bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+                  <div className="px-4 py-3 bg-blue-900/50 border-b border-slate-800">
+                    <h3 className="font-black">Gestão de Processos</h3>
+                  </div>
+                  <div className="space-y-2 p-4">
+                    {dashboardProcessRows.slice(0, 5).map((row) => (
+                      <button key={row.id} type="button" onClick={() => setSelectedProcessId(row.id)} className={`w-full text-left p-3 rounded-xl border ${selectedProcessId === row.id ? 'border-blue-500 bg-blue-900/20' : 'border-slate-800 bg-slate-950'}`}>
+                        <p className="font-bold text-sm">{row.protocol}</p>
+                        <p className="text-xs text-slate-400">{row.userName}</p>
+                        <p className="text-xs text-emerald-300 font-bold mt-1">R$ {row.value.toLocaleString('pt-BR')}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="xl:col-span-3 bg-slate-900 border border-slate-800 rounded-2xl p-4">
+                  <h3 className="font-black mb-3">Detalhes do Processo</h3>
+                  {selectedDashboardProcess ? (
+                    <div className="text-sm space-y-2">
+                      <p className="font-bold">{selectedDashboardProcess.protocol}</p>
+                      <p className="text-slate-400">Responsável: {selectedDashboardProcess.userName}</p>
+                      <p>Status: <span className="font-bold text-blue-300">{selectedDashboardProcess.status}</span></p>
+                      <p>Valor: <span className="font-bold text-emerald-300">R$ {selectedDashboardProcess.value.toLocaleString('pt-BR')}</span></p>
+                      <button type="button" className="mt-3 w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-500 font-bold">Gerar Gráfico de Pizza</button>
+                    </div>
+                  ) : <p className="text-slate-400 text-sm">Selecione um processo para ver detalhes.</p>}
+                </div>
+              </div>
+
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+                <h3 className="font-black mb-4">Distribuição dos Processos</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                  <div className="w-56 h-56 mx-auto rounded-full" style={{ background: `conic-gradient(#3b82f6 0 ${processPieSlices.triagem}%, #f59e0b ${processPieSlices.triagem}% ${processPieSlices.analise}%, #22c55e ${processPieSlices.analise}% ${processPieSlices.concluido}%, #8b5cf6 ${processPieSlices.concluido}% 100%)` }} />
+                  <div className="space-y-2 text-sm">
+                    <p><span className="inline-block w-2 h-2 rounded-full bg-blue-500 mr-2" />Triagem: <strong>{processDistribution.triagem}%</strong></p>
+                    <p><span className="inline-block w-2 h-2 rounded-full bg-amber-500 mr-2" />Análise: <strong>{processDistribution.analise}%</strong></p>
+                    <p><span className="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-2" />Concluído: <strong>{processDistribution.concluido}%</strong></p>
+                    <p><span className="inline-block w-2 h-2 rounded-full bg-violet-500 mr-2" />Cadastro: <strong>{processDistribution.pendente}%</strong></p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+              <div className="p-6 border-b border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 no-print">
+                <div className="relative w-full md:w-96">
+                  <Search className="absolute left-3 top-2.5 text-slate-500 w-4 h-4" />
+                  <input 
+                    type="text" 
+                    placeholder="Pesquise Por: Nome, Protocolo ou E-mail"
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 bg-gray-900 border border-slate-800 rounded-full text-white text-sm font-bold placeholder:text-slate-600 focus:ring-1 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-500 text-[10px] font-black uppercase">Total de Registros:</span>
+                  <span className="bg-slate-800 px-2 py-0.5 rounded-md text-blue-400 font-bold text-xs">{filteredUsers.length}</span>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="bg-slate-950 text-slate-400 uppercase text-[10px] font-black tracking-widest">
+                      <th className="px-6 py-4">Nome Completo</th>
+                      <th className="px-6 py-4">Telefone+DDD+País</th>
+                      <th className="px-6 py-4">Protocolo SGI</th>
+                      <th className="px-6 py-4">Status do Processo</th>
+                      <th className="px-6 py-4">Última Alteração</th>
+                      <th className="px-6 py-4 text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800">
+                    {filteredUsers.map(user => (
+                      <tr key={user.id} className="hover:bg-slate-800/50 transition-colors">
+                        <td className="px-6 py-4 font-bold text-slate-200">{user.name}</td>
+                        <td className="px-6 py-4 text-slate-400 font-bold">{user.phone} ({user.country})</td>
+                        <td className="px-6 py-4">
+                          <span className="bg-blue-900/30 text-blue-400 px-2 py-1 rounded-md text-[10px] font-black">{user.protocol}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`px-3 py-1 rounded-full text-[10px] font-black text-white ${
+                            user.status === ProcessStatus.PENDENTE ? 'bg-slate-600' :
+                            user.status === ProcessStatus.TRIAGEM ? 'bg-yellow-600' :
+                            user.status === ProcessStatus.ANALISE ? 'bg-orange-600' : 'bg-emerald-600'
+                          }`}>
+                            {user.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-slate-500 text-[10px] font-bold">
+                          {user.lastUpdate || user.registrationDate}
+                        </td>
+                        <td className="px-6 py-4 text-right no-print">
+                          <div className="flex justify-end gap-2">
+                            <button onClick={() => setSelectedUser(user)} className="p-1.5 bg-slate-800 hover:bg-slate-700 rounded-md text-slate-300">
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => setEditingUser(user)} className="p-1.5 bg-blue-900/30 hover:bg-blue-900/50 rounded-md text-blue-400">
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
+) : (
         /* Management Tab Content */
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="space-y-4">
+          {!canManageAccess && (
+            <p className="text-xs font-bold text-amber-300">Somente usuários ADMIN podem promover/rebaixar níveis de usuários.</p>
+          )}
+          {orgError && (
+            <div className="rounded-xl border border-red-900/60 bg-red-900/20 px-4 py-3 text-sm font-bold text-red-300">
+              {orgError}
+            </div>
+          )}
+          {orgSuccess && (
+            <div className="rounded-xl border border-emerald-900/60 bg-emerald-900/20 px-4 py-3 text-sm font-bold text-emerald-300">
+              {orgSuccess}
+            </div>
+          )}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
            <div className="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-2xl p-6">
               <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
-                <Plus className="text-blue-500" /> Cadastrar Usuário Administrativo
+                <Plus className="text-blue-500" /> Cadastrar Usuário e Nível
               </h3>
               <form onSubmit={handleCreateUser} className="space-y-4">
                  <div>
@@ -249,6 +1598,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     />
                  </div>
                  <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Perfil de Acesso</label>
+                    <select
+                      value={newUserAccessLevel}
+                      onChange={(event) => setNewUserAccessLevel(event.target.value as AccessLevel)}
+                      disabled={!canManageAccess}
+                      className="w-full bg-gray-900 border border-slate-800 rounded-lg p-3 text-white font-bold disabled:opacity-60"
+                    >
+                      {ACCESS_LEVEL_OPTIONS.map((level) => (
+                        <option key={level} value={level}>{level}</option>
+                      ))}
+                    </select>
+                    <p className="text-[11px] text-slate-400 mt-1">{ACCESS_LEVEL_DESCRIPTIONS[newUserAccessLevel]}</p>
+                  </div>
+                  <div>
                     <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Hierarquia / Nível</label>
                     <div className="space-y-3 mt-2">
                        {Object.values(Hierarchy).map(h => (
@@ -265,13 +1628,38 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                        ))}
                     </div>
                  </div>
-                 <button type="submit" className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg uppercase text-xs tracking-widest mt-4 shadow-lg active:scale-95 transition-transform">
+                 <button type="submit" disabled={!canManageAccess} className="w-full py-4 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-400 text-white font-bold rounded-lg uppercase text-xs tracking-widest mt-4 shadow-lg active:scale-95 transition-transform">
                     Cadastrar / Definir
                  </button>
               </form>
            </div>
 
            <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+              <div className="p-4 border-b border-slate-800 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
+                {isLoadingRemoteUsers && <p className="text-xs text-blue-300">Sincronizando usuários do banco...</p>}
+                <div className="flex items-center gap-2 text-sm text-slate-300">
+                  <span>Mostrar</span>
+                  <select
+                    value={managementPageSize}
+                    onChange={(event) => setManagementPageSize(Number(event.target.value))}
+                    className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm"
+                  >
+                    {[5, 10, 20, 50].map((size) => (
+                      <option key={size} value={size}>{size}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="relative w-full md:w-72">
+                  <Search className="absolute left-3 top-2.5 text-slate-500 w-4 h-4" />
+                  <input
+                    type="text"
+                    placeholder="Pesquisar..."
+                    value={managementSearchTerm}
+                    onChange={(event) => setManagementSearchTerm(event.target.value)}
+                    className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm"
+                  />
+                </div>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead>
@@ -282,7 +1670,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800">
-                    {users.filter(u => u.role === UserRole.ADMIN || u.hierarchy).map(u => (
+                    {managementPagedUsers.map(u => (
                       <tr key={u.id} className="hover:bg-slate-800/30">
                         <td className="px-6 py-4 font-bold flex flex-col">
                            <span>{u.name}</span>
@@ -290,20 +1678,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                         </td>
                         <td className="px-6 py-4">
                           <span className="text-[10px] font-black text-blue-400 uppercase border border-blue-900/50 bg-blue-900/10 px-2 py-0.5 rounded">
-                            {u.hierarchy || 'Acesso Total'}
+                            {getUserAccessLevel(u)}
                           </span>
                         </td>
                         <td className="px-6 py-4 text-right">
                            <div className="flex justify-end gap-2">
                               <button 
-                                onClick={() => setEditingHierarchyUser(u)}
-                                className="p-2 bg-slate-800 hover:bg-slate-700 rounded-md text-slate-400 hover:text-white transition-colors"
+                                onClick={() => { setOrgError(''); setOrgSuccess(''); setEditingHierarchyUser(u); }}
+                                disabled={!canManageAccess}
+                                className="p-2 bg-slate-800 hover:bg-slate-700 rounded-md text-slate-400 hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                               >
                                 <Pencil className="w-4 h-4" />
                               </button>
                               <button 
                                 onClick={() => handleDeleteUser(u.id)} 
-                                className="p-2 bg-red-900/20 hover:bg-red-900/40 rounded-md text-red-500 transition-colors"
+                                disabled={!canManageAccess}
+                                className="p-2 bg-red-900/20 hover:bg-red-900/40 rounded-md text-red-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
@@ -314,7 +1704,34 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                   </tbody>
                 </table>
               </div>
+              <div className="px-4 py-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+                <span>
+                  {managementFilteredUsers.length === 0
+                    ? '0 usuários'
+                    : `${managementPageStart + 1} - ${Math.min(managementPageStart + managementPageSize, managementFilteredUsers.length)} de ${managementFilteredUsers.length} usuários`}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setManagementPage((prev) => Math.max(prev - 1, 1))}
+                    disabled={managementSafePage <= 1}
+                    className="px-2 py-1 rounded bg-slate-800 disabled:opacity-40"
+                  >
+                    {'<'}
+                  </button>
+                  <span>{managementSafePage}/{managementTotalPages}</span>
+                  <button
+                    type="button"
+                    onClick={() => setManagementPage((prev) => Math.min(prev + 1, managementTotalPages))}
+                    disabled={managementSafePage >= managementTotalPages}
+                    className="px-2 py-1 rounded bg-slate-800 disabled:opacity-40"
+                  >
+                    {'>'}
+                  </button>
+                </div>
+              </div>
            </div>
+          </div>
         </div>
       )}
 
@@ -323,9 +1740,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
           <div className="bg-slate-900 w-full max-w-md rounded-3xl border border-slate-800 shadow-2xl overflow-hidden">
              <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-950">
-               <h3 className="text-xl font-black uppercase">Editar Gestor</h3>
+               <h3 className="text-xl font-black uppercase">Editar Perfil de Usuário</h3>
                <button onClick={() => setEditingHierarchyUser(null)} className="p-2 bg-slate-800 hover:bg-slate-700 rounded-full">
-                 <X w-5 h-5 />
+                 <X className="w-5 h-5" />
                </button>
              </div>
              <div className="p-8">
@@ -344,6 +1761,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                       />
                     </div>
 
+                    <label className="text-[10px] font-black text-slate-500 uppercase block mb-1">Perfil de acesso</label>
+                    <select
+                      name="access_level"
+                      defaultValue={getUserAccessLevel(editingHierarchyUser)}
+                      className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+                    >
+                      {ACCESS_LEVEL_OPTIONS.map((level) => (
+                        <option key={level} value={level}>{level}</option>
+                      ))}
+                    </select>
+
                     <label className="text-[10px] font-black text-slate-500 uppercase block mb-1">Hierarquia / Nível</label>
                     {Object.values(Hierarchy).map(h => (
                       <label key={h} className="flex items-center gap-3 p-4 bg-gray-900 border border-slate-800 rounded-xl cursor-pointer hover:border-blue-500 transition-colors">
@@ -357,7 +1785,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                         <span className="font-bold text-slate-200">{h}</span>
                       </label>
                     ))}
-                    <button type="submit" className="w-full py-5 bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-widest rounded-2xl shadow-xl mt-4">
+                    <button type="submit" disabled={!canManageAccess} className="w-full py-5 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-400 text-white font-black uppercase tracking-widest rounded-2xl shadow-xl mt-4">
                       Confirmar Alteração
                     </button>
                   </div>
@@ -374,7 +1802,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
              <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-950">
                <h3 className="text-xl font-black uppercase">Ficha Cadastral do Cliente</h3>
                <button onClick={() => setSelectedUser(null)} className="p-2 bg-slate-800 hover:bg-slate-700 rounded-full">
-                 <X w-5 h-5 />
+                 <X className="w-5 h-5" />
                </button>
              </div>
              <div className="p-8 overflow-y-auto">
@@ -430,6 +1858,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           </div>
         </div>
       )}
+        </div>
+      </div>
 
       {/* Edit Status Modal */}
       {editingUser && (
@@ -438,7 +1868,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
              <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-950">
                <h3 className="text-xl font-black uppercase">Editar Status: {editingUser.protocol}</h3>
                <button onClick={() => setEditingUser(null)} className="p-2 bg-slate-800 hover:bg-slate-700 rounded-full">
-                 <X w-5 h-5 />
+                 <X className="w-5 h-5" />
                </button>
              </div>
              <div className="p-8">
