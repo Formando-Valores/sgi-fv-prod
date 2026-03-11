@@ -525,7 +525,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   };
 
 
-  const resolveTargetUserIdByEmail = async (email: string): Promise<{ userId: string | null; source: 'context' | 'profile' | 'none' }> => {
+  const resolveTargetUserIdByEmail = async (email: string): Promise<{
+    userId: string | null;
+    source: 'profile' | 'context' | 'none';
+    contextUserId: string | null;
+    profileUserId: string | null;
+  }> => {
     const normalizedEmail = email.trim().toLowerCase();
 
     const { data: contextByEmail, error: contextByEmailError } = await supabase
@@ -537,14 +542,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
     if (contextByEmailError) {
       console.warn('[management] erro ao buscar user_id em v_user_context por email', contextByEmailError.message);
-      return { userId: null, source: 'none' };
     }
 
-    const resolvedUserId = contextByEmail?.[0]?.user_id;
-
-    if (resolvedUserId) {
-      return { userId: resolvedUserId, source: 'context' };
-    }
+    const contextUserId = contextByEmail?.[0]?.user_id ?? null;
 
     const { data: profileByEmail, error: profileByEmailError } = await supabase
       .from('profiles')
@@ -555,14 +555,33 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
     if (profileByEmailError) {
       console.warn('[management] erro ao buscar profile.id por email', profileByEmailError.message);
-      return { userId: null, source: 'none' };
     }
 
-    const profileId = profileByEmail?.[0]?.id ?? null;
+    const profileUserId = profileByEmail?.[0]?.id ?? null;
+
+    if (profileUserId) {
+      return {
+        userId: profileUserId,
+        source: 'profile',
+        contextUserId,
+        profileUserId,
+      };
+    }
+
+    if (contextUserId) {
+      return {
+        userId: contextUserId,
+        source: 'context',
+        contextUserId,
+        profileUserId,
+      };
+    }
 
     return {
-      userId: profileId,
-      source: profileId ? 'profile' : 'none',
+      userId: null,
+      source: 'none',
+      contextUserId,
+      profileUserId,
     };
   };
 
@@ -693,7 +712,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const selectedOrganizationId = newAdminOrganizationId || currentUser.organizationId;
     const fallbackOrgId = selectedOrganizationId ?? existing?.organizationId ?? currentUser.organizationId;
 
-    const { userId: targetUserId, source: targetUserIdSource } = await resolveTargetUserIdByEmail(email);
+    const { userId: targetUserId } = await resolveTargetUserIdByEmail(email);
 
     if (!targetUserId) {
       setOrgError('Usuário sem vínculo válido no Auth/Supabase para este e-mail. Faça login com esse usuário e tente novamente.');
@@ -702,10 +721,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
     const hasMembership = await hasAnyOrgMembership(targetUserId);
 
-    if (!hasMembership && targetUserIdSource !== 'context') {
-      setOrgError('Não foi possível criar vínculo em org_members para este e-mail porque o usuário ainda não foi confirmado no Auth. Peça para o usuário fazer login/confirmar conta e tente novamente.');
-      return;
-    }
     const orgRoleCandidates = await resolveRoleCandidates(newUserAccessLevel, fallbackOrgId);
 
     if (!hasMembership && !fallbackOrgId) {
@@ -776,6 +791,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               continue;
             }
 
+            if (
+              insertMemberError.code === '23503' ||
+              insertMemberError.message.includes('org_members_user_id_fkey')
+            ) {
+              setOrgError('Não foi possível vincular este usuário à organização porque o ID não está válido no Auth. Peça para o usuário concluir cadastro/login no Supabase e tente novamente.');
+              return;
+            }
+
             setOrgError(`Erro ao criar vínculo em org_members: ${insertMemberError.message}`);
             return;
           }
@@ -838,7 +861,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const selectedOrganizationId = (fd.get('organization_id') as string | null) ?? '';
 
     const targetOrgId = selectedOrganizationId || editingHierarchyUser.organizationId || currentUser.organizationId;
-    const { userId: targetUserId, source: targetUserIdSource } = await resolveTargetUserIdByEmail(editingHierarchyUser.email);
+    const { userId: targetUserId } = await resolveTargetUserIdByEmail(editingHierarchyUser.email);
 
     if (!targetUserId) {
       setOrgError('Não foi possível alterar o nível: este e-mail ainda não possui vínculo válido no Auth/Supabase. Peça para o usuário realizar o primeiro login.');
@@ -848,11 +871,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
     const hasMembership = await hasAnyOrgMembership(targetUserId);
 
-    if (!hasMembership && targetUserIdSource !== 'context') {
-      setOrgError('Não foi possível alterar o nível: usuário sem vínculo válido no Auth para criação em org_members. Peça para o usuário confirmar conta/login primeiro.');
-      setEditingHierarchyUser(null);
-      return;
-    }
 
     if (!hasMembership && !targetOrgId) {
       setOrgError('Não foi possível alterar o nível: usuário sem vínculo em org_members e sem organização de destino.');
@@ -924,6 +942,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               insertMemberError.code === '23505'
             ) {
               continue;
+            }
+
+            if (
+              insertMemberError.code === '23503' ||
+              insertMemberError.message.includes('org_members_user_id_fkey')
+            ) {
+              setOrgError('Não foi possível vincular este usuário à organização porque o ID não está válido no Auth. Peça para o usuário concluir cadastro/login no Supabase e tente novamente.');
+              setEditingHierarchyUser(null);
+              return;
             }
 
             setOrgError(`Erro ao criar vínculo em org_members: ${insertMemberError.message}`);
