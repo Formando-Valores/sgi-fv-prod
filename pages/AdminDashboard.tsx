@@ -645,6 +645,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     u.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+
+  const hasOrgMembershipForCandidates = async (userIds: string[]): Promise<boolean> => {
+    const filteredIds = Array.from(new Set(userIds.filter(Boolean)));
+
+    if (filteredIds.length === 0) {
+      return false;
+    }
+
+    const { count, error } = await supabase
+      .from('org_members')
+      .select('id', { count: 'exact', head: true })
+      .in('user_id', filteredIds);
+
+    if (error) {
+      console.warn('[management] erro ao validar vínculos em org_members por múltiplos IDs', error.message);
+      return false;
+    }
+
+    return Boolean((count ?? 0) > 0);
+  };
+
+
   const handleUpdateStatus = (userId: string, status: ProcessStatus, deadline?: string, notes?: string, serviceManager?: string) => {
     const timestamp = new Date().toLocaleString('pt-BR');
     setUsers(prev => prev.map(u => 
@@ -733,7 +755,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const fallbackOrgId = selectedOrganizationId ?? existing?.organizationId ?? currentUser.organizationId;
 
     const { userId: targetUserId, contextUserId, profileUserId } = await resolveTargetUserIdByEmail(email);
-    const membershipUserId = contextUserId ?? targetUserId;
+    const membershipCandidateUserIds = Array.from(new Set([contextUserId, profileUserId, targetUserId].filter(Boolean) as string[]));
+    const membershipUserId = membershipCandidateUserIds[0] ?? null;
     const profileTargetUserId = profileUserId ?? targetUserId;
     const currentMembershipOrgId = await resolveCurrentOrgIdByEmail(email);
 
@@ -742,7 +765,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       return;
     }
 
-    const hasMembership = await hasAnyOrgMembership(membershipUserId);
+    const hasMembership = await hasOrgMembershipForCandidates(membershipCandidateUserIds);
 
     const orgRoleCandidates = await resolveRoleCandidates(newUserAccessLevel, fallbackOrgId);
 
@@ -761,7 +784,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         const { data: scopedMemberData, error: scopedMemberError } = await supabase
           .from('org_members')
           .update({ role: roleCandidate })
-          .eq('user_id', membershipUserId)
+          .in('user_id', membershipCandidateUserIds)
           .eq('org_id', fallbackOrgId)
           .select('id');
 
@@ -782,7 +805,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           const { data: fallbackMemberData, error: fallbackMemberError } = await supabase
             .from('org_members')
             .update({ role: roleCandidate })
-            .eq('user_id', membershipUserId)
+            .in('user_id', membershipCandidateUserIds)
             .select('id');
 
           if (fallbackMemberError) {
@@ -803,7 +826,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           const migrateQuery = supabase
             .from('org_members')
             .update({ org_id: fallbackOrgId, role: roleCandidate })
-            .eq('user_id', membershipUserId);
+            .in('user_id', membershipCandidateUserIds);
 
           const { data: migrateMemberData, error: migrateMemberError } = await (currentMembershipOrgId
             ? migrateQuery.eq('org_id', currentMembershipOrgId)
@@ -916,7 +939,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
     const targetOrgId = selectedOrganizationId || editingHierarchyUser.organizationId || currentUser.organizationId;
     const { userId: targetUserId, contextUserId, profileUserId } = await resolveTargetUserIdByEmail(editingHierarchyUser.email);
-    const membershipUserId = contextUserId ?? targetUserId;
+    const membershipCandidateUserIds = Array.from(new Set([contextUserId, profileUserId, targetUserId].filter(Boolean) as string[]));
+    const membershipUserId = membershipCandidateUserIds[0] ?? null;
     const profileTargetUserId = profileUserId ?? targetUserId;
     const currentMembershipOrgId = await resolveCurrentOrgIdByEmail(editingHierarchyUser.email);
 
@@ -926,7 +950,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       return;
     }
 
-    const hasMembership = await hasAnyOrgMembership(membershipUserId);
+    const hasMembership = await hasOrgMembershipForCandidates(membershipCandidateUserIds);
 
 
     if (!hasMembership && !targetOrgId) {
@@ -946,7 +970,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         const { data: scopedUpdateData, error: scopedUpdateError } = await supabase
           .from('org_members')
           .update({ role: roleCandidate })
-          .eq('user_id', membershipUserId)
+          .in('user_id', membershipCandidateUserIds)
           .eq('org_id', targetOrgId)
           .select('id');
 
@@ -968,7 +992,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           const { data: fallbackUpdateData, error: fallbackUpdateError } = await supabase
             .from('org_members')
             .update({ role: roleCandidate })
-            .eq('user_id', membershipUserId)
+            .in('user_id', membershipCandidateUserIds)
             .select('id');
 
           if (fallbackUpdateError) {
@@ -990,7 +1014,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           const migrateQuery = supabase
             .from('org_members')
             .update({ org_id: targetOrgId, role: roleCandidate })
-            .eq('user_id', membershipUserId);
+            .in('user_id', membershipCandidateUserIds);
 
           const { data: migrateMemberData, error: migrateMemberError } = await (currentMembershipOrgId
             ? migrateQuery.eq('org_id', currentMembershipOrgId)
@@ -1077,7 +1101,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
     await loadUsersFromDatabase();
     setUsers(prev => prev.map(u =>
-      u.id === editingHierarchyUser.id || u.id === targetUserId || u.id === membershipUserId || u.id === profileTargetUserId
+      u.id === editingHierarchyUser.id || membershipCandidateUserIds.includes(u.id) || u.id === profileTargetUserId
         ? { ...u, hierarchy, name, accessLevel, role: mapAccessLevelToRole(accessLevel), organizationId: targetOrgId, organizationName: getOrganizationNameById(targetOrgId) }
         : u
     ));
