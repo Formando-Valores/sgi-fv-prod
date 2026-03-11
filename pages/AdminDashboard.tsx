@@ -586,6 +586,26 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   };
 
 
+
+  const resolveCurrentOrgIdByEmail = async (email: string): Promise<string | null> => {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const { data, error } = await supabase
+      .from('v_user_context')
+      .select('org_id')
+      .ilike('email', normalizedEmail)
+      .not('org_id', 'is', null)
+      .limit(1);
+
+    if (error) {
+      console.warn('[management] erro ao buscar org_id atual em v_user_context por email', error.message);
+      return null;
+    }
+
+    return data?.[0]?.org_id ?? null;
+  };
+
+
   const hasOrgMembership = async (userId: string, orgId?: string): Promise<boolean> => {
     const baseQuery = supabase
       .from('org_members')
@@ -715,6 +735,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const { userId: targetUserId, contextUserId, profileUserId } = await resolveTargetUserIdByEmail(email);
     const membershipUserId = contextUserId ?? targetUserId;
     const profileTargetUserId = profileUserId ?? targetUserId;
+    const currentMembershipOrgId = await resolveCurrentOrgIdByEmail(email);
 
     if (!targetUserId) {
       setOrgError('Usuário sem vínculo válido no Auth/Supabase para este e-mail. Faça login com esse usuário e tente novamente.');
@@ -779,11 +800,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
       if (!memberData || memberData.length === 0) {
         if (fallbackOrgId) {
-          const { data: migrateMemberData, error: migrateMemberError } = await supabase
+          const migrateQuery = supabase
             .from('org_members')
             .update({ org_id: fallbackOrgId, role: roleCandidate })
-            .eq('user_id', membershipUserId)
-            .select('id');
+            .eq('user_id', membershipUserId);
+
+          const { data: migrateMemberData, error: migrateMemberError } = await (currentMembershipOrgId
+            ? migrateQuery.eq('org_id', currentMembershipOrgId)
+            : migrateQuery
+          ).select('id');
 
           if (migrateMemberError) {
             lastMemberErrorMessage = migrateMemberError.message;
@@ -893,6 +918,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const { userId: targetUserId, contextUserId, profileUserId } = await resolveTargetUserIdByEmail(editingHierarchyUser.email);
     const membershipUserId = contextUserId ?? targetUserId;
     const profileTargetUserId = profileUserId ?? targetUserId;
+    const currentMembershipOrgId = await resolveCurrentOrgIdByEmail(editingHierarchyUser.email);
 
     if (!targetUserId) {
       setOrgError('Não foi possível alterar o nível: este e-mail ainda não possui vínculo válido no Auth/Supabase. Peça para o usuário realizar o primeiro login.');
@@ -961,11 +987,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
       if (!updatedMemberRows || updatedMemberRows.length === 0) {
         if (targetOrgId) {
-          const { data: migrateMemberData, error: migrateMemberError } = await supabase
+          const migrateQuery = supabase
             .from('org_members')
             .update({ org_id: targetOrgId, role: roleCandidate })
-            .eq('user_id', membershipUserId)
-            .select('id');
+            .eq('user_id', membershipUserId);
+
+          const { data: migrateMemberData, error: migrateMemberError } = await (currentMembershipOrgId
+            ? migrateQuery.eq('org_id', currentMembershipOrgId)
+            : migrateQuery
+          ).select('id');
 
           if (migrateMemberError) {
             lastMemberErrorMessage = migrateMemberError.message;
