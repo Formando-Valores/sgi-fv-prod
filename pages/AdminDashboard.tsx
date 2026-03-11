@@ -172,6 +172,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [newAdminEmail, setNewAdminEmail] = useState('');
   const [newAdminHierarchy, setNewAdminHierarchy] = useState<Hierarchy>(Hierarchy.FULL);
   const [newUserAccessLevel, setNewUserAccessLevel] = useState<AccessLevel>(AccessLevel.SENIOR_USER);
+  const [newAdminOrganizationId, setNewAdminOrganizationId] = useState<string>(currentUser.organizationId ?? '');
   const [editingHierarchyUser, setEditingHierarchyUser] = useState<User | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
@@ -219,6 +220,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   };
 
   const organizationsForDisplay = organizations.filter((organization) => !isDefaultOrganization(organization));
+
+  const getOrganizationNameById = (organizationId?: string): string => {
+    if (!organizationId) {
+      return 'Sem organização';
+    }
+
+    return organizations.find((organization) => organization.id === organizationId)?.name ?? 'Organização não encontrada';
+  };
 
   const sortedOrganizations = [...organizationsForDisplay].sort((left, right) =>
     left.name.localeCompare(right.name, 'pt-BR')
@@ -677,7 +686,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
     const email = newAdminEmail.trim().toLowerCase();
     const existing = users.find((u) => u.email.toLowerCase() === email);
-    const fallbackOrgId = existing?.organizationId ?? currentUser.organizationId;
+    const selectedOrganizationId = newAdminOrganizationId || currentUser.organizationId;
+    const fallbackOrgId = selectedOrganizationId ?? existing?.organizationId ?? currentUser.organizationId;
 
     const { userId: targetUserId, source: targetUserIdSource } = await resolveTargetUserIdByEmail(email);
 
@@ -726,22 +736,48 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       }
 
       if (!memberData || memberData.length === 0) {
-        const { data: fallbackMemberData, error: fallbackMemberError } = await supabase
-          .from('org_members')
-          .update({ role: roleCandidate })
-          .eq('user_id', targetUserId)
-          .select('id');
+        if (!fallbackOrgId) {
+          const { data: fallbackMemberData, error: fallbackMemberError } = await supabase
+            .from('org_members')
+            .update({ role: roleCandidate })
+            .eq('user_id', targetUserId)
+            .select('id');
 
-        if (fallbackMemberError) {
-          lastMemberErrorMessage = fallbackMemberError.message;
-          if (!fallbackMemberError.message.includes('org_members_role_check')) {
-            setOrgError(`Erro ao atualizar permissões: ${fallbackMemberError.message}`);
+          if (fallbackMemberError) {
+            lastMemberErrorMessage = fallbackMemberError.message;
+            if (!fallbackMemberError.message.includes('org_members_role_check')) {
+              setOrgError(`Erro ao atualizar permissões: ${fallbackMemberError.message}`);
+              return;
+            }
+            continue;
+          }
+
+          memberData = fallbackMemberData;
+        }
+      }
+
+      if (!memberData || memberData.length === 0) {
+        if (fallbackOrgId) {
+          const { error: insertMemberError } = await supabase
+            .from('org_members')
+            .insert({ user_id: targetUserId, org_id: fallbackOrgId, role: roleCandidate });
+
+          if (insertMemberError) {
+            lastMemberErrorMessage = insertMemberError.message;
+
+            if (
+              insertMemberError.message.includes('org_members_role_check') ||
+              insertMemberError.code === '23505'
+            ) {
+              continue;
+            }
+
+            setOrgError(`Erro ao criar vínculo em org_members: ${insertMemberError.message}`);
             return;
           }
-          continue;
-        }
 
-        memberData = fallbackMemberData;
+          memberData = [{ id: targetUserId }];
+        }
       }
 
       if (!memberData || memberData.length === 0) {
@@ -771,7 +807,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     setNewAdminEmail('');
     setNewAdminName('');
     setNewUserAccessLevel(AccessLevel.SENIOR_USER);
-    setOrgSuccess('Perfil atualizado com sucesso no banco de dados.');
+    setNewAdminOrganizationId(currentUser.organizationId ?? '');
+    setOrgSuccess(`Perfil atualizado com sucesso no banco de dados. Organização aplicada: ${getOrganizationNameById(fallbackOrgId)}.`);
   };
 
   const handleUpdateHierarchy = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -794,8 +831,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const hierarchy = fd.get('hierarchy') as Hierarchy;
     const name = fd.get('admin_name') as string;
     const accessLevel = fd.get('access_level') as AccessLevel;
+    const selectedOrganizationId = (fd.get('organization_id') as string | null) ?? '';
 
-    const targetOrgId = editingHierarchyUser.organizationId ?? currentUser.organizationId;
+    const targetOrgId = selectedOrganizationId || editingHierarchyUser.organizationId || currentUser.organizationId;
     const { userId: targetUserId, source: targetUserIdSource } = await resolveTargetUserIdByEmail(editingHierarchyUser.email);
 
     if (!targetUserId) {
@@ -847,23 +885,50 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       }
 
       if (!updatedMemberRows || updatedMemberRows.length === 0) {
-        const { data: fallbackUpdateData, error: fallbackUpdateError } = await supabase
-          .from('org_members')
-          .update({ role: roleCandidate })
-          .eq('user_id', targetUserId)
-          .select('id');
+        if (!targetOrgId) {
+          const { data: fallbackUpdateData, error: fallbackUpdateError } = await supabase
+            .from('org_members')
+            .update({ role: roleCandidate })
+            .eq('user_id', targetUserId)
+            .select('id');
 
-        if (fallbackUpdateError) {
-          lastMemberErrorMessage = fallbackUpdateError.message;
-          if (!fallbackUpdateError.message.includes('org_members_role_check')) {
-            setOrgError(`Erro ao atualizar perfil no banco: ${fallbackUpdateError.message}`);
+          if (fallbackUpdateError) {
+            lastMemberErrorMessage = fallbackUpdateError.message;
+            if (!fallbackUpdateError.message.includes('org_members_role_check')) {
+              setOrgError(`Erro ao atualizar perfil no banco: ${fallbackUpdateError.message}`);
+              setEditingHierarchyUser(null);
+              return;
+            }
+            continue;
+          }
+
+          updatedMemberRows = fallbackUpdateData;
+        }
+      }
+
+      if (!updatedMemberRows || updatedMemberRows.length === 0) {
+        if (targetOrgId) {
+          const { error: insertMemberError } = await supabase
+            .from('org_members')
+            .insert({ user_id: targetUserId, org_id: targetOrgId, role: roleCandidate });
+
+          if (insertMemberError) {
+            lastMemberErrorMessage = insertMemberError.message;
+
+            if (
+              insertMemberError.message.includes('org_members_role_check') ||
+              insertMemberError.code === '23505'
+            ) {
+              continue;
+            }
+
+            setOrgError(`Erro ao criar vínculo em org_members: ${insertMemberError.message}`);
             setEditingHierarchyUser(null);
             return;
           }
-          continue;
-        }
 
-        updatedMemberRows = fallbackUpdateData;
+          updatedMemberRows = [{ id: targetUserId }];
+        }
       }
 
       if (!updatedMemberRows || updatedMemberRows.length === 0) {
@@ -892,10 +957,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     await loadUsersFromDatabase();
     setUsers(prev => prev.map(u =>
       u.id === editingHierarchyUser.id || u.id === targetUserId
-        ? { ...u, hierarchy, name, accessLevel, role: mapAccessLevelToRole(accessLevel) }
+        ? { ...u, hierarchy, name, accessLevel, role: mapAccessLevelToRole(accessLevel), organizationId: targetOrgId, organizationName: getOrganizationNameById(targetOrgId) }
         : u
     ));
-    setOrgSuccess(`Alteração concluída com sucesso para ${name}. Dados gravados no banco.`);
+    setOrgSuccess(`Alteração concluída com sucesso para ${name}. Organização atual: ${getOrganizationNameById(targetOrgId)}.`);
     setEditingHierarchyUser(null);
   };
 
@@ -1612,6 +1677,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     <p className="text-[11px] text-slate-400 mt-1">{ACCESS_LEVEL_DESCRIPTIONS[newUserAccessLevel]}</p>
                   </div>
                   <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Instituição / Organização</label>
+                    <select
+                      value={newAdminOrganizationId}
+                      onChange={(event) => setNewAdminOrganizationId(event.target.value)}
+                      disabled={!canManageAccess}
+                      className="w-full bg-gray-900 border border-slate-800 rounded-lg p-3 text-white font-bold disabled:opacity-60"
+                    >
+                      <option value="">Selecione a organização</option>
+                      {sortedOrganizations.map((organization) => (
+                        <option key={organization.id} value={organization.id}>{organization.name}</option>
+                      ))}
+                    </select>
+                    <p className="text-[11px] text-slate-400 mt-1">Instituição atual selecionada: {getOrganizationNameById(newAdminOrganizationId)}</p>
+                  </div>
+                  <div>
                     <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Hierarquia / Nível</label>
                     <div className="space-y-3 mt-2">
                        {Object.values(Hierarchy).map(h => (
@@ -1666,6 +1746,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     <tr className="bg-slate-950 text-slate-400 uppercase text-[10px] font-black tracking-widest">
                       <th className="px-6 py-4">Usuário / Adm</th>
                       <th className="px-6 py-4">Nível de Acesso</th>
+                      <th className="px-6 py-4">Instituição</th>
                       <th className="px-6 py-4 text-right">Ações</th>
                     </tr>
                   </thead>
@@ -1680,6 +1761,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                           <span className="text-[10px] font-black text-blue-400 uppercase border border-blue-900/50 bg-blue-900/10 px-2 py-0.5 rounded">
                             {getUserAccessLevel(u)}
                           </span>
+                        </td>
+                        <td className="px-6 py-4 text-xs text-slate-300 font-bold">
+                          {u.organizationName ?? getOrganizationNameById(u.organizationId)}
                         </td>
                         <td className="px-6 py-4 text-right">
                            <div className="flex justify-end gap-2">
@@ -1747,8 +1831,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
              </div>
              <div className="p-8">
                 <form onSubmit={handleUpdateHierarchy}>
-                  <p className="text-slate-400 text-sm mb-6">Alterando dados para <strong>{editingHierarchyUser.email}</strong></p>
-                  
+                  <p className="text-slate-400 text-sm mb-2">Alterando dados para <strong>{editingHierarchyUser.email}</strong></p>
+                  <p className="text-[11px] text-slate-400 mb-6">Instituição atual: <strong>{editingHierarchyUser.organizationName ?? getOrganizationNameById(editingHierarchyUser.organizationId)}</strong></p>
+
                   <div className="space-y-4">
                     <div>
                       <label className="text-[10px] font-black text-slate-500 uppercase block mb-1">Nome de Usuário</label>
@@ -1769,6 +1854,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     >
                       {ACCESS_LEVEL_OPTIONS.map((level) => (
                         <option key={level} value={level}>{level}</option>
+                      ))}
+                    </select>
+
+                    <label className="text-[10px] font-black text-slate-500 uppercase block mb-1">Instituição / Organização</label>
+                    <select
+                      name="organization_id"
+                      defaultValue={editingHierarchyUser.organizationId ?? currentUser.organizationId ?? ''}
+                      className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+                    >
+                      <option value="">Sem organização definida</option>
+                      {sortedOrganizations.map((organization) => (
+                        <option key={organization.id} value={organization.id}>{organization.name}</option>
                       ))}
                     </select>
 
