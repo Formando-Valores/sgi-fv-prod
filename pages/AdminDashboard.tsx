@@ -35,6 +35,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [processTypeFilter, setProcessTypeFilter] = useState<'all' | 'Administrativo' | 'Jurídico'>('all');
   const [processPeriodFilter, setProcessPeriodFilter] = useState<'all' | 'today' | '7d' | '30d'>('all');
   const [processRowsLimit, setProcessRowsLimit] = useState(10);
+  const [configSearch, setConfigSearch] = useState('');
+  const [configRowsLimit, setConfigRowsLimit] = useState(10);
+  const [newAdminOrgId, setNewAdminOrgId] = useState('default');
 
   const location = useLocation();
   const currentSection = section ?? (location.pathname.split('/')[2] as 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes') ?? 'dashboard';
@@ -138,10 +141,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     e.preventDefault();
     if (!newAdminEmail || !newAdminName) return;
 
+    const selectedOrgName = organizations.find((org) => org.id === newAdminOrgId)?.name || 'Organização Padrão';
+
     const existing = users.find(u => u.email === newAdminEmail);
     if (existing) {
        setUsers(prev => prev.map(u => 
-         u.email === newAdminEmail ? { ...u, name: newAdminName, role: UserRole.ADMIN, hierarchy: newAdminHierarchy } : u
+         u.email === newAdminEmail
+           ? { ...u, name: newAdminName, role: UserRole.ADMIN, hierarchy: newAdminHierarchy, organizationId: newAdminOrgId, organizationName: selectedOrgName }
+           : u
        ));
     } else {
        const newUser: User = {
@@ -161,11 +168,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
          protocol: `ADM-2026-ADM`,
          registrationDate: new Date().toLocaleString('pt-BR'),
          lastUpdate: new Date().toLocaleString('pt-BR'),
+         organizationId: newAdminOrgId,
+         organizationName: selectedOrgName,
        };
        setUsers(prev => [...prev, newUser]);
     }
     setNewAdminEmail('');
     setNewAdminName('');
+    setNewAdminOrgId('default');
     alert('Usuário administrativo definido com sucesso.');
   };
 
@@ -209,6 +219,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
     fetchOrganizations();
   }, []);
+
+  const managementUsers = users
+    .filter((user) =>
+      user.name.toLowerCase().includes(configSearch.toLowerCase()) ||
+      user.email.toLowerCase().includes(configSearch.toLowerCase())
+    )
+    .slice(0, configRowsLimit);
 
   const handleCreateOrganization = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -644,7 +661,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
            <div className="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-2xl p-6">
               <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
-                <Plus className="text-blue-500" /> Cadastrar Usuário Administrativo
+                <Plus className="text-blue-500" /> Cadastrar Usuário e Nível
               </h3>
               <form onSubmit={handleCreateUser} className="space-y-4">
                  <div>
@@ -670,20 +687,47 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     />
                  </div>
                  <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Perfil de Acesso</label>
+                    <select
+                      value={newAdminHierarchy}
+                      onChange={(event) => setNewAdminHierarchy(event.target.value as Hierarchy)}
+                      className="w-full bg-gray-900 border border-slate-800 rounded-lg p-3 text-white font-bold"
+                    >
+                      {Object.values(Hierarchy).map((h) => (
+                        <option key={h} value={h}>{h}</option>
+                      ))}
+                    </select>
+                    <p className="text-[11px] text-slate-500 mt-2">Diretoria/Gerência da organização: agenda, equipe e distribuição autorizada.</p>
+                 </div>
+                 <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Instituição / Organização</label>
+                    <select
+                      value={newAdminOrgId}
+                      onChange={(event) => setNewAdminOrgId(event.target.value)}
+                      className="w-full bg-gray-900 border border-slate-800 rounded-lg p-3 text-white font-bold"
+                    >
+                      <option value="default">Organização Padrão</option>
+                      {organizations.map((org) => (
+                        <option key={org.id} value={org.id}>{org.name}</option>
+                      ))}
+                    </select>
+                    <p className="text-[11px] text-slate-500 mt-2">Instituição atual selecionada: {organizations.find((org) => org.id === newAdminOrgId)?.name || 'Organização Padrão'}</p>
+                 </div>
+                 <div>
                     <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Hierarquia / Nível</label>
-                    <div className="space-y-3 mt-2">
-                       {Object.values(Hierarchy).map(h => (
-                         <label key={h} className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer group">
-                           <input 
-                            type="radio" 
-                            name="new_hierarchy" 
-                            className="w-4 h-4 accent-blue-500" 
-                            checked={newAdminHierarchy === h}
-                            onChange={() => setNewAdminHierarchy(h)}
-                           /> 
-                           <span className="group-hover:text-white transition-colors">{h}</span>
-                         </label>
-                       ))}
+                    <div className="space-y-2 mt-2">
+                      <label className="flex items-center gap-2 text-sm text-slate-200 font-bold">
+                        <input type="radio" name="new_hierarchy_radio" className="w-4 h-4 accent-blue-500" checked={newAdminHierarchy === Hierarchy.FULL} onChange={() => setNewAdminHierarchy(Hierarchy.FULL)} />
+                        Alteração e Edição
+                      </label>
+                      <label className="flex items-center gap-2 text-sm text-slate-200 font-bold">
+                        <input type="radio" name="new_hierarchy_radio" className="w-4 h-4 accent-blue-500" checked={newAdminHierarchy === Hierarchy.STATUS_ONLY} onChange={() => setNewAdminHierarchy(Hierarchy.STATUS_ONLY)} />
+                        Somente Alteração
+                      </label>
+                      <label className="flex items-center gap-2 text-sm text-slate-200 font-bold">
+                        <input type="radio" name="new_hierarchy_radio" className="w-4 h-4 accent-blue-500" checked={newAdminHierarchy === Hierarchy.NOTES_ONLY} onChange={() => setNewAdminHierarchy(Hierarchy.NOTES_ONLY)} />
+                        Somente Anotações
+                      </label>
                     </div>
                  </div>
                  <button type="submit" className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg uppercase text-xs tracking-widest mt-4 shadow-lg active:scale-95 transition-transform">
@@ -693,17 +737,41 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
            </div>
 
            <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+              <div className="p-4 border-b border-slate-800 flex flex-col md:flex-row gap-3 md:items-center md:justify-between bg-slate-900">
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-300 text-sm font-bold">Mostrar</span>
+                  <select
+                    value={configRowsLimit}
+                    onChange={(event) => setConfigRowsLimit(Number(event.target.value))}
+                    className="bg-gray-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-bold"
+                  >
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                  </select>
+                </div>
+                <div className="relative w-full md:w-72">
+                  <Search className="absolute left-3 top-3 text-slate-500 w-4 h-4" />
+                  <input
+                    value={configSearch}
+                    onChange={(event) => setConfigSearch(event.target.value)}
+                    placeholder="Pesquisar..."
+                    className="w-full pl-9 pr-3 py-2 bg-gray-900 border border-slate-700 rounded-lg text-white font-bold"
+                  />
+                </div>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead>
                     <tr className="bg-slate-950 text-slate-400 uppercase text-[10px] font-black tracking-widest">
                       <th className="px-6 py-4">Usuário / Adm</th>
                       <th className="px-6 py-4">Nível de Acesso</th>
+                      <th className="px-6 py-4">Instituição</th>
                       <th className="px-6 py-4 text-right">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800">
-                    {users.filter(u => u.role === UserRole.ADMIN || u.hierarchy).map(u => (
+                    {managementUsers.map(u => (
                       <tr key={u.id} className="hover:bg-slate-800/30">
                         <td className="px-6 py-4 font-bold flex flex-col">
                            <span>{u.name}</span>
@@ -711,9 +779,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                         </td>
                         <td className="px-6 py-4">
                           <span className="text-[10px] font-black text-blue-400 uppercase border border-blue-900/50 bg-blue-900/10 px-2 py-0.5 rounded">
-                            {u.hierarchy || 'Acesso Total'}
+                            {u.role === UserRole.ADMIN ? 'Administrador Geral' : 'Cliente'}
                           </span>
                         </td>
+                        <td className="px-6 py-4 text-slate-300 font-bold">{u.organizationName || 'Organização Padrão'}</td>
                         <td className="px-6 py-4 text-right">
                            <div className="flex justify-end gap-2">
                               <button 
