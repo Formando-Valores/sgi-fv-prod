@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { ProcessStatus, ServiceUnit, User, UserRole } from '../types';
 import { isSupabaseConfigured, supabase } from '../supabase';
 
@@ -56,6 +56,12 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
         const userId = data.user.id;
         console.info('[login] autenticado, buscando profile', { userId });
 
+        const { data: defaultOrganization } = await supabase
+          .from('organizations')
+          .select('id, name, slug')
+          .eq('slug', 'default')
+          .maybeSingle();
+
         const { data: profiles, error: profileError } = await supabase
           .from('profiles')
           .select('*')
@@ -79,6 +85,7 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
                 email: data.user.email,
                 role: UserRole.CLIENT,
                 nome_completo: data.user.user_metadata?.name ?? null,
+                org_id: defaultOrganization?.id ?? null,
               },
             ])
             .select('*')
@@ -93,11 +100,30 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
           profile = inserted;
         }
 
+        const profileOrgId = profile?.org_id ?? profile?.organization_id ?? defaultOrganization?.id ?? null;
+
+        if (profileOrgId) {
+          const { error: membershipError } = await supabase
+            .from('org_members')
+            .upsert(
+              {
+                org_id: profileOrgId,
+                user_id: userId,
+                role: 'client',
+              },
+              { onConflict: 'org_id,user_id' }
+            );
+
+          if (membershipError) {
+            console.warn('[login] não foi possível garantir vínculo em org_members', membershipError);
+          }
+        }
+
         const existingUser = users.find((user) => user.id === userId || user.email === email);
 
         const { data: contextData, error: contextError } = await supabase
           .from('v_user_context')
-          .select('org_role, org_id, org_name')
+          .select('org_role, org_id, org_name, org_slug')
           .eq('user_id', userId)
           .maybeSingle();
 
@@ -106,12 +132,12 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
         }
 
         let contextRole = contextData?.org_role;
-        let contextByEmailData: { org_role?: string | null; org_id?: string | null; org_name?: string | null } | null = null;
+        let contextByEmailData: { org_role?: string | null; org_id?: string | null; org_name?: string | null; org_slug?: string | null } | null = null;
 
         if (!contextRole && data.user.email) {
           const { data: contextByEmail, error: contextByEmailError } = await supabase
             .from('v_user_context')
-            .select('org_role, org_id, org_name')
+            .select('org_role, org_id, org_name, org_slug')
             .eq('email', data.user.email)
             .maybeSingle();
 
@@ -127,11 +153,18 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
 
         const contextOrganizationId = contextData?.org_id ?? contextByEmailData?.org_id;
         const contextOrganizationName = contextData?.org_name ?? contextByEmailData?.org_name;
+        const contextOrganizationSlug = contextData?.org_slug ?? contextByEmailData?.org_slug;
+
+        const hasDefaultOrganizationAccess =
+          contextOrganizationSlug === 'default' ||
+          (!!defaultOrganization?.id && contextOrganizationId === defaultOrganization.id) ||
+          (!!defaultOrganization?.id && profileOrgId === defaultOrganization.id);
 
         const hasAdminRole =
           isAdminRole(profile?.role) ||
           isAdminRole(contextRole) ||
-          isAdminRole(existingUser?.role);
+          isAdminRole(existingUser?.role) ||
+          hasDefaultOrganizationAccess;
 
         const normalizedRole = hasAdminRole ? UserRole.ADMIN : UserRole.CLIENT;
 
@@ -154,8 +187,8 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
           notes: existingUser?.notes,
           deadline: existingUser?.deadline,
           serviceManager: existingUser?.serviceManager,
-          organizationId: profile?.organization_id ?? profile?.org_id ?? existingUser?.organizationId ?? contextOrganizationId ?? undefined,
-          organizationName: profile?.organization_name ?? existingUser?.organizationName ?? contextOrganizationName ?? undefined,
+          organizationId: profileOrgId ?? existingUser?.organizationId ?? contextOrganizationId ?? undefined,
+          organizationName: profile?.organization_name ?? existingUser?.organizationName ?? contextOrganizationName ?? defaultOrganization?.name ?? undefined,
         };
 
         console.info('[login] profile carregado, redirecionando para dashboard', {

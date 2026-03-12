@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import { COUNTRIES } from '../constants';
 import { ServiceUnit, ProcessStatus, User, UserRole, Organization } from '../types';
 import { isSupabaseConfigured, supabase } from '../supabase';
@@ -36,6 +36,11 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
 
   const [error, setError] = useState('');
   const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  const inputClass = 'w-full p-3 bg-gray-900 border border-slate-700 rounded-lg text-white font-bold outline-none focus:ring-2 focus:ring-blue-500';
 
   const validatePassword = (pass: string) => {
     const hasMinLength = pass.length >= 8;
@@ -68,31 +73,25 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
 
     if (!isSupabaseConfigured) {
       setError('Configuração do sistema incompleta. Contate o suporte para ajustar as variáveis do Supabase.');
-      return;
-    }
-
-    if (!isSupabaseConfigured) {
-      setError('Configuração do sistema incompleta. Contate o suporte para ajustar as variáveis do Supabase.');
-      return;
-    }
-
-    if (!isSupabaseConfigured) {
-      setError('Configuração do sistema incompleta. Contate o suporte para ajustar as variáveis do Supabase.');
+      setIsLoading(false);
       return;
     }
 
     if (!formData.organizationId) {
       setError('Selecione a organização vinculada ao cliente.');
+      setIsLoading(false);
       return;
     }
 
     if (formData.password !== formData.confirmPassword) {
       setError('As senhas não coincidem.');
+      setIsLoading(false);
       return;
     }
 
     if (!validatePassword(formData.password)) {
       setError('A senha deve ter 8 caracteres, uma letra maiúscula, um caractere especial e um número.');
+      setIsLoading(false);
       return;
     }
 
@@ -111,21 +110,51 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
       }
 
       if (data.user) {
+        const { data: selectedOrganization } = await supabase
+          .from('organizations')
+          .select('id, name, slug')
+          .eq('id', formData.organizationId)
+          .maybeSingle();
+
         const { error: profileInsertError } = await supabase
           .from('profiles')
           .insert([
             {
               id: data.user.id,
-              nome: formData.name,
+              nome_completo: formData.name,
               email: formData.email,
               role: UserRole.CLIENT,
-              organization_id: formData.organizationId,
+              org_id: formData.organizationId,
+              documento_identidade: formData.documentId,
+              nif_cpf: formData.taxId,
+              estado_civil: formData.maritalStatus,
+              phone: formData.phone,
+              endereco: formData.address,
+              pais: formData.country,
             },
           ]);
 
         if (profileInsertError) {
           console.error('[register] erro ao criar profile', profileInsertError);
           setError('Cadastro criado, mas houve falha ao criar perfil. Tente entrar novamente.');
+          return;
+        }
+
+        const { error: membershipError } = await supabase
+          .from('org_members')
+          .upsert(
+            {
+              org_id: formData.organizationId,
+              user_id: data.user.id,
+              role: 'client',
+            },
+            { onConflict: 'org_id,user_id' }
+          );
+
+        if (membershipError) {
+          console.error('[register] erro ao criar vínculo na organização', membershipError);
+          setError('Cadastro criado, mas não foi possível vincular o usuário à organização.');
+          setIsLoading(false);
           return;
         }
 
@@ -136,8 +165,6 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
               ? 'ADM'
               : 'TECAI';
         const protocol = `${prefix}-2026-00${Math.floor(Math.random() * 900) + 100}`;
-
-        const selectedOrganization = organizations.find((organization) => organization.id === formData.organizationId);
 
         const newUser: User = {
           id: data.user.id,
@@ -161,12 +188,15 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
         };
 
         setUsers((prev) => [...prev, newUser]);
-        alert('Cadastro realizado com sucesso');
-        goToRoute('/login');
+        setCurrentUser(newUser);
+        setSuccess(true);
+        setTimeout(() => goToRoute('/login'), 1200);
       }
     } catch (err) {
       console.error('[register] erro inesperado', err);
       setError('Erro inesperado. Tente novamente.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -317,10 +347,21 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
             <div className="pt-6">
               <button 
                 type="button"
+                disabled={isLoading}
                 className="w-full py-5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl uppercase tracking-widest transition-all shadow-xl flex items-center justify-center gap-3"
                 onClick={handleRegister}
               >
-                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                {isLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    <span>Finalizando cadastro...</span>
+                  </>
+                ) : (
+                  <>
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    <span>Cadastrar</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
