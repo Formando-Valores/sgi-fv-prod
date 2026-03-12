@@ -18,6 +18,16 @@ interface OrgMemberView {
   accessLevel: AccessLevel;
 }
 
+type OrgMemberRow = {
+  org_id: string;
+  user_id: string;
+  role: string;
+  nome_completo?: string | null;
+  nome?: string | null;
+  full_name?: string | null;
+  organizations?: { name?: string } | null;
+};
+
 interface ClientProfileView {
   id: string;
   nome: string;
@@ -186,10 +196,24 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     setMembersLoading(true);
     setMembersError('');
 
-    const { data: memberRows, error: memberError } = await supabase
+    const withNamesQuery = await supabase
       .from('org_members')
-      .select('org_id,user_id,role,organizations(name)')
+      .select('org_id,user_id,role,nome_completo,nome,full_name,organizations(name)')
       .order('created_at', { ascending: false });
+
+    let memberRows = withNamesQuery.data as OrgMemberRow[] | null;
+    let memberError = withNamesQuery.error;
+
+    // Compatibilidade: se a tabela não tiver colunas de nome, faz fallback para consulta básica.
+    if (memberError && String(memberError.message || '').toLowerCase().includes('column')) {
+      const fallbackQuery = await supabase
+        .from('org_members')
+        .select('org_id,user_id,role,organizations(name)')
+        .order('created_at', { ascending: false });
+
+      memberRows = fallbackQuery.data as OrgMemberRow[] | null;
+      memberError = fallbackQuery.error;
+    }
 
     if (memberError) {
       setMembersError('Não foi possível carregar os membros da organização.');
@@ -214,6 +238,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const normalizedMembers: OrgMemberView[] = (memberRows || []).map((member) => {
       const profile = profileMap.get(member.user_id);
       const fallbackUser = users.find((user) => user.id === member.user_id);
+      const nameFromMemberRow = member.nome_completo || member.full_name || member.nome;
       const roleFromProfile = typeof profile?.role === 'string' ? profile.role : null;
       const accessLevel = ACCESS_LEVELS.includes(roleFromProfile as AccessLevel)
         ? (roleFromProfile as AccessLevel)
@@ -221,6 +246,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
       const resolvedEmail = profile?.email || fallbackUser?.email || '';
       const resolvedName =
+        nameFromMemberRow ||
         profile?.nome_completo ||
         profile?.nome ||
         fallbackUser?.name ||
@@ -230,7 +256,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       return {
         user_id: member.user_id,
         org_id: member.org_id,
-        org_name: (member.organizations as { name?: string } | null)?.name || 'Organização Padrão',
+        org_name: member.organizations?.name || 'Organização Padrão',
         name: resolvedName,
         email: resolvedEmail || '-',
         accessLevel,
@@ -1032,7 +1058,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                 <table className="w-full text-left text-sm">
                   <thead>
                     <tr className="bg-slate-950 text-slate-400 uppercase text-[10px] font-black tracking-widest">
-                      <th className="px-6 py-4">Usuário / Adm</th>
+                      <th className="px-6 py-4">Usuário</th>
                       <th className="px-6 py-4">Nível de Acesso</th>
                       <th className="px-6 py-4">Instituição</th>
                       <th className="px-6 py-4 text-right">Ações</th>
