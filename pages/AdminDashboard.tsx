@@ -30,8 +30,12 @@ type OrgMemberRow = {
 
 interface ClientProfileView {
   id: string;
+  user_id: string;
+  org_id: string;
+  org_name: string;
   nome: string;
   email: string;
+  accessLevel: AccessLevel;
   created_at?: string;
 }
 
@@ -48,6 +52,20 @@ const mapAccessLevelToOrgRole = (level: AccessLevel): 'admin' | 'staff' | 'clien
   if (level === 'Administrador') return 'admin';
   if (level === 'Usuário Sênior' || level === 'Usuário Pleno' || level === 'Operador') return 'staff';
   return 'client';
+};
+
+const DEFAULT_ORGANIZATION_NAME_KEYWORDS = ['central', 'default', 'padr', 'todas'];
+
+const normalizeText = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase();
+
+const isDefaultOrganizationName = (name: string | undefined | null) => {
+  if (!name) return false;
+  const normalized = normalizeText(name);
+  return DEFAULT_ORGANIZATION_NAME_KEYWORDS.some((keyword) => normalized.includes(keyword));
 };
 
 interface AdminDashboardProps {
@@ -439,23 +457,76 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     setClientsLoading(true);
     setClientsError('');
 
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id,nome_completo,nome,email,created_at')
-      .order('created_at', { ascending: false });
+    const { data: membershipScopeRows, error: membershipScopeError } = await supabase
+      .from('org_members')
+      .select('org_id,user_id,role,organizations(name)')
+      .eq('user_id', currentUser.id);
 
-    if (error) {
-      setClientsError('Não foi possível carregar os clientes da tabela profiles.');
+    if (membershipScopeError) {
+      setClientsError('Não foi possível validar o escopo de acesso do usuário.');
       setClientsLoading(false);
       return;
     }
 
-    const normalizedClients: ClientProfileView[] = (data || []).map((row) => ({
-      id: row.id,
-      nome: row.nome_completo || row.nome || (row.email ? String(row.email).split('@')[0] : 'Cliente sem nome'),
-      email: row.email || '-',
-      created_at: row.created_at || undefined,
-    }));
+    const hasGlobalScope = (membershipScopeRows || []).some((membership) => {
+      const role = String(membership.role || '').toLowerCase();
+      const orgName = membership.organizations?.name;
+      return (role === 'admin' || role === 'owner') && isDefaultOrganizationName(orgName);
+    });
+
+    const { data: memberRows, error: membersError } = await supabase
+      .from('org_members')
+      .select('org_id,user_id,role,organizations(name)')
+      .order('created_at', { ascending: false });
+
+    if (membersError) {
+      setClientsError('Não foi possível carregar os membros da tabela org_members.');
+      setClientsLoading(false);
+      return;
+    }
+
+    const allowedOrgIds = new Set((membershipScopeRows || []).map((row) => row.org_id));
+    const scopedMembers = (memberRows || []).filter((member) => hasGlobalScope || allowedOrgIds.has(member.org_id));
+
+    if (scopedMembers.length === 0) {
+      setClientsData([]);
+      setClientsLoading(false);
+      return;
+    }
+
+    const userIds = Array.from(new Set(scopedMembers.map((member) => member.user_id)));
+    const { data: profileRows, error: profileError } = await supabase
+      .from('profiles')
+      .select('id,nome_completo,nome,email,created_at')
+      .in('id', userIds);
+
+    if (profileError) {
+      setClientsError('Não foi possível carregar os perfis vinculados aos membros.');
+      setClientsLoading(false);
+      return;
+    }
+
+    const profileMap = new Map((profileRows || []).map((row) => [row.id, row]));
+
+    const normalizedClients: ClientProfileView[] = scopedMembers.map((member) => {
+      const profile = profileMap.get(member.user_id);
+      const email = profile?.email || '-';
+      const nome =
+        profile?.nome_completo ||
+        profile?.nome ||
+        (email !== '-' ? String(email).split('@')[0] : `Usuário ${member.user_id.slice(0, 8)}`);
+
+      return {
+        id: `${member.org_id}-${member.user_id}`,
+        user_id: member.user_id,
+        org_id: member.org_id,
+        org_name: member.organizations?.name || 'Organização Padrão',
+        nome,
+        email,
+        accessLevel: mapOrgRoleToAccessLevel(member.role),
+        created_at: profile?.created_at || undefined,
+      };
+    });
 
     setClientsData(normalizedClients);
     setClientsLoading(false);
@@ -470,7 +541,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const visibleClients = clientsData
     .filter((client) =>
       client.nome.toLowerCase().includes(clientsSearch.toLowerCase()) ||
-      client.email.toLowerCase().includes(clientsSearch.toLowerCase())
+      client.email.toLowerCase().includes(clientsSearch.toLowerCase()) ||
+      client.org_name.toLowerCase().includes(clientsSearch.toLowerCase())
     )
     .sort((a, b) => {
       if (clientsSort === 'name_asc') {
@@ -863,17 +935,44 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
           {clientsError && <p className="text-sm text-red-400 font-bold mb-4">{clientsError}</p>}
 
-          <div className="space-y-3">
-            {clientsLoading ? (
-              <div className="p-6 rounded-xl bg-slate-950 border border-slate-800 text-slate-400">Carregando clientes...</div>
-            ) : visibleClients.length === 0 ? (
-              <div className="p-6 rounded-xl bg-slate-950 border border-slate-800 text-slate-400">Nenhum cliente encontrado.</div>
-            ) : visibleClients.map((client) => (
-              <div key={client.id} className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                <p className="font-bold">{client.nome}</p>
-                <p className="text-xs text-slate-400">{client.email}</p>
-              </div>
-            ))}
+          <div className="mb-3 flex items-center justify-between text-xs text-slate-400 font-bold">
+            <span>Total encontrado: {clientsData.length}</span>
+            <span>Exibindo: {visibleClients.length}</span>
+          </div>
+
+          <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="bg-slate-950 text-slate-400 uppercase text-[10px] font-black tracking-widest">
+                  <th className="px-6 py-4">Usuário</th>
+                  <th className="px-6 py-4">Nível</th>
+                  <th className="px-6 py-4">Organização</th>
+                  <th className="px-6 py-4">Email</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {clientsLoading ? (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-8 text-center text-slate-400">Carregando membros...</td>
+                  </tr>
+                ) : visibleClients.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-8 text-center text-slate-400">Nenhum membro encontrado.</td>
+                  </tr>
+                ) : visibleClients.map((client) => (
+                  <tr key={client.id} className="hover:bg-slate-800/30">
+                    <td className="px-6 py-4 font-bold text-slate-100">{client.nome}</td>
+                    <td className="px-6 py-4">
+                      <span className="text-[10px] font-black text-blue-400 uppercase border border-blue-900/50 bg-blue-900/10 px-2 py-0.5 rounded">
+                        {client.accessLevel}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-slate-300 font-bold">{client.org_name}</td>
+                    <td className="px-6 py-4 text-slate-400 font-bold">{client.email}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       ) : activeTab === 'users' ? (
