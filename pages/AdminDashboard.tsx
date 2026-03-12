@@ -31,6 +31,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [orgError, setOrgError] = useState('');
   const [processSearch, setProcessSearch] = useState('');
   const [processStatusFilter, setProcessStatusFilter] = useState<'all' | ProcessStatus>('all');
+  const [processResponsibleFilter, setProcessResponsibleFilter] = useState('all');
+  const [processTypeFilter, setProcessTypeFilter] = useState<'all' | 'Administrativo' | 'Jurídico'>('all');
+  const [processPeriodFilter, setProcessPeriodFilter] = useState<'all' | 'today' | '7d' | '30d'>('all');
+  const [processRowsLimit, setProcessRowsLimit] = useState(10);
 
   const location = useLocation();
   const currentSection = section ?? (location.pathname.split('/')[2] as 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes') ?? 'dashboard';
@@ -64,15 +68,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     u.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const processRows = users
-    .filter((user) => {
-      const matchesSearch =
-        user.name.toLowerCase().includes(processSearch.toLowerCase()) ||
-        user.email.toLowerCase().includes(processSearch.toLowerCase()) ||
-        user.protocol.toLowerCase().includes(processSearch.toLowerCase());
-      const matchesStatus = processStatusFilter === 'all' || user.status === processStatusFilter;
-      return matchesSearch && matchesStatus;
-    })
+  const baseProcessRows = users
     .map((user) => {
       const generatedValue = user.unit === ServiceUnit.ADMINISTRATIVO ? 5200 : 1800;
       return {
@@ -86,6 +82,41 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         valor: generatedValue,
       };
     });
+
+  const processResponsibles = Array.from(new Set(baseProcessRows.map((row) => row.serviceManager || 'Não definido')));
+
+  const isWithinPeriod = (registrationDate: string, period: 'all' | 'today' | '7d' | '30d') => {
+    if (period === 'all') return true;
+
+    const parsedDate = new Date(registrationDate);
+    if (Number.isNaN(parsedDate.getTime())) {
+      return true;
+    }
+
+    const now = new Date();
+    const diffMs = now.getTime() - parsedDate.getTime();
+    const diffDays = diffMs / (1000 * 60 * 60 * 24);
+
+    if (period === 'today') return diffDays <= 1;
+    if (period === '7d') return diffDays <= 7;
+    return diffDays <= 30;
+  };
+
+  const processRows = baseProcessRows.filter((process) => {
+    const matchesSearch =
+      process.name.toLowerCase().includes(processSearch.toLowerCase()) ||
+      process.email.toLowerCase().includes(processSearch.toLowerCase()) ||
+      process.protocol.toLowerCase().includes(processSearch.toLowerCase());
+
+    const matchesStatus = processStatusFilter === 'all' || process.status === processStatusFilter;
+    const matchesResponsible = processResponsibleFilter === 'all' || (process.serviceManager || 'Não definido') === processResponsibleFilter;
+    const matchesType = processTypeFilter === 'all' || process.processType === processTypeFilter;
+    const matchesPeriod = isWithinPeriod(process.registrationDate, processPeriodFilter);
+
+    return matchesSearch && matchesStatus && matchesResponsible && matchesType && matchesPeriod;
+  });
+
+  const visibleProcessRows = processRows.slice(0, processRowsLimit);
 
   const processStats = {
     total: processRows.length,
@@ -339,7 +370,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       ) : currentSection === 'processos' ? (
         <div className="space-y-6">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-            <h3 className="text-5xl font-black tracking-tight mb-2 leading-none">Processos</h3>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-5xl font-black tracking-tight leading-none">Processos</h3>
+              <button className="px-4 py-2 rounded-xl border border-slate-700 bg-slate-800/60 text-slate-200 font-bold">
+                ≡ Colunas
+              </button>
+            </div>
             <p className="text-slate-400 text-sm mb-6">Visão geral em formato de planilha para filtrar, acompanhar status e agir rápido.</p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
@@ -370,13 +406,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               </div>
             </div>
 
-            <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="mt-5 grid grid-cols-1 md:grid-cols-5 gap-4">
               <div className="relative">
                 <Search className="absolute left-3 top-3 text-slate-500 w-5 h-5" />
                 <input
                   value={processSearch}
                   onChange={(event) => setProcessSearch(event.target.value)}
-                  placeholder="Buscar processo, cliente ou protocolo..."
+                  placeholder="Buscar processo, cliente, responsável..."
                   className="w-full pl-10 pr-4 py-3 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold"
                 />
               </div>
@@ -391,6 +427,35 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                 <option value={ProcessStatus.ANALISE}>Análise</option>
                 <option value={ProcessStatus.CONCLUIDO}>Concluído</option>
               </select>
+              <select
+                value={processResponsibleFilter}
+                onChange={(event) => setProcessResponsibleFilter(event.target.value)}
+                className="w-full py-3 px-4 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold"
+              >
+                <option value="all">Todos os responsáveis</option>
+                {processResponsibles.map((responsible) => (
+                  <option key={responsible} value={responsible}>{responsible}</option>
+                ))}
+              </select>
+              <select
+                value={processTypeFilter}
+                onChange={(event) => setProcessTypeFilter(event.target.value as 'all' | 'Administrativo' | 'Jurídico')}
+                className="w-full py-3 px-4 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold"
+              >
+                <option value="all">Todos os tipos</option>
+                <option value="Administrativo">Administrativo</option>
+                <option value="Jurídico">Jurídico</option>
+              </select>
+              <select
+                value={processPeriodFilter}
+                onChange={(event) => setProcessPeriodFilter(event.target.value as 'all' | 'today' | '7d' | '30d')}
+                className="w-full py-3 px-4 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold"
+              >
+                <option value="all">Todo período</option>
+                <option value="today">Hoje</option>
+                <option value="7d">Últimos 7 dias</option>
+                <option value="30d">Últimos 30 dias</option>
+              </select>
             </div>
           </div>
 
@@ -398,9 +463,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
             <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
               <div>
                 <h4 className="text-2xl font-black">Lista de processos</h4>
-                <p className="text-slate-400 text-sm">Mostrando {processRows.length} resultados</p>
+                <p className="text-slate-400 text-sm">Mostrando {visibleProcessRows.length} de {processRows.length} resultados</p>
               </div>
-              <span className="text-sm text-slate-300 font-bold">Linhas: {processRows.length}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-slate-300 font-bold">Linhas</span>
+                <select
+                  value={processRowsLimit}
+                  onChange={(event) => setProcessRowsLimit(Number(event.target.value))}
+                  className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm font-bold"
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                </select>
+              </div>
             </div>
 
             <div className="overflow-x-auto">
@@ -422,7 +498,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800">
-                  {processRows.map((process) => (
+                  {visibleProcessRows.map((process) => (
                     <tr key={process.id} className="hover:bg-slate-800/40 transition-colors">
                       <td className="px-4 py-4 font-black text-white">{process.protocol}</td>
                       <td className="px-4 py-4 font-bold text-slate-200">{process.name}</td>
