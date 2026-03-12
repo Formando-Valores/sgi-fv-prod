@@ -29,6 +29,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [organizationName, setOrganizationName] = useState('');
   const [orgError, setOrgError] = useState('');
+  const [processSearch, setProcessSearch] = useState('');
+  const [processStatusFilter, setProcessStatusFilter] = useState<'all' | ProcessStatus>('all');
 
   const location = useLocation();
   const currentSection = section ?? (location.pathname.split('/')[2] as 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes') ?? 'dashboard';
@@ -61,6 +63,37 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     u.protocol.toLowerCase().includes(searchTerm.toLowerCase()) ||
     u.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const processRows = users
+    .filter((user) => {
+      const matchesSearch =
+        user.name.toLowerCase().includes(processSearch.toLowerCase()) ||
+        user.email.toLowerCase().includes(processSearch.toLowerCase()) ||
+        user.protocol.toLowerCase().includes(processSearch.toLowerCase());
+      const matchesStatus = processStatusFilter === 'all' || user.status === processStatusFilter;
+      return matchesSearch && matchesStatus;
+    })
+    .map((user) => {
+      const generatedValue = user.unit === ServiceUnit.ADMINISTRATIVO ? 5200 : 1800;
+      return {
+        ...user,
+        processType: user.unit === ServiceUnit.ADMINISTRATIVO ? 'Administrativo' : 'Jurídico',
+        startDate: user.registrationDate,
+        deadlineDate: user.deadline || '12/03/2026',
+        etapaAtual: user.status === ProcessStatus.CONCLUIDO ? 'Finalizado' : 'Documentos',
+        financeiro: user.status === ProcessStatus.CONCLUIDO ? 'Quitado' : 'Pendente',
+        prioridade: user.status === ProcessStatus.CONCLUIDO ? 'Média' : 'Baixa',
+        valor: generatedValue,
+      };
+    });
+
+  const processStats = {
+    total: processRows.length,
+    emAndamento: processRows.filter((process) => process.status !== ProcessStatus.CONCLUIDO).length,
+    concluidos: processRows.filter((process) => process.status === ProcessStatus.CONCLUIDO).length,
+    aguardando: processRows.filter((process) => process.status === ProcessStatus.PENDENTE || process.status === ProcessStatus.TRIAGEM).length,
+    atrasados: processRows.filter((process) => process.status !== ProcessStatus.CONCLUIDO && Boolean(process.deadline)).length,
+  };
 
   const handleUpdateStatus = (userId: string, status: ProcessStatus, deadline?: string, notes?: string, serviceManager?: string) => {
     const timestamp = new Date().toLocaleString('pt-BR');
@@ -304,17 +337,145 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           </div>
         </div>
       ) : currentSection === 'processos' ? (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+            <h3 className="text-5xl font-black tracking-tight mb-2 leading-none">Processos</h3>
+            <p className="text-slate-400 text-sm mb-6">Visão geral em formato de planilha para filtrar, acompanhar status e agir rápido.</p>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-          <h3 className="text-lg font-black mb-4">PROCESSOS</h3>
-          <p className="text-slate-400 text-sm mb-4">Visão rápida dos processos cadastrados.</p>
-          <div className="space-y-3">
-            {users.map((user) => (
-              <div key={user.id} className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
-                <span className="font-bold">{user.name}</span>
-                <span className="text-xs text-slate-400">{user.protocol} • {user.status}</span>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+              <div className="bg-slate-800/30 border border-slate-700 rounded-2xl p-4">
+                <p className="text-xs text-slate-400 uppercase">Processos</p>
+                <p className="text-4xl font-black leading-none mt-2">{processStats.total}</p>
+                <p className="text-slate-300 mt-1">Total após filtros</p>
               </div>
-            ))}
+              <div className="bg-slate-800/30 border border-slate-700 rounded-2xl p-4">
+                <p className="text-xs text-slate-400 uppercase">Em andamento</p>
+                <p className="text-4xl font-black leading-none mt-2">{processStats.emAndamento}</p>
+                <p className="text-slate-300 mt-1">Ativos</p>
+              </div>
+              <div className="bg-slate-800/30 border border-slate-700 rounded-2xl p-4">
+                <p className="text-xs text-slate-400 uppercase">Concluídos</p>
+                <p className="text-4xl font-black leading-none mt-2">{processStats.concluidos}</p>
+                <p className="text-slate-300 mt-1">Finalizados</p>
+              </div>
+              <div className="bg-slate-800/30 border border-slate-700 rounded-2xl p-4">
+                <p className="text-xs text-slate-400 uppercase">Aguardando</p>
+                <p className="text-4xl font-black leading-none mt-2">{processStats.aguardando}</p>
+                <p className="text-slate-300 mt-1">Pendências</p>
+              </div>
+              <div className="bg-slate-800/30 border border-slate-700 rounded-2xl p-4">
+                <p className="text-xs text-slate-400 uppercase">Atrasados</p>
+                <p className="text-4xl font-black leading-none mt-2">{processStats.atrasados}</p>
+                <p className="text-slate-300 mt-1">Prazo vencido</p>
+              </div>
+            </div>
+
+            <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-3 text-slate-500 w-5 h-5" />
+                <input
+                  value={processSearch}
+                  onChange={(event) => setProcessSearch(event.target.value)}
+                  placeholder="Buscar processo, cliente ou protocolo..."
+                  className="w-full pl-10 pr-4 py-3 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold"
+                />
+              </div>
+              <select
+                value={processStatusFilter}
+                onChange={(event) => setProcessStatusFilter(event.target.value as 'all' | ProcessStatus)}
+                className="w-full py-3 px-4 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold"
+              >
+                <option value="all">Todos os status</option>
+                <option value={ProcessStatus.PENDENTE}>Cadastro</option>
+                <option value={ProcessStatus.TRIAGEM}>Triagem</option>
+                <option value={ProcessStatus.ANALISE}>Análise</option>
+                <option value={ProcessStatus.CONCLUIDO}>Concluído</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+              <div>
+                <h4 className="text-2xl font-black">Lista de processos</h4>
+                <p className="text-slate-400 text-sm">Mostrando {processRows.length} resultados</p>
+              </div>
+              <span className="text-sm text-slate-300 font-bold">Linhas: {processRows.length}</span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="bg-slate-950 text-slate-400 uppercase text-[10px] font-black tracking-widest">
+                    <th className="px-4 py-4">Nº Processo</th>
+                    <th className="px-4 py-4">Cliente</th>
+                    <th className="px-4 py-4">Tipo</th>
+                    <th className="px-4 py-4">Responsável</th>
+                    <th className="px-4 py-4">Data Início</th>
+                    <th className="px-4 py-4">Prazo</th>
+                    <th className="px-4 py-4">Status</th>
+                    <th className="px-4 py-4">Etapa Atual</th>
+                    <th className="px-4 py-4">Financeiro</th>
+                    <th className="px-4 py-4">Prioridade</th>
+                    <th className="px-4 py-4">Valor</th>
+                    <th className="px-4 py-4 text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800">
+                  {processRows.map((process) => (
+                    <tr key={process.id} className="hover:bg-slate-800/40 transition-colors">
+                      <td className="px-4 py-4 font-black text-white">{process.protocol}</td>
+                      <td className="px-4 py-4 font-bold text-slate-200">{process.name}</td>
+                      <td className="px-4 py-4 text-slate-300">{process.processType}</td>
+                      <td className="px-4 py-4 text-slate-300">{process.serviceManager || 'Não definido'}</td>
+                      <td className="px-4 py-4 text-slate-300">{process.startDate}</td>
+                      <td className="px-4 py-4 text-slate-300">{process.deadlineDate}</td>
+                      <td className="px-4 py-4">
+                        <span className={`px-3 py-1 rounded-full text-[10px] font-black ${
+                          process.status === ProcessStatus.CONCLUIDO
+                            ? 'bg-emerald-900/40 text-emerald-300 border border-emerald-700'
+                            : process.status === ProcessStatus.ANALISE
+                              ? 'bg-orange-900/40 text-orange-300 border border-orange-700'
+                              : process.status === ProcessStatus.TRIAGEM
+                                ? 'bg-blue-900/40 text-blue-300 border border-blue-700'
+                                : 'bg-yellow-900/40 text-yellow-300 border border-yellow-700'
+                        }`}>
+                          {process.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 text-slate-300">{process.etapaAtual}</td>
+                      <td className="px-4 py-4">
+                        <span className="px-3 py-1 rounded-full text-[10px] font-black bg-yellow-900/40 text-yellow-300 border border-yellow-700">
+                          {process.financeiro}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4">
+                        <span className="px-3 py-1 rounded-full text-[10px] font-black bg-emerald-900/40 text-emerald-300 border border-emerald-700">
+                          {process.prioridade}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 font-black text-slate-100">R$ {process.valor.toLocaleString('pt-BR')}</td>
+                      <td className="px-4 py-4 text-right">
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => setSelectedUser(process)}
+                            className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setEditingUser(process)}
+                            className="p-2 bg-blue-900/30 hover:bg-blue-900/50 rounded-lg text-blue-400"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       ) : currentSection === 'clientes' ? (
