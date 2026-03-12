@@ -18,6 +18,13 @@ interface OrgMemberView {
   accessLevel: AccessLevel;
 }
 
+interface ClientProfileView {
+  id: string;
+  nome: string;
+  email: string;
+  created_at?: string;
+}
+
 const ACCESS_LEVELS: AccessLevel[] = ['Administrador', 'Usuário Sênior', 'Usuário Pleno', 'Operador', 'Cliente'];
 
 const mapOrgRoleToAccessLevel = (role: string | null | undefined): AccessLevel => {
@@ -70,6 +77,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [membersLoading, setMembersLoading] = useState(false);
   const [membersError, setMembersError] = useState('');
   const [editingMemberUserId, setEditingMemberUserId] = useState<string | null>(null);
+  const [clientsData, setClientsData] = useState<ClientProfileView[]>([]);
+  const [clientsLoading, setClientsLoading] = useState(false);
+  const [clientsError, setClientsError] = useState('');
+  const [clientsSearch, setClientsSearch] = useState('');
+  const [clientsRowsLimit, setClientsRowsLimit] = useState(10);
+  const [clientsSort, setClientsSort] = useState<'name_asc' | 'name_desc' | 'recent'>('name_asc');
 
   const location = useLocation();
   const currentSection = section ?? (location.pathname.split('/')[2] as 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes') ?? 'dashboard';
@@ -395,6 +408,54 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
     await fetchOrgMembers();
   };
+
+  const fetchClients = async () => {
+    setClientsLoading(true);
+    setClientsError('');
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id,nome_completo,nome,email,created_at')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      setClientsError('Não foi possível carregar os clientes da tabela profiles.');
+      setClientsLoading(false);
+      return;
+    }
+
+    const normalizedClients: ClientProfileView[] = (data || []).map((row) => ({
+      id: row.id,
+      nome: row.nome_completo || row.nome || (row.email ? String(row.email).split('@')[0] : 'Cliente sem nome'),
+      email: row.email || '-',
+      created_at: row.created_at || undefined,
+    }));
+
+    setClientsData(normalizedClients);
+    setClientsLoading(false);
+  };
+
+  useEffect(() => {
+    if (currentSection === 'clientes') {
+      fetchClients();
+    }
+  }, [currentSection]);
+
+  const visibleClients = clientsData
+    .filter((client) =>
+      client.nome.toLowerCase().includes(clientsSearch.toLowerCase()) ||
+      client.email.toLowerCase().includes(clientsSearch.toLowerCase())
+    )
+    .sort((a, b) => {
+      if (clientsSort === 'name_asc') {
+        return a.nome.localeCompare(b.nome, 'pt-BR');
+      }
+      if (clientsSort === 'name_desc') {
+        return b.nome.localeCompare(a.nome, 'pt-BR');
+      }
+      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+    })
+    .slice(0, clientsRowsLimit);
 
   const handleCreateOrganization = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -743,11 +804,48 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       ) : currentSection === 'clientes' ? (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
           <h3 className="text-lg font-black mb-4">CLIENTES</h3>
+
+          <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="relative md:col-span-1">
+              <Search className="absolute left-3 top-3 text-slate-500 w-4 h-4" />
+              <input
+                value={clientsSearch}
+                onChange={(event) => setClientsSearch(event.target.value)}
+                placeholder="Buscar por nome..."
+                className="w-full pl-9 pr-3 py-2 bg-gray-900 border border-slate-700 rounded-lg text-white font-bold"
+              />
+            </div>
+            <select
+              value={clientsSort}
+              onChange={(event) => setClientsSort(event.target.value as 'name_asc' | 'name_desc' | 'recent')}
+              className="w-full py-2 px-3 bg-gray-900 border border-slate-700 rounded-lg text-white font-bold"
+            >
+              <option value="name_asc">Ordenar: Nome (A-Z)</option>
+              <option value="name_desc">Ordenar: Nome (Z-A)</option>
+              <option value="recent">Ordenar: Mais recentes</option>
+            </select>
+            <select
+              value={clientsRowsLimit}
+              onChange={(event) => setClientsRowsLimit(Number(event.target.value))}
+              className="w-full py-2 px-3 bg-gray-900 border border-slate-700 rounded-lg text-white font-bold"
+            >
+              <option value={10}>Mostrar 10</option>
+              <option value={25}>Mostrar 25</option>
+              <option value={50}>Mostrar 50</option>
+            </select>
+          </div>
+
+          {clientsError && <p className="text-sm text-red-400 font-bold mb-4">{clientsError}</p>}
+
           <div className="space-y-3">
-            {users.filter((user) => user.role !== UserRole.ADMIN).map((user) => (
-              <div key={user.id} className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                <p className="font-bold">{user.name}</p>
-                <p className="text-xs text-slate-400">{user.email}</p>
+            {clientsLoading ? (
+              <div className="p-6 rounded-xl bg-slate-950 border border-slate-800 text-slate-400">Carregando clientes...</div>
+            ) : visibleClients.length === 0 ? (
+              <div className="p-6 rounded-xl bg-slate-950 border border-slate-800 text-slate-400">Nenhum cliente encontrado.</div>
+            ) : visibleClients.map((client) => (
+              <div key={client.id} className="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                <p className="font-bold">{client.nome}</p>
+                <p className="text-xs text-slate-400">{client.email}</p>
               </div>
             ))}
           </div>
