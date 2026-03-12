@@ -8,6 +8,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { AlertCircle, Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { ProcessStatus, ServiceUnit, User, UserRole } from '../types';
 import { isSupabaseConfigured, supabase } from '../supabase';
+import { ADMIN_CREDENTIALS } from '../constants';
 
 interface LoginProps {
   setCurrentUser: (user: User) => void;
@@ -19,7 +20,7 @@ const isAdminRole = (value: unknown): boolean => {
     return false;
   }
 
-  return ['admin', 'administrator', UserRole.ADMIN.toLowerCase()].includes(value.toLowerCase());
+  return ['admin', 'administrator', 'administrador', 'owner', 'administrador geral', UserRole.ADMIN.toLowerCase()].includes(value.toLowerCase());
 };
 
 const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
@@ -103,19 +104,29 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
         const profileOrgId = profile?.org_id ?? profile?.organization_id ?? defaultOrganization?.id ?? null;
 
         if (profileOrgId) {
-          const { error: membershipError } = await supabase
+          const { data: existingMembership, error: membershipLookupError } = await supabase
             .from('org_members')
-            .upsert(
-              {
+            .select('org_id')
+            .eq('org_id', profileOrgId)
+            .eq('user_id', userId)
+            .maybeSingle();
+
+          if (membershipLookupError) {
+            console.warn('[login] não foi possível verificar vínculo em org_members', membershipLookupError);
+          }
+
+          if (!existingMembership) {
+            const { error: membershipInsertError } = await supabase
+              .from('org_members')
+              .insert({
                 org_id: profileOrgId,
                 user_id: userId,
                 role: 'client',
-              },
-              { onConflict: 'org_id,user_id' }
-            );
+              });
 
-          if (membershipError) {
-            console.warn('[login] não foi possível garantir vínculo em org_members', membershipError);
+            if (membershipInsertError) {
+              console.warn('[login] não foi possível criar vínculo em org_members', membershipInsertError);
+            }
           }
         }
 
@@ -164,6 +175,7 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
           isAdminRole(profile?.role) ||
           isAdminRole(contextRole) ||
           isAdminRole(existingUser?.role) ||
+          ADMIN_CREDENTIALS.some((adminEmail) => adminEmail.toLowerCase() === (data.user.email || '').toLowerCase()) ||
           hasDefaultOrganizationAccess;
 
         const normalizedRole = hasAdminRole ? UserRole.ADMIN : UserRole.CLIENT;
