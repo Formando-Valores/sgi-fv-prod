@@ -5,6 +5,33 @@ import { User, ProcessStatus, UserRole, Hierarchy, ServiceUnit, Organization } f
 import { NavLink, useLocation } from 'react-router-dom';
 import { SERVICE_MANAGERS } from '../constants';
 import { buildOrganizationErrorMessage, createOrganization, loadOrganizations } from '../organizationRepository';
+import { supabase } from '../supabase';
+
+type AccessLevel = 'Administrador' | 'Usuário Sênior' | 'Usuário Pleno' | 'Operador' | 'Cliente';
+
+interface OrgMemberView {
+  user_id: string;
+  org_id: string;
+  org_name: string;
+  name: string;
+  email: string;
+  accessLevel: AccessLevel;
+}
+
+const ACCESS_LEVELS: AccessLevel[] = ['Administrador', 'Usuário Sênior', 'Usuário Pleno', 'Operador', 'Cliente'];
+
+const mapOrgRoleToAccessLevel = (role: string | null | undefined): AccessLevel => {
+  if (!role) return 'Cliente';
+  if (role === 'owner' || role === 'admin') return 'Administrador';
+  if (role === 'staff') return 'Usuário Pleno';
+  return 'Cliente';
+};
+
+const mapAccessLevelToOrgRole = (level: AccessLevel): 'admin' | 'staff' | 'client' => {
+  if (level === 'Administrador') return 'admin';
+  if (level === 'Usuário Sênior' || level === 'Usuário Pleno' || level === 'Operador') return 'staff';
+  return 'client';
+};
 
 interface AdminDashboardProps {
   currentUser: User;
@@ -23,6 +50,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   // Management tab states
   const [newAdminName, setNewAdminName] = useState('');
   const [newAdminEmail, setNewAdminEmail] = useState('');
+  const [newAccessLevel, setNewAccessLevel] = useState<AccessLevel>('Usuário Sênior');
   const [newAdminHierarchy, setNewAdminHierarchy] = useState<Hierarchy>(Hierarchy.FULL);
   const [editingHierarchyUser, setEditingHierarchyUser] = useState<User | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -37,7 +65,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [processRowsLimit, setProcessRowsLimit] = useState(10);
   const [configSearch, setConfigSearch] = useState('');
   const [configRowsLimit, setConfigRowsLimit] = useState(10);
-  const [newAdminOrgId, setNewAdminOrgId] = useState('default');
+  const [newAdminOrgId, setNewAdminOrgId] = useState('');
+  const [orgMembers, setOrgMembers] = useState<OrgMemberView[]>([]);
+  const [membersLoading, setMembersLoading] = useState(false);
+  const [membersError, setMembersError] = useState('');
+  const [editingMemberUserId, setEditingMemberUserId] = useState<string | null>(null);
 
   const location = useLocation();
   const currentSection = section ?? (location.pathname.split('/')[2] as 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes') ?? 'dashboard';
@@ -137,46 +169,152 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     setEditingUser(null);
   };
 
-  const handleCreateUser = (e: React.FormEvent) => {
+  const fetchOrgMembers = async () => {
+    setMembersLoading(true);
+    setMembersError('');
+
+    const { data: memberRows, error: memberError } = await supabase
+      .from('org_members')
+      .select('org_id,user_id,role,organizations(name)')
+      .order('created_at', { ascending: false });
+
+    if (memberError) {
+      setMembersError('Não foi possível carregar os membros da organização.');
+      setMembersLoading(false);
+      return;
+    }
+
+    const memberUserIds = Array.from(new Set((memberRows || []).map((row) => row.user_id)));
+    let profileMap = new Map<string, { nome_completo?: string | null; email?: string | null; role?: string | null }>();
+
+    if (memberUserIds.length > 0) {
+      const { data: profileRows, error: profileError } = await supabase
+        .from('profiles')
+        .select('id,nome_completo,email,role')
+        .in('id', memberUserIds);
+
+      if (!profileError) {
+        profileMap = new Map((profileRows || []).map((profile) => [profile.id, profile]));
+      }
+    }
+
+    const normalizedMembers: OrgMemberView[] = (memberRows || []).map((member) => {
+      const profile = profileMap.get(member.user_id);
+      const roleFromProfile = typeof profile?.role === 'string' ? profile.role : null;
+      const accessLevel = ACCESS_LEVELS.includes(roleFromProfile as AccessLevel)
+        ? (roleFromProfile as AccessLevel)
+        : mapOrgRoleToAccessLevel(member.role);
+
+      return {
+        user_id: member.user_id,
+        org_id: member.org_id,
+        org_name: (member.organizations as { name?: string } | null)?.name || 'Organização Padrão',
+        name: profile?.nome_completo || profile?.email || member.user_id,
+        email: profile?.email || '-',
+        accessLevel,
+      };
+    });
+
+    setOrgMembers(normalizedMembers);
+    setMembersLoading(false);
+  };
+
+  const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newAdminEmail || !newAdminName) return;
 
-    const selectedOrgName = organizations.find((org) => org.id === newAdminOrgId)?.name || 'Organização Padrão';
-
-    const existing = users.find(u => u.email === newAdminEmail);
-    if (existing) {
-       setUsers(prev => prev.map(u => 
-         u.email === newAdminEmail
-           ? { ...u, name: newAdminName, role: UserRole.ADMIN, hierarchy: newAdminHierarchy, organizationId: newAdminOrgId, organizationName: selectedOrgName }
-           : u
-       ));
-    } else {
-       const newUser: User = {
-         id: Date.now().toString(),
-         name: newAdminName,
-         email: newAdminEmail,
-         role: UserRole.ADMIN,
-         hierarchy: newAdminHierarchy,
-         documentId: '---',
-         taxId: '---',
-         address: '---',
-         maritalStatus: '---',
-         country: '---',
-         phone: '---',
-         unit: ServiceUnit.ADMINISTRATIVO,
-         status: ProcessStatus.PENDENTE,
-         protocol: `ADM-2026-ADM`,
-         registrationDate: new Date().toLocaleString('pt-BR'),
-         lastUpdate: new Date().toLocaleString('pt-BR'),
-         organizationId: newAdminOrgId,
-         organizationName: selectedOrgName,
-       };
-       setUsers(prev => [...prev, newUser]);
+    const selectedOrg = organizations.find((org) => org.id === newAdminOrgId);
+    if (!selectedOrg) {
+      alert('Selecione uma organização válida.');
+      return;
     }
+    const selectedOrgName = selectedOrg?.name || 'Organização Padrão';
+
+    const { data: existingProfile, error: profileLookupError } = await supabase
+      .from('profiles')
+      .select('id,email')
+      .eq('email', newAdminEmail)
+      .maybeSingle();
+
+    if (profileLookupError) {
+      alert('Erro ao buscar usuário no banco. Tente novamente.');
+      return;
+    }
+
+    if (!existingProfile?.id) {
+      alert('Não foi possível vincular este usuário à organização porque o ID não está válido no Auth. Peça para o usuário concluir cadastro/login no Supabase e tente novamente.');
+      return;
+    }
+
+    const orgRole = mapAccessLevelToOrgRole(newAccessLevel);
+
+    const { error: upsertMemberError } = await supabase
+      .from('org_members')
+      .upsert(
+        {
+          org_id: newAdminOrgId,
+          user_id: existingProfile.id,
+          role: orgRole,
+        },
+        { onConflict: 'org_id,user_id' }
+      );
+
+    if (upsertMemberError) {
+      alert('Erro ao salvar vínculo na tabela org_members.');
+      return;
+    }
+
+    await supabase
+      .from('profiles')
+      .update({
+        nome_completo: newAdminName,
+        role: newAccessLevel,
+        org_id: newAdminOrgId,
+      })
+      .eq('id', existingProfile.id);
+
+    setUsers((prev) => {
+      const found = prev.find((user) => user.id === existingProfile.id || user.email === newAdminEmail);
+      const role = newAccessLevel === 'Administrador' ? UserRole.ADMIN : UserRole.CLIENT;
+
+      if (found) {
+        return prev.map((user) =>
+          user.id === found.id
+            ? { ...user, name: newAdminName, role, hierarchy: newAdminHierarchy, organizationId: newAdminOrgId, organizationName: selectedOrgName }
+            : user
+        );
+      }
+
+      const newUser: User = {
+        id: existingProfile.id,
+        name: newAdminName,
+        email: newAdminEmail,
+        role,
+        hierarchy: newAdminHierarchy,
+        documentId: '---',
+        taxId: '---',
+        address: '---',
+        maritalStatus: '---',
+        country: '---',
+        phone: '---',
+        unit: ServiceUnit.ADMINISTRATIVO,
+        status: ProcessStatus.PENDENTE,
+        protocol: `USR-2026-000`,
+        registrationDate: new Date().toLocaleString('pt-BR'),
+        lastUpdate: new Date().toLocaleString('pt-BR'),
+        organizationId: newAdminOrgId,
+        organizationName: selectedOrgName,
+      };
+      return [...prev, newUser];
+    });
+
     setNewAdminEmail('');
     setNewAdminName('');
-    setNewAdminOrgId('default');
-    alert('Usuário administrativo definido com sucesso.');
+    setNewAdminOrgId(selectedOrg.id);
+    setNewAccessLevel('Usuário Sênior');
+    setEditingMemberUserId(null);
+    await fetchOrgMembers();
+    alert('Membro cadastrado/atualizado com sucesso.');
   };
 
   const handleUpdateHierarchy = (e: React.FormEvent<HTMLFormElement>) => {
@@ -215,17 +353,39 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
       setOrgError('');
       setOrganizations(loadedOrganizations);
+      if (!newAdminOrgId && loadedOrganizations.length > 0) {
+        const defaultOrg = loadedOrganizations.find((org) => org.name.toLowerCase().includes('padr'));
+        setNewAdminOrgId(defaultOrg?.id || loadedOrganizations[0].id);
+      }
     };
 
     fetchOrganizations();
+    fetchOrgMembers();
   }, []);
 
-  const managementUsers = users
+  const managementUsers = orgMembers
     .filter((user) =>
       user.name.toLowerCase().includes(configSearch.toLowerCase()) ||
       user.email.toLowerCase().includes(configSearch.toLowerCase())
     )
     .slice(0, configRowsLimit);
+
+  const handleDeleteMember = async (member: OrgMemberView) => {
+    if (!window.confirm('Deseja realmente remover este membro da organização?')) return;
+
+    const { error } = await supabase
+      .from('org_members')
+      .delete()
+      .eq('org_id', member.org_id)
+      .eq('user_id', member.user_id);
+
+    if (error) {
+      alert('Erro ao remover membro.');
+      return;
+    }
+
+    await fetchOrgMembers();
+  };
 
   const handleCreateOrganization = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -689,12 +849,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                  <div>
                     <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Perfil de Acesso</label>
                     <select
-                      value={newAdminHierarchy}
-                      onChange={(event) => setNewAdminHierarchy(event.target.value as Hierarchy)}
+                      value={newAccessLevel}
+                      onChange={(event) => setNewAccessLevel(event.target.value as AccessLevel)}
                       className="w-full bg-gray-900 border border-slate-800 rounded-lg p-3 text-white font-bold"
                     >
-                      {Object.values(Hierarchy).map((h) => (
-                        <option key={h} value={h}>{h}</option>
+                      {ACCESS_LEVELS.map((level) => (
+                        <option key={level} value={level}>{level}</option>
                       ))}
                     </select>
                     <p className="text-[11px] text-slate-500 mt-2">Diretoria/Gerência da organização: agenda, equipe e distribuição autorizada.</p>
@@ -706,7 +866,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                       onChange={(event) => setNewAdminOrgId(event.target.value)}
                       className="w-full bg-gray-900 border border-slate-800 rounded-lg p-3 text-white font-bold"
                     >
-                      <option value="default">Organização Padrão</option>
+                      {organizations.length === 0 && <option value="">Carregando organizações...</option>}
                       {organizations.map((org) => (
                         <option key={org.id} value={org.id}>{org.name}</option>
                       ))}
@@ -731,7 +891,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     </div>
                  </div>
                  <button type="submit" className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg uppercase text-xs tracking-widest mt-4 shadow-lg active:scale-95 transition-transform">
-                    Cadastrar / Definir
+                    {editingMemberUserId ? 'Atualizar / Definir' : 'Cadastrar / Definir'}
                  </button>
               </form>
            </div>
@@ -760,6 +920,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                   />
                 </div>
               </div>
+              {membersError && <p className="px-4 pt-3 text-sm text-red-400 font-bold">{membersError}</p>}
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead>
@@ -771,28 +932,38 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800">
-                    {managementUsers.map(u => (
-                      <tr key={u.id} className="hover:bg-slate-800/30">
+                    {membersLoading ? (
+                      <tr>
+                        <td colSpan={4} className="px-6 py-8 text-center text-slate-400">Carregando membros...</td>
+                      </tr>
+                    ) : managementUsers.map(u => (
+                      <tr key={`${u.user_id}-${u.org_id}`} className="hover:bg-slate-800/30">
                         <td className="px-6 py-4 font-bold flex flex-col">
                            <span>{u.name}</span>
                            <span className="text-[10px] text-slate-500">{u.email}</span>
                         </td>
                         <td className="px-6 py-4">
                           <span className="text-[10px] font-black text-blue-400 uppercase border border-blue-900/50 bg-blue-900/10 px-2 py-0.5 rounded">
-                            {u.role === UserRole.ADMIN ? 'Administrador Geral' : 'Cliente'}
+                            {u.accessLevel.toUpperCase()}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-slate-300 font-bold">{u.organizationName || 'Organização Padrão'}</td>
+                        <td className="px-6 py-4 text-slate-300 font-bold">{u.org_name || 'Organização Padrão'}</td>
                         <td className="px-6 py-4 text-right">
                            <div className="flex justify-end gap-2">
                               <button 
-                                onClick={() => setEditingHierarchyUser(u)}
+                                onClick={() => {
+                                  setNewAdminName(u.name);
+                                  setNewAdminEmail(u.email);
+                                  setNewAdminOrgId(u.org_id);
+                                  setNewAccessLevel(u.accessLevel);
+                                  setEditingMemberUserId(u.user_id);
+                                }}
                                 className="p-2 bg-slate-800 hover:bg-slate-700 rounded-md text-slate-400 hover:text-white transition-colors"
                               >
                                 <Pencil className="w-4 h-4" />
                               </button>
                               <button 
-                                onClick={() => handleDeleteUser(u.id)} 
+                                onClick={() => handleDeleteMember(u)} 
                                 className="p-2 bg-red-900/20 hover:bg-red-900/40 rounded-md text-red-500 transition-colors"
                               >
                                 <Trash2 className="w-4 h-4" />
