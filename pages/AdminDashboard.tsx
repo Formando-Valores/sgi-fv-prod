@@ -185,12 +185,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     }
 
     const memberUserIds = Array.from(new Set((memberRows || []).map((row) => row.user_id)));
-    let profileMap = new Map<string, { nome_completo?: string | null; email?: string | null; role?: string | null }>();
+    let profileMap = new Map<string, { nome_completo?: string | null; nome?: string | null; email?: string | null; role?: string | null }>();
 
     if (memberUserIds.length > 0) {
       const { data: profileRows, error: profileError } = await supabase
         .from('profiles')
-        .select('id,nome_completo,email,role')
+        .select('id,nome_completo,nome,email,role')
         .in('id', memberUserIds);
 
       if (!profileError) {
@@ -200,17 +200,26 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
     const normalizedMembers: OrgMemberView[] = (memberRows || []).map((member) => {
       const profile = profileMap.get(member.user_id);
+      const fallbackUser = users.find((user) => user.id === member.user_id);
       const roleFromProfile = typeof profile?.role === 'string' ? profile.role : null;
       const accessLevel = ACCESS_LEVELS.includes(roleFromProfile as AccessLevel)
         ? (roleFromProfile as AccessLevel)
         : mapOrgRoleToAccessLevel(member.role);
 
+      const resolvedEmail = profile?.email || fallbackUser?.email || '';
+      const resolvedName =
+        profile?.nome_completo ||
+        profile?.nome ||
+        fallbackUser?.name ||
+        (resolvedEmail ? resolvedEmail.split('@')[0] : '') ||
+        `Usuário ${member.user_id.slice(0, 8)}`;
+
       return {
         user_id: member.user_id,
         org_id: member.org_id,
         org_name: (member.organizations as { name?: string } | null)?.name || 'Organização Padrão',
-        name: profile?.nome_completo || profile?.email || member.user_id,
-        email: profile?.email || '-',
+        name: resolvedName,
+        email: resolvedEmail || '-',
         accessLevel,
       };
     });
