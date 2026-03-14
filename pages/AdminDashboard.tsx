@@ -136,6 +136,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [orgMembers, setOrgMembers] = useState<OrgMemberView[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
   const [membersError, setMembersError] = useState('');
+  const [memberActionFeedback, setMemberActionFeedback] = useState<{ type: 'success' | 'warning' | 'error'; message: string } | null>(null);
   const [editingMemberUserId, setEditingMemberUserId] = useState<string | null>(null);
   const [clientsData, setClientsData] = useState<ClientProfileView[]>([]);
   const [clientsLoading, setClientsLoading] = useState(false);
@@ -624,6 +625,29 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
   const handleDeleteMember = async (member: OrgMemberView) => {
     if (!window.confirm('Deseja realmente remover este membro da organização?')) return;
+    setMemberActionFeedback(null);
+
+    const { data: existingProfile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', member.user_id)
+      .maybeSingle();
+
+    const { data: existingMembership } = await supabase
+      .from('org_members')
+      .select('user_id')
+      .eq('org_id', member.org_id)
+      .eq('user_id', member.user_id)
+      .maybeSingle();
+
+    if (!existingProfile && !existingMembership) {
+      setMemberActionFeedback({
+        type: 'warning',
+        message: 'Este usuário não possui mais cadastro no banco. A listagem foi atualizada.',
+      });
+      await fetchOrgMembers();
+      return;
+    }
 
     if (member.source === 'org_members') {
       const { error: orgMemberDeleteError } = await supabase
@@ -633,6 +657,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         .eq('user_id', member.user_id);
 
       if (orgMemberDeleteError) {
+        setMemberActionFeedback({ type: 'error', message: 'Erro ao remover vínculo na organização.' });
         alert('Erro ao remover vínculo na organização.');
         return;
       }
@@ -656,8 +681,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         errorMessage.includes('not allowed');
 
       if (isPermissionError) {
+        setMemberActionFeedback({
+          type: 'warning',
+          message: 'Vínculo removido, mas o perfil não pôde ser excluído por permissão no Supabase.',
+        });
         alert('Vínculo removido, mas não foi possível excluir o perfil por permissão. Verifique políticas do Supabase para exclusão completa.');
       } else {
+        setMemberActionFeedback({
+          type: 'error',
+          message: 'Vínculo removido, mas houve erro ao excluir o perfil no banco.',
+        });
         alert('Vínculo removido, mas houve erro ao excluir o perfil no banco.');
       }
 
@@ -666,6 +699,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     }
 
     setUsers((prev) => prev.filter((user) => user.id !== member.user_id));
+    setMemberActionFeedback({ type: 'success', message: 'Usuário excluído com sucesso do sistema.' });
 
     await fetchOrgMembers();
   };
@@ -1370,6 +1404,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                 </div>
               </div>
               {membersError && <p className="px-4 pt-3 text-sm text-red-400 font-bold">{membersError}</p>}
+              {memberActionFeedback && (
+                <p
+                  className={`px-4 pt-3 text-sm font-bold ${
+                    memberActionFeedback.type === 'success'
+                      ? 'text-emerald-400'
+                      : memberActionFeedback.type === 'warning'
+                        ? 'text-amber-400'
+                        : 'text-red-400'
+                  }`}
+                >
+                  {memberActionFeedback.message}
+                </p>
+              )}
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead>
