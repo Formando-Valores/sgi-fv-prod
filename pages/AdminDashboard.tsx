@@ -626,6 +626,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const handleDeleteMember = async (member: OrgMemberView) => {
     if (!window.confirm('Deseja realmente remover este membro da organização?')) return;
     setMemberActionFeedback(null);
+    const memberEmail = sanitizeDisplayValue(member.email) || 'sem-email';
 
     const { data: existingProfile } = await supabase
       .from('profiles')
@@ -643,7 +644,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     if (!existingProfile && !existingMembership) {
       setMemberActionFeedback({
         type: 'warning',
-        message: 'Este usuário não possui mais cadastro no banco. A listagem foi atualizada.',
+        message: `O usuário ${memberEmail} já não possui cadastro no banco. A listagem foi atualizada.`,
       });
       await fetchOrgMembers();
       return;
@@ -657,7 +658,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         .eq('user_id', member.user_id);
 
       if (orgMemberDeleteError) {
-        setMemberActionFeedback({ type: 'error', message: 'Erro ao remover vínculo na organização.' });
+        setMemberActionFeedback({ type: 'error', message: `Erro ao remover vínculo na organização para ${memberEmail}.` });
         alert('Erro ao remover vínculo na organização.');
         return;
       }
@@ -683,13 +684,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       if (isPermissionError) {
         setMemberActionFeedback({
           type: 'warning',
-          message: 'Vínculo removido, mas o perfil não pôde ser excluído por permissão no Supabase.',
+          message: `Vínculo removido, mas o perfil de ${memberEmail} não pôde ser excluído por permissão no Supabase.`,
         });
         alert('Vínculo removido, mas não foi possível excluir o perfil por permissão. Verifique políticas do Supabase para exclusão completa.');
       } else {
         setMemberActionFeedback({
           type: 'error',
-          message: 'Vínculo removido, mas houve erro ao excluir o perfil no banco.',
+          message: `Vínculo removido, mas houve erro ao excluir o perfil de ${memberEmail} no banco.`,
         });
         alert('Vínculo removido, mas houve erro ao excluir o perfil no banco.');
       }
@@ -698,8 +699,30 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       return;
     }
 
+    const { data: profileStillExists } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', member.user_id)
+      .maybeSingle();
+
+    const { data: membershipStillExists } = await supabase
+      .from('org_members')
+      .select('user_id')
+      .eq('user_id', member.user_id)
+      .limit(1)
+      .maybeSingle();
+
+    if (profileStillExists || membershipStillExists) {
+      setMemberActionFeedback({
+        type: 'warning',
+        message: `A exclusão de ${memberEmail} não foi concluída totalmente. Ainda existe cadastro no banco.`,
+      });
+      await fetchOrgMembers();
+      return;
+    }
+
     setUsers((prev) => prev.filter((user) => user.id !== member.user_id));
-    setMemberActionFeedback({ type: 'success', message: 'Usuário excluído com sucesso do sistema.' });
+    setMemberActionFeedback({ type: 'success', message: `Usuário ${memberEmail} excluído com sucesso do sistema.` });
 
     await fetchOrgMembers();
   };
