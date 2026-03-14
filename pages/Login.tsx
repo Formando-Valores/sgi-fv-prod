@@ -182,7 +182,7 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
 
         const normalizedUser: User = {
           id: userId,
-          name: profile?.nome ?? profile?.nome_completo ?? existingUser?.name ?? data.user.email?.split('@')[0] ?? 'Usuário',
+          name: profile?.nome_completo ?? existingUser?.name ?? data.user.email?.split('@')[0] ?? 'Usuário',
           email: data.user.email ?? existingUser?.email ?? email,
           role: normalizedRole,
           documentId: existingUser?.documentId ?? '-',
