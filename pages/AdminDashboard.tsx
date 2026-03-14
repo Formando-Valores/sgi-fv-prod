@@ -658,6 +658,33 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       return;
     }
 
+    const { error: hardDeleteError } = await supabase.rpc('delete_user_completely', {
+      target_user_id: member.user_id,
+    });
+
+    if (!hardDeleteError) {
+      const { data: profileStillExistsAfterRpc } = await supabase
+        .from('profiles')
+        .select('id')
+        .or(`id.eq.${member.user_id},email.eq.${memberEmail}`)
+        .limit(1)
+        .maybeSingle();
+
+      const { data: membershipStillExistsAfterRpc } = await supabase
+        .from('org_members')
+        .select('user_id')
+        .eq('user_id', member.user_id)
+        .limit(1)
+        .maybeSingle();
+
+      if (!profileStillExistsAfterRpc && !membershipStillExistsAfterRpc) {
+        setUsers((prev) => prev.filter((user) => user.id !== member.user_id));
+        setMemberActionFeedback({ type: 'success', message: `Usuário ${memberEmail} excluído com sucesso do sistema.` });
+        await fetchOrgMembers();
+        return;
+      }
+    }
+
     const { error: orgMemberDeleteError } = await supabase
       .from('org_members')
       .delete()
