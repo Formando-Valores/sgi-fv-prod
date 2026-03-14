@@ -625,16 +625,42 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const handleDeleteMember = async (member: OrgMemberView) => {
     if (!window.confirm('Deseja realmente remover este membro da organização?')) return;
 
-    const { error } = await supabase
+    const { error: orgMemberDeleteError } = await supabase
       .from('org_members')
       .delete()
       .eq('org_id', member.org_id)
       .eq('user_id', member.user_id);
 
-    if (error) {
+    if (orgMemberDeleteError) {
       alert('Erro ao remover membro.');
       return;
     }
+
+    const { error: profileDeleteError } = await supabase
+      .from('profiles')
+      .delete()
+      .eq('id', member.user_id);
+
+    if (profileDeleteError) {
+      const errorMessage = String(profileDeleteError.message || '').toLowerCase();
+      const errorCode = String((profileDeleteError as { code?: string }).code || '').toLowerCase();
+      const errorStatus = String((profileDeleteError as { status?: number }).status || '');
+
+      const isPermissionError =
+        errorStatus === '403' ||
+        errorCode === '42501' ||
+        errorMessage.includes('permission denied') ||
+        errorMessage.includes('row-level security') ||
+        errorMessage.includes('not allowed');
+
+      if (isPermissionError) {
+        alert('Vínculo removido de org_members, mas o perfil não pôde ser apagado por permissão.');
+      } else {
+        alert('Vínculo removido, mas houve erro ao apagar o perfil no banco.');
+      }
+    }
+
+    setUsers((prev) => prev.filter((user) => user.id !== member.user_id));
 
     await fetchOrgMembers();
   };
