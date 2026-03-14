@@ -105,7 +105,12 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
 
       if (authError) {
         console.error('[register] falha no cadastro', authError);
-        setError(authError.message);
+        const authMessage = String(authError.message || '').toLowerCase();
+        if (authMessage.includes('user already registered')) {
+          setError('Este e-mail já está cadastrado. Faça login para continuar.');
+        } else {
+          setError(authError.message);
+        }
         return;
       }
 
@@ -159,6 +164,32 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
                 .update({ role: UserRole.CLIENT })
                 .eq('id', data.user.id);
             }
+          }
+        }
+
+        if (profileInsertError) {
+          const duplicateProfile =
+            profileInsertError.code === '23505' ||
+            String(profileInsertError.message || '').toLowerCase().includes('duplicate');
+
+          if (duplicateProfile) {
+            const { error: profileUpdateError } = await supabase
+              .from('profiles')
+              .update({
+                nome_completo: formData.name,
+                email: formData.email,
+                role: UserRole.CLIENT,
+                org_id: formData.organizationId,
+                documento_identidade: formData.documentId,
+                nif_cpf: formData.taxId,
+                estado_civil: formData.maritalStatus,
+                phone: formData.phone,
+                endereco: formData.address,
+                pais: formData.country,
+              })
+              .eq('id', data.user.id);
+
+            profileInsertError = profileUpdateError;
           }
         }
 
