@@ -211,10 +211,25 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
           );
 
         if (membershipError) {
-          console.error('[register] erro ao criar vínculo na organização', membershipError);
-          setError('Cadastro criado, mas não foi possível vincular o usuário à organização.');
-          setIsLoading(false);
-          return;
+          const membershipStatus = String((membershipError as { code?: string; status?: number }).status ?? '');
+          const membershipCode = String((membershipError as { code?: string; status?: number }).code ?? '').toLowerCase();
+          const membershipMessage = String(membershipError.message || '').toLowerCase();
+
+          const isPermissionError =
+            membershipStatus === '403' ||
+            membershipCode === '42501' ||
+            membershipMessage.includes('permission denied') ||
+            membershipMessage.includes('row-level security') ||
+            membershipMessage.includes('not allowed');
+
+          if (isPermissionError) {
+            console.warn('[register] vínculo em org_members bloqueado por política; seguindo com profile.org_id', membershipError);
+          } else {
+            console.error('[register] erro ao criar vínculo na organização', membershipError);
+            setError('Cadastro criado, mas não foi possível vincular o usuário à organização.');
+            setIsLoading(false);
+            return;
+          }
         }
 
         const prefix =
