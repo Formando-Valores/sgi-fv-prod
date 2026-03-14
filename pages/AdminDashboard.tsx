@@ -341,7 +341,31 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
     const membershipKeys = new Set(normalizedMembersFromMembership.map((member) => `${member.org_id}-${member.user_id}`));
 
-    const defaultOrgId = newAdminOrgId || organizations[0]?.id || '';
+    let defaultOrgId = newAdminOrgId || organizations[0]?.id || '';
+    let defaultOrgName = organizations.find((org) => org.id === defaultOrgId)?.name || 'Organização Padrão';
+
+    if (!defaultOrgId) {
+      const { data: fallbackOrganizations, error: fallbackOrganizationsError } = await supabase
+        .from('organizations')
+        .select('id,name,slug')
+        .order('created_at', { ascending: true });
+
+      if (!fallbackOrganizationsError && (fallbackOrganizations || []).length > 0) {
+        const defaultOrg =
+          (fallbackOrganizations || []).find((org) => String(org.slug || '').toLowerCase() === 'default') ||
+          (fallbackOrganizations || []).find((org) => String(org.name || '').toLowerCase().includes('padr')) ||
+          fallbackOrganizations?.[0];
+
+        if (defaultOrg?.id) {
+          defaultOrgId = defaultOrg.id;
+          defaultOrgName = defaultOrg.name || defaultOrgName;
+
+          if (!newAdminOrgId) {
+            setNewAdminOrgId(defaultOrg.id);
+          }
+        }
+      }
+    }
 
     const profileOnlyMembers: OrgMemberView[] = (((allProfilesError ? [] : profileRows) || []) as ProfileRow[])
       .filter((profile) => Boolean(profile.id))
@@ -367,14 +391,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         return {
           user_id: profile.id,
           org_id: sanitizeDisplayValue(profile.org_id) || defaultOrgId,
-          org_name: profile.organizations?.name || 'Organização Padrão',
+          org_name: profile.organizations?.name || defaultOrgName,
           name: resolvedName,
           email: resolvedEmail,
           accessLevel: resolveAccessLevel(profile.role),
           source: 'profiles',
         };
-      })
-      .filter((member) => Boolean(member.org_id));
+      });
 
     setOrgMembers([...normalizedMembersFromMembership, ...profileOnlyMembers]);
     setMembersLoading(false);
