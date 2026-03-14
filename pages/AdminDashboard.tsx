@@ -625,6 +625,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const handleDeleteMember = async (member: OrgMemberView) => {
     if (!window.confirm('Deseja realmente remover este membro da organização?')) return;
 
+    const membershipSnapshot = {
+      org_id: member.org_id,
+      user_id: member.user_id,
+      role: mapAccessLevelToOrgRole(member.accessLevel),
+    };
+
     const { error: orgMemberDeleteError } = await supabase
       .from('org_members')
       .delete()
@@ -642,6 +648,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       .eq('id', member.user_id);
 
     if (profileDeleteError) {
+      await supabase
+        .from('org_members')
+        .upsert(membershipSnapshot, { onConflict: 'org_id,user_id' });
+
       const errorMessage = String(profileDeleteError.message || '').toLowerCase();
       const errorCode = String((profileDeleteError as { code?: string }).code || '').toLowerCase();
       const errorStatus = String((profileDeleteError as { status?: number }).status || '');
@@ -654,10 +664,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         errorMessage.includes('not allowed');
 
       if (isPermissionError) {
-        alert('Vínculo removido de org_members, mas o perfil não pôde ser apagado por permissão.');
+        alert('Não foi possível excluir completamente por permissão no perfil. A remoção foi revertida para evitar usuário parcial.');
       } else {
-        alert('Vínculo removido, mas houve erro ao apagar o perfil no banco.');
+        alert('Não foi possível excluir completamente o usuário. A remoção foi revertida.');
       }
+
+      await fetchOrgMembers();
+      return;
     }
 
     setUsers((prev) => prev.filter((user) => user.id !== member.user_id));
