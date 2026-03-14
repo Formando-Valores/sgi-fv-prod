@@ -116,23 +116,51 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
           .eq('id', formData.organizationId)
           .maybeSingle();
 
-        const { error: profileInsertError } = await supabase
+        const profilePayload = {
+          id: data.user.id,
+          nome_completo: formData.name,
+          email: formData.email,
+          role: UserRole.CLIENT,
+          org_id: formData.organizationId,
+          documento_identidade: formData.documentId,
+          nif_cpf: formData.taxId,
+          estado_civil: formData.maritalStatus,
+          phone: formData.phone,
+          endereco: formData.address,
+          pais: formData.country,
+        };
+
+        let { error: profileInsertError } = await supabase
           .from('profiles')
-          .insert([
-            {
+          .insert([profilePayload]);
+
+        if (profileInsertError) {
+          const schemaMismatch =
+            profileInsertError.code === 'PGRST204' ||
+            String(profileInsertError.message || '').toLowerCase().includes('column');
+
+          if (schemaMismatch) {
+            const minimalProfilePayload = {
               id: data.user.id,
               nome_completo: formData.name,
               email: formData.email,
-              role: UserRole.CLIENT,
               org_id: formData.organizationId,
-              documento_identidade: formData.documentId,
-              nif_cpf: formData.taxId,
-              estado_civil: formData.maritalStatus,
-              phone: formData.phone,
-              endereco: formData.address,
-              pais: formData.country,
-            },
-          ]);
+            };
+
+            const { error: fallbackProfileError } = await supabase
+              .from('profiles')
+              .insert([minimalProfilePayload]);
+
+            profileInsertError = fallbackProfileError;
+
+            if (!fallbackProfileError) {
+              await supabase
+                .from('profiles')
+                .update({ role: UserRole.CLIENT })
+                .eq('id', data.user.id);
+            }
+          }
+        }
 
         if (profileInsertError) {
           console.error('[register] erro ao criar profile', profileInsertError);
@@ -216,15 +244,15 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gradient-to-b from-slate-900 to-slate-950">
-      <div className="w-full max-w-md bg-slate-800 p-8 rounded-2xl shadow-2xl border border-slate-700">
+      <div className="w-full max-w-4xl bg-slate-800 p-4 sm:p-8 rounded-2xl shadow-2xl border border-slate-700">
         <div className="mb-8 text-center">
           <h1 className="text-2xl font-bold tracking-wider text-white">SGI FV</h1>
           <p className="text-slate-400 font-semibold uppercase text-xs mt-1">Criar Nova Conta</p>
         </div>
 
-        <div className="p-8">
-          <div className="flex justify-between items-center mb-10">
-            <h2 className="text-3xl font-bold">Solicitar Registro</h2>
+        <div className="p-2 sm:p-6">
+          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-8">
+            <h2 className="text-2xl sm:text-3xl font-bold">Solicitar Registro</h2>
             <button 
               onClick={() => goToRoute('/login')}
               className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm font-bold"
@@ -326,9 +354,9 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
                 </select>
               </div>
 
-              <div className="flex flex-wrap gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {Object.values(ServiceUnit).map(unit => (
-                  <label key={unit} className={`flex-1 min-w-[200px] cursor-pointer p-4 rounded-xl border-2 transition-all ${formData.unit === unit ? 'bg-blue-600/20 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)]' : 'bg-gray-900 border-slate-800'}`}>
+                  <label key={unit} className={`cursor-pointer p-4 rounded-xl border-2 transition-all ${formData.unit === unit ? 'bg-blue-600/20 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)]' : 'bg-gray-900 border-slate-800'}`}>
                     <input type="radio" name="unit" className="hidden" value={unit} checked={formData.unit === unit} onChange={() => setFormData({...formData, unit})} />
                     <div className="text-center">
                       <p className={`text-sm font-bold ${formData.unit === unit ? 'text-white' : 'text-slate-500'}`}>{unit}</p>
