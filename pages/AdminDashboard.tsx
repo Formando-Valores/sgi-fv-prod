@@ -487,9 +487,26 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         { onConflict: 'org_id,user_id' }
       );
 
+    let membershipWarning = '';
+
     if (upsertMemberError) {
-      alert('Erro ao salvar vínculo na tabela org_members.');
-      return;
+      const errorMessage = String(upsertMemberError.message || '').toLowerCase();
+      const errorCode = String((upsertMemberError as { code?: string }).code || '').toLowerCase();
+      const errorStatus = String((upsertMemberError as { status?: number }).status || '');
+
+      const isPermissionError =
+        errorStatus === '403' ||
+        errorCode === '42501' ||
+        errorMessage.includes('permission denied') ||
+        errorMessage.includes('row-level security') ||
+        errorMessage.includes('not allowed');
+
+      if (isPermissionError) {
+        membershipWarning = 'Nível atualizado no perfil, mas o vínculo em org_members foi bloqueado por permissão.';
+      } else {
+        alert('Erro ao salvar vínculo na tabela org_members.');
+        return;
+      }
     }
 
     await supabase
@@ -543,7 +560,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     setNewAccessLevel('Usuário Sênior');
     setEditingMemberUserId(null);
     await fetchOrgMembers();
-    alert('Membro cadastrado/atualizado com sucesso.');
+    alert(membershipWarning || 'Membro cadastrado/atualizado com sucesso.');
   };
 
   const handleUpdateHierarchy = (e: React.FormEvent<HTMLFormElement>) => {
