@@ -625,21 +625,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const handleDeleteMember = async (member: OrgMemberView) => {
     if (!window.confirm('Deseja realmente remover este membro da organização?')) return;
 
-    const membershipSnapshot = {
-      org_id: member.org_id,
-      user_id: member.user_id,
-      role: mapAccessLevelToOrgRole(member.accessLevel),
-    };
+    if (member.source === 'org_members') {
+      const { error: orgMemberDeleteError } = await supabase
+        .from('org_members')
+        .delete()
+        .eq('org_id', member.org_id)
+        .eq('user_id', member.user_id);
 
-    const { error: orgMemberDeleteError } = await supabase
-      .from('org_members')
-      .delete()
-      .eq('org_id', member.org_id)
-      .eq('user_id', member.user_id);
-
-    if (orgMemberDeleteError) {
-      alert('Erro ao remover membro.');
-      return;
+      if (orgMemberDeleteError) {
+        alert('Erro ao remover vínculo na organização.');
+        return;
+      }
     }
 
     const { error: profileDeleteError } = await supabase
@@ -648,10 +644,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       .eq('id', member.user_id);
 
     if (profileDeleteError) {
-      await supabase
-        .from('org_members')
-        .upsert(membershipSnapshot, { onConflict: 'org_id,user_id' });
-
       const errorMessage = String(profileDeleteError.message || '').toLowerCase();
       const errorCode = String((profileDeleteError as { code?: string }).code || '').toLowerCase();
       const errorStatus = String((profileDeleteError as { status?: number }).status || '');
@@ -664,9 +656,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         errorMessage.includes('not allowed');
 
       if (isPermissionError) {
-        alert('Não foi possível excluir completamente por permissão no perfil. A remoção foi revertida para evitar usuário parcial.');
+        alert('Vínculo removido, mas não foi possível excluir o perfil por permissão. Verifique políticas do Supabase para exclusão completa.');
       } else {
-        alert('Não foi possível excluir completamente o usuário. A remoção foi revertida.');
+        alert('Vínculo removido, mas houve erro ao excluir o perfil no banco.');
       }
 
       await fetchOrgMembers();
@@ -1419,23 +1411,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                               >
                                 <Pencil className="w-4 h-4" />
                               </button>
-                              {u.source === 'org_members' ? (
-                                <button 
-                                  onClick={() => handleDeleteMember(u)} 
-                                  className="p-2 bg-red-900/20 hover:bg-red-900/40 rounded-md text-red-500 transition-colors"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  disabled
-                                  title="Sem vínculo em org_members"
-                                  className="p-2 bg-slate-900/50 rounded-md text-slate-600 cursor-not-allowed"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              )}
+                              <button 
+                                onClick={() => handleDeleteMember(u)} 
+                                className="p-2 bg-red-900/20 hover:bg-red-900/40 rounded-md text-red-500 transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
                            </div>
                         </td>
                       </tr>
