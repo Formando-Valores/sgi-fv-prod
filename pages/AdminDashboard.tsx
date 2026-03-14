@@ -246,23 +246,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     setMembersLoading(true);
     setMembersError('');
 
-    const withNamesQuery = await supabase
-      .from('org_members')
-      .select('org_id,user_id,role,nome_completo,nome,name,full_name,organizations(name)')
-      .order('created_at', { ascending: false });
+    const orgMemberSelectOptions = [
+      'org_id,user_id,role,nome_completo,nome,name,full_name,organizations(name)',
+      'org_id,user_id,role,organizations(name)',
+      'org_id,user_id,role',
+    ];
 
-    let memberRows = withNamesQuery.data as OrgMemberRow[] | null;
-    let memberError = withNamesQuery.error;
+    let memberRows: OrgMemberRow[] | null = null;
+    let memberError: { message?: string } | null = null;
 
-    // Compatibilidade: se a tabela não tiver colunas de nome, faz fallback para consulta básica.
-    if (memberError && String(memberError.message || '').toLowerCase().includes('column')) {
-      const fallbackQuery = await supabase
+    for (const selectFields of orgMemberSelectOptions) {
+      const query = await supabase
         .from('org_members')
-        .select('org_id,user_id,role,organizations(name)')
+        .select(selectFields)
         .order('created_at', { ascending: false });
 
-      memberRows = fallbackQuery.data as OrgMemberRow[] | null;
-      memberError = fallbackQuery.error;
+      if (!query.error) {
+        memberRows = query.data as OrgMemberRow[] | null;
+        memberError = null;
+        break;
+      }
+
+      memberError = query.error;
     }
 
     if (memberError) {
@@ -275,13 +280,24 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     let profileMap = new Map<string, { nome_completo?: string | null; nome?: string | null; name?: string | null; email?: string | null; role?: string | null }>();
 
     if (memberUserIds.length > 0) {
-      const { data: profileRows, error: profileError } = await supabase
-        .from('profiles')
-        .select('id,nome_completo,nome,name,email,role')
-        .in('id', memberUserIds);
+      const profileSelectOptions = [
+        'id,nome_completo,nome,name,email,role',
+        'id,nome_completo,name,email,role',
+        'id,nome_completo,email,role',
+        'id,email,role',
+      ];
 
-      if (!profileError) {
-        profileMap = new Map((profileRows || []).map((profile) => [profile.id, profile]));
+      for (const selectFields of profileSelectOptions) {
+        const profileQuery = await supabase
+          .from('profiles')
+          .select(selectFields)
+          .in('id', memberUserIds);
+
+        if (!profileQuery.error) {
+          const rows = (profileQuery.data || []) as Array<{ id: string; nome_completo?: string | null; nome?: string | null; name?: string | null; email?: string | null; role?: string | null }>;
+          profileMap = new Map(rows.map((profile) => [profile.id, profile]));
+          break;
+        }
       }
     }
 
@@ -317,22 +333,31 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       };
     });
 
-    const profilesWithOrganizationQuery = await supabase
-      .from('profiles')
-      .select('id,org_id,role,email,nome_completo,nome,name,organizations(name)')
-      .order('created_at', { ascending: false });
+    const profileSelectOptions = [
+      'id,org_id,role,email,nome_completo,nome,name,organizations(name)',
+      'id,org_id,role,email,nome_completo,name,organizations(name)',
+      'id,org_id,role,email,nome_completo,nome,name',
+      'id,org_id,role,email,nome_completo,name',
+      'id,org_id,role,email,nome_completo',
+      'id,org_id,role,email',
+    ];
 
-    let profileRows = profilesWithOrganizationQuery.data as ProfileRow[] | null;
-    let allProfilesError = profilesWithOrganizationQuery.error;
+    let profileRows: ProfileRow[] | null = null;
+    let allProfilesError: { message?: string } | null = null;
 
-    if (allProfilesError && String(allProfilesError.message || '').toLowerCase().includes('column')) {
-      const profilesFallbackQuery = await supabase
+    for (const selectFields of profileSelectOptions) {
+      const query = await supabase
         .from('profiles')
-        .select('id,org_id,role,email,nome_completo,nome,name')
+        .select(selectFields)
         .order('created_at', { ascending: false });
 
-      profileRows = (profilesFallbackQuery.data as ProfileRow[] | null) || [];
-      allProfilesError = profilesFallbackQuery.error;
+      if (!query.error) {
+        profileRows = (query.data as ProfileRow[] | null) || [];
+        allProfilesError = null;
+        break;
+      }
+
+      allProfilesError = query.error;
     }
 
     if (allProfilesError) {
