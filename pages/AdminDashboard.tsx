@@ -317,22 +317,33 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       };
     });
 
-    const { data: profileRows, error: allProfilesError } = await supabase
+    const profilesWithOrganizationQuery = await supabase
       .from('profiles')
       .select('id,org_id,role,email,nome_completo,nome,name,organizations(name)')
       .order('created_at', { ascending: false });
 
+    let profileRows = profilesWithOrganizationQuery.data as ProfileRow[] | null;
+    let allProfilesError = profilesWithOrganizationQuery.error;
+
+    if (allProfilesError && String(allProfilesError.message || '').toLowerCase().includes('column')) {
+      const profilesFallbackQuery = await supabase
+        .from('profiles')
+        .select('id,org_id,role,email,nome_completo,nome,name')
+        .order('created_at', { ascending: false });
+
+      profileRows = (profilesFallbackQuery.data as ProfileRow[] | null) || [];
+      allProfilesError = profilesFallbackQuery.error;
+    }
+
     if (allProfilesError) {
-      setMembersError('Não foi possível carregar os perfis para a gestão de acessos.');
-      setMembersLoading(false);
-      return;
+      console.warn('[configuracoes] não foi possível carregar profiles completos; exibindo apenas org_members', allProfilesError);
     }
 
     const membershipKeys = new Set(normalizedMembersFromMembership.map((member) => `${member.org_id}-${member.user_id}`));
 
     const defaultOrgId = newAdminOrgId || organizations[0]?.id || '';
 
-    const profileOnlyMembers: OrgMemberView[] = ((profileRows || []) as ProfileRow[])
+    const profileOnlyMembers: OrgMemberView[] = (((allProfilesError ? [] : profileRows) || []) as ProfileRow[])
       .filter((profile) => Boolean(profile.id))
       .map((profile) => {
         const orgId = sanitizeDisplayValue(profile.org_id) || 'sem-org';
