@@ -626,7 +626,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const handleDeleteMember = async (member: OrgMemberView) => {
     if (!window.confirm('Deseja realmente remover este membro da organização?')) return;
     setMemberActionFeedback(null);
-    const memberEmail = sanitizeDisplayValue(member.email) || 'sem-email';
+    const fallbackEmail = sanitizeDisplayValue(member.email) || 'sem-email';
+
+    const { data: profileBeforeDelete } = await supabase
+      .from('profiles')
+      .select('id,email')
+      .eq('id', member.user_id)
+      .maybeSingle();
+
+    const memberEmail = sanitizeDisplayValue(profileBeforeDelete?.email) || fallbackEmail;
 
     const { data: existingProfile } = await supabase
       .from('profiles')
@@ -650,18 +658,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       return;
     }
 
-    if (member.source === 'org_members') {
-      const { error: orgMemberDeleteError } = await supabase
-        .from('org_members')
-        .delete()
-        .eq('org_id', member.org_id)
-        .eq('user_id', member.user_id);
+    const { error: orgMemberDeleteError } = await supabase
+      .from('org_members')
+      .delete()
+      .eq('user_id', member.user_id);
 
-      if (orgMemberDeleteError) {
-        setMemberActionFeedback({ type: 'error', message: `Erro ao remover vínculo na organização para ${memberEmail}.` });
-        alert('Erro ao remover vínculo na organização.');
-        return;
-      }
+    if (orgMemberDeleteError) {
+      setMemberActionFeedback({ type: 'error', message: `Erro ao remover vínculos de organização para ${memberEmail}.` });
+      alert('Erro ao remover vínculo na organização.');
+      return;
     }
 
     const { error: profileDeleteError } = await supabase
@@ -699,10 +704,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       return;
     }
 
+    if (memberEmail !== 'sem-email') {
+      await supabase
+        .from('profiles')
+        .delete()
+        .eq('email', memberEmail)
+        .neq('id', member.user_id);
+    }
+
     const { data: profileStillExists } = await supabase
       .from('profiles')
-      .select('id')
-      .eq('id', member.user_id)
+      .select('id,email')
+      .or(`id.eq.${member.user_id},email.eq.${memberEmail}`)
+      .limit(1)
       .maybeSingle();
 
     const { data: membershipStillExists } = await supabase
