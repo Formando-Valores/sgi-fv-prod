@@ -310,7 +310,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         sanitizeDisplayValue(member.name) ||
         sanitizeDisplayValue(member.nome);
       const roleFromProfile = typeof profile?.role === 'string' ? profile.role : null;
-      const accessLevel = roleFromProfile ? resolveAccessLevel(roleFromProfile) : mapOrgRoleToAccessLevel(member.role);
+      const accessLevelFromMembership = mapOrgRoleToAccessLevel(member.role);
+      const accessLevelFromProfile = roleFromProfile ? resolveAccessLevel(roleFromProfile) : null;
+
+      const accessLevel =
+        accessLevelFromMembership !== 'Cliente'
+          ? accessLevelFromMembership
+          : accessLevelFromProfile || 'Cliente';
 
       const resolvedEmail = sanitizeDisplayValue(profile?.email) || sanitizeDisplayValue(fallbackUser?.email) || '';
       const resolvedName =
