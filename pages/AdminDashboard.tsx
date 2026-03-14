@@ -24,6 +24,7 @@ type OrgMemberRow = {
   role: string;
   nome_completo?: string | null;
   nome?: string | null;
+  name?: string | null;
   full_name?: string | null;
   organizations?: { name?: string } | null;
 };
@@ -66,6 +67,11 @@ const isDefaultOrganizationName = (name: string | undefined | null) => {
   if (!name) return false;
   const normalized = normalizeText(name);
   return DEFAULT_ORGANIZATION_NAME_KEYWORDS.some((keyword) => normalized.includes(keyword));
+};
+
+const sanitizeDisplayValue = (value: string | null | undefined) => {
+  if (typeof value !== 'string') return '';
+  return value.replace(/\s+/g, ' ').trim();
 };
 
 interface AdminDashboardProps {
@@ -216,7 +222,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
     const withNamesQuery = await supabase
       .from('org_members')
-      .select('org_id,user_id,role,nome_completo,nome,full_name,organizations(name)')
+      .select('org_id,user_id,role,nome_completo,nome,name,full_name,organizations(name)')
       .order('created_at', { ascending: false });
 
     let memberRows = withNamesQuery.data as OrgMemberRow[] | null;
@@ -240,12 +246,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     }
 
     const memberUserIds = Array.from(new Set((memberRows || []).map((row) => row.user_id)));
-    let profileMap = new Map<string, { nome_completo?: string | null; nome?: string | null; email?: string | null; role?: string | null }>();
+    let profileMap = new Map<string, { nome_completo?: string | null; nome?: string | null; name?: string | null; email?: string | null; role?: string | null }>();
 
     if (memberUserIds.length > 0) {
       const { data: profileRows, error: profileError } = await supabase
         .from('profiles')
-        .select('id,nome_completo,nome,email,role')
+        .select('id,nome_completo,nome,name,email,role')
         .in('id', memberUserIds);
 
       if (!profileError) {
@@ -256,18 +262,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const normalizedMembers: OrgMemberView[] = (memberRows || []).map((member) => {
       const profile = profileMap.get(member.user_id);
       const fallbackUser = users.find((user) => user.id === member.user_id);
-      const nameFromMemberRow = member.nome_completo || member.full_name || member.nome;
+      const nameFromMemberRow =
+        sanitizeDisplayValue(member.nome_completo) ||
+        sanitizeDisplayValue(member.full_name) ||
+        sanitizeDisplayValue(member.name) ||
+        sanitizeDisplayValue(member.nome);
       const roleFromProfile = typeof profile?.role === 'string' ? profile.role : null;
       const accessLevel = ACCESS_LEVELS.includes(roleFromProfile as AccessLevel)
         ? (roleFromProfile as AccessLevel)
         : mapOrgRoleToAccessLevel(member.role);
 
-      const resolvedEmail = profile?.email || fallbackUser?.email || '';
+      const resolvedEmail = sanitizeDisplayValue(profile?.email) || sanitizeDisplayValue(fallbackUser?.email) || '';
       const resolvedName =
         nameFromMemberRow ||
-        profile?.nome_completo ||
-        profile?.nome ||
-        fallbackUser?.name ||
+        sanitizeDisplayValue(profile?.nome_completo) ||
+        sanitizeDisplayValue(profile?.name) ||
+        sanitizeDisplayValue(profile?.nome) ||
+        sanitizeDisplayValue(fallbackUser?.name) ||
         (resolvedEmail ? resolvedEmail.split('@')[0] : '') ||
         `Usuário ${member.user_id.slice(0, 8)}`;
 
@@ -287,7 +298,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newAdminEmail || !newAdminName) return;
+    if (!newAdminName) return;
 
     const selectedOrg = organizations.find((org) => org.id === newAdminOrgId);
     if (!selectedOrg) {
@@ -296,19 +307,38 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     }
     const selectedOrgName = selectedOrg?.name || 'Organização Padrão';
 
-    const { data: existingProfile, error: profileLookupError } = await supabase
-      .from('profiles')
-      .select('id,email')
-      .eq('email', newAdminEmail)
-      .maybeSingle();
+    let targetUserId = editingMemberUserId;
+    const normalizedEmail = sanitizeDisplayValue(newAdminEmail);
+    const shouldLookupProfileByEmail = !targetUserId && normalizedEmail && normalizedEmail !== '-';
+
+    let existingProfile: { id?: string; email?: string | null } | null = null;
+    let profileLookupError: { message?: string } | null = null;
+
+    if (shouldLookupProfileByEmail) {
+      const lookupResult = await supabase
+        .from('profiles')
+        .select('id,email')
+        .eq('email', normalizedEmail)
+        .maybeSingle();
+
+      existingProfile = lookupResult.data;
+      profileLookupError = lookupResult.error;
+    }
 
     if (profileLookupError) {
       alert('Erro ao buscar usuário no banco. Tente novamente.');
       return;
     }
 
-    if (!existingProfile?.id) {
+    if (!targetUserId && !existingProfile?.id) {
       alert('Não foi possível vincular este usuário à organização porque o ID não está válido no Auth. Peça para o usuário concluir cadastro/login no Supabase e tente novamente.');
+      return;
+    }
+
+    targetUserId = targetUserId || existingProfile?.id || null;
+
+    if (!targetUserId) {
+      alert('Não foi possível identificar o usuário selecionado para atualização.');
       return;
     }
 
@@ -319,7 +349,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       .upsert(
         {
           org_id: newAdminOrgId,
-          user_id: existingProfile.id,
+          user_id: targetUserId,
           role: orgRole,
         },
         { onConflict: 'org_id,user_id' }
@@ -333,28 +363,29 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     await supabase
       .from('profiles')
       .update({
-        nome_completo: newAdminName,
+        nome_completo: sanitizeDisplayValue(newAdminName),
+        name: sanitizeDisplayValue(newAdminName),
         role: newAccessLevel,
         org_id: newAdminOrgId,
       })
-      .eq('id', existingProfile.id);
+      .eq('id', targetUserId);
 
     setUsers((prev) => {
-      const found = prev.find((user) => user.id === existingProfile.id || user.email === newAdminEmail);
+      const found = prev.find((user) => user.id === targetUserId || user.email === normalizedEmail);
       const role = newAccessLevel === 'Administrador' ? UserRole.ADMIN : UserRole.CLIENT;
 
       if (found) {
         return prev.map((user) =>
           user.id === found.id
-            ? { ...user, name: newAdminName, role, hierarchy: newAdminHierarchy, organizationId: newAdminOrgId, organizationName: selectedOrgName }
+            ? { ...user, name: sanitizeDisplayValue(newAdminName) || user.name, role, hierarchy: newAdminHierarchy, organizationId: newAdminOrgId, organizationName: selectedOrgName }
             : user
         );
       }
 
       const newUser: User = {
-        id: existingProfile.id,
-        name: newAdminName,
-        email: newAdminEmail,
+        id: targetUserId,
+        name: sanitizeDisplayValue(newAdminName) || 'Usuário',
+        email: normalizedEmail || '-',
         role,
         hierarchy: newAdminHierarchy,
         documentId: '---',
