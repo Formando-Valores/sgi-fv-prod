@@ -168,12 +168,7 @@ export const createOrganization = async (organizationName: string, isActive = tr
               continue;
             }
 
-          
-  if (error.code === '42710' || normalizedMessage.includes('already exists')) {
-    return 'Conflito de policy já existente no banco. Aplique a migration 012_fix_organizations_policy_reapply.sql para limpar/recriar as policies de organizations.';
-  }
-
-  if (error.code === '42501') {
+            if (error.code === '42501') {
               permissionError = { error, schema, table };
               continue;
             }
@@ -190,8 +185,16 @@ export const createOrganization = async (organizationName: string, isActive = tr
                 { onConflict: 'org_id,user_id' }
               );
 
+            // Alguns ambientes bloqueiam o upsert em org_members por RLS,
+            // mesmo com INSERT em organizations concluído com sucesso.
+            // Nesse caso, não devemos reportar falha de cadastro da organização.
             if (memberError) {
-              return { organization: null, resolvedSchema: schema, resolvedTable: table, error: memberError };
+              console.warn('[organizacoes] organização criada, mas sem vínculo automático em org_members', {
+                schema,
+                organizationId,
+                userId: authenticatedUserId,
+                error: memberError,
+              });
             }
           }
 
