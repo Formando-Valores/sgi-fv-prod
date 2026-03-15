@@ -142,7 +142,7 @@ export const buildOrganizationErrorMessage = (error: PostgrestErrorLike | null |
   }
 
   if (error.code === '42501') {
-    return 'Sem permissão para cadastrar organização. Aplique a migration 007_organizations_insert_policy.sql no Supabase e confirme que seu usuário é admin/owner da organização padrão.';
+    return 'Sem permissão para cadastrar organização. Aplique as migrations 007_organizations_insert_policy.sql e 008_organizations_insert_policy_fallback.sql no Supabase.';
   }
 
   if (error.code === 'PGRST204') {
