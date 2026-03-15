@@ -662,6 +662,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       target_user_id: member.user_id,
     });
 
+    if (hardDeleteError) {
+      const rpcStatus = String((hardDeleteError as { status?: number }).status || '');
+      const rpcCode = String((hardDeleteError as { code?: string }).code || '').toLowerCase();
+      const rpcMessage = String(hardDeleteError.message || '').toLowerCase();
+
+      const rpcMissing =
+        rpcStatus === '404' ||
+        rpcCode.includes('pgrst202') ||
+        rpcMessage.includes('delete_user_completely') ||
+        rpcMessage.includes('function') ||
+        rpcMessage.includes('not found');
+
+      if (rpcMissing) {
+        setMemberActionFeedback({
+          type: 'warning',
+          message:
+            `Exclusão definitiva indisponível para ${memberEmail}: a função RPC delete_user_completely não está publicada neste banco. ` +
+            'Aplique a migration 006_hard_delete_user.sql no Supabase para remover também auth.users.',
+        });
+      }
+    }
+
     if (!hardDeleteError) {
       const { data: profileStillExistsAfterRpc } = await supabase
         .from('profiles')
@@ -716,7 +738,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       if (isPermissionError) {
         setMemberActionFeedback({
           type: 'warning',
-          message: `Vínculo removido, mas o perfil de ${memberEmail} não pôde ser excluído por permissão no Supabase.`,
+          message:
+            `Vínculo removido, mas o perfil de ${memberEmail} não pôde ser excluído por permissão no Supabase. ` +
+            'Isso indica RLS/policies sem DELETE em profiles para seu usuário atual.',
         });
         alert('Vínculo removido, mas não foi possível excluir o perfil por permissão. Verifique políticas do Supabase para exclusão completa.');
       } else {
