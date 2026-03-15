@@ -168,14 +168,7 @@ export const createOrganization = async (organizationName: string, isActive = tr
               continue;
             }
 
-          
-  const normalizedMessage = `${error.message ?? ''} ${error.details ?? ''}`.toLowerCase();
-
-  if (normalizedMessage.includes('infinite recursion detected in policy')) {
-    return 'Foi detectada uma policy recursiva na tabela organizations. Aplique a migration 011_fix_organizations_policy_recursion.sql e atualize a página.';
-  }
-
-  if (error.code === '42501') {
+            if (error.code === '42501') {
               permissionError = { error, schema, table };
               continue;
             }
@@ -221,7 +214,12 @@ export const createOrganization = async (organizationName: string, isActive = tr
     };
   }
 
-  return { organization: null, resolvedSchema: null, resolvedTable: null, error: lastError };
+  return {
+    organization: null,
+    resolvedSchema: null,
+    resolvedTable: null,
+    error: lastError ?? { message: 'Falha ao criar organização.' },
+  };
 };
 
 export const updateOrganization = async (organizationId: string, organizationName: string) => {
@@ -348,6 +346,10 @@ export const buildOrganizationErrorMessage = (error: PostgrestErrorLike | null |
 
   if (error.code === '23502') {
     return 'A tabela exige campos obrigatórios adicionais (ex.: slug). Ajuste defaults no banco ou preencha esses campos no cadastro.';
+  }
+
+  if (error.code === '500' || String(error.message || '').toLowerCase().includes('internal server error')) {
+    return 'Erro interno do Supabase ao processar organizações. Verifique os logs do Database/PostgREST no painel do Supabase para identificar a policy/trigger que falhou.';
   }
 
   return error.message ?? 'Erro inesperado ao processar organizações.';
