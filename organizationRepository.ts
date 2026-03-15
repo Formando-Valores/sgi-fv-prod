@@ -112,6 +112,7 @@ export const createOrganization = async (organizationName: string) => {
   }
 
   let lastError: PostgrestErrorLike | null = null;
+  let permissionError: { error: PostgrestErrorLike; schema: string; table: string } | null = null;
 
   for (const schema of candidateSchemas) {
     for (const table of candidateTables) {
@@ -138,7 +139,8 @@ export const createOrganization = async (organizationName: string) => {
             }
 
             if (error.code === '42501') {
-              return { organization: null, resolvedSchema: schema, resolvedTable: table, error };
+              permissionError = { error, schema, table };
+              continue;
             }
 
             if (error.code === '23505') {
@@ -165,9 +167,17 @@ export const createOrganization = async (organizationName: string) => {
     }
   }
 
+    if (permissionError) {
+    return {
+      organization: null,
+      resolvedSchema: permissionError.schema,
+      resolvedTable: permissionError.table,
+      error: permissionError.error,
+    };
+  }
+
   return { organization: null, resolvedSchema: null, resolvedTable: null, error: lastError };
 };
-
 export const buildOrganizationErrorMessage = (error: PostgrestErrorLike | null | undefined) => {
   if (!error) {
     return 'Não foi possível processar organizações.';
