@@ -12,8 +12,8 @@ const configuredSchema = import.meta.env.VITE_SUPABASE_ORG_SCHEMA?.trim();
 const configuredTable = import.meta.env.VITE_SUPABASE_ORG_TABLE?.trim() || 'banco';
 
 const candidateSchemas = Array.from(new Set([configuredSchema, 'public'].filter(Boolean))) as string[];
-const candidateNameColumns = ['nome', 'name', 'razao_social'];
-
+const candidateTables = Array.from(new Set([configuredTable, 'organizations'].filter(Boolean))) as string[];
+const candidateNameColumns = ['name', 'nome', 'razao_social'];
 
 const slugify = (value: string) =>
   value
@@ -43,93 +43,129 @@ const toOrganization = (row: Record<string, unknown>): Organization | null => {
 const isSchemaCacheError = (error: PostgrestErrorLike | null | undefined) =>
   error?.code === 'PGRST205' || error?.message?.includes('schema cache');
 
+const isRetryableColumnError = (error: PostgrestErrorLike | null | undefined) => {
+  if (!error) {
+    return false;
+  }
+
+  if (error.code === 'PGRST204') {
+    return true;
+  }
+
+  const normalizedMessage = `${error.message ?? ''} ${error.details ?? ''}`.toLowerCase();
+
+  return (
+    error.code === '42703' ||
+    normalizedMessage.includes('column') ||
+    normalizedMessage.includes('does not exist') ||
+    normalizedMessage.includes('unknown column')
+  );
+};
+
 export const loadOrganizations = async () => {
   let lastError: PostgrestErrorLike | null = null;
 
   for (const schema of candidateSchemas) {
-    const { data, error } = await supabase
-      .schema(schema)
-      .from(configuredTable)
-      .select('*')
-      .limit(300);
+    for (const table of candidateTables) {
+      const { data, error } = await supabase
+        .schema(schema)
+        .from(table)
+        .select('*')
+        .limit(300);
 
-    if (error) {
-      lastError = error;
-      continue;
+      if (error) {
+        lastError = error;
+
+        if (isSchemaCacheError(error)) {
+          continue;
+        }
+
+        if (error.code === '42P01') {
+          continue;
+        }
+
+        continue;
+      }
+
+      const organizations = (data ?? [])
+        .map((row) => toOrganization(row as Record<string, unknown>))
+        .filter((value): value is Organization => Boolean(value))
+        .sort((left, right) => left.name.localeCompare(right.name, 'pt-BR'));
+
+      return {
+        organizations,
+        resolvedSchema: schema,
+        resolvedTable: table,
+        error: null as PostgrestErrorLike | null,
+      };
     }
-
-    const organizations = (data ?? [])
-      .map((row) => toOrganization(row as Record<string, unknown>))
-      .filter((value): value is Organization => Boolean(value))
-      .sort((left, right) => left.name.localeCompare(right.name, 'pt-BR'));
-
-    return { organizations, resolvedSchema: schema, error: null as PostgrestErrorLike | null };
   }
 
-  return { organizations: [], resolvedSchema: null, error: lastError };
+  return { organizations: [], resolvedSchema: null, resolvedTable: null, error: lastError };
 };
 
 export const createOrganization = async (organizationName: string) => {
   const normalizedName = organizationName.trim();
 
   if (!normalizedName) {
-    return { organization: null, resolvedSchema: null, error: { message: 'Nome da organização é obrigatório.' } };
+    return { organization: null, resolvedSchema: null, resolvedTable: null, error: { message: 'Nome da organização é obrigatório.' } };
   }
 
   let lastError: PostgrestErrorLike | null = null;
 
   for (const schema of candidateSchemas) {
-    for (const nameColumn of candidateNameColumns) {
-      const baseSlug = slugify(normalizedName);
-      const payloadVariants: Array<Record<string, unknown>> = [
-        { [nameColumn]: normalizedName, slug: `${baseSlug}-${Date.now()}` },
-        { [nameColumn]: normalizedName },
-      ];
+    for (const table of candidateTables) {
+      for (const nameColumn of candidateNameColumns) {
+        const baseSlug = slugify(normalizedName);
+        const payloadVariants: Array<Record<string, unknown>> = [
+          { [nameColumn]: normalizedName, slug: `${baseSlug}-${Date.now()}` },
+          { [nameColumn]: normalizedName },
+        ];
 
-      for (const payload of payloadVariants) {
-        const { data, error } = await supabase
-          .schema(schema)
-          .from(configuredTable)
-          .insert([payload])
-          .select('*')
-          .single();
+        for (const payload of payloadVariants) {
+          const { data, error } = await supabase
+            .schema(schema)
+            .from(table)
+            .insert([payload])
+            .select('*')
+            .single();
 
-        if (error) {
-          lastError = error;
+          if (error) {
+            lastError = error;
 
-          // Quando a coluna não existe no schema (nome/slug), tentamos o próximo formato/coluna.
-          if (error.code === 'PGRST204') {
-            continue;
+            if (isRetryableColumnError(error) || isSchemaCacheError(error) || error.code === '42P01') {
+              continue;
+            }
+
+            if (error.code === '42501') {
+              return { organization: null, resolvedSchema: schema, resolvedTable: table, error };
+            }
+
+            if (error.code === '23505') {
+              continue;
+            }
+
+            return { organization: null, resolvedSchema: schema, resolvedTable: table, error };
           }
 
-          // Permissão negada (RLS/policy) deve ser retornada imediatamente.
-          if (error.code === '42501') {
-            return { organization: null, resolvedSchema: schema, error };
+          const organization = toOrganization((data ?? {}) as Record<string, unknown>);
+
+          if (!organization) {
+            return {
+              organization: null,
+              resolvedSchema: schema,
+              resolvedTable: table,
+              error: { message: 'Registro criado, mas sem campo id.' },
+            };
           }
 
-          // Para qualquer outro erro não relacionado à coluna, retornamos logo para não mascarar causa raiz.
-          return { organization: null, resolvedSchema: schema, error };
+          return { organization, resolvedSchema: schema, resolvedTable: table, error: null as PostgrestErrorLike | null };
         }
-
-        const organization = toOrganization((data ?? {}) as Record<string, unknown>);
-
-        if (!organization) {
-          return {
-            organization: null,
-            resolvedSchema: schema,
-            error: { message: 'Registro criado, mas sem campo id.' },
-          };
-        }
-
-        return { organization, resolvedSchema: schema, error: null as PostgrestErrorLike | null };
       }
-
-      continue;
     }
-
   }
 
-  return { organization: null, resolvedSchema: null, error: lastError };
+  return { organization: null, resolvedSchema: null, resolvedTable: null, error: lastError };
 };
 
 export const buildOrganizationErrorMessage = (error: PostgrestErrorLike | null | undefined) => {
@@ -137,16 +173,16 @@ export const buildOrganizationErrorMessage = (error: PostgrestErrorLike | null |
     return 'Não foi possível processar organizações.';
   }
 
-  if (isSchemaCacheError(error)) {
-    return `Não foi encontrada a tabela ${configuredTable} no schema esperado. Configure VITE_SUPABASE_ORG_SCHEMA com o schema correto no Vercel.`;
+  if (isSchemaCacheError(error) || error.code === '42P01') {
+    return `Não foi encontrada a tabela de organizações no schema esperado. Verifique VITE_SUPABASE_ORG_SCHEMA/VITE_SUPABASE_ORG_TABLE ou use a tabela padrão organizations.`;
   }
 
   if (error.code === '42501') {
     return 'Sem permissão para cadastrar organização. Aplique as migrations 007_organizations_insert_policy.sql e 008_organizations_insert_policy_fallback.sql no Supabase.';
   }
 
-  if (error.code === 'PGRST204') {
-    return 'A tabela de organizações foi encontrada, mas a coluna de nome esperada não existe. Verifique se há uma coluna nome/name.';
+  if (isRetryableColumnError(error)) {
+    return 'A tabela de organizações foi encontrada, mas as colunas esperadas não batem (name/nome/razao_social/slug). Revise o schema da tabela.';
   }
 
   if (error.code === '23502') {
