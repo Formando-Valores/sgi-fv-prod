@@ -168,7 +168,14 @@ export const createOrganization = async (organizationName: string, isActive = tr
               continue;
             }
 
-            if (error.code === '42501') {
+          
+  const normalizedMessage = `${error.message ?? ''} ${error.details ?? ''}`.toLowerCase();
+
+  if (normalizedMessage.includes('infinite recursion detected in policy')) {
+    return 'Foi detectada uma policy recursiva na tabela organizations. Aplique a migration 011_fix_organizations_policy_recursion.sql e atualize a página.';
+  }
+
+  if (error.code === '42501') {
               permissionError = { error, schema, table };
               continue;
             }
@@ -318,6 +325,13 @@ export const buildOrganizationErrorMessage = (error: PostgrestErrorLike | null |
 
   if (isSchemaCacheError(error) || error.code === '42P01') {
     return 'Não foi encontrada a tabela de organizações no schema esperado. Verifique VITE_SUPABASE_ORG_SCHEMA/VITE_SUPABASE_ORG_TABLE ou use a tabela padrão organizations.';
+  }
+
+
+  const normalizedMessage = `${error.message ?? ''} ${error.details ?? ''}`.toLowerCase();
+
+  if (normalizedMessage.includes('infinite recursion detected in policy')) {
+    return 'Foi detectada uma policy recursiva na tabela organizations. Aplique a migration 011_fix_organizations_policy_recursion.sql e atualize a página.';
   }
 
   if (error.code === '42501') {
