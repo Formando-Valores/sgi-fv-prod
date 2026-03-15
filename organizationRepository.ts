@@ -14,7 +14,7 @@ const configuredSchema = import.meta.env.VITE_SUPABASE_ORG_SCHEMA?.trim();
 const configuredTable = import.meta.env.VITE_SUPABASE_ORG_TABLE?.trim() || 'banco';
 
 const candidateSchemas = Array.from(new Set([configuredSchema, 'public'].filter(Boolean))) as string[];
-const candidateTables = Array.from(new Set([configuredTable, 'organizations'].filter(Boolean))) as string[];
+const candidateTables = Array.from(new Set(['organizations', configuredTable].filter(Boolean))) as string[];
 const candidateNameColumns = ['name', 'nome', 'razao_social'];
 const candidateActiveColumns = ['is_active', 'active', 'ativo'];
 
@@ -186,12 +186,7 @@ export const createOrganization = async (organizationName: string, isActive = tr
               );
 
             if (memberError) {
-              console.warn('[organizacoes] organização criada, mas falhou ao vincular owner em org_members', {
-                schema,
-                organizationId,
-                userId: authenticatedUserId,
-                error: memberError,
-              });
+              return { organization: null, resolvedSchema: schema, resolvedTable: table, error: memberError };
             }
           }
 
@@ -326,7 +321,7 @@ export const buildOrganizationErrorMessage = (error: PostgrestErrorLike | null |
   }
 
   if (error.code === '42501') {
-    return 'Sem permissão para executar esta ação na organização. Verifique as policies RLS de SELECT/INSERT/UPDATE/DELETE em organizations e de UPSERT em org_members para o usuário autenticado.';
+    return 'Sem permissão para executar esta ação na organização. Verifique as policies RLS de SELECT/INSERT/UPDATE/DELETE em organizations e de UPSERT em org_members. Se a organização não aparece na listagem, aplique também a migration 010_organizations_select_policy_fallback.sql.';
   }
 
   if (isRetryableColumnError(error)) {
