@@ -4,7 +4,7 @@ import { LogOut, Printer, FileDown, Eye, Pencil, Search, Users, ShieldCheck, X, 
 import { User, ProcessStatus, UserRole, Hierarchy, ServiceUnit, Organization } from '../types';
 import { NavLink, useLocation } from 'react-router-dom';
 import { SERVICE_MANAGERS } from '../constants';
-import { buildOrganizationErrorMessage, createOrganization, deleteOrganization, loadOrganizations, updateOrganization } from '../organizationRepository';
+import { buildOrganizationErrorMessage, createOrganization, deleteOrganization, loadOrganizations, updateOrganization, updateOrganizationStatus } from '../organizationRepository';
 import { supabase } from '../supabase';
 
 type AccessLevel = 'Administrador' | 'Usuário Sênior' | 'Usuário Pleno' | 'Operador' | 'Cliente';
@@ -123,6 +123,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [organizationName, setOrganizationName] = useState('');
+  const [organizationIsActive, setOrganizationIsActive] = useState(true);
   const [editingOrganizationId, setEditingOrganizationId] = useState<string | null>(null);
   const [editingOrganizationName, setEditingOrganizationName] = useState('');
   const [orgError, setOrgError] = useState('');
@@ -906,7 +907,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       return;
     }
 
-    const { organization, error } = await createOrganization(organizationName);
+    const { organization, error } = await createOrganization(organizationName, organizationIsActive);
 
     if (error || !organization) {
       console.error('[organizacoes] erro ao cadastrar organização', error);
@@ -916,6 +917,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
     setOrganizations((prev) => [...prev, organization].sort((left, right) => left.name.localeCompare(right.name, 'pt-BR')));
     setOrganizationName('');
+    setOrganizationIsActive(true);
     setOrgSuccess(`Organização ${organization.name} cadastrada com sucesso.`);
     await refreshOrganizations();
   };
@@ -946,6 +948,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
     setOrgSuccess('Organização atualizada com sucesso.');
     handleCancelEditOrganization();
+    await refreshOrganizations();
+  };
+
+  const handleToggleOrganizationStatus = async (organization: Organization) => {
+    setOrgError('');
+    setOrgSuccess('');
+
+    const nextStatus = !(organization.isActive ?? true);
+    const { error } = await updateOrganizationStatus(organization.id, nextStatus);
+
+    if (error) {
+      console.error('[organizacoes] erro ao atualizar status da organização', error);
+      setOrgError(buildOrganizationErrorMessage(error));
+      return;
+    }
+
+    setOrgSuccess(`Organização ${organization.name} marcada como ${nextStatus ? 'ativa' : 'inativa'}.`);
     await refreshOrganizations();
   };
 
@@ -1083,6 +1102,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                   placeholder="Ex.: Organização Alpha"
                 />
               </div>
+              <label className="flex items-center gap-2 text-sm text-slate-300 font-semibold">
+                <input
+                  type="checkbox"
+                  checked={organizationIsActive}
+                  onChange={(event) => setOrganizationIsActive(event.target.checked)}
+                  className="w-4 h-4"
+                />
+                Organização ativa
+              </label>
               {orgError && <p className="text-sm text-red-400 font-bold">{orgError}</p>}
               {orgSuccess && <p className="text-sm text-emerald-400 font-bold">{orgSuccess}</p>}
               <button type="submit" className="px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold">
@@ -1125,15 +1153,27 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                       </>
                     ) : (
                       <>
-                        <p className="font-bold">{organization.name}</p>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-bold">{organization.name}</p>
+                          <span className={`text-[11px] font-bold px-2 py-1 rounded-full ${organization.isActive ?? true ? 'bg-emerald-900/40 text-emerald-300 border border-emerald-700' : 'bg-amber-900/40 text-amber-300 border border-amber-700'}`}>
+                            {(organization.isActive ?? true) ? 'ATIVA' : 'INATIVA'}
+                          </span>
+                        </div>
                         <p className="text-xs text-slate-400">ID: {organization.id}</p>
-                        <div className="flex gap-2 pt-1">
+                        <div className="flex gap-2 pt-1 flex-wrap">
                           <button
                             type="button"
                             onClick={() => handleStartEditOrganization(organization)}
                             className="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-xs font-bold"
                           >
                             Editar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void handleToggleOrganizationStatus(organization)}
+                            className="px-3 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-xs font-bold"
+                          >
+                            {(organization.isActive ?? true) ? 'Inativar' : 'Ativar'}
                           </button>
                           <button
                             type="button"

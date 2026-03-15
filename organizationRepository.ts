@@ -8,12 +8,15 @@ type PostgrestErrorLike = {
   hint?: string | null;
 };
 
+type MutableOrganization = Organization & { isActive?: boolean };
+
 const configuredSchema = import.meta.env.VITE_SUPABASE_ORG_SCHEMA?.trim();
 const configuredTable = import.meta.env.VITE_SUPABASE_ORG_TABLE?.trim() || 'banco';
 
 const candidateSchemas = Array.from(new Set([configuredSchema, 'public'].filter(Boolean))) as string[];
 const candidateTables = Array.from(new Set([configuredTable, 'organizations'].filter(Boolean))) as string[];
 const candidateNameColumns = ['name', 'nome', 'razao_social'];
+const candidateActiveColumns = ['is_active', 'active', 'ativo'];
 
 const slugify = (value: string) =>
   value
@@ -23,7 +26,18 @@ const slugify = (value: string) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '') || 'organizacao';
 
-const toOrganization = (row: Record<string, unknown>): Organization | null => {
+const toBoolean = (value: unknown): boolean | undefined => {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value !== 0;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (['true', 't', '1', 'sim', 'yes', 'ativo'].includes(normalized)) return true;
+    if (['false', 'f', '0', 'nao', 'não', 'no', 'inativo'].includes(normalized)) return false;
+  }
+  return undefined;
+};
+
+const toOrganization = (row: Record<string, unknown>): MutableOrganization | null => {
   const idValue = row.id;
 
   if (idValue === null || idValue === undefined) {
@@ -34,9 +48,12 @@ const toOrganization = (row: Record<string, unknown>): Organization | null => {
     .map((column) => row[column])
     .find((value) => typeof value === 'string' && value.trim().length > 0) as string | undefined;
 
+  const activeRaw = candidateActiveColumns.map((column) => row[column]).find((value) => value !== undefined);
+
   return {
     id: String(idValue),
     name: organizationName ?? `Organização ${idValue}`,
+    isActive: toBoolean(activeRaw) ?? true,
   };
 };
 
@@ -62,10 +79,16 @@ const isRetryableColumnError = (error: PostgrestErrorLike | null | undefined) =>
   );
 };
 
-const buildPayloadVariants = (organizationName: string, organizationId: string, nameColumn: string) => {
+const buildPayloadVariants = (organizationName: string, organizationId: string, nameColumn: string, isActive: boolean) => {
   const baseSlug = slugify(organizationName);
 
+  const withStatusPayloads = candidateActiveColumns.flatMap((activeColumn) => [
+    { id: organizationId, [nameColumn]: organizationName, [activeColumn]: isActive, slug: `${baseSlug}-${Date.now()}` },
+    { id: organizationId, [nameColumn]: organizationName, [activeColumn]: isActive },
+  ]);
+
   return [
+    ...withStatusPayloads,
     { id: organizationId, [nameColumn]: organizationName, slug: `${baseSlug}-${Date.now()}` },
     { id: organizationId, [nameColumn]: organizationName },
   ] as Array<Record<string, unknown>>;
@@ -73,7 +96,7 @@ const buildPayloadVariants = (organizationName: string, organizationId: string, 
 
 export const loadOrganizations = async () => {
   let lastError: PostgrestErrorLike | null = null;
-  const mergedOrganizations = new Map<string, Organization>();
+  const mergedOrganizations = new Map<string, MutableOrganization>();
 
   for (const schema of candidateSchemas) {
     for (const table of candidateTables) {
@@ -81,7 +104,7 @@ export const loadOrganizations = async () => {
         .schema(schema)
         .from(table)
         .select('*')
-        .limit(500);
+        .limit(1000);
 
       if (error) {
         lastError = error;
@@ -114,7 +137,7 @@ export const loadOrganizations = async () => {
   return { organizations: [], resolvedSchema: null, resolvedTable: null, error: lastError };
 };
 
-export const createOrganization = async (organizationName: string) => {
+export const createOrganization = async (organizationName: string, isActive = true) => {
   const normalizedName = organizationName.trim();
 
   if (!normalizedName) {
@@ -132,7 +155,7 @@ export const createOrganization = async (organizationName: string) => {
       for (const nameColumn of candidateNameColumns) {
         const organizationId = crypto.randomUUID();
 
-        for (const payload of buildPayloadVariants(normalizedName, organizationId, nameColumn)) {
+        for (const payload of buildPayloadVariants(normalizedName, organizationId, nameColumn, isActive)) {
           const { error } = await supabase
             .schema(schema)
             .from(table)
@@ -176,7 +199,8 @@ export const createOrganization = async (organizationName: string) => {
             organization: {
               id: organizationId,
               name: normalizedName,
-            },
+              isActive,
+            } as MutableOrganization,
             resolvedSchema: schema,
             resolvedTable: table,
             error: null as PostgrestErrorLike | null,
@@ -214,6 +238,36 @@ export const updateOrganization = async (organizationId: string, organizationNam
           .schema(schema)
           .from(table)
           .update({ [nameColumn]: normalizedName })
+          .eq('id', organizationId);
+
+        if (error) {
+          lastError = error;
+
+          if (isRetryableColumnError(error) || isSchemaCacheError(error) || error.code === '42P01') {
+            continue;
+          }
+
+          return { error };
+        }
+
+        return { error: null as PostgrestErrorLike | null };
+      }
+    }
+  }
+
+  return { error: lastError };
+};
+
+export const updateOrganizationStatus = async (organizationId: string, isActive: boolean) => {
+  let lastError: PostgrestErrorLike | null = null;
+
+  for (const schema of candidateSchemas) {
+    for (const table of candidateTables) {
+      for (const activeColumn of candidateActiveColumns) {
+        const { error } = await supabase
+          .schema(schema)
+          .from(table)
+          .update({ [activeColumn]: isActive })
           .eq('id', organizationId);
 
         if (error) {
@@ -272,11 +326,11 @@ export const buildOrganizationErrorMessage = (error: PostgrestErrorLike | null |
   }
 
   if (error.code === '42501') {
-    return 'Sem permissão para cadastrar organização. Verifique as policies RLS de INSERT em organizations e de UPSERT em org_members para o usuário autenticado.';
+    return 'Sem permissão para executar esta ação na organização. Verifique as policies RLS de SELECT/INSERT/UPDATE/DELETE em organizations e de UPSERT em org_members para o usuário autenticado.';
   }
 
   if (isRetryableColumnError(error)) {
-    return 'A tabela de organizações foi encontrada, mas as colunas esperadas não batem (name/nome/razao_social/slug). Revise o schema da tabela.';
+    return 'A tabela de organizações foi encontrada, mas as colunas esperadas não batem (name/nome/razao_social/is_active/active/ativo/slug). Revise o schema da tabela.';
   }
 
   if (error.code === '23503') {
