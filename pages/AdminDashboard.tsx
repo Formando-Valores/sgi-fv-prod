@@ -658,6 +658,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       return;
     }
 
+    let rpcMissingFunction = false;
+
     const { error: hardDeleteError } = await supabase.rpc('delete_user_completely', {
       target_user_id: member.user_id,
     });
@@ -675,12 +677,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         rpcMessage.includes('not found');
 
       if (rpcMissing) {
-        setMemberActionFeedback({
-          type: 'warning',
-          message:
-            `Exclusão definitiva indisponível para ${memberEmail}: a função RPC delete_user_completely não está publicada neste banco. ` +
-            'Aplique a migration 006_hard_delete_user.sql no Supabase para remover também auth.users.',
-        });
+        rpcMissingFunction = true;
       }
     }
 
@@ -780,7 +777,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     if (profileStillExists || membershipStillExists) {
       setMemberActionFeedback({
         type: 'warning',
-        message: `A exclusão de ${memberEmail} não foi concluída totalmente. Ainda existe cadastro no banco.`,
+        message: rpcMissingFunction
+          ? `Exclusão definitiva indisponível para ${memberEmail}: a função RPC delete_user_completely não está publicada neste banco. Aplique a migration 006_hard_delete_user.sql no Supabase para remover também auth.users.`
+          : `A exclusão de ${memberEmail} não foi concluída totalmente. Ainda existe cadastro no banco.`,
       });
       await fetchOrgMembers();
       return;
