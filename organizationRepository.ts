@@ -75,15 +75,6 @@ export const loadOrganizations = async () => {
 
       if (error) {
         lastError = error;
-
-        if (isSchemaCacheError(error)) {
-          continue;
-        }
-
-        if (error.code === '42P01') {
-          continue;
-        }
-
         continue;
       }
 
@@ -114,27 +105,30 @@ export const createOrganization = async (organizationName: string) => {
   let lastError: PostgrestErrorLike | null = null;
   let permissionError: { error: PostgrestErrorLike; schema: string; table: string } | null = null;
 
+  const userResult = await supabase.auth.getUser();
+  const authenticatedUserId = userResult.data.user?.id ?? null;
+
   for (const schema of candidateSchemas) {
     for (const table of candidateTables) {
       for (const nameColumn of candidateNameColumns) {
         const baseSlug = slugify(normalizedName);
+        const organizationId = crypto.randomUUID();
+
         const payloadVariants: Array<Record<string, unknown>> = [
-          { [nameColumn]: normalizedName, slug: `${baseSlug}-${Date.now()}` },
-          { [nameColumn]: normalizedName },
+          { id: organizationId, [nameColumn]: normalizedName, slug: `${baseSlug}-${Date.now()}` },
+          { id: organizationId, [nameColumn]: normalizedName },
         ];
 
         for (const payload of payloadVariants) {
-          const { data, error } = await supabase
+          const { error } = await supabase
             .schema(schema)
             .from(table)
-            .insert([payload])
-            .select('*')
-            .single();
+            .insert([payload]);
 
           if (error) {
             lastError = error;
 
-            if (isRetryableColumnError(error) || isSchemaCacheError(error) || error.code === '42P01') {
+            if (isRetryableColumnError(error) || isSchemaCacheError(error) || error.code === '42P01' || error.code === '23505') {
               continue;
             }
 
@@ -143,31 +137,43 @@ export const createOrganization = async (organizationName: string) => {
               continue;
             }
 
-            if (error.code === '23505') {
-              continue;
-            }
-
             return { organization: null, resolvedSchema: schema, resolvedTable: table, error };
           }
 
-          const organization = toOrganization((data ?? {}) as Record<string, unknown>);
+          if (table === 'organizations' && authenticatedUserId) {
+            const { error: memberError } = await supabase
+              .schema(schema)
+              .from('org_members')
+              .upsert(
+                [{ org_id: organizationId, user_id: authenticatedUserId, role: 'owner' }],
+                { onConflict: 'org_id,user_id' }
+              );
 
-          if (!organization) {
-            return {
-              organization: null,
-              resolvedSchema: schema,
-              resolvedTable: table,
-              error: { message: 'Registro criado, mas sem campo id.' },
-            };
+            if (memberError) {
+              console.warn('[organizacoes] organização criada, mas falhou ao vincular owner em org_members', {
+                schema,
+                organizationId,
+                userId: authenticatedUserId,
+                error: memberError,
+              });
+            }
           }
 
-          return { organization, resolvedSchema: schema, resolvedTable: table, error: null as PostgrestErrorLike | null };
+          return {
+            organization: {
+              id: organizationId,
+              name: normalizedName,
+            },
+            resolvedSchema: schema,
+            resolvedTable: table,
+            error: null as PostgrestErrorLike | null,
+          };
         }
       }
     }
   }
 
-    if (permissionError) {
+  if (permissionError) {
     return {
       organization: null,
       resolvedSchema: permissionError.schema,
@@ -178,17 +184,18 @@ export const createOrganization = async (organizationName: string) => {
 
   return { organization: null, resolvedSchema: null, resolvedTable: null, error: lastError };
 };
+
 export const buildOrganizationErrorMessage = (error: PostgrestErrorLike | null | undefined) => {
   if (!error) {
     return 'Não foi possível processar organizações.';
   }
 
   if (isSchemaCacheError(error) || error.code === '42P01') {
-    return `Não foi encontrada a tabela de organizações no schema esperado. Verifique VITE_SUPABASE_ORG_SCHEMA/VITE_SUPABASE_ORG_TABLE ou use a tabela padrão organizations.`;
+    return 'Não foi encontrada a tabela de organizações no schema esperado. Verifique VITE_SUPABASE_ORG_SCHEMA/VITE_SUPABASE_ORG_TABLE ou use a tabela padrão organizations.';
   }
 
   if (error.code === '42501') {
-    return 'Sem permissão para cadastrar organização. Aplique as migrations 007_organizations_insert_policy.sql e 008_organizations_insert_policy_fallback.sql no Supabase.';
+    return 'Sem permissão para cadastrar organização. Verifique as policies RLS de INSERT em organizations e de UPSERT em org_members para o usuário autenticado.';
   }
 
   if (isRetryableColumnError(error)) {
