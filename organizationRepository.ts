@@ -142,7 +142,7 @@ export const buildOrganizationErrorMessage = (error: PostgrestErrorLike | null |
   }
 
   if (error.code === '42501') {
-    return 'Sem permissão para cadastrar organização. Ajuste as políticas RLS de INSERT na tabela de organizações.';
+    return 'Sem permissão para cadastrar organização. Aplique a migration 007_organizations_insert_policy.sql no Supabase e confirme que seu usuário é admin/owner da organização padrão.';
   }
 
   if (error.code === 'PGRST204') {
