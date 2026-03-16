@@ -104,6 +104,7 @@
     const SUPABASE_URL = "https://SEU_PROJECT_REF.supabase.co";
     const ENDPOINT = `${SUPABASE_URL.replace(/\/$/, "")}/functions/v1/wix-client-intake`;
     const API_KEY = "SUA_CHAVE_PRIVADA_DA_INTEGRACAO";
+    const SUPABASE_ANON_KEY = "SUA_SUPABASE_ANON_KEY";
 
     const form = document.getElementById("sgiWixForm");
     const message = document.getElementById("sgiWixMessage");
@@ -117,10 +118,11 @@
       event.preventDefault();
 
       const hasPlaceholder = /SEU[_-]?PROJECT[_-]?REF/i.test(SUPABASE_URL) ||
-        /SUA_CHAVE_PRIVADA_DA_INTEGRACAO/i.test(API_KEY);
+        /SUA_CHAVE_PRIVADA_DA_INTEGRACAO/i.test(API_KEY) ||
+        /SUA_SUPABASE_ANON_KEY/i.test(SUPABASE_ANON_KEY);
 
-      if (!SUPABASE_URL || !ENDPOINT || !API_KEY || hasPlaceholder) {
-        setMessage("Configuração incompleta: substitua SUPABASE_URL e API_KEY pelos valores reais do seu projeto Supabase.", false);
+      if (!SUPABASE_URL || !ENDPOINT || !API_KEY || !SUPABASE_ANON_KEY || hasPlaceholder) {
+        setMessage("Configuração incompleta: substitua SUPABASE_URL, API_KEY e SUPABASE_ANON_KEY pelos valores reais do seu projeto Supabase.", false);
         return;
       }
 
@@ -150,6 +152,8 @@
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            "apikey": SUPABASE_ANON_KEY,
+            "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
             "x-api-key": API_KEY
           },
           body: JSON.stringify(payload)

@@ -40,10 +40,22 @@ No arquivo/trecho do formulário Wix, substitua:
 
 - `SUPABASE_URL`: `https://SEU_PROJECT_REF.supabase.co`
 - `API_KEY`: valor real da secret `WIX_INTAKE_API_KEY`
+- `SUPABASE_ANON_KEY`: chave pública (anon) do projeto Supabase
 
 > O endpoint é montado automaticamente no script (`${SUPABASE_URL}/functions/v1/wix-client-intake`), para evitar erro de digitação.
 
-Se `SUPABASE_URL`/`API_KEY` estiverem ausentes ou com placeholder, o formulário mostrará aviso. Se a URL estiver errada, o navegador exibirá erro DNS (`ERR_NAME_NOT_RESOLVED`).
+Se `SUPABASE_URL`/`API_KEY`/`SUPABASE_ANON_KEY` estiverem ausentes ou com placeholder, o formulário mostrará aviso. Sem `SUPABASE_ANON_KEY`, o preflight pode falhar com CORS (status não-OK). Se a URL estiver errada, o navegador exibirá erro DNS (`ERR_NAME_NOT_RESOLVED`).
+
+
+## 2.2) Cabeçalhos obrigatórios para evitar erro de CORS
+
+No `fetch` do snippet, mantenha estes headers:
+
+- `apikey: SUPABASE_ANON_KEY`
+- `Authorization: Bearer SUPABASE_ANON_KEY`
+- `x-api-key: WIX_INTAKE_API_KEY`
+
+Isso evita bloqueio no preflight/POST para chamadas cross-origin (Wix -> Supabase Functions).
 
 ## 3) SQL necessária
 
