@@ -8,6 +8,12 @@ Quando o cliente preencher esse formulário no Wix:
 2. o profile é criado/atualizado em `profiles`;
 3. o vínculo com a organização é criado em `org_members`;
 4. (opcional automático) é criado processo inicial em `processes`.
+5. o cliente escolhe o **setor de serviço** e informa o **nome da organização solicitada**.
+
+Regra implementada:
+
+- o cadastro inicial entra na organização `default`;
+- se o nome da organização for informado, essa organização é criada em seguida e vinculada ao usuário.
 
 ---
 
@@ -39,7 +45,7 @@ Substitua:
 
 - `SEU_PROJECT_REF` pelo ref do seu Supabase.
 - `SUA_CHAVE_PRIVADA_DA_INTEGRACAO` pela mesma `WIX_INTAKE_API_KEY`.
-- `organizationSlug` com o slug da organização (ex.: `default`, `formando-valores`).
+
 
 ```html
 <div id="sgi-wix-form-wrap" style="max-width:720px;margin:0 auto;padding:20px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;font-family:Arial,sans-serif;">
@@ -98,6 +104,20 @@ Substitua:
     </div>
 
     <div>
+      <label>Setor de serviço</label>
+      <select name="serviceUnit" required style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;">
+        <option value="JURÍDICO / ADVOCACIA">JURÍDICO / ADVOCACIA</option>
+        <option value="ADMINISTRATIVO">ADMINISTRATIVO</option>
+        <option value="TECNOLÓGICO / AI">TECNOLÓGICO / AI</option>
+      </select>
+    </div>
+
+    <div>
+      <label>Nome da organização solicitada</label>
+      <input name="requestedOrganizationName" placeholder="Ex.: Assessoria Exemplo" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;" />
+    </div>
+
+    <div>
       <label>Título do processo (opcional)</label>
       <input name="processTitle" placeholder="Ex.: Solicitação inicial" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;" />
     </div>
@@ -139,7 +159,6 @@ Substitua:
 
       const data = new FormData(form);
       const payload = {
-        organizationSlug: "default",
         fullName: data.get("fullName") || "",
         email: data.get("email") || "",
         password: data.get("password") || "",
@@ -150,6 +169,8 @@ Substitua:
         maritalStatus: data.get("maritalStatus") || "Solteiro",
         country: data.get("country") || "Brasil",
         phone: data.get("phone") || "",
+        serviceUnit: data.get("serviceUnit") || "JURÍDICO / ADVOCACIA",
+        requestedOrganizationName: data.get("requestedOrganizationName") || "",
         processTitle: data.get("processTitle") || ""
       };
 
@@ -198,3 +219,13 @@ A senha enviada pelo formulário precisa ter:
 - Não use `anon key` para criar usuários externos nesse cenário.
 - Use somente a Edge Function com `x-api-key` e, idealmente, troque a chave periodicamente.
 - Se quiser endurecer mais, podemos adicionar validação por domínio de origem (`Origin`) e rate limit.
+
+---
+
+## 5) Novo comportamento de organização
+
+- O usuário é criado e vinculado primeiro na organização padrão (`default`).
+- Se o campo `requestedOrganizationName` vier preenchido:
+  - a organização é criada automaticamente com slug único;
+  - o usuário recebe vínculo nessa organização também (como `owner`);
+  - o processo inicial recebe observação registrando a criação.

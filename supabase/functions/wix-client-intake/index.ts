@@ -7,7 +7,6 @@ const corsHeaders = {
 };
 
 type IntakePayload = {
-  organizationSlug?: string;
   fullName?: string;
   email?: string;
   password?: string;
@@ -18,6 +17,8 @@ type IntakePayload = {
   maritalStatus?: string;
   country?: string;
   phone?: string;
+  serviceUnit?: string;
+  requestedOrganizationName?: string;
   processTitle?: string;
 };
 
@@ -37,6 +38,40 @@ const validatePassword = (value: string) => {
   const hasNumber = /[0-9]/.test(value);
   return hasMinLength && hasUpper && hasSpecial && hasNumber;
 };
+
+const ALLOWED_SERVICE_UNITS = [
+  'JURÍDICO / ADVOCACIA',
+  'ADMINISTRATIVO',
+  'TECNOLÓGICO / AI',
+] as const;
+
+const slugify = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 45);
+
+async function generateUniqueOrgSlug(admin: ReturnType<typeof createClient>, organizationName: string) {
+  const baseSlug = slugify(organizationName) || `org-${Date.now()}`;
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const candidate = attempt === 0 ? baseSlug : `${baseSlug}-${attempt + 1}`;
+    const { data: existing } = await admin
+      .from('organizations')
+      .select('id')
+      .eq('slug', candidate)
+      .maybeSingle();
+
+    if (!existing) {
+      return candidate;
+    }
+  }
+
+  return `${baseSlug}-${crypto.randomUUID().slice(0, 8)}`;
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -67,7 +102,6 @@ Deno.serve(async (req) => {
   }
 
   const {
-    organizationSlug = 'default',
     fullName = '',
     email = '',
     password = '',
@@ -78,6 +112,8 @@ Deno.serve(async (req) => {
     maritalStatus = 'Solteiro',
     country = 'Brasil',
     phone = '',
+    serviceUnit = 'JURÍDICO / ADVOCACIA',
+    requestedOrganizationName = '',
     processTitle,
   } = payload;
 
@@ -95,6 +131,12 @@ Deno.serve(async (req) => {
     }, 400);
   }
 
+  if (!ALLOWED_SERVICE_UNITS.includes(serviceUnit as (typeof ALLOWED_SERVICE_UNITS)[number])) {
+    return jsonResponse({
+      error: 'Setor de serviço inválido. Escolha entre Jurídico, Administrativo ou Tecnológico/AI.',
+    }, 400);
+  }
+
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
@@ -106,10 +148,13 @@ Deno.serve(async (req) => {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
+  // Regra comercial solicitada:
+  // 1) Cadastro inicial sempre na organização padrão
+  // 2) Organização solicitada é criada em seguida no sistema
   const { data: organization, error: organizationError } = await admin
     .from('organizations')
     .select('id, slug, name')
-    .eq('slug', organizationSlug)
+    .eq('slug', 'default')
     .maybeSingle();
 
   if (organizationError || !organization) {
@@ -126,6 +171,8 @@ Deno.serve(async (req) => {
     user_metadata: {
       name: fullName,
       source: 'wix_form',
+      service_unit: serviceUnit,
+      requested_organization_name: requestedOrganizationName || null,
     },
   });
 
@@ -217,9 +264,50 @@ Deno.serve(async (req) => {
       org_id: organization.id,
       process_id: processId,
       tipo: 'registro',
-      mensagem: 'Processo criado automaticamente via formulário Wix',
+      mensagem: `Processo criado automaticamente via formulário Wix. Setor escolhido: ${serviceUnit}.`,
       created_by: userId,
     });
+  }
+
+  let requestedOrganization: { id: string; slug: string; name: string } | null = null;
+  const sanitizedRequestedOrganizationName = requestedOrganizationName.trim();
+
+  if (sanitizedRequestedOrganizationName) {
+    const requestedSlug = await generateUniqueOrgSlug(admin, sanitizedRequestedOrganizationName);
+
+    const { data: createdOrganization, error: createOrganizationError } = await admin
+      .from('organizations')
+      .insert({
+        slug: requestedSlug,
+        name: sanitizedRequestedOrganizationName,
+      })
+      .select('id, slug, name')
+      .maybeSingle();
+
+    if (!createOrganizationError && createdOrganization) {
+      requestedOrganization = createdOrganization;
+
+      await admin
+        .from('org_members')
+        .upsert(
+          {
+            org_id: createdOrganization.id,
+            user_id: userId,
+            role: 'owner',
+          },
+          { onConflict: 'org_id,user_id' },
+        );
+
+      if (processId) {
+        await admin.from('process_events').insert({
+          org_id: organization.id,
+          process_id: processId,
+          tipo: 'observacao',
+          mensagem: `Organização solicitada criada: ${createdOrganization.name} (${createdOrganization.slug}). Cadastro inicial mantido na organização padrão.`,
+          created_by: userId,
+        });
+      }
+    }
   }
 
   return jsonResponse({
@@ -232,5 +320,7 @@ Deno.serve(async (req) => {
       slug: organization.slug,
       name: organization.name,
     },
+    service_unit: serviceUnit,
+    requested_organization: requestedOrganization,
   });
 });
