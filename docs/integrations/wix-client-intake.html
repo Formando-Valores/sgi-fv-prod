@@ -59,6 +59,11 @@
     </div>
 
     <div style="grid-column:1 / -1;">
+      <label>Endereço</label>
+      <input name="address" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;" />
+    </div>
+
+    <div style="grid-column:1 / -1;">
       <label>Nome da organização para cadastro futuro</label>
       <input name="organizationRequestedName" placeholder="Ex.: Associação XPTO" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;" />
     </div>
@@ -79,11 +84,6 @@
           TECNOLÓGICO / AI
         </label>
       </div>
-    </div>
-
-    <div style="grid-column:1 / -1;">
-      <label>Endereço</label>
-      <input name="address" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;" />
     </div>
 
     <div style="grid-column:1 / -1;display:flex;align-items:center;gap:8px;">
@@ -107,8 +107,7 @@
     const isPlaceholderConfig =
       ENDPOINT.includes("SEU_PROJECT_REF") ||
       ENDPOINT.includes("seu_project_ref") ||
-      API_KEY.includes("SUA_CHAVE_PRIVADA_DA_INTEGRACAO") ||
-      API_KEY.trim().length < 10;
+      API_KEY.includes("SUA_CHAVE_PRIVADA_DA_INTEGRACAO");
 
     const form = document.getElementById("sgiWixForm");
     const message = document.getElementById("sgiWixMessage");
