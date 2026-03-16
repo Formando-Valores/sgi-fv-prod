@@ -1,0 +1,200 @@
+# Integração Wix → SGI-FV (cadastro do cliente)
+
+Este guia entrega um **código pronto** para usar no componente **"HTML incorporado"** do Wix.
+
+Quando o cliente preencher esse formulário no Wix:
+
+1. o usuário é criado no Supabase Auth;
+2. o profile é criado/atualizado em `profiles`;
+3. o vínculo com a organização é criado em `org_members`;
+4. (opcional automático) é criado processo inicial em `processes`.
+
+---
+
+## 1) Deploy da Edge Function
+
+Arquivo da função:
+
+- `supabase/functions/wix-client-intake/index.ts`
+
+Deploy (exemplo):
+
+```bash
+supabase functions deploy wix-client-intake
+```
+
+Configurar secrets no projeto Supabase:
+
+```bash
+supabase secrets set WIX_INTAKE_API_KEY="sua-chave-forte-aqui"
+```
+
+> A função usa `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` do ambiente de functions (padrão do Supabase).
+
+---
+
+## 2) Código para colar no Wix (HTML incorporado)
+
+Substitua:
+
+- `SEU_PROJECT_REF` pelo ref do seu Supabase.
+- `SUA_CHAVE_PRIVADA_DA_INTEGRACAO` pela mesma `WIX_INTAKE_API_KEY`.
+- `organizationSlug` com o slug da organização (ex.: `default`, `formando-valores`).
+
+```html
+<div id="sgi-wix-form-wrap" style="max-width:720px;margin:0 auto;padding:20px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;font-family:Arial,sans-serif;">
+  <h2 style="margin:0 0 12px;color:#0f172a;">Cadastro do Cliente</h2>
+  <p style="margin:0 0 20px;color:#475569;font-size:14px;">Preencha os dados para criar seu acesso na plataforma SGI-FV.</p>
+
+  <form id="sgiWixForm" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+    <div style="grid-column:1 / -1;">
+      <label>Nome completo</label>
+      <input name="fullName" required style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;" />
+    </div>
+
+    <div style="grid-column:1 / -1;">
+      <label>E-mail</label>
+      <input type="email" name="email" required style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;" />
+    </div>
+
+    <div>
+      <label>Senha</label>
+      <input type="password" name="password" required minlength="8" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;" />
+    </div>
+
+    <div>
+      <label>Confirmar senha</label>
+      <input type="password" name="confirmPassword" required minlength="8" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;" />
+    </div>
+
+    <div>
+      <label>Documento de identidade</label>
+      <input name="documentId" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;" />
+    </div>
+
+    <div>
+      <label>NIF / CPF</label>
+      <input name="taxId" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;" />
+    </div>
+
+    <div>
+      <label>Telefone</label>
+      <input name="phone" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;" />
+    </div>
+
+    <div>
+      <label>Estado civil</label>
+      <select name="maritalStatus" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;">
+        <option>Solteiro</option>
+        <option>Casado</option>
+        <option>Divorciado</option>
+        <option>Viúvo</option>
+      </select>
+    </div>
+
+    <div>
+      <label>País</label>
+      <input name="country" value="Brasil" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;" />
+    </div>
+
+    <div>
+      <label>Título do processo (opcional)</label>
+      <input name="processTitle" placeholder="Ex.: Solicitação inicial" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;" />
+    </div>
+
+    <div style="grid-column:1 / -1;">
+      <label>Endereço</label>
+      <input name="address" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;" />
+    </div>
+
+    <div style="grid-column:1 / -1;display:flex;align-items:center;gap:8px;">
+      <input id="consent" type="checkbox" required />
+      <label for="consent" style="font-size:13px;color:#334155;">Autorizo o cadastro dos meus dados para acesso à plataforma.</label>
+    </div>
+
+    <button type="submit" style="grid-column:1 / -1;background:#1d4ed8;color:white;border:none;padding:12px 16px;border-radius:10px;font-weight:bold;cursor:pointer;">
+      Criar meu acesso
+    </button>
+
+    <div id="sgiWixMessage" style="grid-column:1 / -1;font-size:14px;"></div>
+  </form>
+</div>
+
+<script>
+  (function () {
+    const ENDPOINT = "https://SEU_PROJECT_REF.supabase.co/functions/v1/wix-client-intake";
+    const API_KEY = "SUA_CHAVE_PRIVADA_DA_INTEGRACAO";
+
+    const form = document.getElementById("sgiWixForm");
+    const message = document.getElementById("sgiWixMessage");
+
+    const setMessage = (text, ok) => {
+      message.textContent = text;
+      message.style.color = ok ? "#166534" : "#b91c1c";
+    };
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      setMessage("Enviando cadastro...", true);
+
+      const data = new FormData(form);
+      const payload = {
+        organizationSlug: "default",
+        fullName: data.get("fullName") || "",
+        email: data.get("email") || "",
+        password: data.get("password") || "",
+        confirmPassword: data.get("confirmPassword") || "",
+        documentId: data.get("documentId") || "",
+        taxId: data.get("taxId") || "",
+        address: data.get("address") || "",
+        maritalStatus: data.get("maritalStatus") || "Solteiro",
+        country: data.get("country") || "Brasil",
+        phone: data.get("phone") || "",
+        processTitle: data.get("processTitle") || ""
+      };
+
+      try {
+        const response = await fetch(ENDPOINT, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": API_KEY
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          setMessage(result.error || "Não foi possível concluir o cadastro.", false);
+          return;
+        }
+
+        setMessage("Cadastro realizado com sucesso! Agora você já pode fazer login na plataforma.", true);
+        form.reset();
+      } catch (error) {
+        setMessage("Erro de conexão ao enviar cadastro. Tente novamente.", false);
+      }
+    });
+  })();
+</script>
+```
+
+---
+
+## 3) Regras de senha (iguais ao sistema atual)
+
+A senha enviada pelo formulário precisa ter:
+
+- mínimo 8 caracteres;
+- ao menos 1 letra maiúscula;
+- ao menos 1 número;
+- ao menos 1 caractere especial.
+
+---
+
+## 4) Observações importantes de segurança
+
+- Não use `anon key` para criar usuários externos nesse cenário.
+- Use somente a Edge Function com `x-api-key` e, idealmente, troque a chave periodicamente.
+- Se quiser endurecer mais, podemos adicionar validação por domínio de origem (`Origin`) e rate limit.
