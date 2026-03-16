@@ -19,8 +19,10 @@ supabase functions deploy wix-client-intake
 Defina no Supabase (Functions Secrets):
 
 - `WIX_INTAKE_API_KEY` (chave privada da integração)
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
+- `URL_SUPABASE`
+- `SERVICE_ROLE_KEY_SUPABASE`
+
+> Compatibilidade: a função também aceita `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` para ambientes antigos.
 
 ## 3) SQL necessária
 

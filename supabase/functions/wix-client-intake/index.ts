@@ -59,8 +59,8 @@ Deno.serve(async (request) => {
     return buildResponse(401, { success: false, error: 'Integração não autorizada.' });
   }
 
-  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  const supabaseUrl = Deno.env.get('URL_SUPABASE') ?? Deno.env.get('SUPABASE_URL') ?? '';
+  const serviceRoleKey = Deno.env.get('SERVICE_ROLE_KEY_SUPABASE') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
   if (!supabaseUrl || !serviceRoleKey) {
     return buildResponse(500, { success: false, error: 'Configuração do Supabase ausente na Edge Function.' });
