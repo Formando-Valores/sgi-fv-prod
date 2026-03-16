@@ -101,7 +101,8 @@
 
 <script>
   (function () {
-    const ENDPOINT = "https://SEU_PROJECT_REF.supabase.co/functions/v1/wix-client-intake";
+    const SUPABASE_URL = "https://SEU_PROJECT_REF.supabase.co";
+    const ENDPOINT = `${SUPABASE_URL.replace(/\/$/, "")}/functions/v1/wix-client-intake`;
     const API_KEY = "SUA_CHAVE_PRIVADA_DA_INTEGRACAO";
 
     const form = document.getElementById("sgiWixForm");
@@ -115,8 +116,11 @@
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
 
-      if (!ENDPOINT || !API_KEY) {
-        setMessage("Configuração incompleta: informe ENDPOINT e API_KEY no snippet do formulário.", false);
+      const hasPlaceholder = /SEU[_-]?PROJECT[_-]?REF/i.test(SUPABASE_URL) ||
+        /SUA_CHAVE_PRIVADA_DA_INTEGRACAO/i.test(API_KEY);
+
+      if (!SUPABASE_URL || !ENDPOINT || !API_KEY || hasPlaceholder) {
+        setMessage("Configuração incompleta: substitua SUPABASE_URL e API_KEY pelos valores reais do seu projeto Supabase.", false);
         return;
       }
 

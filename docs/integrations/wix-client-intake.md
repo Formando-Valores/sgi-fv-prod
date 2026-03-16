@@ -38,10 +38,12 @@ Defina no Supabase (Functions Secrets):
 
 No arquivo/trecho do formulário Wix, substitua:
 
-- `ENDPOINT`: `https://SEU_PROJECT_REF.supabase.co/functions/v1/wix-client-intake`
+- `SUPABASE_URL`: `https://SEU_PROJECT_REF.supabase.co`
 - `API_KEY`: valor real da secret `WIX_INTAKE_API_KEY`
 
-Se endpoint/chave estiverem ausentes ou inválidos, o envio falhará com erro de conexão/DNS (`ERR_NAME_NOT_RESOLVED`) ou retorno de autorização da API.
+> O endpoint é montado automaticamente no script (`${SUPABASE_URL}/functions/v1/wix-client-intake`), para evitar erro de digitação.
+
+Se `SUPABASE_URL`/`API_KEY` estiverem ausentes ou com placeholder, o formulário mostrará aviso. Se a URL estiver errada, o navegador exibirá erro DNS (`ERR_NAME_NOT_RESOLVED`).
 
 ## 3) SQL necessária
 
