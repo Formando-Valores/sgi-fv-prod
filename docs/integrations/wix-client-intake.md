@@ -57,6 +57,13 @@ No `fetch` do snippet, mantenha estes headers:
 
 Isso evita bloqueio no preflight/POST para chamadas cross-origin (Wix -> Supabase Functions).
 
+
+## 2.3) Erros comuns no Wix (importante)
+
+- **`SyntaxError: Invalid or unexpected token` no Console**: normalmente ocorre quando a chave foi colada com quebra de linha dentro de aspas. No snippet atualizado usamos template string com `.trim()`, mas ainda assim cole a chave em **uma única linha**.
+- **`SUPABASE_ANON_KEY` incorreta**: não use a chave `service_role` no navegador. A chave correta deve ser a **anon public key** (Settings → API → Project API keys).
+- Se usar `service_role` por engano, o snippet já interrompe o envio e mostra mensagem explícita no formulário.
+
 ## 3) SQL necessária
 
 Aplicar migration:

@@ -101,10 +101,22 @@
 
 <script>
   (function () {
-    const SUPABASE_URL = "https://SEU_PROJECT_REF.supabase.co";
+    const SUPABASE_URL = `https://SEU_PROJECT_REF.supabase.co`.trim();
     const ENDPOINT = `${SUPABASE_URL.replace(/\/$/, "")}/functions/v1/wix-client-intake`;
-    const API_KEY = "SUA_CHAVE_PRIVADA_DA_INTEGRACAO";
-    const SUPABASE_ANON_KEY = "SUA_SUPABASE_ANON_KEY";
+    const API_KEY = `SUA_CHAVE_PRIVADA_DA_INTEGRACAO`.trim();
+    const SUPABASE_ANON_KEY = `SUA_SUPABASE_ANON_KEY`.trim();
+
+    const decodeJwtPayload = (token) => {
+      try {
+        const payload = token.split(".")[1];
+        if (!payload) return null;
+        const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+        const json = decodeURIComponent(atob(base64).split("").map((char) => `%${char.charCodeAt(0).toString(16).padStart(2, "0")}`).join(""));
+        return JSON.parse(json);
+      } catch (_) {
+        return null;
+      }
+    };
 
     const form = document.getElementById("sgiWixForm");
     const message = document.getElementById("sgiWixMessage");
@@ -123,6 +135,12 @@
 
       if (!SUPABASE_URL || !ENDPOINT || !API_KEY || !SUPABASE_ANON_KEY || hasPlaceholder) {
         setMessage("Configuração incompleta: substitua SUPABASE_URL, API_KEY e SUPABASE_ANON_KEY pelos valores reais do seu projeto Supabase.", false);
+        return;
+      }
+
+      const anonPayload = decodeJwtPayload(SUPABASE_ANON_KEY);
+      if (anonPayload?.role === "service_role") {
+        setMessage("A chave SUPABASE_ANON_KEY está incorreta. Use a chave ANON pública do projeto (não use SERVICE_ROLE).", false);
         return;
       }
 
