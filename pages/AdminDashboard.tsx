@@ -4,7 +4,7 @@ import { LogOut, Printer, FileDown, Eye, Pencil, Search, Users, ShieldCheck, X, 
 import { User, ProcessStatus, UserRole, Hierarchy, ServiceUnit, Organization } from '../types';
 import { NavLink, useLocation } from 'react-router-dom';
 import { SERVICE_MANAGERS } from '../constants';
-import { buildOrganizationErrorMessage, createOrganization, loadOrganizations } from '../organizationRepository';
+import { buildOrganizationErrorMessage, createOrganization, deleteOrganization, loadOrganizations, updateOrganization } from '../organizationRepository';
 import { supabase } from '../supabase';
 
 type AccessLevel = 'Administrador' | 'Usuário Sênior' | 'Usuário Pleno' | 'Operador' | 'Cliente';
@@ -97,6 +97,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [organizationName, setOrganizationName] = useState('');
+  const [editingOrganizationId, setEditingOrganizationId] = useState('');
+  const [editingOrganizationName, setEditingOrganizationName] = useState('');
+  const [organizationSubmitting, setOrganizationSubmitting] = useState(false);
   const [orgError, setOrgError] = useState('');
   const [processSearch, setProcessSearch] = useState('');
   const [processStatusFilter, setProcessStatusFilter] = useState<'all' | ProcessStatus>('all');
@@ -595,16 +598,83 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       return;
     }
 
+    setOrganizationSubmitting(true);
     const { organization, error } = await createOrganization(organizationName);
 
     if (error || !organization) {
       console.error('[organizacoes] erro ao cadastrar organização', error);
       setOrgError(buildOrganizationErrorMessage(error));
+      setOrganizationSubmitting(false);
       return;
     }
 
     setOrganizations((prev) => [...prev, organization].sort((left, right) => left.name.localeCompare(right.name, 'pt-BR')));
     setOrganizationName('');
+    setOrganizationSubmitting(false);
+  };
+
+  const handleStartEditOrganization = (organization: Organization) => {
+    setEditingOrganizationId(organization.id);
+    setEditingOrganizationName(organization.name);
+    setOrgError('');
+  };
+
+  const handleCancelEditOrganization = () => {
+    setEditingOrganizationId('');
+    setEditingOrganizationName('');
+    setOrgError('');
+  };
+
+  const handleSaveOrganization = async (organizationId: string) => {
+    setOrgError('');
+
+    if (!editingOrganizationName.trim()) {
+      setOrgError('Informe o nome da organização para salvar edição.');
+      return;
+    }
+
+    setOrganizationSubmitting(true);
+    const { organization, error } = await updateOrganization(organizationId, editingOrganizationName);
+
+    if (error || !organization) {
+      console.error('[organizacoes] erro ao editar organização', error);
+      setOrgError(buildOrganizationErrorMessage(error));
+      setOrganizationSubmitting(false);
+      return;
+    }
+
+    setOrganizations((prev) =>
+      prev
+        .map((item) => (item.id === organization.id ? organization : item))
+        .sort((left, right) => left.name.localeCompare(right.name, 'pt-BR'))
+    );
+
+    handleCancelEditOrganization();
+    setOrganizationSubmitting(false);
+  };
+
+  const handleDeleteOrganization = async (organization: Organization) => {
+    const confirmed = window.confirm(`Deseja realmente excluir a organização "${organization.name}"?`);
+    if (!confirmed) return;
+
+    setOrgError('');
+    setOrganizationSubmitting(true);
+    const { success, error } = await deleteOrganization(organization.id);
+
+    if (!success) {
+      console.error('[organizacoes] erro ao excluir organização', error);
+      setOrgError(buildOrganizationErrorMessage(error));
+      setOrganizationSubmitting(false);
+      return;
+    }
+
+    setOrganizations((prev) => prev.filter((item) => item.id !== organization.id));
+
+    if (editingOrganizationId === organization.id) {
+      handleCancelEditOrganization();
+    }
+
+    setOrganizationSubmitting(false);
   };
 
   return (
@@ -723,7 +793,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               </div>
               {orgError && <p className="text-sm text-red-400 font-bold">{orgError}</p>}
               <button type="submit" className="px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold">
-                Salvar organização
+                {organizationSubmitting ? 'Salvando...' : 'Salvar organização'}
               </button>
             </form>
           </div>
@@ -733,8 +803,54 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
             <div className="space-y-3">
               {organizations.map((organization) => (
                 <div key={organization.id} className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                  <p className="font-bold">{organization.name}</p>
+                  {editingOrganizationId === organization.id ? (
+                    <div className="space-y-3">
+                      <input
+                        value={editingOrganizationName}
+                        onChange={(event) => setEditingOrganizationName(event.target.value)}
+                        className="w-full p-2 bg-gray-900 border border-slate-700 rounded-lg text-white font-bold"
+                        placeholder="Nome da organização"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleSaveOrganization(organization.id)}
+                          className="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs font-bold"
+                        >
+                          Salvar edição
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleCancelEditOrganization}
+                          className="px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs font-bold"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="font-bold">{organization.name}</p>
+                  )}
                   <p className="text-xs text-slate-400">ID: {organization.id}</p>
+                  <p className="text-xs text-slate-500">Slug: {organization.slug}</p>
+                  {editingOrganizationId !== organization.id && (
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleStartEditOrganization(organization)}
+                        className="px-3 py-2 rounded-lg bg-blue-900/40 hover:bg-blue-900/60 border border-blue-800 text-[11px] font-bold"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteOrganization(organization)}
+                        className="px-3 py-2 rounded-lg bg-red-900/30 hover:bg-red-900/50 border border-red-800 text-[11px] font-bold text-red-200"
+                      >
+                        Excluir
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
               {organizations.length === 0 && (

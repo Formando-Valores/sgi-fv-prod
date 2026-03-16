@@ -34,8 +34,13 @@ const toOrganization = (row: Record<string, unknown>): Organization | null => {
     .map((column) => row[column])
     .find((value) => typeof value === 'string' && value.trim().length > 0) as string | undefined;
 
+  const slugValue = typeof row.slug === 'string' && row.slug.trim().length > 0
+    ? row.slug
+    : slugify(organizationName ?? String(idValue));
+
   return {
     id: String(idValue),
+    slug: slugValue,
     name: organizationName ?? `Organização ${idValue}`,
   };
 };
@@ -132,6 +137,95 @@ export const createOrganization = async (organizationName: string) => {
   return { organization: null, resolvedSchema: null, error: lastError };
 };
 
+export const updateOrganization = async (organizationId: string, organizationName: string) => {
+  const normalizedId = organizationId.trim();
+  const normalizedName = organizationName.trim();
+
+  if (!normalizedId) {
+    return { organization: null, resolvedSchema: null, error: { message: 'ID da organização é obrigatório.' } };
+  }
+
+  if (!normalizedName) {
+    return { organization: null, resolvedSchema: null, error: { message: 'Nome da organização é obrigatório.' } };
+  }
+
+  let lastError: PostgrestErrorLike | null = null;
+
+  for (const schema of candidateSchemas) {
+    for (const nameColumn of candidateNameColumns) {
+      const payload: Record<string, unknown> = { [nameColumn]: normalizedName };
+
+      const { data, error } = await supabase
+        .schema(schema)
+        .from(configuredTable)
+        .update(payload)
+        .eq('id', normalizedId)
+        .select('*')
+        .single();
+
+      if (error) {
+        lastError = error;
+
+        if (error.code === 'PGRST204') {
+          continue;
+        }
+
+        if (error.code === '42501') {
+          return { organization: null, resolvedSchema: schema, error };
+        }
+
+        return { organization: null, resolvedSchema: schema, error };
+      }
+
+      const organization = toOrganization((data ?? {}) as Record<string, unknown>);
+
+      if (!organization) {
+        return {
+          organization: null,
+          resolvedSchema: schema,
+          error: { message: 'Registro atualizado, mas sem campo id.' },
+        };
+      }
+
+      return { organization, resolvedSchema: schema, error: null as PostgrestErrorLike | null };
+    }
+  }
+
+  return { organization: null, resolvedSchema: null, error: lastError };
+};
+
+export const deleteOrganization = async (organizationId: string) => {
+  const normalizedId = organizationId.trim();
+
+  if (!normalizedId) {
+    return { success: false, resolvedSchema: null, error: { message: 'ID da organização é obrigatório.' } };
+  }
+
+  let lastError: PostgrestErrorLike | null = null;
+
+  for (const schema of candidateSchemas) {
+    const { error } = await supabase
+      .schema(schema)
+      .from(configuredTable)
+      .delete()
+      .eq('id', normalizedId);
+
+    if (error) {
+      lastError = error;
+
+      if (error.code === '42501') {
+        return { success: false, resolvedSchema: schema, error };
+      }
+
+      continue;
+    }
+
+    return { success: true, resolvedSchema: schema, error: null as PostgrestErrorLike | null };
+  }
+
+  return { success: false, resolvedSchema: null, error: lastError };
+};
+
 export const buildOrganizationErrorMessage = (error: PostgrestErrorLike | null | undefined) => {
   if (!error) {
     return 'Não foi possível processar organizações.';
@@ -142,7 +236,7 @@ export const buildOrganizationErrorMessage = (error: PostgrestErrorLike | null |
   }
 
   if (error.code === '42501') {
-    return 'Sem permissão para cadastrar organização. Ajuste as políticas RLS de INSERT na tabela de organizações.';
+    return 'Sem permissão para processar organização. Ajuste as políticas RLS (INSERT/UPDATE/DELETE) na tabela de organizações.';
   }
 
   if (error.code === 'PGRST204') {
