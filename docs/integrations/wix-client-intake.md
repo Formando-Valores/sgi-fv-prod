@@ -14,6 +14,15 @@ Deploy:
 supabase functions deploy wix-client-intake
 ```
 
+
+## 1.1) Configuração de autenticação da Edge Function
+
+Para chamadas diretas do navegador (Wix), a função deve ser publicada com:
+
+- `verify_jwt = false` em `supabase/functions/wix-client-intake/config.toml`
+
+Sem isso, o preflight/POST pode retornar bloqueio de CORS com status não-OK no OPTIONS/401.
+
 ## 2) Variáveis obrigatórias na Function
 
 Defina no Supabase (Functions Secrets):
