@@ -32,7 +32,7 @@ No arquivo/trecho do formulário Wix, substitua:
 - `ENDPOINT`: `https://SEU_PROJECT_REF.supabase.co/functions/v1/wix-client-intake`
 - `API_KEY`: valor real da secret `WIX_INTAKE_API_KEY`
 
-Se você deixar os placeholders, o formulário exibirá aviso de configuração incompleta e/ou erro de DNS (`ERR_NAME_NOT_RESOLVED`).
+Se endpoint/chave estiverem ausentes ou inválidos, o envio falhará com erro de conexão/DNS (`ERR_NAME_NOT_RESOLVED`) ou retorno de autorização da API.
 
 ## 3) SQL necessária
 
