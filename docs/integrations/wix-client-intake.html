@@ -104,6 +104,12 @@
     const ENDPOINT = "https://SEU_PROJECT_REF.supabase.co/functions/v1/wix-client-intake";
     const API_KEY = "SUA_CHAVE_PRIVADA_DA_INTEGRACAO";
 
+    const isPlaceholderConfig =
+      ENDPOINT.includes("SEU_PROJECT_REF") ||
+      ENDPOINT.includes("seu_project_ref") ||
+      API_KEY.includes("SUA_CHAVE_PRIVADA_DA_INTEGRACAO") ||
+      API_KEY.trim().length < 10;
+
     const form = document.getElementById("sgiWixForm");
     const message = document.getElementById("sgiWixMessage");
 
@@ -114,6 +120,12 @@
 
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
+
+      if (isPlaceholderConfig) {
+        setMessage("Configuração incompleta: substitua ENDPOINT e API_KEY pelos valores reais do seu projeto Supabase.", false);
+        return;
+      }
+
       setMessage("Enviando cadastro...", true);
 
       const data = new FormData(form);

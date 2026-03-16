@@ -24,6 +24,16 @@ Defina no Supabase (Functions Secrets):
 
 > Compatibilidade: a função também aceita `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` para ambientes antigos.
 
+
+## 2.1) Configuração no HTML do Wix (obrigatório)
+
+No arquivo/trecho do formulário Wix, substitua:
+
+- `ENDPOINT`: `https://SEU_PROJECT_REF.supabase.co/functions/v1/wix-client-intake`
+- `API_KEY`: valor real da secret `WIX_INTAKE_API_KEY`
+
+Se você deixar os placeholders, o navegador vai retornar erro de DNS (`ERR_NAME_NOT_RESOLVED`) exatamente como no print.
+
 ## 3) SQL necessária
 
 Aplicar migration:
