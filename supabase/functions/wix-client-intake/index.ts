@@ -206,10 +206,11 @@ Deno.serve(async (request) => {
     const processPayload = {
       org_id: orgId,
       titulo: processTitle,
-      status: 'cadastro',
+      status: 'analise',
       cliente_nome: fullName,
       cliente_documento: String(payload.taxId ?? payload.documentId ?? '').trim() || null,
       cliente_contato: String(payload.phone ?? email).trim() || email,
+      responsavel_user_id: userId,
       unidade_atendimento: serviceUnit,
       org_nome_solicitado: organizationRequestedName || null,
       origem_canal: source,

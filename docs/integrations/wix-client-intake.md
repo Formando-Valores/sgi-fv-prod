@@ -70,6 +70,7 @@ Isso evita bloqueio no preflight/POST para chamadas cross-origin (Wix -> Supabas
 Aplicar migration:
 
 - `supabase/migrations/013_processes_external_intake_columns.sql`
+- `supabase/migrations/014_processes_client_visibility.sql`
 
 Ela adiciona nas `processes`:
 
@@ -95,7 +96,7 @@ Ao enviar formulário com sucesso:
 
 1. cria/atualiza `auth.users` e `profiles`;
 2. vincula em `org_members` com role `client` na organização default;
-3. cria `processes` com origem do canal e unidade;
+3. cria `processes` com origem do canal e unidade, com status inicial `analise`;
 4. cria evento inicial em `process_events` informando a origem do recebimento.
 
 
