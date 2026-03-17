@@ -1,0 +1,141 @@
+{
+  "info": {
+    "name": "SGI-FV - Wix Client Intake",
+    "description": "Collection para validar a Edge Function wix-client-intake via Postman (preflight OPTIONS + cadastro POST).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "c7d2a86e-bad4-4d3f-b9f2-2e0e0d8ec7af"
+  },
+  "variable": [
+    {
+      "key": "supabase_url",
+      "value": "https://ktrrrqaqaljdcmxqdcff.supabase.co"
+    },
+    {
+      "key": "wix_intake_api_key",
+      "value": "COLE_AQUI_WIX_INTAKE_API_KEY"
+    },
+    {
+      "key": "publishable_key",
+      "value": "COLE_AQUI_SB_PUBLISHABLE"
+    },
+    {
+      "key": "test_email",
+      "value": "wix.teste+{{$timestamp}}@example.com"
+    },
+    {
+      "key": "test_password",
+      "value": "SenhaForte123"
+    }
+  ],
+  "item": [
+    {
+      "name": "Preflight OPTIONS - wix-client-intake",
+      "request": {
+        "method": "OPTIONS",
+        "header": [
+          {
+            "key": "Origin",
+            "value": "https://www.formandovalores.com"
+          },
+          {
+            "key": "Access-Control-Request-Method",
+            "value": "POST"
+          },
+          {
+            "key": "Access-Control-Request-Headers",
+            "value": "content-type,apikey,authorization,x-api-key"
+          }
+        ],
+        "url": {
+          "raw": "{{supabase_url}}/functions/v1/wix-client-intake",
+          "host": [
+            "{{supabase_url}}"
+          ],
+          "path": [
+            "functions",
+            "v1",
+            "wix-client-intake"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status deve ser 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Deve retornar Access-Control-Allow-Origin', function () {",
+              "  pm.expect(pm.response.headers.get('Access-Control-Allow-Origin')).to.eql('*');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "Cadastro POST - wix-client-intake",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "apikey",
+            "value": "{{publishable_key}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{publishable_key}}"
+          },
+          {
+            "key": "x-api-key",
+            "value": "{{wix_intake_api_key}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"organizationSlug\": \"default\",\n  \"source\": \"wix\",\n  \"fullName\": \"Teste Postman\",\n  \"email\": \"{{test_email}}\",\n  \"password\": \"{{test_password}}\",\n  \"confirmPassword\": \"{{test_password}}\",\n  \"documentId\": \"\",\n  \"taxId\": \"\",\n  \"address\": \"Rua de teste, 100\",\n  \"maritalStatus\": \"Solteiro\",\n  \"country\": \"Brasil\",\n  \"phone\": \"\",\n  \"processTitle\": \"Cadastro via Postman\",\n  \"serviceUnit\": \"ADMINISTRATIVO\",\n  \"organizationRequestedName\": \"Org teste via Postman\"\n}"
+        },
+        "url": {
+          "raw": "{{supabase_url}}/functions/v1/wix-client-intake",
+          "host": [
+            "{{supabase_url}}"
+          ],
+          "path": [
+            "functions",
+            "v1",
+            "wix-client-intake"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status deve ser 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "const json = pm.response.json();",
+              "pm.test('success deve ser true', function () {",
+              "  pm.expect(json.success).to.eql(true);",
+              "});",
+              "pm.test('retorna processId ou protocol', function () {",
+              "  pm.expect(json.data).to.be.an('object');",
+              "  pm.expect(Boolean(json.data.processId) || Boolean(json.data.protocol)).to.eql(true);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "response": []
+    }
+  ]
+}

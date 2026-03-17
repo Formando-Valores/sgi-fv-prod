@@ -96,3 +96,23 @@ Ao enviar formulário com sucesso:
 2. vincula em `org_members` com role `client` na organização default;
 3. cria `processes` com origem do canal e unidade;
 4. cria evento inicial em `process_events` informando a origem do recebimento.
+
+
+## 6) Teste rápido no Postman
+
+Foi adicionado um arquivo pronto para importação:
+
+- `docs/integrations/postman/wix-client-intake.postman_collection.json`
+
+Passos:
+
+1. Importar a collection no Postman.
+2. Preencher variáveis da collection:
+   - `supabase_url`
+   - `wix_intake_api_key`
+   - `publishable_key`
+3. Executar primeiro `Preflight OPTIONS - wix-client-intake`.
+4. Executar depois `Cadastro POST - wix-client-intake`.
+
+Se o preflight retornar 404, a função não está deployada no projeto/ref informado.
+
