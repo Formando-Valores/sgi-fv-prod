@@ -62,6 +62,7 @@ Isso evita bloqueio no preflight/POST para chamadas cross-origin (Wix -> Supabas
 
 - **`SyntaxError: Invalid or unexpected token` no Console**: normalmente ocorre quando a chave foi colada com quebra de linha dentro de aspas. No snippet atualizado usamos template string com `.trim()`, mas ainda assim cole a chave em **uma única linha**.
 - **`SUPABASE_ANON_KEY` incorreta**: não use a chave `service_role` no navegador. A chave correta deve ser a **anon public key** (Settings → API → Project API keys).
+- **`net::ERR_NAME_NOT_RESOLVED` no navegador**: a `SUPABASE_URL` está com o project-ref incorreto (erro de digitação). Confirme o ref exato em *Project Settings → General* e use no formato `https://<project-ref>.supabase.co`.
 - Se usar `service_role` por engano, o snippet já interrompe o envio e mostra mensagem explícita no formulário.
 
 ## 3) SQL necessária

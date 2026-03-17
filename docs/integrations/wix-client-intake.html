@@ -106,6 +106,8 @@
     const API_KEY = `SUA_CHAVE_PRIVADA_DA_INTEGRACAO`.trim();
     const SUPABASE_ANON_KEY = `SUA_SUPABASE_ANON_KEY`.trim();
 
+    const isLikelySupabaseUrl = (url) => /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url);
+
     const decodeJwtPayload = (token) => {
       try {
         const payload = token.split(".")[1];
@@ -135,6 +137,11 @@
 
       if (!SUPABASE_URL || !ENDPOINT || !API_KEY || !SUPABASE_ANON_KEY || hasPlaceholder) {
         setMessage("Configuração incompleta: substitua SUPABASE_URL, API_KEY e SUPABASE_ANON_KEY pelos valores reais do seu projeto Supabase.", false);
+        return;
+      }
+
+      if (!isLikelySupabaseUrl(SUPABASE_URL)) {
+        setMessage("SUPABASE_URL inválida. Use o formato https://<project-ref>.supabase.co (sem /functions no final).", false);
         return;
       }
 
@@ -187,7 +194,8 @@
         setMessage("Cadastro realizado com sucesso! Você receberá as orientações de acesso.", true);
         form.reset();
       } catch (error) {
-        setMessage("Erro de conexão ao enviar cadastro. Tente novamente.", false);
+        console.error("Falha ao chamar wix-client-intake", { endpoint: ENDPOINT, error });
+        setMessage("Erro de conexão ao enviar cadastro. Verifique se SUPABASE_URL está correta e se a função foi publicada.", false);
       }
     });
   })();
