@@ -44,6 +44,8 @@ type ProfileRow = {
 
 
 interface AdminProcessRow extends User {
+  processRecordId?: string;
+  profileUserId?: string | null;
   processType: string;
   startDate: string;
   deadlineDate: string;
@@ -125,8 +127,8 @@ interface AdminDashboardProps {
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, setUsers, onLogout, section = 'dashboard' }) => {
   const [activeTab, setActiveTab] = useState<'users' | 'management'>('users');
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [selectedUser, setSelectedUser] = useState<AdminProcessRow | User | null>(null);
+  const [editingUser, setEditingUser] = useState<AdminProcessRow | User | null>(null);
   
   // Management tab states
   const [newAdminName, setNewAdminName] = useState('');
@@ -165,6 +167,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [dbProcesses, setDbProcesses] = useState<DbProcess[]>([]);
   const [processesLoading, setProcessesLoading] = useState(false);
   const [processesError, setProcessesError] = useState('');
+  const [editingProfileForm, setEditingProfileForm] = useState({
+    fullName: '',
+    email: '',
+    documentId: '',
+    taxId: '',
+    phone: '',
+    address: '',
+    country: 'Brasil',
+    maritalStatus: 'Solteiro',
+  });
+  const [editingProfileLoading, setEditingProfileLoading] = useState(false);
+  const [editingProfileError, setEditingProfileError] = useState('');
+  const [editingProfileSaving, setEditingProfileSaving] = useState(false);
 
   const location = useLocation();
   const currentSection = section ?? (location.pathname.split('/')[2] as 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes') ?? 'dashboard';
@@ -241,6 +256,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
       return {
         id: process.id,
+        processRecordId: process.id,
+        profileUserId: process.responsavel_user_id,
         name: sanitizeDisplayValue(process.cliente_nome) || sanitizeDisplayValue(process.titulo) || 'Solicitação sem nome',
         email: email || '-',
         role: UserRole.CLIENT,
@@ -276,6 +293,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       const generatedValue = user.unit === ServiceUnit.ADMINISTRATIVO ? 5200 : 1800;
       return {
         ...user,
+        processRecordId: user.id,
+        profileUserId: user.id,
         processType: user.unit === ServiceUnit.ADMINISTRATIVO ? 'Administrativo' : 'Jurídico',
         startDate: user.registrationDate,
         deadlineDate: user.deadline || '12/03/2026',
@@ -334,6 +353,61 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     atrasados: processRows.filter((process) => process.status !== ProcessStatus.CONCLUIDO && Boolean(process.deadline)).length,
   };
 
+  const hydrateEditingProfileForm = async (user: AdminProcessRow | User | null) => {
+    if (!user) return;
+
+    const profileUserId = sanitizeDisplayValue((user as AdminProcessRow).profileUserId || user.id);
+    const fallbackForm = {
+      fullName: sanitizeDisplayValue(user.name),
+      email: sanitizeDisplayValue(user.email === '-' ? '' : user.email),
+      documentId: sanitizeDisplayValue(user.documentId === '---' ? '' : user.documentId),
+      taxId: sanitizeDisplayValue(user.taxId === '---' ? '' : user.taxId),
+      phone: sanitizeDisplayValue(user.phone === '---' ? '' : user.phone),
+      address: sanitizeDisplayValue(user.address === '---' ? '' : user.address),
+      country: sanitizeDisplayValue(user.country) || 'Brasil',
+      maritalStatus: sanitizeDisplayValue(user.maritalStatus) || 'Solteiro',
+    };
+
+    setEditingProfileForm(fallbackForm);
+    setEditingProfileError('');
+
+    if (!profileUserId) return;
+
+    setEditingProfileLoading(true);
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id,nome_completo,email,documento_identidade,nif_cpf,estado_civil,phone,endereco,pais')
+      .eq('id', profileUserId)
+      .maybeSingle();
+
+    if (error) {
+      setEditingProfileError('Não foi possível carregar todos os dados cadastrais do usuário.');
+      setEditingProfileLoading(false);
+      return;
+    }
+
+    if (data) {
+      setEditingProfileForm({
+        fullName: sanitizeDisplayValue(data.nome_completo) || fallbackForm.fullName,
+        email: sanitizeDisplayValue(data.email) || fallbackForm.email,
+        documentId: sanitizeDisplayValue(data.documento_identidade) || fallbackForm.documentId,
+        taxId: sanitizeDisplayValue(data.nif_cpf) || fallbackForm.taxId,
+        phone: sanitizeDisplayValue(data.phone) || fallbackForm.phone,
+        address: sanitizeDisplayValue(data.endereco) || fallbackForm.address,
+        country: sanitizeDisplayValue(data.pais) || fallbackForm.country,
+        maritalStatus: sanitizeDisplayValue(data.estado_civil) || fallbackForm.maritalStatus,
+      });
+    }
+
+    setEditingProfileLoading(false);
+  };
+
+  useEffect(() => {
+    if (!editingUser) return;
+    void hydrateEditingProfileForm(editingUser);
+  }, [editingUser]);
+
 
   const fetchProcesses = async () => {
     setProcessesLoading(true);
@@ -356,12 +430,88 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     setProcessesLoading(false);
   };
 
-  const handleUpdateStatus = (userId: string, status: ProcessStatus, deadline?: string, notes?: string, serviceManager?: string) => {
+  const handleUpdateStatus = async (userId: string, status: ProcessStatus, deadline?: string, notes?: string, serviceManager?: string) => {
     const timestamp = new Date().toLocaleString('pt-BR');
+    const currentEditingUser = editingUser;
+    const profileUserId = sanitizeDisplayValue((currentEditingUser as AdminProcessRow | null)?.profileUserId || currentEditingUser?.id);
+    const processRecordId = sanitizeDisplayValue((currentEditingUser as AdminProcessRow | null)?.processRecordId || currentEditingUser?.id);
+
+    const profilePayload = {
+      nome_completo: sanitizeDisplayValue(editingProfileForm.fullName) || null,
+      email: sanitizeDisplayValue(editingProfileForm.email).toLowerCase() || null,
+      documento_identidade: sanitizeDisplayValue(editingProfileForm.documentId) || null,
+      nif_cpf: sanitizeDisplayValue(editingProfileForm.taxId) || null,
+      phone: sanitizeDisplayValue(editingProfileForm.phone) || null,
+      endereco: sanitizeDisplayValue(editingProfileForm.address) || null,
+      pais: sanitizeDisplayValue(editingProfileForm.country) || null,
+      estado_civil: sanitizeDisplayValue(editingProfileForm.maritalStatus) || null,
+    };
+
+    const statusMap: Record<ProcessStatus, 'cadastro' | 'triagem' | 'analise' | 'concluido'> = {
+      [ProcessStatus.PENDENTE]: 'cadastro',
+      [ProcessStatus.TRIAGEM]: 'triagem',
+      [ProcessStatus.ANALISE]: 'analise',
+      [ProcessStatus.CONCLUIDO]: 'concluido',
+    };
+
+    setEditingProfileSaving(true);
+    setEditingProfileError('');
+
+    let processUpdateError = '';
+    if ((currentEditingUser as AdminProcessRow | null)?.processRecordId && dbProcesses.length > 0 && processRecordId) {
+      const { error } = await supabase
+        .from('processes')
+        .update({ status: statusMap[status] })
+        .eq('id', processRecordId);
+
+      if (error) {
+        processUpdateError = 'Não foi possível atualizar o status do processo no banco.';
+      } else {
+        setDbProcesses((prev) =>
+          prev.map((process) => (process.id === processRecordId ? { ...process, status: statusMap[status] } : process))
+        );
+      }
+    }
+
+    let profileUpdateError = '';
+    if (profileUserId) {
+      const { error } = await supabase
+        .from('profiles')
+        .update(profilePayload)
+        .eq('id', profileUserId);
+
+      if (error) {
+        profileUpdateError = 'Não foi possível atualizar os dados cadastrais na tabela profiles.';
+      }
+    }
+
     setUsers(prev => prev.map(u => 
-      u.id === userId ? { ...u, status, deadline, notes, serviceManager, lastUpdate: timestamp } : u
+      u.id === userId || u.id === profileUserId ? {
+        ...u,
+        name: profilePayload.nome_completo || u.name,
+        email: profilePayload.email || u.email,
+        documentId: profilePayload.documento_identidade || u.documentId,
+        taxId: profilePayload.nif_cpf || u.taxId,
+        address: profilePayload.endereco || u.address,
+        maritalStatus: profilePayload.estado_civil || u.maritalStatus,
+        country: profilePayload.pais || u.country,
+        phone: profilePayload.phone || u.phone,
+        status,
+        deadline,
+        notes,
+        serviceManager,
+        lastUpdate: timestamp
+      } : u
     ));
-    setEditingUser(null);
+
+    if (!processUpdateError && !profileUpdateError) {
+      setEditingProfileSaving(false);
+      setEditingUser(null);
+      return;
+    }
+
+    setEditingProfileError([processUpdateError, profileUpdateError].filter(Boolean).join(' '));
+    setEditingProfileSaving(false);
   };
 
   const fetchOrgMembers = async () => {
@@ -1957,18 +2107,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       {/* Edit Status Modal */}
       {editingUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-slate-900 w-full max-w-lg rounded-3xl border border-slate-800 shadow-2xl overflow-hidden">
+          <div className="bg-slate-900 w-full max-w-3xl rounded-3xl border border-slate-800 shadow-2xl overflow-hidden">
              <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-950">
                <h3 className="text-xl font-black uppercase">Editar Status: {editingUser.protocol}</h3>
                <button onClick={() => setEditingUser(null)} className="p-2 bg-slate-800 hover:bg-slate-700 rounded-full">
                  <X className="w-5 h-5" />
                </button>
              </div>
-             <div className="p-8">
+             <div className="p-8 max-h-[85vh] overflow-y-auto">
                 <form onSubmit={(e: React.FormEvent<HTMLFormElement>) => {
                   e.preventDefault();
                   const fd = new FormData(e.currentTarget);
-                  handleUpdateStatus(
+                  void handleUpdateStatus(
                     editingUser.id, 
                     fd.get('status') as ProcessStatus,
                     fd.get('deadline') as string,
@@ -1977,25 +2127,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                   );
                 }}>
                   <div className="space-y-6">
-                    <div>
-                      <label className="text-[10px] font-black text-slate-500 uppercase mb-2 block">Alterar Status do Processo</label>
-                      <select name="status" defaultValue={editingUser.status} className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none ring-blue-500 focus:ring-2">
-                        {Object.values(ProcessStatus).map(s => (
-                          <option key={s} value={s}>{s}</option>
-                        ))}
-                      </select>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="text-[10px] font-black text-slate-500 uppercase mb-2 block">Alterar Status do Processo</label>
+                        <select name="status" defaultValue={editingUser.status} className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none ring-blue-500 focus:ring-2">
+                          {Object.values(ProcessStatus).map(s => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black text-slate-500 uppercase mb-2 block flex items-center gap-2">
+                          <UserCheck className="w-3 h-3" /> Gestor do Serviço
+                        </label>
+                        <select name="serviceManager" defaultValue={editingUser.serviceManager} className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none ring-blue-500 focus:ring-2">
+                          <option value="">Selecione um gestor</option>
+                          {SERVICE_MANAGERS.map(manager => (
+                            <option key={manager} value={manager}>{manager}</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
-                    <div>
-                      <label className="text-[10px] font-black text-slate-500 uppercase mb-2 block flex items-center gap-2">
-                        <UserCheck className="w-3 h-3" /> Gestor do Serviço
-                      </label>
-                      <select name="serviceManager" defaultValue={editingUser.serviceManager} className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none ring-blue-500 focus:ring-2">
-                        <option value="">Selecione um gestor</option>
-                        {SERVICE_MANAGERS.map(manager => (
-                          <option key={manager} value={manager}>{manager}</option>
-                        ))}
-                      </select>
-                    </div>
+
                     <div>
                       <label className="text-[10px] font-black text-slate-500 uppercase mb-2 block flex items-center gap-2">
                         <Calendar className="w-3 h-3" /> Data de Prazo
@@ -2008,8 +2161,98 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                       </label>
                       <textarea name="notes" rows={4} defaultValue={editingUser.notes} className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold resize-none" placeholder="Digite as anotações do processo..."></textarea>
                     </div>
-                    <button type="submit" className="w-full py-5 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest rounded-2xl shadow-xl transition-all">
-                      Salvar Alterações
+
+                    <div className="border-t border-slate-800 pt-6">
+                      <h4 className="text-lg font-black uppercase mb-4">Dados cadastrais do usuário</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="md:col-span-2">
+                          <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Nome Completo</label>
+                          <input
+                            type="text"
+                            value={editingProfileForm.fullName}
+                            onChange={(event) => setEditingProfileForm((prev) => ({ ...prev, fullName: event.target.value }))}
+                            className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">E-mail</label>
+                          <input
+                            type="email"
+                            value={editingProfileForm.email}
+                            onChange={(event) => setEditingProfileForm((prev) => ({ ...prev, email: event.target.value }))}
+                            className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Documento de Identidade</label>
+                          <input
+                            type="text"
+                            value={editingProfileForm.documentId}
+                            onChange={(event) => setEditingProfileForm((prev) => ({ ...prev, documentId: event.target.value }))}
+                            className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">NIF / CPF</label>
+                          <input
+                            type="text"
+                            value={editingProfileForm.taxId}
+                            onChange={(event) => setEditingProfileForm((prev) => ({ ...prev, taxId: event.target.value }))}
+                            className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Telefone</label>
+                          <input
+                            type="text"
+                            value={editingProfileForm.phone}
+                            onChange={(event) => setEditingProfileForm((prev) => ({ ...prev, phone: event.target.value }))}
+                            className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Estado Civil</label>
+                          <input
+                            type="text"
+                            value={editingProfileForm.maritalStatus}
+                            onChange={(event) => setEditingProfileForm((prev) => ({ ...prev, maritalStatus: event.target.value }))}
+                            className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">País</label>
+                          <input
+                            type="text"
+                            value={editingProfileForm.country}
+                            onChange={(event) => setEditingProfileForm((prev) => ({ ...prev, country: event.target.value }))}
+                            className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Endereço completo (inclua CEP)</label>
+                          <input
+                            type="text"
+                            value={editingProfileForm.address}
+                            onChange={(event) => setEditingProfileForm((prev) => ({ ...prev, address: event.target.value }))}
+                            className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {editingProfileLoading && (
+                      <p className="text-sm font-bold text-slate-400">Carregando dados completos do cadastro...</p>
+                    )}
+                    {editingProfileError && (
+                      <p className="text-sm font-bold text-amber-300">{editingProfileError}</p>
+                    )}
+
+                    <button
+                      type="submit"
+                      disabled={editingProfileSaving}
+                      className="w-full py-5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-black uppercase tracking-widest rounded-2xl shadow-xl transition-all"
+                    >
+                      {editingProfileSaving ? 'SALVANDO...' : 'Salvar Alterações'}
                     </button>
                   </div>
                 </form>
