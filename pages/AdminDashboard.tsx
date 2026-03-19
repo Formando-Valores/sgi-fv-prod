@@ -1464,16 +1464,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         </div>
       ) : currentSection === 'processos' ? (
         <div className="space-y-6">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-5xl font-black tracking-tight leading-none">Processos</h3>
-              <button className="px-4 py-2 rounded-xl border border-slate-700 bg-slate-800/60 text-slate-200 font-bold">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6">
+            <div className="mb-2 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <h3 className="text-4xl sm:text-5xl font-black tracking-tight leading-none">Processos</h3>
+              </div>
+              <button className="hidden xl:inline-flex shrink-0 px-4 py-2 rounded-xl border border-slate-700 bg-slate-800/60 text-slate-200 font-bold">
                 ≡ Colunas
               </button>
             </div>
             <p className="text-slate-400 text-sm mb-6">Visão geral em formato de planilha para filtrar, acompanhar status e agir rápido.</p>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 gap-3 sm:gap-4">
               <div className="bg-slate-800/30 border border-slate-700 rounded-2xl p-4">
                 <p className="text-xs text-slate-400 uppercase">Processos</p>
                 <p className="text-4xl font-black leading-none mt-2">{processStats.total}</p>
@@ -1501,8 +1503,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               </div>
             </div>
 
-            <div className="mt-5 grid grid-cols-1 md:grid-cols-5 gap-4">
-              <div className="relative">
+            <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
+              <div className="relative sm:col-span-2 xl:col-span-3">
                 <Search className="absolute left-3 top-3 text-slate-500 w-5 h-5" />
                 <input
                   value={processSearch}
@@ -1568,12 +1570,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           )}
 
           <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+            <div className="px-4 sm:px-6 py-4 border-b border-slate-800 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h4 className="text-2xl font-black">Lista de processos</h4>
                 <p className="text-slate-400 text-sm">Mostrando {visibleProcessRows.length} de {processRows.length} resultados</p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 self-start sm:self-auto">
                 <span className="text-sm text-slate-300 font-bold">Linhas</span>
                 <select
                   value={processRowsLimit}
