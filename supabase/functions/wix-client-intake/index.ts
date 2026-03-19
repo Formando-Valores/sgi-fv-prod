@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { sendAccessCredentialsEmail } from '../_shared/accessEmail.ts';
 
 type IntakePayload = {
   organizationSlug?: string;
@@ -240,6 +241,13 @@ Deno.serve(async (request) => {
       ]);
     }
 
+    const emailResult = await sendAccessCredentialsEmail({
+      email,
+      password,
+      fullName,
+      source: 'formulário externo',
+    });
+
     return buildResponse(200, {
       success: true,
       message: 'Cadastro recebido com sucesso.',
@@ -252,6 +260,8 @@ Deno.serve(async (request) => {
         linkedOrganizationSlug: requestedSlug || 'default',
         requestedOrganizationName: organizationRequestedName || null,
         source,
+        credentialsEmailSent: emailResult.ok,
+        credentialsEmailError: emailResult.ok ? null : emailResult.error,
       },
     });
   } catch (error) {

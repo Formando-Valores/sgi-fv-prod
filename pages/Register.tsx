@@ -263,6 +263,22 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
 
         setUsers((prev) => [...prev, newUser]);
         setCurrentUser(newUser);
+
+        const loginUrl = `${window.location.origin}${window.location.pathname.includes('#') ? '' : '/#/login'}`;
+        const credentialEmailResult = await supabase.functions.invoke('send-access-credentials', {
+          body: {
+            email: formData.email,
+            password: formData.password,
+            fullName: formData.name,
+            source: 'cadastro interno',
+            loginUrl,
+          },
+        });
+
+        if (credentialEmailResult.error) {
+          console.warn('[register] não foi possível enviar o e-mail com as credenciais', credentialEmailResult.error);
+        }
+
         setSuccess(true);
         setTimeout(() => goToRoute('/login'), 1200);
       }
