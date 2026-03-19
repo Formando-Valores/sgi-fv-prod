@@ -9,7 +9,7 @@ console.log('[APP] ========================================');
 console.log('[APP] App.tsx module loading...', new Date().toISOString());
 console.log('[APP] ========================================');
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 console.log('[APP] ✅ React imported');
 
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
