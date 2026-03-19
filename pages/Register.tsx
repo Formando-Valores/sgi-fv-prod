@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import { COUNTRIES } from '../constants';
 import { ServiceUnit, ProcessStatus, User, UserRole, Organization } from '../types';
 import { isSupabaseConfigured, supabase } from '../supabase';
@@ -36,6 +36,11 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
 
   const [error, setError] = useState('');
   const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  const inputClass = 'w-full p-3 bg-gray-900 border border-slate-700 rounded-lg text-white font-bold outline-none focus:ring-2 focus:ring-blue-500';
 
   const validatePassword = (pass: string) => {
     const hasMinLength = pass.length >= 8;
@@ -68,31 +73,25 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
 
     if (!isSupabaseConfigured) {
       setError('Configuração do sistema incompleta. Contate o suporte para ajustar as variáveis do Supabase.');
-      return;
-    }
-
-    if (!isSupabaseConfigured) {
-      setError('Configuração do sistema incompleta. Contate o suporte para ajustar as variáveis do Supabase.');
-      return;
-    }
-
-    if (!isSupabaseConfigured) {
-      setError('Configuração do sistema incompleta. Contate o suporte para ajustar as variáveis do Supabase.');
+      setIsLoading(false);
       return;
     }
 
     if (!formData.organizationId) {
       setError('Selecione a organização vinculada ao cliente.');
+      setIsLoading(false);
       return;
     }
 
     if (formData.password !== formData.confirmPassword) {
       setError('As senhas não coincidem.');
+      setIsLoading(false);
       return;
     }
 
     if (!validatePassword(formData.password)) {
       setError('A senha deve ter 8 caracteres, uma letra maiúscula, um caractere especial e um número.');
+      setIsLoading(false);
       return;
     }
 
@@ -106,27 +105,131 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
 
       if (authError) {
         console.error('[register] falha no cadastro', authError);
-        setError(authError.message);
+        const authMessage = String(authError.message || '').toLowerCase();
+        if (authMessage.includes('user already registered')) {
+          setError('Este e-mail já está cadastrado. Faça login para continuar.');
+        } else {
+          setError(authError.message);
+        }
         return;
       }
 
       if (data.user) {
-        const { error: profileInsertError } = await supabase
+        const { data: selectedOrganization } = await supabase
+          .from('organizations')
+          .select('id, name, slug')
+          .eq('id', formData.organizationId)
+          .maybeSingle();
+
+        const profilePayload = {
+          id: data.user.id,
+          nome_completo: formData.name,
+          email: formData.email,
+          role: UserRole.CLIENT,
+          org_id: formData.organizationId,
+          documento_identidade: formData.documentId,
+          nif_cpf: formData.taxId,
+          estado_civil: formData.maritalStatus,
+          phone: formData.phone,
+          endereco: formData.address,
+          pais: formData.country,
+        };
+
+        let { error: profileInsertError } = await supabase
           .from('profiles')
-          .insert([
-            {
+          .insert([profilePayload]);
+
+        if (profileInsertError) {
+          const schemaMismatch =
+            profileInsertError.code === 'PGRST204' ||
+            String(profileInsertError.message || '').toLowerCase().includes('column');
+
+          if (schemaMismatch) {
+            const minimalProfilePayload = {
               id: data.user.id,
-              nome: formData.name,
+              nome_completo: formData.name,
               email: formData.email,
-              role: UserRole.CLIENT,
-              organization_id: formData.organizationId,
-            },
-          ]);
+              org_id: formData.organizationId,
+            };
+
+            const { error: fallbackProfileError } = await supabase
+              .from('profiles')
+              .insert([minimalProfilePayload]);
+
+            profileInsertError = fallbackProfileError;
+
+            if (!fallbackProfileError) {
+              await supabase
+                .from('profiles')
+                .update({ role: UserRole.CLIENT })
+                .eq('id', data.user.id);
+            }
+          }
+        }
+
+        if (profileInsertError) {
+          const duplicateProfile =
+            profileInsertError.code === '23505' ||
+            String(profileInsertError.message || '').toLowerCase().includes('duplicate');
+
+          if (duplicateProfile) {
+            const { error: profileUpdateError } = await supabase
+              .from('profiles')
+              .update({
+                nome_completo: formData.name,
+                email: formData.email,
+                role: UserRole.CLIENT,
+                org_id: formData.organizationId,
+                documento_identidade: formData.documentId,
+                nif_cpf: formData.taxId,
+                estado_civil: formData.maritalStatus,
+                phone: formData.phone,
+                endereco: formData.address,
+                pais: formData.country,
+              })
+              .eq('id', data.user.id);
+
+            profileInsertError = profileUpdateError;
+          }
+        }
 
         if (profileInsertError) {
           console.error('[register] erro ao criar profile', profileInsertError);
           setError('Cadastro criado, mas houve falha ao criar perfil. Tente entrar novamente.');
           return;
+        }
+
+        const { error: membershipError } = await supabase
+          .from('org_members')
+          .upsert(
+            {
+              org_id: formData.organizationId,
+              user_id: data.user.id,
+              role: 'client',
+            },
+            { onConflict: 'org_id,user_id' }
+          );
+
+        if (membershipError) {
+          const membershipStatus = String((membershipError as { code?: string; status?: number }).status ?? '');
+          const membershipCode = String((membershipError as { code?: string; status?: number }).code ?? '').toLowerCase();
+          const membershipMessage = String(membershipError.message || '').toLowerCase();
+
+          const isPermissionError =
+            membershipStatus === '403' ||
+            membershipCode === '42501' ||
+            membershipMessage.includes('permission denied') ||
+            membershipMessage.includes('row-level security') ||
+            membershipMessage.includes('not allowed');
+
+          if (isPermissionError) {
+            console.warn('[register] vínculo em org_members bloqueado por política; seguindo com profile.org_id', membershipError);
+          } else {
+            console.error('[register] erro ao criar vínculo na organização', membershipError);
+            setError('Cadastro criado, mas não foi possível vincular o usuário à organização.');
+            setIsLoading(false);
+            return;
+          }
         }
 
         const prefix =
@@ -136,8 +239,6 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
               ? 'ADM'
               : 'TECAI';
         const protocol = `${prefix}-2026-00${Math.floor(Math.random() * 900) + 100}`;
-
-        const selectedOrganization = organizations.find((organization) => organization.id === formData.organizationId);
 
         const newUser: User = {
           id: data.user.id,
@@ -161,12 +262,31 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
         };
 
         setUsers((prev) => [...prev, newUser]);
-        alert('Cadastro realizado com sucesso');
-        goToRoute('/login');
+        setCurrentUser(newUser);
+
+        const loginUrl = `${window.location.origin}${window.location.pathname.includes('#') ? '' : '/#/login'}`;
+        const credentialEmailResult = await supabase.functions.invoke('send-access-credentials', {
+          body: {
+            email: formData.email,
+            password: formData.password,
+            fullName: formData.name,
+            source: 'cadastro interno',
+            loginUrl,
+          },
+        });
+
+        if (credentialEmailResult.error) {
+          console.warn('[register] não foi possível enviar o e-mail com as credenciais', credentialEmailResult.error);
+        }
+
+        setSuccess(true);
+        setTimeout(() => goToRoute('/login'), 1200);
       }
     } catch (err) {
       console.error('[register] erro inesperado', err);
       setError('Erro inesperado. Tente novamente.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -186,15 +306,15 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gradient-to-b from-slate-900 to-slate-950">
-      <div className="w-full max-w-md bg-slate-800 p-8 rounded-2xl shadow-2xl border border-slate-700">
+      <div className="w-full max-w-4xl bg-slate-800 p-4 sm:p-8 rounded-2xl shadow-2xl border border-slate-700">
         <div className="mb-8 text-center">
           <h1 className="text-2xl font-bold tracking-wider text-white">SGI FV</h1>
           <p className="text-slate-400 font-semibold uppercase text-xs mt-1">Criar Nova Conta</p>
         </div>
 
-        <div className="p-8">
-          <div className="flex justify-between items-center mb-10">
-            <h2 className="text-3xl font-bold">Solicitar Registro</h2>
+        <div className="p-2 sm:p-6">
+          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-8">
+            <h2 className="text-2xl sm:text-3xl font-bold">Solicitar Registro</h2>
             <button 
               onClick={() => goToRoute('/login')}
               className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm font-bold"
@@ -296,9 +416,9 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
                 </select>
               </div>
 
-              <div className="flex flex-wrap gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {Object.values(ServiceUnit).map(unit => (
-                  <label key={unit} className={`flex-1 min-w-[200px] cursor-pointer p-4 rounded-xl border-2 transition-all ${formData.unit === unit ? 'bg-blue-600/20 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)]' : 'bg-gray-900 border-slate-800'}`}>
+                  <label key={unit} className={`cursor-pointer p-4 rounded-xl border-2 transition-all ${formData.unit === unit ? 'bg-blue-600/20 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)]' : 'bg-gray-900 border-slate-800'}`}>
                     <input type="radio" name="unit" className="hidden" value={unit} checked={formData.unit === unit} onChange={() => setFormData({...formData, unit})} />
                     <div className="text-center">
                       <p className={`text-sm font-bold ${formData.unit === unit ? 'text-white' : 'text-slate-500'}`}>{unit}</p>
@@ -317,10 +437,21 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
             <div className="pt-6">
               <button 
                 type="button"
+                disabled={isLoading}
                 className="w-full py-5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl uppercase tracking-widest transition-all shadow-xl flex items-center justify-center gap-3"
                 onClick={handleRegister}
               >
-                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                {isLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    <span>Finalizando cadastro...</span>
+                  </>
+                ) : (
+                  <>
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    <span>Cadastrar</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
