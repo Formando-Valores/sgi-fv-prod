@@ -1257,8 +1257,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 p-4 md:p-8">
-      <div className="mx-auto max-w-[1600px] flex flex-col lg:flex-row gap-6">
+    <div className="min-h-screen overflow-x-hidden bg-slate-950 p-4 md:p-8">
+      <div className="mx-auto flex min-w-0 max-w-[1600px] flex-col gap-6 lg:flex-row">
         <div className="lg:hidden mb-3">
           <button
             onClick={() => setSidebarOpen(true)}
@@ -1278,7 +1278,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         )}
 
         <aside
-          className={`fixed lg:static inset-y-0 left-0 z-50 lg:z-auto w-72 bg-slate-900 border border-slate-800 rounded-r-2xl lg:rounded-2xl p-5 h-full lg:h-fit transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
+          className={`fixed lg:static inset-y-0 left-0 z-50 lg:z-auto w-72 shrink-0 bg-slate-900 border border-slate-800 rounded-r-2xl lg:rounded-2xl p-5 h-full lg:h-fit transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
         >
           <h2 className="text-xl font-black mb-1">SGI FV</h2>
           <p className="text-slate-500 text-xs font-bold uppercase mb-6">Formando Valores</p>
@@ -1303,7 +1303,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           </nav>
         </aside>
 
-        <div className="flex-1 lg:pl-0">
+        <div className="min-w-0 flex-1 lg:pl-0">
       {/* Admin Header */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 no-print">
         <div>
@@ -1463,8 +1463,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           </div>
         </div>
       ) : currentSection === 'processos' ? (
-        <div className="space-y-6">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6">
+        <div className="min-w-0 space-y-6">
+          <div className="min-w-0 bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6">
             <div className="mb-2 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
                 <h3 className="text-4xl sm:text-5xl font-black tracking-tight leading-none">Processos</h3>
@@ -1475,7 +1475,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
             </div>
             <p className="text-slate-400 text-sm mb-6">Visão geral em formato de planilha para filtrar, acompanhar status e agir rápido.</p>
 
-            <div className="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 gap-3 sm:gap-4">
+            <div className="grid min-w-0 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5 gap-3 sm:gap-4">
               <div className="bg-slate-800/30 border border-slate-700 rounded-2xl p-4">
                 <p className="text-xs text-slate-400 uppercase">Processos</p>
                 <p className="text-4xl font-black leading-none mt-2">{processStats.total}</p>
@@ -1503,8 +1503,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               </div>
             </div>
 
-            <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
-              <div className="relative sm:col-span-2 xl:col-span-3">
+            <div className="mt-5 grid min-w-0 grid-cols-1 md:grid-cols-2 2xl:grid-cols-4 gap-3 sm:gap-4">
+              <div className="relative min-w-0 md:col-span-2 2xl:col-span-4">
                 <Search className="absolute left-3 top-3 text-slate-500 w-5 h-5" />
                 <input
                   value={processSearch}
