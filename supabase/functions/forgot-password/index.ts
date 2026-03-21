@@ -52,11 +52,15 @@ Deno.serve(async (request) => {
     `${String(Deno.env.get('APP_URL') ?? Deno.env.get('SITE_URL') ?? 'https://sgi-fv-prod.vercel.app').replace(/\/$/, '')}/recovery.html`;
 
   try {
-    const { data: profile } = await adminClient
+    const { data: profile, error: profileLookupError } = await adminClient
       .from('profiles')
-      .select('nome_completo')
+      .select('id,nome_completo')
       .eq('email', email)
       .maybeSingle();
+
+    if (profileLookupError || !profile?.id) {
+      return jsonResponse(200, { success: true, message: genericMessage });
+    }
 
     const { data, error } = await adminClient.auth.admin.generateLink({
       type: 'recovery',
