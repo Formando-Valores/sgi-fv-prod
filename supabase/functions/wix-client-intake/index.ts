@@ -243,7 +243,6 @@ Deno.serve(async (request) => {
 
     const emailResult = await sendAccessCredentialsEmail({
       email,
-      password,
       fullName,
       source: 'formulário externo',
     });

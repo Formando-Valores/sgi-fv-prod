@@ -29,7 +29,49 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
+  const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
+  const [forgotPasswordMessage, setForgotPasswordMessage] = useState('');
+  const [forgotPasswordError, setForgotPasswordError] = useState('');
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const navigate = useNavigate();
+
+  const handleForgotPassword = async () => {
+    setForgotPasswordError('');
+    setForgotPasswordMessage('');
+
+    if (!forgotPasswordEmail) {
+      setForgotPasswordError('Informe o e-mail da sua conta para continuar.');
+      return;
+    }
+
+    setForgotPasswordLoading(true);
+
+    try {
+      const appOrigin = window.location.origin.replace(/\/$/, '');
+      const loginUrl = `${appOrigin}${window.location.pathname.includes('#') ? '' : '/#/login'}`;
+      const redirectTo = `${appOrigin}/recovery.html`;
+
+      const { error: forgotError } = await supabase.functions.invoke('forgot-password', {
+        body: {
+          email: forgotPasswordEmail,
+          loginUrl,
+          redirectTo,
+        },
+      });
+
+      if (forgotError) {
+        console.error('[login] falha ao solicitar redefinição de senha', forgotError);
+      }
+
+      setForgotPasswordMessage('Se o email estiver cadastrado, você receberá instruções para redefinir sua senha.');
+    } catch (forgotPasswordRequestError) {
+      console.error('[login] erro inesperado ao solicitar redefinição de senha', forgotPasswordRequestError);
+      setForgotPasswordMessage('Se o email estiver cadastrado, você receberá instruções para redefinir sua senha.');
+    } finally {
+      setForgotPasswordLoading(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -275,7 +317,66 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
                 {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
             </div>
+            <div className="mt-3 text-right">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowForgotPassword((current) => !current);
+                  setForgotPasswordEmail((current) => current || email);
+                  setForgotPasswordError('');
+                  setForgotPasswordMessage('');
+                }}
+                className="text-sm font-bold text-blue-300 hover:text-blue-200 transition-colors"
+              >
+                Esqueci minha senha
+              </button>
+            </div>
           </div>
+
+          {showForgotPassword && (
+            <div className="space-y-4 rounded-xl border border-blue-800/80 bg-blue-950/30 p-4">
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-wider text-blue-200">Recuperar acesso</h3>
+                <p className="mt-1 text-sm text-slate-300">
+                  Informe seu e-mail para receber um link seguro de redefinição de senha.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wide text-slate-400 mb-2">
+                    E-mail cadastrado
+                  </label>
+                  <input
+                    type="email"
+                    value={forgotPasswordEmail}
+                    onChange={(event) => setForgotPasswordEmail(event.target.value)}
+                    className="w-full rounded-lg border border-slate-700 bg-gray-900 px-4 py-3 text-white font-bold placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="seu@email.com"
+                    required
+                    disabled={forgotPasswordLoading}
+                  />
+                </div>
+
+                {forgotPasswordError && (
+                  <p className="text-sm font-bold text-red-300">{forgotPasswordError}</p>
+                )}
+
+                {forgotPasswordMessage && (
+                  <p className="text-sm font-bold text-emerald-300">{forgotPasswordMessage}</p>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => void handleForgotPassword()}
+                  disabled={forgotPasswordLoading}
+                  className="w-full rounded-lg border border-blue-700 bg-blue-600/90 px-4 py-3 text-sm font-black uppercase tracking-wider text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {forgotPasswordLoading ? 'Enviando instruções...' : 'Enviar link de redefinição'}
+                </button>
+              </div>
+            </div>
+          )}
 
           {error && (
             <div className="flex items-center gap-2 p-3 bg-red-900/30 border border-red-800 rounded-lg">

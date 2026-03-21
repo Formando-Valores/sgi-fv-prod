@@ -46,13 +46,12 @@ Deno.serve(async (request) => {
 
   const payload = await request.json();
   const email = String(payload.email ?? '').trim().toLowerCase();
-  const password = String(payload.password ?? '');
   const fullName = String(payload.fullName ?? '').trim();
   const loginUrl = String(payload.loginUrl ?? '').trim();
   const source = String(payload.source ?? 'cadastro interno').trim();
 
-  if (!email || !password) {
-    return jsonResponse(400, { success: false, error: 'E-mail e senha são obrigatórios.' });
+  if (!email) {
+    return jsonResponse(400, { success: false, error: 'E-mail é obrigatório.' });
   }
 
   if (email !== userData.user.email.toLowerCase()) {
@@ -61,7 +60,6 @@ Deno.serve(async (request) => {
 
   const emailResult = await sendAccessCredentialsEmail({
     email,
-    password,
     fullName,
     loginUrl,
     source,

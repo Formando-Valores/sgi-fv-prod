@@ -265,19 +265,23 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
         setCurrentUser(newUser);
 
         const loginUrl = `${window.location.origin}${window.location.pathname.includes('#') ? '' : '/#/login'}`;
-        const credentialEmailResult = await supabase.functions.invoke('send-access-credentials', {
-          body: {
-            email: formData.email,
-            password: formData.password,
-            fullName: formData.name,
-            source: 'cadastro interno',
-            loginUrl,
-          },
-        });
-
-        if (credentialEmailResult.error) {
-          console.warn('[register] não foi possível enviar o e-mail com as credenciais', credentialEmailResult.error);
-        }
+        void supabase.functions
+          .invoke('send-access-credentials', {
+            body: {
+              email: formData.email,
+              fullName: formData.name,
+              source: 'cadastro interno',
+              loginUrl,
+            },
+          })
+          .then((credentialEmailResult) => {
+            if (credentialEmailResult.error) {
+              console.warn('[register] não foi possível enviar o e-mail de acesso', credentialEmailResult.error);
+            }
+          })
+          .catch((credentialEmailError) => {
+            console.warn('[register] falha assíncrona ao solicitar e-mail de acesso', credentialEmailError);
+          });
 
         setSuccess(true);
         setTimeout(() => goToRoute('/login'), 1200);
