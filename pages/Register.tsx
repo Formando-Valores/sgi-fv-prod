@@ -10,6 +10,7 @@ import { COUNTRIES } from '../constants';
 import { ServiceUnit, ProcessStatus, User, UserRole, Organization } from '../types';
 import { isSupabaseConfigured, supabase } from '../supabase';
 import { buildOrganizationErrorMessage, loadOrganizations } from '../organizationRepository';
+import { SUPABASE_EDGE_FUNCTIONS } from '../src/lib/supabaseFunctions';
 
 interface RegisterProps {
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
@@ -266,7 +267,7 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
 
         const loginUrl = `${window.location.origin}${window.location.pathname.includes('#') ? '' : '/#/login'}`;
         void supabase.functions
-          .invoke('send-access-credentials', {
+          .invoke(SUPABASE_EDGE_FUNCTIONS.SEND_ACCESS_CREDENTIALS, {
             body: {
               email: formData.email,
               fullName: formData.name,

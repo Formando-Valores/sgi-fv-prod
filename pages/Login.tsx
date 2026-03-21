@@ -9,6 +9,7 @@ import { AlertCircle, Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { ProcessStatus, ServiceUnit, User, UserRole } from '../types';
 import { isSupabaseConfigured, supabase } from '../supabase';
 import { ADMIN_CREDENTIALS } from '../constants';
+import { SUPABASE_EDGE_FUNCTIONS } from '../src/lib/supabaseFunctions';
 
 interface LoginProps {
   setCurrentUser: (user: User) => void;
@@ -52,7 +53,7 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
       const loginUrl = `${appOrigin}${window.location.pathname.includes('#') ? '' : '/#/login'}`;
       const redirectTo = `${appOrigin}/recovery.html`;
 
-      const { error: forgotError } = await supabase.functions.invoke('forgot-password', {
+      const { error: forgotError } = await supabase.functions.invoke(SUPABASE_EDGE_FUNCTIONS.FORGOT_PASSWORD, {
         body: {
           email: forgotPasswordEmail,
           loginUrl,
