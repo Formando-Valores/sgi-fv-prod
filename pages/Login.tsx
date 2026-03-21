@@ -280,60 +280,7 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
         </div>
 
         <form onSubmit={handleLogin} className="space-y-6">
-          <div>
-            <label className="block text-sm font-bold text-slate-300 mb-2">Usuário - e-mail</label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-3.5 text-slate-500 w-5 h-5" />
-              <input
-                type="email"
-                placeholder="seu@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 bg-gray-900 border border-slate-700 rounded-lg text-white font-bold placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-                disabled={isLoading}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-bold text-slate-300 mb-2">Senha Privada</label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-3.5 text-slate-500 w-5 h-5" />
-              <input
-                type={showPassword ? 'text' : 'password'}
-                placeholder="******"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 pr-12 py-3 bg-gray-900 border border-slate-700 rounded-lg text-white font-bold placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-                disabled={isLoading}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-3.5 text-slate-500 hover:text-slate-300 transition-colors"
-              >
-                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-              </button>
-            </div>
-            <div className="mt-3 text-right">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowForgotPassword((current) => !current);
-                  setForgotPasswordEmail((current) => current || email);
-                  setForgotPasswordError('');
-                  setForgotPasswordMessage('');
-                }}
-                className="text-sm font-bold text-blue-300 hover:text-blue-200 transition-colors"
-              >
-                Esqueci minha senha
-              </button>
-            </div>
-          </div>
-
-          {showForgotPassword && (
+          {showForgotPassword ? (
             <div className="space-y-4 rounded-xl border border-blue-800/80 bg-blue-950/30 p-4">
               <div>
                 <h3 className="text-sm font-black uppercase tracking-wider text-blue-200">Recuperar acesso</h3>
@@ -347,15 +294,18 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
                   <label className="block text-xs font-bold uppercase tracking-wide text-slate-400 mb-2">
                     E-mail cadastrado
                   </label>
-                  <input
-                    type="email"
-                    value={forgotPasswordEmail}
-                    onChange={(event) => setForgotPasswordEmail(event.target.value)}
-                    className="w-full rounded-lg border border-slate-700 bg-gray-900 px-4 py-3 text-white font-bold placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="seu@email.com"
-                    required
-                    disabled={forgotPasswordLoading}
-                  />
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-3.5 text-slate-500 w-5 h-5" />
+                    <input
+                      type="email"
+                      value={forgotPasswordEmail}
+                      onChange={(event) => setForgotPasswordEmail(event.target.value)}
+                      className="w-full rounded-lg border border-slate-700 bg-gray-900 py-3 pl-10 pr-4 text-white font-bold placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="seu@email.com"
+                      required={showForgotPassword}
+                      disabled={forgotPasswordLoading}
+                    />
+                  </div>
                 </div>
 
                 {forgotPasswordError && (
@@ -374,31 +324,98 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
                 >
                   {forgotPasswordLoading ? 'Enviando instruções...' : 'Enviar link de redefinição'}
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForgotPassword(false);
+                    setForgotPasswordError('');
+                    setForgotPasswordMessage('');
+                  }}
+                  className="w-full rounded-lg border border-slate-600 px-4 py-3 text-sm font-black uppercase tracking-wider text-slate-200 transition-colors hover:border-slate-400 hover:text-white"
+                >
+                  Voltar ao login
+                </button>
               </div>
             </div>
-          )}
+          ) : (
+            <>
+              <div>
+                <label className="block text-sm font-bold text-slate-300 mb-2">Usuário - e-mail</label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-3.5 text-slate-500 w-5 h-5" />
+                  <input
+                    type="email"
+                    placeholder="seu@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 bg-gray-900 border border-slate-700 rounded-lg text-white font-bold placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required={!showForgotPassword}
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
 
-          {error && (
-            <div className="flex items-center gap-2 p-3 bg-red-900/30 border border-red-800 rounded-lg">
-              <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
-              <p className="text-red-200 text-sm font-bold">{error}</p>
-            </div>
-          )}
+              <div>
+                <label className="block text-sm font-bold text-slate-300 mb-2">Senha Privada</label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-3.5 text-slate-500 w-5 h-5" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="******"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full pl-10 pr-12 py-3 bg-gray-900 border border-slate-700 rounded-lg text-white font-bold placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required={!showForgotPassword}
+                    disabled={isLoading}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-3.5 text-slate-500 hover:text-slate-300 transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+                <div className="mt-3 text-right">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowForgotPassword(true);
+                      setForgotPasswordEmail((current) => current || email);
+                      setForgotPasswordError('');
+                      setForgotPasswordMessage('');
+                    }}
+                    className="text-sm font-bold text-blue-300 hover:text-blue-200 transition-colors"
+                  >
+                    Esqueci minha senha
+                  </button>
+                </div>
+              </div>
 
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full py-4 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:cursor-not-allowed text-white font-bold rounded-lg uppercase tracking-widest transition-all transform active:scale-95 shadow-lg flex items-center justify-center gap-2"
-          >
-            {isLoading ? (
-              <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                <span>Autenticando...</span>
-              </>
-            ) : (
-              'Autenticar no SGI'
-            )}
-          </button>
+              {error && (
+                <div className="flex items-center gap-2 p-3 bg-red-900/30 border border-red-800 rounded-lg">
+                  <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+                  <p className="text-red-200 text-sm font-bold">{error}</p>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full py-4 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:cursor-not-allowed text-white font-bold rounded-lg uppercase tracking-widest transition-all transform active:scale-95 shadow-lg flex items-center justify-center gap-2"
+              >
+                {isLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    <span>Autenticando...</span>
+                  </>
+                ) : (
+                  'Autenticar no SGI'
+                )}
+              </button>
+            </>
+          )}
         </form>
 
         <div className="mt-8 pt-6 border-t border-slate-700 text-center">
