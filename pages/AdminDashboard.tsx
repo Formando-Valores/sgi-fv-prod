@@ -150,6 +150,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [processTypeFilter, setProcessTypeFilter] = useState<'all' | ServiceUnit>('all');
   const [processPeriodFilter, setProcessPeriodFilter] = useState<'all' | 'today' | '7d' | '30d'>('all');
   const [processRowsLimit, setProcessRowsLimit] = useState(10);
+  const [showCreateProcessModal, setShowCreateProcessModal] = useState(false);
+  const [creatingProcess, setCreatingProcess] = useState(false);
+  const [processActionFeedback, setProcessActionFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [newProcessForm, setNewProcessForm] = useState({
+    organizationId: '',
+    title: '',
+    clientName: '',
+    clientDocument: '',
+    clientContact: '',
+    serviceUnit: ServiceUnit.JURIDICO,
+  });
   const [configSearch, setConfigSearch] = useState('');
   const [configRowsLimit, setConfigRowsLimit] = useState(10);
   const [newAdminOrgId, setNewAdminOrgId] = useState('');
@@ -353,6 +364,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     atrasados: processRows.filter((process) => process.status !== ProcessStatus.CONCLUIDO && Boolean(process.deadline)).length,
   };
 
+  const resetNewProcessForm = () => {
+    setNewProcessForm({
+      organizationId: newAdminOrgId || organizations[0]?.id || '',
+      title: '',
+      clientName: '',
+      clientDocument: '',
+      clientContact: '',
+      serviceUnit: ServiceUnit.JURIDICO,
+    });
+  };
+
   const hydrateEditingProfileForm = async (user: AdminProcessRow | User | null) => {
     if (!user) return;
 
@@ -428,6 +450,68 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
     setDbProcesses((data as DbProcess[] | null) || []);
     setProcessesLoading(false);
+  };
+
+  const handleCreateProcess = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setProcessActionFeedback(null);
+
+    const selectedOrganization = organizations.find((organization) => organization.id === newProcessForm.organizationId);
+
+    if (!selectedOrganization) {
+      setProcessActionFeedback({ type: 'error', message: 'Selecione uma organização válida para criar o processo.' });
+      return;
+    }
+
+    if (!sanitizeDisplayValue(newProcessForm.clientName)) {
+      setProcessActionFeedback({ type: 'error', message: 'Informe o nome do cliente para criar o processo.' });
+      return;
+    }
+
+    setCreatingProcess(true);
+
+    const processTitle =
+      sanitizeDisplayValue(newProcessForm.title) ||
+      `Processo manual - ${sanitizeDisplayValue(newProcessForm.clientName)}`;
+
+    const processPayload = {
+      org_id: selectedOrganization.id,
+      titulo: processTitle,
+      status: 'cadastro' as const,
+      cliente_nome: sanitizeDisplayValue(newProcessForm.clientName),
+      cliente_documento: sanitizeDisplayValue(newProcessForm.clientDocument) || null,
+      cliente_contato: sanitizeDisplayValue(newProcessForm.clientContact) || null,
+      responsavel_user_id: currentUser.id,
+      origem_canal: 'painel',
+      unidade_atendimento: newProcessForm.serviceUnit,
+      org_nome_solicitado: selectedOrganization.name,
+    };
+
+    const { data: createdProcess, error: processInsertError } = await supabase
+      .from('processes')
+      .insert(processPayload)
+      .select('id,org_id,titulo,protocolo,status,cliente_nome,cliente_documento,cliente_contato,responsavel_user_id,created_at,updated_at,origem_canal,unidade_atendimento,org_nome_solicitado')
+      .single();
+
+    if (processInsertError || !createdProcess) {
+      setCreatingProcess(false);
+      setProcessActionFeedback({ type: 'error', message: 'Não foi possível criar o processo manualmente no banco.' });
+      return;
+    }
+
+    await supabase.from('process_events').insert({
+      org_id: selectedOrganization.id,
+      process_id: createdProcess.id,
+      tipo: 'registro',
+      mensagem: `Processo criado manualmente pelo painel administrativo para ${sanitizeDisplayValue(newProcessForm.clientName)}.`,
+      created_by: currentUser.id,
+    });
+
+    setDbProcesses((prev) => [createdProcess as DbProcess, ...prev]);
+    setProcessActionFeedback({ type: 'success', message: 'Processo criado com sucesso e adicionado à lista.' });
+    setCreatingProcess(false);
+    setShowCreateProcessModal(false);
+    resetNewProcessForm();
   };
 
   const handleUpdateStatus = async (userId: string, status: ProcessStatus, deadline?: string, notes?: string, serviceManager?: string) => {
@@ -876,6 +960,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
     setOrgError('');
     setOrganizations(loadedOrganizations);
+    setNewProcessForm((prev) => ({
+      ...prev,
+      organizationId: prev.organizationId || newAdminOrgId || loadedOrganizations[0]?.id || '',
+    }));
     if (!newAdminOrgId && loadedOrganizations.length > 0) {
       const defaultOrg = loadedOrganizations.find((org) => org.name.toLowerCase().includes('padr'));
       setNewAdminOrgId(defaultOrg?.id || loadedOrganizations[0].id);
@@ -1469,9 +1557,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               <div className="min-w-0">
                 <h3 className="text-4xl sm:text-5xl font-black tracking-tight leading-none">Processos</h3>
               </div>
-              <button className="hidden xl:inline-flex shrink-0 px-4 py-2 rounded-xl border border-slate-700 bg-slate-800/60 text-slate-200 font-bold">
-                ≡ Colunas
-              </button>
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    resetNewProcessForm();
+                    setProcessActionFeedback(null);
+                    setShowCreateProcessModal(true);
+                  }}
+                  className="inline-flex items-center gap-2 shrink-0 px-4 py-2 rounded-xl border border-blue-700 bg-blue-600/15 text-blue-200 font-bold hover:bg-blue-600/25 transition-colors"
+                >
+                  <Plus className="w-4 h-4" /> Novo processo
+                </button>
+                <button className="hidden xl:inline-flex shrink-0 px-4 py-2 rounded-xl border border-slate-700 bg-slate-800/60 text-slate-200 font-bold">
+                  ≡ Colunas
+                </button>
+              </div>
             </div>
             <p className="text-slate-400 text-sm mb-6">Visão geral em formato de planilha para filtrar, acompanhar status e agir rápido.</p>
 
@@ -1560,6 +1661,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           {processesError && (
             <div className="mb-4 rounded-2xl border border-amber-700/60 bg-amber-900/20 px-4 py-3 text-sm font-bold text-amber-200">
               {processesError}
+            </div>
+          )}
+
+          {processActionFeedback && (
+            <div className={`mb-4 rounded-2xl px-4 py-3 text-sm font-bold ${
+              processActionFeedback.type === 'success'
+                ? 'border border-emerald-700/60 bg-emerald-900/20 text-emerald-200'
+                : 'border border-red-700/60 bg-red-900/20 text-red-200'
+            }`}>
+              {processActionFeedback.message}
             </div>
           )}
 
@@ -2100,6 +2211,128 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                   </div>
                 )}
              </div>
+          </div>
+        </div>
+      )}
+
+      {showCreateProcessModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-slate-900 w-full max-w-3xl rounded-3xl border border-slate-800 shadow-2xl overflow-hidden">
+            <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-950">
+              <h3 className="text-xl font-black uppercase">Criar processo manual</h3>
+              <button
+                onClick={() => {
+                  setShowCreateProcessModal(false);
+                  setProcessActionFeedback(null);
+                }}
+                className="p-2 bg-slate-800 hover:bg-slate-700 rounded-full"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-8 max-h-[85vh] overflow-y-auto">
+              <form onSubmit={handleCreateProcess} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="md:col-span-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Organização</label>
+                    <select
+                      value={newProcessForm.organizationId}
+                      onChange={(event) => setNewProcessForm((prev) => ({ ...prev, organizationId: event.target.value }))}
+                      className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    >
+                      <option value="">Selecione a organização</option>
+                      {organizations.map((organization) => (
+                        <option key={organization.id} value={organization.id}>{organization.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Título do processo</label>
+                    <input
+                      type="text"
+                      value={newProcessForm.title}
+                      onChange={(event) => setNewProcessForm((prev) => ({ ...prev, title: event.target.value }))}
+                      className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Ex.: Abertura de acompanhamento administrativo"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Cliente</label>
+                    <input
+                      type="text"
+                      value={newProcessForm.clientName}
+                      onChange={(event) => setNewProcessForm((prev) => ({ ...prev, clientName: event.target.value }))}
+                      className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Nome completo do cliente"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Documento</label>
+                    <input
+                      type="text"
+                      value={newProcessForm.clientDocument}
+                      onChange={(event) => setNewProcessForm((prev) => ({ ...prev, clientDocument: event.target.value }))}
+                      className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="CPF / NIF / Documento"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Contato</label>
+                    <input
+                      type="text"
+                      value={newProcessForm.clientContact}
+                      onChange={(event) => setNewProcessForm((prev) => ({ ...prev, clientContact: event.target.value }))}
+                      className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="E-mail, telefone ou WhatsApp"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Tipo</label>
+                    <select
+                      value={newProcessForm.serviceUnit}
+                      onChange={(event) => setNewProcessForm((prev) => ({ ...prev, serviceUnit: event.target.value as ServiceUnit }))}
+                      className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value={ServiceUnit.ADMINISTRATIVO}>Administrativo</option>
+                      <option value={ServiceUnit.JURIDICO}>Jurídico / Advocacia</option>
+                      <option value={ServiceUnit.TECNOLOGICO}>Tecnológico / AI</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-sm text-slate-300">
+                  O processo será criado manualmente com origem <span className="font-black text-white">PAINEL</span>,
+                  status inicial <span className="font-black text-white">Cadastro</span> e vinculado à organização selecionada.
+                </div>
+
+                <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCreateProcessModal(false);
+                      setProcessActionFeedback(null);
+                    }}
+                    className="px-5 py-3 rounded-xl border border-slate-700 text-slate-200 font-bold hover:bg-slate-800 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={creatingProcess}
+                    className="px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:cursor-not-allowed text-white font-black uppercase tracking-wider"
+                  >
+                    {creatingProcess ? 'Criando processo...' : 'Criar processo'}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}
