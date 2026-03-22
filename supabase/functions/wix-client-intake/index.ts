@@ -4,6 +4,7 @@ import { sendAccessCredentialsEmail } from './accessEmail.ts';
 type IntakePayload = {
   organizationSlug?: string;
   organizationRequestedName?: string;
+  siteName?: string;
   fullName?: string;
   email?: string;
   password?: string;
@@ -88,6 +89,7 @@ Deno.serve(async (request) => {
 
   const serviceUnit = normalizeUnit(payload.serviceUnit);
   const source = String(payload.source ?? 'wix').trim() || 'wix';
+  const siteName = String(payload.siteName ?? '').trim() || (source.toLowerCase() === 'wix' ? 'Wix' : source);
   const organizationRequestedName = String(payload.organizationRequestedName ?? '').trim();
 
   const adminClient = createClient(supabaseUrl, serviceRoleKey, {
@@ -141,6 +143,7 @@ Deno.serve(async (request) => {
       user_metadata: {
         full_name: fullName,
         source,
+        source_site_name: siteName,
       },
     });
 
@@ -235,7 +238,7 @@ Deno.serve(async (request) => {
           org_id: orgId,
           process_id: processId,
           tipo: 'registro',
-          mensagem: `Processo recebido via integração externa (${source}). Unidade: ${serviceUnit}. Organização solicitada: ${organizationRequestedName || 'não informada'}.`,
+          mensagem: `Processo recebido via integração externa (${source}). Site/portal: ${siteName}. Unidade: ${serviceUnit}. Organização solicitada: ${organizationRequestedName || 'não informada'}.`,
           created_by: userId,
         },
       ]);
@@ -244,7 +247,7 @@ Deno.serve(async (request) => {
     const emailResult = await sendAccessCredentialsEmail({
       email,
       fullName,
-      source: 'formulário externo',
+      source: `formulário externo • ${siteName}`,
     });
 
     return buildResponse(200, {
@@ -259,6 +262,7 @@ Deno.serve(async (request) => {
         linkedOrganizationSlug: requestedSlug || 'default',
         requestedOrganizationName: organizationRequestedName || null,
         source,
+        siteName,
         credentialsEmailSent: emailResult.ok,
         credentialsEmailError: emailResult.ok ? null : emailResult.error,
       },

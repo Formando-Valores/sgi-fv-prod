@@ -2,6 +2,8 @@
 
 Este fluxo permite receber cadastro externo (Wix e futuros canais), criar usuário com perfil `client`, vincular inicialmente na organização `default` e abrir um processo com origem do canal.
 
+> Para novos sites/portais além da Wix, use também a base genérica em `docs/integrations/external-client-intake.html` e `docs/integrations/external-client-intake.md`, mantendo esta function como backend único.
+
 ## 1) Deploy da Edge Function
 
 Função criada em:
@@ -88,7 +90,7 @@ Esse formulário já inclui:
 
 - opções de área: **JURÍDICO / ADVOCACIA**, **ADMINISTRATIVO**, **TECNOLÓGICO / AI**;
 - campo de **nome da organização solicitada**;
-- envio com `source: "wix"`.
+- envio com `source: "wix"` e `siteName: "Wix"`.
 
 ## 5) Resultado esperado
 
@@ -117,4 +119,3 @@ Passos:
 4. Executar depois `Cadastro POST - wix-client-intake`.
 
 Se o preflight retornar 404, a função não está deployada no projeto/ref informado.
-

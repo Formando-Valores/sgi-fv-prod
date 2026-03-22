@@ -1,8 +1,10 @@
-<div id="sgi-wix-form-wrap" style="max-width:720px;margin:0 auto;padding:20px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;font-family:Arial,sans-serif;">
+<div id="sgi-external-form-wrap" style="max-width:720px;margin:0 auto;padding:20px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;font-family:Arial,sans-serif;">
   <h2 style="margin:0 0 12px;color:#0f172a;">Cadastro do Cliente</h2>
-  <p style="margin:0 0 20px;color:#475569;font-size:14px;">Preencha os dados para criar seu acesso na plataforma SGI-FV.</p>
+  <p style="margin:0 0 20px;color:#475569;font-size:14px;">
+    Preencha os dados para criar seu acesso na plataforma SGI-FV a partir deste site/portal.
+  </p>
 
-  <form id="sgiWixForm" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+  <form id="sgiExternalForm" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
     <div style="grid-column:1 / -1;">
       <label>Nome completo</label>
       <input name="fullName" required style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;" />
@@ -87,15 +89,15 @@
     </div>
 
     <div style="grid-column:1 / -1;display:flex;align-items:center;gap:8px;">
-      <input id="consent" type="checkbox" required />
-      <label for="consent" style="font-size:13px;color:#334155;">Autorizo o cadastro dos meus dados para acesso à plataforma.</label>
+      <input id="consentExternal" type="checkbox" required />
+      <label for="consentExternal" style="font-size:13px;color:#334155;">Autorizo o cadastro dos meus dados para acesso à plataforma.</label>
     </div>
 
     <button type="submit" style="grid-column:1 / -1;background:#1d4ed8;color:white;border:none;padding:12px 16px;border-radius:10px;font-weight:bold;cursor:pointer;">
       Criar meu acesso
     </button>
 
-    <div id="sgiWixMessage" style="grid-column:1 / -1;font-size:14px;"></div>
+    <div id="sgiExternalMessage" style="grid-column:1 / -1;font-size:14px;"></div>
   </form>
 </div>
 
@@ -106,22 +108,12 @@
     const API_KEY = `SUA_CHAVE_PRIVADA_DA_INTEGRACAO`.trim();
     const SUPABASE_ANON_KEY = `SUA_SUPABASE_ANON_KEY`.trim();
 
-    const isLikelySupabaseUrl = (url) => /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url);
+    const INTEGRATION_SOURCE = `portal-parceiro`.trim();
+    const INTEGRATION_SITE_NAME = `Portal Parceiro XPTO`.trim();
+    const DEFAULT_ORGANIZATION_SLUG = `default`.trim();
 
-    const decodeJwtPayload = (token) => {
-      try {
-        const payload = token.split(".")[1];
-        if (!payload) return null;
-        const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
-        const json = decodeURIComponent(atob(base64).split("").map((char) => `%${char.charCodeAt(0).toString(16).padStart(2, "0")}`).join(""));
-        return JSON.parse(json);
-      } catch (_) {
-        return null;
-      }
-    };
-
-    const form = document.getElementById("sgiWixForm");
-    const message = document.getElementById("sgiWixMessage");
+    const form = document.getElementById("sgiExternalForm");
+    const message = document.getElementById("sgiExternalMessage");
 
     const setMessage = (text, ok) => {
       message.textContent = text;
@@ -131,33 +123,11 @@
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
 
-      const hasPlaceholder = /SEU[_-]?PROJECT[_-]?REF/i.test(SUPABASE_URL) ||
-        /SUA_CHAVE_PRIVADA_DA_INTEGRACAO/i.test(API_KEY) ||
-        /SUA_SUPABASE_ANON_KEY/i.test(SUPABASE_ANON_KEY);
-
-      if (!SUPABASE_URL || !ENDPOINT || !API_KEY || !SUPABASE_ANON_KEY || hasPlaceholder) {
-        setMessage("Configuração incompleta: substitua SUPABASE_URL, API_KEY e SUPABASE_ANON_KEY pelos valores reais do seu projeto Supabase.", false);
-        return;
-      }
-
-      if (!isLikelySupabaseUrl(SUPABASE_URL)) {
-        setMessage("SUPABASE_URL inválida. Use o formato https://<project-ref>.supabase.co (sem /functions no final).", false);
-        return;
-      }
-
-      const anonPayload = decodeJwtPayload(SUPABASE_ANON_KEY);
-      if (anonPayload?.role === "service_role") {
-        setMessage("A chave SUPABASE_ANON_KEY está incorreta. Use a chave ANON pública do projeto (não use SERVICE_ROLE).", false);
-        return;
-      }
-
-      setMessage("Enviando cadastro...", true);
-
       const data = new FormData(form);
       const payload = {
-        organizationSlug: "default",
-        source: "wix",
-        siteName: "Wix",
+        organizationSlug: DEFAULT_ORGANIZATION_SLUG || "default",
+        source: INTEGRATION_SOURCE || "site-externo",
+        siteName: INTEGRATION_SITE_NAME || "Site Externo",
         fullName: data.get("fullName") || "",
         email: data.get("email") || "",
         password: data.get("password") || "",
@@ -172,6 +142,8 @@
         serviceUnit: data.get("serviceUnit") || "JURÍDICO / ADVOCACIA",
         organizationRequestedName: data.get("organizationRequestedName") || ""
       };
+
+      setMessage("Enviando cadastro...", true);
 
       try {
         const response = await fetch(ENDPOINT, {
@@ -192,11 +164,11 @@
           return;
         }
 
-        setMessage("Cadastro realizado com sucesso! Você receberá as orientações de acesso.", true);
+        setMessage("Cadastro realizado com sucesso! O sistema registrou a origem e o nome deste site/portal.", true);
         form.reset();
       } catch (error) {
         console.error("Falha ao chamar wix-client-intake", { endpoint: ENDPOINT, error });
-        setMessage("Erro de conexão ao enviar cadastro. Verifique se SUPABASE_URL está correta e se a função foi publicada.", false);
+        setMessage("Erro de conexão ao enviar cadastro.", false);
       }
     });
   })();
