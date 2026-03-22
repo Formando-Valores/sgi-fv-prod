@@ -28,6 +28,9 @@ export interface Process {
   responsavel_user_id: string | null;
   created_at: string;
   updated_at: string;
+  origem_canal?: string | null;
+  unidade_atendimento?: string | null;
+  org_nome_solicitado?: string | null;
 }
 
 export interface ProcessEvent {
@@ -46,6 +49,9 @@ export interface CreateProcessPayload {
   cliente_documento?: string;
   cliente_contato?: string;
   responsavel_user_id?: string;
+  origem_canal?: string;
+  unidade_atendimento?: string;
+  org_nome_solicitado?: string;
 }
 
 /**

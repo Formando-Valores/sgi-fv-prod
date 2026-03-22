@@ -5,9 +5,11 @@
 
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { ProcessStatus, ServiceUnit, User, UserRole } from '../types';
 import { isSupabaseConfigured, supabase } from '../supabase';
+import { ADMIN_CREDENTIALS } from '../constants';
+import { SUPABASE_EDGE_FUNCTIONS } from '../src/lib/supabaseFunctions';
 
 interface LoginProps {
   setCurrentUser: (user: User) => void;
@@ -19,8 +21,10 @@ const isAdminRole = (value: unknown): boolean => {
     return false;
   }
 
-  return ['admin', 'administrator', UserRole.ADMIN.toLowerCase()].includes(value.toLowerCase());
+  return ['admin', 'administrator', 'administrador', 'owner', 'administrador geral', UserRole.ADMIN.toLowerCase()].includes(value.toLowerCase());
 };
+
+const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 
 const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
   const [email, setEmail] = useState('');
@@ -28,7 +32,54 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
+  const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
+  const [forgotPasswordMessage, setForgotPasswordMessage] = useState('');
+  const [forgotPasswordError, setForgotPasswordError] = useState('');
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const navigate = useNavigate();
+
+  const handleForgotPassword = async () => {
+    setForgotPasswordError('');
+    setForgotPasswordMessage('');
+
+    if (!forgotPasswordEmail) {
+      setForgotPasswordError('Informe o e-mail da sua conta para continuar.');
+      return;
+    }
+
+    if (!isValidEmail(forgotPasswordEmail)) {
+      setForgotPasswordError('Informe um e-mail válido para receber o link de redefinição.');
+      return;
+    }
+
+    setForgotPasswordLoading(true);
+
+    try {
+      const appOrigin = window.location.origin.replace(/\/$/, '');
+      const loginUrl = `${appOrigin}${window.location.pathname.includes('#') ? '' : '/#/login'}`;
+      const redirectTo = `${appOrigin}/recovery.html`;
+
+      const { error: forgotError } = await supabase.functions.invoke(SUPABASE_EDGE_FUNCTIONS.FORGOT_PASSWORD, {
+        body: {
+          email: forgotPasswordEmail,
+          loginUrl,
+          redirectTo,
+        },
+      });
+
+      if (forgotError) {
+        console.error('[login] falha ao solicitar redefinição de senha', forgotError);
+      }
+
+      setForgotPasswordMessage('Se o email estiver cadastrado, você receberá instruções para redefinir sua senha.');
+    } catch (forgotPasswordRequestError) {
+      console.error('[login] erro inesperado ao solicitar redefinição de senha', forgotPasswordRequestError);
+      setForgotPasswordMessage('Se o email estiver cadastrado, você receberá instruções para redefinir sua senha.');
+    } finally {
+      setForgotPasswordLoading(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,6 +107,12 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
         const userId = data.user.id;
         console.info('[login] autenticado, buscando profile', { userId });
 
+        const { data: defaultOrganization } = await supabase
+          .from('organizations')
+          .select('id, name, slug')
+          .eq('slug', 'default')
+          .maybeSingle();
+
         const { data: profiles, error: profileError } = await supabase
           .from('profiles')
           .select('*')
@@ -79,6 +136,7 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
                 email: data.user.email,
                 role: UserRole.CLIENT,
                 nome_completo: data.user.user_metadata?.name ?? null,
+                org_id: defaultOrganization?.id ?? null,
               },
             ])
             .select('*')
@@ -93,11 +151,40 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
           profile = inserted;
         }
 
+        const profileOrgId = profile?.org_id ?? profile?.organization_id ?? defaultOrganization?.id ?? null;
+
+        if (profileOrgId) {
+          const { data: existingMembership, error: membershipLookupError } = await supabase
+            .from('org_members')
+            .select('org_id')
+            .eq('org_id', profileOrgId)
+            .eq('user_id', userId)
+            .maybeSingle();
+
+          if (membershipLookupError) {
+            console.warn('[login] não foi possível verificar vínculo em org_members', membershipLookupError);
+          }
+
+          if (!existingMembership) {
+            const { error: membershipInsertError } = await supabase
+              .from('org_members')
+              .insert({
+                org_id: profileOrgId,
+                user_id: userId,
+                role: 'client',
+              });
+
+            if (membershipInsertError) {
+              console.warn('[login] não foi possível criar vínculo em org_members', membershipInsertError);
+            }
+          }
+        }
+
         const existingUser = users.find((user) => user.id === userId || user.email === email);
 
         const { data: contextData, error: contextError } = await supabase
           .from('v_user_context')
-          .select('org_role, org_id, org_name')
+          .select('org_role, org_id, org_name, org_slug')
           .eq('user_id', userId)
           .maybeSingle();
 
@@ -106,12 +193,12 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
         }
 
         let contextRole = contextData?.org_role;
-        let contextByEmailData: { org_role?: string | null; org_id?: string | null; org_name?: string | null } | null = null;
+        let contextByEmailData: { org_role?: string | null; org_id?: string | null; org_name?: string | null; org_slug?: string | null } | null = null;
 
         if (!contextRole && data.user.email) {
           const { data: contextByEmail, error: contextByEmailError } = await supabase
             .from('v_user_context')
-            .select('org_role, org_id, org_name')
+            .select('org_role, org_id, org_name, org_slug')
             .eq('email', data.user.email)
             .maybeSingle();
 
@@ -127,17 +214,25 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
 
         const contextOrganizationId = contextData?.org_id ?? contextByEmailData?.org_id;
         const contextOrganizationName = contextData?.org_name ?? contextByEmailData?.org_name;
+        const contextOrganizationSlug = contextData?.org_slug ?? contextByEmailData?.org_slug;
+
+        const hasDefaultOrganizationAccess =
+          contextOrganizationSlug === 'default' ||
+          (!!defaultOrganization?.id && contextOrganizationId === defaultOrganization.id) ||
+          (!!defaultOrganization?.id && profileOrgId === defaultOrganization.id);
 
         const hasAdminRole =
           isAdminRole(profile?.role) ||
           isAdminRole(contextRole) ||
-          isAdminRole(existingUser?.role);
+          isAdminRole(existingUser?.role) ||
+          ADMIN_CREDENTIALS.some((adminEmail) => adminEmail.toLowerCase() === (data.user.email || '').toLowerCase()) ||
+          hasDefaultOrganizationAccess;
 
         const normalizedRole = hasAdminRole ? UserRole.ADMIN : UserRole.CLIENT;
 
         const normalizedUser: User = {
           id: userId,
-          name: profile?.nome ?? profile?.nome_completo ?? existingUser?.name ?? data.user.email?.split('@')[0] ?? 'Usuário',
+          name: profile?.nome_completo ?? existingUser?.name ?? data.user.email?.split('@')[0] ?? 'Usuário',
           email: data.user.email ?? existingUser?.email ?? email,
           role: normalizedRole,
           documentId: existingUser?.documentId ?? '-',
@@ -154,8 +249,8 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
           notes: existingUser?.notes,
           deadline: existingUser?.deadline,
           serviceManager: existingUser?.serviceManager,
-          organizationId: profile?.organization_id ?? profile?.org_id ?? existingUser?.organizationId ?? contextOrganizationId ?? undefined,
-          organizationName: profile?.organization_name ?? existingUser?.organizationName ?? contextOrganizationName ?? undefined,
+          organizationId: profileOrgId ?? existingUser?.organizationId ?? contextOrganizationId ?? undefined,
+          organizationName: profile?.organization_name ?? existingUser?.organizationName ?? contextOrganizationName ?? defaultOrganization?.name ?? undefined,
         };
 
         console.info('[login] profile carregado, redirecionando para dashboard', {
@@ -193,66 +288,142 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
         </div>
 
         <form onSubmit={handleLogin} className="space-y-6">
-          <div>
-            <label className="block text-sm font-bold text-slate-300 mb-2">Usuário - e-mail</label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-3.5 text-slate-500 w-5 h-5" />
-              <input
-                type="email"
-                placeholder="seu@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 bg-gray-900 border border-slate-700 rounded-lg text-white font-bold placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-                disabled={isLoading}
-              />
-            </div>
-          </div>
+          {showForgotPassword ? (
+            <div className="space-y-4 rounded-xl border border-blue-800/80 bg-blue-950/30 p-4">
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-wider text-blue-200">Recuperar acesso</h3>
+                <p className="mt-1 text-sm text-slate-300">
+                  Informe seu e-mail para receber um link seguro de redefinição de senha.
+                </p>
+              </div>
 
-          <div>
-            <label className="block text-sm font-bold text-slate-300 mb-2">Senha Privada</label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-3.5 text-slate-500 w-5 h-5" />
-              <input
-                type={showPassword ? 'text' : 'password'}
-                placeholder="******"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 pr-12 py-3 bg-gray-900 border border-slate-700 rounded-lg text-white font-bold placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-                disabled={isLoading}
-              />
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wide text-slate-400 mb-2">
+                    E-mail cadastrado
+                  </label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-3.5 text-slate-500 w-5 h-5" />
+                    <input
+                      type="email"
+                      value={forgotPasswordEmail}
+                      onChange={(event) => setForgotPasswordEmail(event.target.value)}
+                      className="w-full rounded-lg border border-slate-700 bg-gray-900 py-3 pl-10 pr-4 text-white font-bold placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="seu@email.com"
+                      required={showForgotPassword}
+                      disabled={forgotPasswordLoading}
+                    />
+                  </div>
+                </div>
+
+                {forgotPasswordError && (
+                  <p className="text-sm font-bold text-red-300">{forgotPasswordError}</p>
+                )}
+
+                {forgotPasswordMessage && (
+                  <p className="text-sm font-bold text-emerald-300">{forgotPasswordMessage}</p>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => void handleForgotPassword()}
+                  disabled={forgotPasswordLoading}
+                  className="w-full rounded-lg border border-blue-700 bg-blue-600/90 px-4 py-3 text-sm font-black uppercase tracking-wider text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {forgotPasswordLoading ? 'Enviando instruções...' : 'Enviar link de redefinição'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForgotPassword(false);
+                    setForgotPasswordError('');
+                    setForgotPasswordMessage('');
+                  }}
+                  className="w-full rounded-lg border border-slate-600 px-4 py-3 text-sm font-black uppercase tracking-wider text-slate-200 transition-colors hover:border-slate-400 hover:text-white"
+                >
+                  Voltar ao login
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div>
+                <label className="block text-sm font-bold text-slate-300 mb-2">Usuário - e-mail</label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-3.5 text-slate-500 w-5 h-5" />
+                  <input
+                    type="email"
+                    placeholder="seu@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 bg-gray-900 border border-slate-700 rounded-lg text-white font-bold placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required={!showForgotPassword}
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-300 mb-2">Senha Privada</label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-3.5 text-slate-500 w-5 h-5" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="******"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full pl-10 pr-12 py-3 bg-gray-900 border border-slate-700 rounded-lg text-white font-bold placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required={!showForgotPassword}
+                    disabled={isLoading}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-3.5 text-slate-500 hover:text-slate-300 transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+                <div className="mt-3 text-right">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowForgotPassword(true);
+                      setForgotPasswordEmail((current) => current || email);
+                      setForgotPasswordError('');
+                      setForgotPasswordMessage('');
+                    }}
+                    className="text-sm font-bold text-blue-300 hover:text-blue-200 transition-colors"
+                  >
+                    Esqueci minha senha
+                  </button>
+                </div>
+              </div>
+
+              {error && (
+                <div className="flex items-center gap-2 p-3 bg-red-900/30 border border-red-800 rounded-lg">
+                  <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+                  <p className="text-red-200 text-sm font-bold">{error}</p>
+                </div>
+              )}
+
               <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-3.5 text-slate-500 hover:text-slate-300 transition-colors"
+                type="submit"
+                disabled={isLoading}
+                className="w-full py-4 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:cursor-not-allowed text-white font-bold rounded-lg uppercase tracking-widest transition-all transform active:scale-95 shadow-lg flex items-center justify-center gap-2"
               >
-                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                {isLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    <span>Autenticando...</span>
+                  </>
+                ) : (
+                  'Autenticar no SGI'
+                )}
               </button>
-            </div>
-          </div>
-
-          {error && (
-            <div className="flex items-center gap-2 p-3 bg-red-900/30 border border-red-800 rounded-lg">
-              <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
-              <p className="text-red-200 text-sm font-bold">{error}</p>
-            </div>
+            </>
           )}
-
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full py-4 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:cursor-not-allowed text-white font-bold rounded-lg uppercase tracking-widest transition-all transform active:scale-95 shadow-lg flex items-center justify-center gap-2"
-          >
-            {isLoading ? (
-              <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                <span>Autenticando...</span>
-              </>
-            ) : (
-              'Autenticar no SGI'
-            )}
-          </button>
         </form>
 
         <div className="mt-8 pt-6 border-t border-slate-700 text-center">
