@@ -1557,22 +1557,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               <div className="min-w-0">
                 <h3 className="text-4xl sm:text-5xl font-black tracking-tight leading-none">Processos</h3>
               </div>
-              <div className="flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    resetNewProcessForm();
-                    setProcessActionFeedback(null);
-                    setShowCreateProcessModal(true);
-                  }}
-                  className="inline-flex items-center gap-2 shrink-0 px-4 py-2 rounded-xl border border-blue-700 bg-blue-600/15 text-blue-200 font-bold hover:bg-blue-600/25 transition-colors"
-                >
-                  <Plus className="w-4 h-4" /> Novo processo
-                </button>
-                <button className="hidden xl:inline-flex shrink-0 px-4 py-2 rounded-xl border border-slate-700 bg-slate-800/60 text-slate-200 font-bold">
-                  ≡ Colunas
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  resetNewProcessForm();
+                  setProcessActionFeedback(null);
+                  setShowCreateProcessModal(true);
+                }}
+                className="inline-flex items-center gap-2 shrink-0 px-4 py-2 rounded-xl border border-blue-700 bg-blue-600/15 text-blue-200 font-bold hover:bg-blue-600/25 transition-colors"
+              >
+                <Plus className="w-4 h-4" /> Novo processo
+              </button>
             </div>
             <p className="text-slate-400 text-sm mb-6">Visão geral em formato de planilha para filtrar, acompanhar status e agir rápido.</p>
 
@@ -1671,12 +1666,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                 : 'border border-red-700/60 bg-red-900/20 text-red-200'
             }`}>
               {processActionFeedback.message}
-            </div>
-          )}
-
-          {!processesError && dbProcesses.some((process) => sanitizeDisplayValue(process.origem_canal).toLowerCase() === 'wix') && (
-            <div className="mb-4 rounded-2xl border border-fuchsia-700/60 bg-fuchsia-900/10 px-4 py-3 text-sm font-bold text-fuchsia-200">
-              Solicitações recebidas via Wix aparecem com a origem <span className="text-white">WIX</span> e ficam prontas para análise/aprovação nesta lista.
             </div>
           )}
 
