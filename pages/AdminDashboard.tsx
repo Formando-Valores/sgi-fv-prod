@@ -1253,6 +1253,132 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     })
     .slice(0, clientsRowsLimit);
 
+  const managementUsers = orgMembers
+    .filter((user) =>
+      user.name.toLowerCase().includes(configSearch.toLowerCase()) ||
+      user.email.toLowerCase().includes(configSearch.toLowerCase())
+    )
+    .slice(0, configRowsLimit);
+
+  const handleDeleteMember = async (member: OrgMemberView) => {
+    if (!window.confirm('Deseja realmente remover este membro da organização?')) return;
+
+    const { error } = await supabase
+      .from('org_members')
+      .delete()
+      .eq('org_id', member.org_id)
+      .eq('user_id', member.user_id);
+
+    if (error) {
+      alert('Erro ao remover membro.');
+      return;
+    }
+
+    await fetchOrgMembers();
+  };
+
+  const fetchClients = async () => {
+    setClientsLoading(true);
+    setClientsError('');
+
+    const { data: membershipScopeRows, error: membershipScopeError } = await supabase
+      .from('org_members')
+      .select('org_id,user_id,role,organizations(name)')
+      .eq('user_id', currentUser.id);
+
+    if (membershipScopeError) {
+      setClientsError('Não foi possível validar o escopo de acesso do usuário.');
+      setClientsLoading(false);
+      return;
+    }
+
+    const hasGlobalScope = (membershipScopeRows || []).some((membership) => {
+      const role = String(membership.role || '').toLowerCase();
+      const orgName = membership.organizations?.name;
+      return (role === 'admin' || role === 'owner') && isDefaultOrganizationName(orgName);
+    });
+
+    const { data: memberRows, error: membersError } = await supabase
+      .from('org_members')
+      .select('org_id,user_id,role,organizations(name)')
+      .order('created_at', { ascending: false });
+
+    if (membersError) {
+      setClientsError('Não foi possível carregar os membros da tabela org_members.');
+      setClientsLoading(false);
+      return;
+    }
+
+    const allowedOrgIds = new Set((membershipScopeRows || []).map((row) => row.org_id));
+    const scopedMembers = (memberRows || []).filter((member) => hasGlobalScope || allowedOrgIds.has(member.org_id));
+
+    if (scopedMembers.length === 0) {
+      setClientsData([]);
+      setClientsLoading(false);
+      return;
+    }
+
+    const userIds = Array.from(new Set(scopedMembers.map((member) => member.user_id)));
+    const { data: profileRows, error: profileError } = await supabase
+      .from('profiles')
+      .select('id,nome_completo,nome,email,created_at')
+      .in('id', userIds);
+
+    if (profileError) {
+      setClientsError('Não foi possível carregar os perfis vinculados aos membros.');
+      setClientsLoading(false);
+      return;
+    }
+
+    const profileMap = new Map((profileRows || []).map((row) => [row.id, row]));
+
+    const normalizedClients: ClientProfileView[] = scopedMembers.map((member) => {
+      const profile = profileMap.get(member.user_id);
+      const email = profile?.email || '-';
+      const nome =
+        profile?.nome_completo ||
+        profile?.nome ||
+        (email !== '-' ? String(email).split('@')[0] : `Usuário ${member.user_id.slice(0, 8)}`);
+
+      return {
+        id: `${member.org_id}-${member.user_id}`,
+        user_id: member.user_id,
+        org_id: member.org_id,
+        org_name: member.organizations?.name || 'Organização Padrão',
+        nome,
+        email,
+        accessLevel: mapOrgRoleToAccessLevel(member.role),
+        created_at: profile?.created_at || undefined,
+      };
+    });
+
+    setClientsData(normalizedClients);
+    setClientsLoading(false);
+  };
+
+  useEffect(() => {
+    if (currentSection === 'clientes') {
+      fetchClients();
+    }
+  }, [currentSection]);
+
+  const visibleClients = clientsData
+    .filter((client) =>
+      client.nome.toLowerCase().includes(clientsSearch.toLowerCase()) ||
+      client.email.toLowerCase().includes(clientsSearch.toLowerCase()) ||
+      client.org_name.toLowerCase().includes(clientsSearch.toLowerCase())
+    )
+    .sort((a, b) => {
+      if (clientsSort === 'name_asc') {
+        return a.nome.localeCompare(b.nome, 'pt-BR');
+      }
+      if (clientsSort === 'name_desc') {
+        return b.nome.localeCompare(a.nome, 'pt-BR');
+      }
+      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+    })
+    .slice(0, clientsRowsLimit);
+
   const handleCreateOrganization = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setOrgError('');
