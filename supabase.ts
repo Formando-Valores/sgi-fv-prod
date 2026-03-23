@@ -1,24 +1,19 @@
 /**
  * Supabase Client Configuration
- * DEBUG VERSION: Comprehensive logging enabled
  */
 
-console.log('[SUPABASE] ========================================');
-console.log('[SUPABASE] supabase.ts module loading...', new Date().toISOString());
-console.log('[SUPABASE] ========================================');
+console.log('[SUPABASE] supabase.ts module loading...');
 
 import { createClient } from '@supabase/supabase-js'
-console.log('[SUPABASE] ✅ @supabase/supabase-js imported');
 
-const fallbackSupabaseUrl = 'https://ktrrrqaqaljdcmxqdcff.supabase.co';
-const fallbackSupabaseAnonKey = 'sb_publishable_ZcEU2_K18A4NU43hO4zPmA_N5SkuqO_';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://ktrrqaqaljdcmxqdcff.supabase.co';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 console.log('[SUPABASE] Environment variables:', {
   VITE_SUPABASE_URL: supabaseUrl ? `${supabaseUrl.substring(0, 30)}...` : 'NOT SET',
   VITE_SUPABASE_ANON_KEY: supabaseAnonKey ? `${supabaseAnonKey.substring(0, 20)}...` : 'NOT SET'
 });
 
-// Validate environment variables
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error('[SUPABASE] ❌ Missing environment variables!');
   throw new Error(
@@ -27,9 +22,5 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 console.log('[SUPABASE] Creating Supabase client...');
-export const supabase = createClient(
-  supabaseUrl,
-  supabaseAnonKey
-)
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 console.log('[SUPABASE] ✅ Supabase client created successfully');
-console.log('[SUPABASE] ========================================');
