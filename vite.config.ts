@@ -22,15 +22,8 @@ export default defineConfig(({ mode }) => {
         host: '0.0.0.0',
       },
       build: {
-        // Clean build without source maps in production
         sourcemap: !isProd,
-        // Remove console logs in production
-        minify: 'terser',
-        terserOptions: {
-          compress: {
-            drop_console: isProd,
-          },
-        },
+        target: 'es2022',
       },
       plugins: [react()],
       define: {
