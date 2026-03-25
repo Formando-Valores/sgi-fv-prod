@@ -1151,7 +1151,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     await fetchOrgMembers();
   };
 
-  const fetchClients = async () => {
+  const fetchClients1 = async () => {
     setClientsLoading(true);
     setClientsError('');
 
@@ -1232,7 +1232,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
   useEffect(() => {
     if (currentSection === 'clientes') {
-      fetchClients();
+      fetchClients1();
     }
   }, [currentSection]);
 
@@ -1253,29 +1253,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     })
     .slice(0, clientsRowsLimit);
 
-  const managementUsers = orgMembers
-    .filter((user) =>
-      user.name.toLowerCase().includes(configSearch.toLowerCase()) ||
-      user.email.toLowerCase().includes(configSearch.toLowerCase())
-    )
-    .slice(0, configRowsLimit);
 
-  const handleDeleteMember = async (member: OrgMemberView) => {
-    if (!window.confirm('Deseja realmente remover este membro da organização?')) return;
-
-    const { error } = await supabase
-      .from('org_members')
-      .delete()
-      .eq('org_id', member.org_id)
-      .eq('user_id', member.user_id);
-
-    if (error) {
-      alert('Erro ao remover membro.');
-      return;
-    }
-
-    await fetchOrgMembers();
-  };
 
   const fetchClients = async () => {
     setClientsLoading(true);
@@ -1362,7 +1340,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     }
   }, [currentSection]);
 
-  const visibleClients = clientsData
+  const visibleClientsFiltered = clientsData
     .filter((client) =>
       client.nome.toLowerCase().includes(clientsSearch.toLowerCase()) ||
       client.email.toLowerCase().includes(clientsSearch.toLowerCase()) ||
