@@ -1584,10 +1584,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         </div>
       ) : currentSection === 'processos' ? (
         <div className="min-w-0 space-y-6">
-          <div className="min-w-0 bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6">
-            <div className="mb-2 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4">
+            <div className="mb-2 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
-                <h3 className="text-4xl sm:text-5xl font-black tracking-tight leading-none">Processos</h3>
+                <h3 className="text-3xl sm:text-4xl font-black tracking-tight leading-none">Processos</h3>
               </div>
               <button
                 type="button"
@@ -1601,37 +1601,37 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                 <Plus className="w-4 h-4" /> Novo processo
               </button>
             </div>
-            <p className="text-slate-400 text-sm mb-6">Visão geral em formato de planilha para filtrar, acompanhar status e agir rápido.</p>
+            <p className="text-slate-400 text-sm mb-4">Visão geral em formato de planilha para filtrar, acompanhar status e agir rápido.</p>
 
-            <div className="grid min-w-0 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5 gap-3 sm:gap-4">
-              <div className="bg-slate-800/30 border border-slate-700 rounded-2xl p-4">
-                <p className="text-xs text-slate-400 uppercase">Processos</p>
-                <p className="text-4xl font-black leading-none mt-2">{processStats.total}</p>
-                <p className="text-slate-300 mt-1">Total após filtros</p>
+            <div className="grid min-w-0 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5 gap-2.5 sm:gap-3">
+              <div className="bg-blue-900/15 border border-blue-700/40 rounded-xl p-3">
+                <p className="text-xs text-blue-300/80 uppercase">Processos</p>
+                <p className="text-3xl font-black leading-none mt-1.5 text-blue-100">{processStats.total}</p>
+                <p className="text-blue-200/90 mt-1">Total após filtros</p>
               </div>
-              <div className="bg-slate-800/30 border border-slate-700 rounded-2xl p-4">
-                <p className="text-xs text-slate-400 uppercase">Em andamento</p>
-                <p className="text-4xl font-black leading-none mt-2">{processStats.emAndamento}</p>
-                <p className="text-slate-300 mt-1">Ativos</p>
+              <div className="bg-cyan-900/15 border border-cyan-700/40 rounded-xl p-3">
+                <p className="text-xs text-cyan-300/80 uppercase">Em andamento</p>
+                <p className="text-3xl font-black leading-none mt-1.5 text-cyan-100">{processStats.emAndamento}</p>
+                <p className="text-cyan-200/90 mt-1">Ativos</p>
               </div>
-              <div className="bg-slate-800/30 border border-slate-700 rounded-2xl p-4">
-                <p className="text-xs text-slate-400 uppercase">Concluídos</p>
-                <p className="text-4xl font-black leading-none mt-2">{processStats.concluidos}</p>
-                <p className="text-slate-300 mt-1">Finalizados</p>
+              <div className="bg-emerald-900/15 border border-emerald-700/40 rounded-xl p-3">
+                <p className="text-xs text-emerald-300/80 uppercase">Concluídos</p>
+                <p className="text-3xl font-black leading-none mt-1.5 text-emerald-100">{processStats.concluidos}</p>
+                <p className="text-emerald-200/90 mt-1">Finalizados</p>
               </div>
-              <div className="bg-slate-800/30 border border-slate-700 rounded-2xl p-4">
-                <p className="text-xs text-slate-400 uppercase">Aguardando</p>
-                <p className="text-4xl font-black leading-none mt-2">{processStats.aguardando}</p>
-                <p className="text-slate-300 mt-1">Pendências</p>
+              <div className="bg-amber-900/15 border border-amber-700/40 rounded-xl p-3">
+                <p className="text-xs text-amber-300/80 uppercase">Aguardando</p>
+                <p className="text-3xl font-black leading-none mt-1.5 text-amber-100">{processStats.aguardando}</p>
+                <p className="text-amber-200/90 mt-1">Pendências</p>
               </div>
-              <div className="bg-slate-800/30 border border-slate-700 rounded-2xl p-4">
-                <p className="text-xs text-slate-400 uppercase">Atrasados</p>
-                <p className="text-4xl font-black leading-none mt-2">{processStats.atrasados}</p>
-                <p className="text-slate-300 mt-1">Prazo vencido</p>
+              <div className="bg-rose-900/15 border border-rose-700/40 rounded-xl p-3">
+                <p className="text-xs text-rose-300/80 uppercase">Atrasados</p>
+                <p className="text-3xl font-black leading-none mt-1.5 text-rose-100">{processStats.atrasados}</p>
+                <p className="text-rose-200/90 mt-1">Prazo vencido</p>
               </div>
             </div>
 
-            <div className="mt-5 grid min-w-0 grid-cols-1 md:grid-cols-2 2xl:grid-cols-4 gap-3 sm:gap-4">
+            <div className="mt-4 grid min-w-0 grid-cols-1 md:grid-cols-2 2xl:grid-cols-4 gap-2.5 sm:gap-3">
               <div className="relative min-w-0 md:col-span-2 2xl:col-span-4">
                 <Search className="absolute left-3 top-3 text-slate-500 w-5 h-5" />
                 <input
