@@ -95,6 +95,14 @@ const ProcessList: React.FC = () => {
     return new Date(dateStr).toLocaleDateString('pt-BR');
   };
 
+
+  const formatSource = (source?: string | null) => {
+    if (!source) return 'Painel interno';
+    const normalized = source.toLowerCase();
+    if (normalized === 'wix') return 'Wix';
+    return source;
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -164,6 +172,8 @@ const ProcessList: React.FC = () => {
                   <th className="px-6 py-4">Título</th>
                   <th className="px-6 py-4">Cliente</th>
                   <th className="px-6 py-4">Status</th>
+                  <th className="px-6 py-4">Origem</th>
+                  <th className="px-6 py-4">Unidade</th>
                   <th className="px-6 py-4">Data</th>
                   <th className="px-6 py-4 text-right">Ações</th>
                 </tr>
@@ -185,6 +195,8 @@ const ProcessList: React.FC = () => {
                         {statusLabels[process.status]?.label || process.status}
                       </span>
                     </td>
+                    <td className="px-6 py-4 text-slate-300 font-semibold">{formatSource(process.origem_canal)}</td>
+                    <td className="px-6 py-4 text-slate-300">{process.unidade_atendimento || '-'}</td>
                     <td className="px-6 py-4 text-slate-400 font-bold">{formatDate(process.created_at)}</td>
                     <td className="px-6 py-4 text-right">
                       <Link

@@ -42,9 +42,10 @@ export type OrgRole = 'owner' | 'admin' | 'staff' | 'client';
 /** Organização/Empresa */
 export interface Organization {
   id: string;
-  slug: string;
+  slug?: string;
   name: string;
   created_at?: string;
+  isActive?: boolean;
 }
 
 /** Membership do usuário em uma organização */
@@ -118,11 +119,10 @@ export interface User {
   serviceManager?: string; // Novo campo: Gestor do Serviço
   organizationId?: string;
   organizationName?: string;
-}
-
-export interface Organization {
-  id: string;
-  name: string;
+  org_id?: string;
+  org_slug?: string;
+  org_name?: string;
+  org_role?: OrgRole;
 }
 
 // ============================================
@@ -162,13 +162,9 @@ export function isAdmin(user: User | UserContext): boolean {
   if ('org_role' in user && user.org_role) {
     return user.org_role === 'admin' || user.org_role === 'owner';
   }
-  if ('role' in user) {
-    if (typeof user.role === 'string') {
-      return user.role === 'admin' || user.role === 'owner' || user.role === 'ADMIN';
-    }
-    return user.role === UserRole.ADMIN;
-  }
-  return false;
+
+  const role = 'role' in user ? String(user.role).toLowerCase() : '';
+  return role === 'admin' || role === 'owner';
 }
 
 // ============================================
