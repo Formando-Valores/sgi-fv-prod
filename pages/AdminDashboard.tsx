@@ -161,6 +161,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [processRowsLimit, setProcessRowsLimit] = useState(10);
   const [showCreateProcessModal, setShowCreateProcessModal] = useState(false);
   const [creatingProcess, setCreatingProcess] = useState(false);
+  const [processDeadlines, setProcessDeadlines] = useState<Record<string, string>>({});
   const [processActionFeedback, setProcessActionFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [newProcessForm, setNewProcessForm] = useState({
     organizationId: '',
@@ -248,6 +249,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     return parsed.toLocaleString('pt-BR');
   };
 
+  const formatDeadlineForDisplay = (value?: string | null) => {
+    if (!value) return '';
+    const parsed = new Date(`${value}T00:00:00`);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return parsed.toLocaleDateString('pt-BR');
+  };
+
   const inferServiceUnit = (process: DbProcess): ServiceUnit => {
     const unit = sanitizeDisplayValue(process.unidade_atendimento);
     if (unit === ServiceUnit.ADMINISTRATIVO) return ServiceUnit.ADMINISTRATIVO;
@@ -273,6 +281,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       const requestedOrganizationName = sanitizeDisplayValue(process.org_nome_solicitado) || 'Não informado';
       const isExternalRequest = source.toLowerCase() === 'wix';
       const generatedValue = unit === ServiceUnit.ADMINISTRATIVO ? 5200 : unit === ServiceUnit.TECNOLOGICO ? 8200 : 1800;
+      const manualDeadline = sanitizeDisplayValue(processDeadlines[process.id]);
+      const resolvedDeadlineDisplay =
+        formatDeadlineForDisplay(manualDeadline) || (isExternalRequest ? 'Aguardando análise' : '-');
 
       return {
         id: process.id,
@@ -295,13 +306,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         lastUpdate: process.updated_at || process.created_at,
         hierarchy: Hierarchy.STATUS_ONLY,
         notes: isExternalRequest ? `Origem: Wix${requestedOrganizationName !== 'Não informado' ? ` · Organização solicitada: ${requestedOrganizationName}` : ''}` : undefined,
-        deadline: '',
+        deadline: manualDeadline,
         serviceManager: isExternalRequest ? 'Aguardando aprovação' : 'Não definido',
         organizationId: process.org_id,
         organizationName: requestedOrganizationName,
         processType: unit,
         startDate: formatProcessDate(process.created_at),
-        deadlineDate: isExternalRequest ? 'Aguardando análise' : '-',
+        deadlineDate: resolvedDeadlineDisplay,
         etapaAtual: buildProcessStage(process),
         financeiro: isExternalRequest ? 'Aguardando validação' : (legacyStatus === ProcessStatus.CONCLUIDO ? 'Quitado' : 'Pendente'),
         prioridade: isExternalRequest ? 'Alta' : (legacyStatus === ProcessStatus.CONCLUIDO ? 'Média' : 'Baixa'),
@@ -564,6 +575,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           prev.map((process) => (process.id === processRecordId ? { ...process, status: statusMap[status] } : process))
         );
       }
+    }
+
+    if (processRecordId) {
+      const normalizedDeadline = sanitizeDisplayValue(deadline);
+      setProcessDeadlines((prev) => {
+        if (!normalizedDeadline) {
+          if (!prev[processRecordId]) return prev;
+          const { [processRecordId]: _removed, ...rest } = prev;
+          return rest;
+        }
+        return { ...prev, [processRecordId]: normalizedDeadline };
+      });
     }
 
     let profileUpdateError = '';
