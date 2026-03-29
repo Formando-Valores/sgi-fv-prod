@@ -1678,8 +1678,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
             </div>
           )}
 
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
-            <div className="px-4 sm:px-6 py-4 border-b border-slate-800 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="bg-slate-900/95 border border-slate-800 rounded-2xl overflow-hidden shadow-[0_20px_50px_rgba(2,6,23,0.35)]">
+            <div className="px-4 sm:px-6 py-4 border-b border-slate-800/80 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950">
               <div>
                 <h4 className="text-2xl font-black">Lista de processos</h4>
                 <p className="text-slate-400 text-sm">Mostrando {visibleProcessRows.length} de {processRows.length} resultados</p>
@@ -1698,80 +1698,100 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               </div>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="min-w-[1400px] w-full text-left text-sm">
-                <thead>
-                  <tr className="bg-slate-950 text-slate-400 uppercase text-[10px] font-black tracking-widest">
-                    <th className="px-4 py-4">Nº Processo</th>
-                    <th className="px-4 py-4">Cliente</th>
-                    <th className="px-4 py-4">Tipo</th>
-                    <th className="px-4 py-4">Origem</th>
-                    <th className="px-4 py-4">Responsável</th>
-                    <th className="px-4 py-4">Data Início</th>
-                    <th className="px-4 py-4">Prazo</th>
-                    <th className="px-4 py-4">Status</th>
-                    <th className="px-4 py-4">Etapa Atual</th>
-                    <th className="px-4 py-4">Financeiro</th>
-                    <th className="px-4 py-4">Prioridade</th>
-                    <th className="px-4 py-4">Valor</th>
-                    <th className="px-4 py-4 text-right">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800">
-                  {visibleProcessRows.map((process) => (
-                    <tr key={process.id} className="hover:bg-slate-800/40 transition-colors">
-                      <td className="px-4 py-4 font-black text-white">{process.protocol}</td>
-                      <td className="px-4 py-4 font-bold text-slate-200">{process.name}</td>
-                      <td className="px-4 py-4 text-slate-300">{process.processType}</td>
-                      <td className="px-4 py-4"><span className={`px-3 py-1 rounded-full text-[10px] font-black ${process.sourceLabel === 'WIX' ? 'bg-fuchsia-900/40 text-fuchsia-300 border border-fuchsia-700' : 'bg-slate-800 text-slate-300 border border-slate-700'}`}>{process.sourceLabel}</span></td>
-                      <td className="px-4 py-4 text-slate-300">{process.serviceManager || 'Não definido'}</td>
-                      <td className="px-4 py-4 text-slate-300">{process.startDate}</td>
-                      <td className="px-4 py-4 text-slate-300">{process.deadlineDate}</td>
-                      <td className="px-4 py-4">
-                        <span className={`px-3 py-1 rounded-full text-[10px] font-black ${
-                          process.status === ProcessStatus.CONCLUIDO
-                            ? 'bg-emerald-900/40 text-emerald-300 border border-emerald-700'
-                            : process.status === ProcessStatus.ANALISE
-                              ? 'bg-orange-900/40 text-orange-300 border border-orange-700'
-                              : process.status === ProcessStatus.TRIAGEM
-                                ? 'bg-blue-900/40 text-blue-300 border border-blue-700'
-                                : 'bg-yellow-900/40 text-yellow-300 border border-yellow-700'
-                        }`}>
-                          {process.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 text-slate-300">{process.etapaAtual}{process.requestedOrganizationName !== 'Não informado' ? ` · ${process.requestedOrganizationName}` : ''}</td>
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <span className="inline-flex items-center whitespace-nowrap px-3 py-1 rounded-full text-[10px] font-black bg-yellow-900/40 text-yellow-300 border border-yellow-700">
-                          {process.financeiro}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4">
-                        <span className="px-3 py-1 rounded-full text-[10px] font-black bg-emerald-900/40 text-emerald-300 border border-emerald-700">
-                          {process.prioridade}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 font-black text-slate-100">R$ {process.valor.toLocaleString('pt-BR')}</td>
-                      <td className="px-4 py-4 text-right">
-                        <div className="flex justify-end gap-2">
-                          <button
-                            onClick={() => setSelectedUser(process)}
-                            className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => setEditingUser(process)}
-                            className="p-2 bg-blue-900/30 hover:bg-blue-900/50 rounded-lg text-blue-400"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
+            <div className="p-4 sm:p-6 space-y-4 bg-slate-950/60">
+              {visibleProcessRows.length === 0 ? (
+                <div className="rounded-xl border border-slate-800 bg-slate-900/70 px-4 py-10 text-center text-slate-400 font-semibold">
+                  Nenhum processo encontrado para os filtros selecionados.
+                </div>
+              ) : visibleProcessRows.map((process) => (
+                <article
+                  key={process.id}
+                  className="rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-4 sm:px-5 sm:py-5 hover:border-blue-700/60 hover:bg-slate-900 transition-all"
+                >
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-white font-black text-lg tracking-tight">{process.protocol}</p>
+                          <span className={`inline-flex items-center whitespace-nowrap px-3 py-1 rounded-full text-[10px] font-black border ${
+                            process.sourceLabel === 'WIX'
+                              ? 'bg-fuchsia-900/40 text-fuchsia-300 border-fuchsia-700'
+                              : 'bg-slate-800 text-slate-300 border-slate-700'
+                          }`}>
+                            {process.sourceLabel}
+                          </span>
+                          <span className={`inline-flex items-center whitespace-nowrap px-3 py-1 rounded-full text-[10px] font-black border ${
+                            process.status === ProcessStatus.CONCLUIDO
+                              ? 'bg-emerald-900/40 text-emerald-300 border-emerald-700'
+                              : process.status === ProcessStatus.ANALISE
+                                ? 'bg-orange-900/40 text-orange-300 border-orange-700'
+                                : process.status === ProcessStatus.TRIAGEM
+                                  ? 'bg-blue-900/40 text-blue-300 border-blue-700'
+                                  : 'bg-yellow-900/40 text-yellow-300 border-yellow-700'
+                          }`}>
+                            {process.status}
+                          </span>
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                        <p className="text-slate-200 font-bold mt-1">{process.name}</p>
+                        <p className="text-slate-400 text-xs mt-1">Etapa: {process.etapaAtual}{process.requestedOrganizationName !== 'Não informado' ? ` · ${process.requestedOrganizationName}` : ''}</p>
+                      </div>
+
+                      <div className="flex items-center gap-2 self-start xl:self-auto">
+                        <button
+                          onClick={() => setSelectedUser(process)}
+                          className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300"
+                          title="Visualizar"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setEditingUser(process)}
+                          className="p-2 bg-blue-900/30 hover:bg-blue-900/50 rounded-lg text-blue-400"
+                          title="Editar"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-3 text-sm">
+                      <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3">
+                        <p className="text-[10px] uppercase tracking-widest text-slate-500 font-black">Tipo</p>
+                        <p className="text-slate-200 font-bold mt-1">{process.processType}</p>
+                      </div>
+                      <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3">
+                        <p className="text-[10px] uppercase tracking-widest text-slate-500 font-black">Responsável</p>
+                        <p className="text-slate-200 font-bold mt-1">{process.serviceManager || 'Não definido'}</p>
+                      </div>
+                      <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3">
+                        <p className="text-[10px] uppercase tracking-widest text-slate-500 font-black">Início</p>
+                        <p className="text-slate-200 font-bold mt-1">{process.startDate}</p>
+                      </div>
+                      <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3">
+                        <p className="text-[10px] uppercase tracking-widest text-slate-500 font-black">Prazo</p>
+                        <p className="text-slate-200 font-bold mt-1">{process.deadlineDate}</p>
+                      </div>
+                      <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3">
+                        <p className="text-[10px] uppercase tracking-widest text-slate-500 font-black">Financeiro</p>
+                        <p className="mt-1">
+                          <span className="inline-flex items-center whitespace-nowrap px-2.5 py-1 rounded-full text-[10px] font-black bg-yellow-900/40 text-yellow-300 border border-yellow-700">
+                            {process.financeiro}
+                          </span>
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3">
+                        <p className="text-[10px] uppercase tracking-widest text-slate-500 font-black">Prioridade & Valor</p>
+                        <p className="mt-1 flex flex-wrap items-center gap-2">
+                          <span className="inline-flex items-center whitespace-nowrap px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-900/40 text-emerald-300 border border-emerald-700">
+                            {process.prioridade}
+                          </span>
+                          <span className="text-slate-100 font-black">R$ {process.valor.toLocaleString('pt-BR')}</span>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              ))}
             </div>
           </div>
         </div>
