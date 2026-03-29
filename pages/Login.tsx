@@ -60,7 +60,7 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
       const loginUrl = `${appOrigin}${window.location.pathname.includes('#') ? '' : '/#/login'}`;
       const redirectTo = `${appOrigin}/recovery.html`;
 
-      const { error: forgotError } = await supabase.functions.invoke(SUPABASE_EDGE_FUNCTIONS.FORGOT_PASSWORD, {
+      const { data: forgotData, error: forgotError } = await supabase.functions.invoke(SUPABASE_EDGE_FUNCTIONS.FORGOT_PASSWORD, {
         body: {
           email: forgotPasswordEmail,
           loginUrl,
@@ -68,8 +68,18 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
         },
       });
 
-      if (forgotError) {
+      const functionSucceeded = !forgotError && (forgotData?.success ?? true);
+
+      if (!functionSucceeded) {
         console.error('[login] falha ao solicitar redefinição de senha', forgotError);
+
+        const { error: fallbackError } = await supabase.auth.resetPasswordForEmail(forgotPasswordEmail, {
+          redirectTo,
+        });
+
+        if (fallbackError) {
+          console.error('[login] fallback resetPasswordForEmail também falhou', fallbackError);
+        }
       }
 
       setForgotPasswordMessage('Se o email estiver cadastrado, você receberá instruções para redefinir sua senha.');
