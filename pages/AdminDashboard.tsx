@@ -1603,7 +1603,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
             </div>
             <p className="text-slate-400 text-sm mb-4">Visão geral em formato de planilha para filtrar, acompanhar status e agir rápido.</p>
 
-            <div className="grid min-w-0 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5 gap-2.5 sm:gap-3">
+            <div className="grid min-w-0 grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5 gap-2.5 sm:gap-3">
               <div className="bg-blue-900/15 border border-blue-700/40 rounded-xl p-3">
                 <p className="text-xs text-blue-300/80 uppercase">Processos</p>
                 <p className="text-3xl font-black leading-none mt-1.5 text-blue-100">{processStats.total}</p>
