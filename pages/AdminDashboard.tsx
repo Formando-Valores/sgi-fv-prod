@@ -1489,7 +1489,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
       {currentSection === 'organizacoes' ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+          <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
             <h3 className="text-lg font-black mb-4">CADASTRAR ORGANIZAÇÃO</h3>
             <form onSubmit={handleCreateOrganization} className="space-y-4">
               <div>
@@ -1518,14 +1518,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
             </form>
           </div>
 
-          <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+          <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
             <h3 className="text-lg font-black mb-4">ORGANIZAÇÕES CADASTRADAS</h3>
             <div className="space-y-3">
               {organizations.map((organization) => {
                 const isEditing = editingOrganizationId === organization.id;
 
                 return (
-                  <div key={organization.id} className="p-3 rounded-xl bg-gray-50 border border-gray-100 space-y-3">
+                  <div key={organization.id} className="p-3 rounded-xl bg-gray-50 border border-gray-100 space-y-3 shadow-[0_10px_22px_rgba(15,23,42,0.06)]">
                     {isEditing ? (
                       <>
                         <input
@@ -1810,7 +1810,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           </Card>
         </div>
       ) : currentSection === 'clientes' ? (
-        <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+        <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
           <h3 className="text-lg font-black mb-4">CLIENTES</h3>
 
           <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -1886,7 +1886,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           </div>
         </div>
       ) : activeTab === 'users' ? (
-        <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-2xl">
+        <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
           <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 no-print">
             <div className="relative w-full md:w-96">
               <Search className="absolute left-3 top-2.5 text-gray-500 w-4 h-4" />
@@ -1961,7 +1961,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       ) : (
         /* Management Tab Content */
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-           <div className="lg:col-span-1 bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+           <div className="lg:col-span-1 bg-white border border-gray-100 rounded-2xl p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
               <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
                 <Plus className="text-blue-500" /> Cadastrar Usuário e Nível
               </h3>
@@ -2038,7 +2038,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               </form>
            </div>
 
-           <div className="lg:col-span-2 bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-2xl">
+           <div className="lg:col-span-2 bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
               <div className="p-4 border-b border-gray-100 flex flex-col md:flex-row gap-3 md:items-center md:justify-between bg-white">
                 <div className="flex items-center gap-2">
                   <span className="text-gray-600 text-sm font-bold">Mostrar</span>
