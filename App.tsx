@@ -9,7 +9,7 @@ console.log('[APP] ========================================');
 console.log('[APP] App.tsx module loading...', new Date().toISOString());
 console.log('[APP] ========================================');
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 console.log('[APP] ✅ React imported');
 
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
@@ -88,7 +88,7 @@ const RootApp: React.FC = () => {
 
   return (
     <HashRouter>
-      <div className="min-h-screen bg-[#0f172a] text-white font-arial">
+      <div className="min-h-screen bg-gray-50 text-gray-800 font-['Inter',sans-serif]">
         <Routes>
           <Route 
             path="/login" 
