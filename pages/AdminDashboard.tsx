@@ -71,6 +71,15 @@ interface ClientProfileView {
   created_at?: string;
 }
 
+type ProcessVisualOverrides = Record<
+  string,
+  {
+    deadline?: string;
+    serviceManager?: string;
+    notes?: string;
+  }
+>;
+
 const ACCESS_LEVELS: AccessLevel[] = ['Administrador', 'Usuário Sênior', 'Usuário Pleno', 'Operador', 'Cliente'];
 
 const mapOrgRoleToAccessLevel = (role: string | null | undefined): AccessLevel => {
@@ -171,7 +180,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [processRowsLimit, setProcessRowsLimit] = useState(10);
   const [showCreateProcessModal, setShowCreateProcessModal] = useState(false);
   const [creatingProcess, setCreatingProcess] = useState(false);
-  const [processDeadlines, setProcessDeadlines] = useState<Record<string, string>>({});
+  const [processVisualOverrides, setProcessVisualOverrides] = useState<ProcessVisualOverrides>({});
   const [processActionFeedback, setProcessActionFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [newProcessForm, setNewProcessForm] = useState({
     organizationId: '',
@@ -291,7 +300,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       const requestedOrganizationName = sanitizeDisplayValue(process.org_nome_solicitado) || 'Não informado';
       const isExternalRequest = source.toLowerCase() === 'wix';
       const generatedValue = unit === ServiceUnit.ADMINISTRATIVO ? 5200 : unit === ServiceUnit.TECNOLOGICO ? 8200 : 1800;
-      const manualDeadline = sanitizeDisplayValue(processDeadlines[process.id]);
+      const processOverrides = processVisualOverrides[process.id] || {};
+      const manualDeadline = sanitizeDisplayValue(processOverrides.deadline);
+      const manualServiceManager = sanitizeDisplayValue(processOverrides.serviceManager);
+      const manualNotes = sanitizeDisplayValue(processOverrides.notes);
       const resolvedDeadlineDisplay =
         formatDeadlineForDisplay(manualDeadline) || (isExternalRequest ? 'Aguardando análise' : '-');
 
@@ -315,9 +327,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         registrationDate: process.created_at,
         lastUpdate: process.updated_at || process.created_at,
         hierarchy: Hierarchy.STATUS_ONLY,
-        notes: isExternalRequest ? `Origem: Wix${requestedOrganizationName !== 'Não informado' ? ` · Organização solicitada: ${requestedOrganizationName}` : ''}` : undefined,
+        notes:
+          manualNotes ||
+          (isExternalRequest ? `Origem: Wix${requestedOrganizationName !== 'Não informado' ? ` · Organização solicitada: ${requestedOrganizationName}` : ''}` : undefined),
         deadline: manualDeadline,
-        serviceManager: isExternalRequest ? 'Aguardando aprovação' : 'Não definido',
+        serviceManager: manualServiceManager || (isExternalRequest ? 'Aguardando aprovação' : 'Não definido'),
         organizationId: process.org_id,
         organizationName: requestedOrganizationName,
         processType: unit,
@@ -571,6 +585,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     setEditingProfileSaving(true);
     setEditingProfileError('');
 
+    const normalizedDeadline = sanitizeDisplayValue(deadline);
+    const normalizedNotes = sanitizeDisplayValue(notes);
+    const normalizedServiceManager = sanitizeDisplayValue(serviceManager);
+
+    if (normalizedDeadline && !/^\d{4}-\d{2}-\d{2}$/.test(normalizedDeadline)) {
+      setEditingProfileError('Data de prazo inválida. Use o calendário para selecionar uma data válida.');
+      setEditingProfileSaving(false);
+      return;
+    }
+
     let processUpdateError = '';
     if ((currentEditingUser as AdminProcessRow | null)?.processRecordId && dbProcesses.length > 0 && processRecordId) {
       const { error } = await supabase
@@ -588,15 +612,58 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     }
 
     if (processRecordId) {
-      const normalizedDeadline = sanitizeDisplayValue(deadline);
-      setProcessDeadlines((prev) => {
-        if (!normalizedDeadline) {
-          if (!prev[processRecordId]) return prev;
+      setProcessVisualOverrides((prev) => {
+        const existing = prev[processRecordId] || {};
+        const nextEntry = {
+          ...existing,
+          deadline: normalizedDeadline || undefined,
+          notes: normalizedNotes || undefined,
+          serviceManager: normalizedServiceManager || undefined,
+        };
+
+        if (!nextEntry.deadline && !nextEntry.notes && !nextEntry.serviceManager) {
           const { [processRecordId]: _removed, ...rest } = prev;
           return rest;
         }
-        return { ...prev, [processRecordId]: normalizedDeadline };
+
+        return { ...prev, [processRecordId]: nextEntry };
       });
+
+      const processEventsPayload: Array<Record<string, unknown>> = [];
+
+      if (normalizedServiceManager) {
+        processEventsPayload.push({
+          org_id: (currentEditingUser as AdminProcessRow | null)?.organizationId || currentUser.organizationId || null,
+          process_id: processRecordId,
+          tipo: 'atribuicao',
+          mensagem: `Gestor do serviço definido para: ${normalizedServiceManager}.`,
+          created_by: currentUser.id,
+        });
+      }
+
+      if (normalizedDeadline) {
+        processEventsPayload.push({
+          org_id: (currentEditingUser as AdminProcessRow | null)?.organizationId || currentUser.organizationId || null,
+          process_id: processRecordId,
+          tipo: 'observacao',
+          mensagem: `Prazo atualizado para: ${formatDeadlineForDisplay(normalizedDeadline)}.`,
+          created_by: currentUser.id,
+        });
+      }
+
+      if (normalizedNotes) {
+        processEventsPayload.push({
+          org_id: (currentEditingUser as AdminProcessRow | null)?.organizationId || currentUser.organizationId || null,
+          process_id: processRecordId,
+          tipo: 'observacao',
+          mensagem: `Observação registrada: ${normalizedNotes}.`,
+          created_by: currentUser.id,
+        });
+      }
+
+      if (processEventsPayload.length > 0) {
+        await supabase.from('process_events').insert(processEventsPayload);
+      }
     }
 
     let profileUpdateError = '';
@@ -623,9 +690,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         country: profilePayload.pais || u.country,
         phone: profilePayload.phone || u.phone,
         status,
-        deadline,
-        notes,
-        serviceManager,
+        deadline: normalizedDeadline,
+        notes: normalizedNotes,
+        serviceManager: normalizedServiceManager,
         lastUpdate: timestamp
       } : u
     ));
