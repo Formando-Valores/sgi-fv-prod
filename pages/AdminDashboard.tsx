@@ -1467,17 +1467,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       {(currentSection === 'dashboard' || currentSection === 'configuracoes') && (
         <>
           {/* Navigation Tabs */}
-          <div className="flex border-b border-slate-800 mb-6 gap-8 no-print">
+          <div className="flex border-b border-gray-100 mb-6 gap-8 no-print">
         <button 
           onClick={() => setActiveTab('users')}
-          className={`pb-4 px-2 font-black uppercase text-xs tracking-widest transition-all relative ${activeTab === 'users' ? 'text-blue-500' : 'text-slate-500'}`}
+          className={`pb-4 px-2 font-black uppercase text-xs tracking-widest transition-all relative ${activeTab === 'users' ? 'text-blue-500' : 'text-gray-500'}`}
         >
           Visualização de Usuários
           {activeTab === 'users' && <div className="absolute bottom-0 left-0 w-full h-1 bg-blue-500 rounded-t-full"></div>}
         </button>
         <button 
           onClick={() => setActiveTab('management')}
-          className={`pb-4 px-2 font-black uppercase text-xs tracking-widest transition-all relative ${activeTab === 'management' ? 'text-blue-500' : 'text-slate-500'}`}
+          className={`pb-4 px-2 font-black uppercase text-xs tracking-widest transition-all relative ${activeTab === 'management' ? 'text-blue-500' : 'text-gray-500'}`}
         >
           Gestão de Acessos
           {activeTab === 'management' && <div className="absolute bottom-0 left-0 w-full h-1 bg-blue-500 rounded-t-full"></div>}
@@ -1489,19 +1489,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
       {currentSection === 'organizacoes' ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+          <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
             <h3 className="text-lg font-black mb-4">CADASTRAR ORGANIZAÇÃO</h3>
             <form onSubmit={handleCreateOrganization} className="space-y-4">
               <div>
-                <label className="text-xs font-bold text-slate-400 mb-2 block">Nome da organização</label>
+                <label className="text-xs font-bold text-gray-500 mb-2 block">Nome da organização</label>
                 <input
                   value={organizationName}
                   onChange={(event) => setOrganizationName(event.target.value)}
-                  className="w-full p-3 bg-gray-900 border border-slate-700 rounded-lg text-white font-bold"
+                  className="w-full p-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold"
                   placeholder="Ex.: Organização Alpha"
                 />
               </div>
-              <label className="flex items-center gap-2 text-sm text-slate-300 font-semibold">
+              <label className="flex items-center gap-2 text-sm text-gray-600 font-semibold">
                 <input
                   type="checkbox"
                   checked={organizationIsActive}
@@ -1518,20 +1518,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
             </form>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+          <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
             <h3 className="text-lg font-black mb-4">ORGANIZAÇÕES CADASTRADAS</h3>
             <div className="space-y-3">
               {organizations.map((organization) => {
                 const isEditing = editingOrganizationId === organization.id;
 
                 return (
-                  <div key={organization.id} className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
+                  <div key={organization.id} className="p-3 rounded-xl bg-gray-50 border border-gray-100 space-y-3">
                     {isEditing ? (
                       <>
                         <input
                           value={editingOrganizationName}
                           onChange={(event) => setEditingOrganizationName(event.target.value)}
-                          className="w-full p-2 bg-slate-900 border border-slate-700 rounded-lg text-white font-bold"
+                          className="w-full p-2 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold"
                         />
                         <div className="flex gap-2">
                           <button
@@ -1544,7 +1544,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                           <button
                             type="button"
                             onClick={handleCancelEditOrganization}
-                            className="px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs font-bold"
+                            className="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold"
                           >
                             Cancelar
                           </button>
@@ -1558,7 +1558,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                             {(organization.isActive ?? true) ? 'ATIVA' : 'INATIVA'}
                           </span>
                         </div>
-                        <p className="text-xs text-slate-400">ID: {organization.id}</p>
+                        <p className="text-xs text-gray-500">ID: {organization.id}</p>
                         <div className="flex gap-2 pt-1 flex-wrap">
                           <button
                             type="button"
@@ -1588,7 +1588,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                 );
               })}
               {organizations.length === 0 && (
-                <p className="text-slate-400 text-sm">Nenhuma organização cadastrada ainda.</p>
+                <p className="text-gray-500 text-sm">Nenhuma organização cadastrada ainda.</p>
               )}
             </div>
           </div>
@@ -1616,35 +1616,35 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
             <div className="grid min-w-0 grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5 gap-2.5 sm:gap-3">
               <div className="bg-white border-l-4 border-blue-500 rounded-xl p-3 shadow-sm border border-gray-100">
-                <p className="text-xs text-blue-300/80 uppercase">Processos</p>
-                <p className="text-3xl font-black leading-none mt-1.5 text-blue-100">{processStats.total}</p>
-                <p className="text-blue-200/90 mt-1">Total após filtros</p>
+                <p className="text-xs text-blue-500 uppercase">Processos</p>
+                <p className="text-3xl font-black leading-none mt-1.5 text-blue-600">{processStats.total}</p>
+                <p className="text-blue-600 mt-1">Total após filtros</p>
               </div>
               <div className="bg-white border-l-4 border-blue-400 rounded-xl p-3 shadow-sm border border-gray-100">
-                <p className="text-xs text-cyan-300/80 uppercase">Em andamento</p>
-                <p className="text-3xl font-black leading-none mt-1.5 text-cyan-100">{processStats.emAndamento}</p>
-                <p className="text-cyan-200/90 mt-1">Ativos</p>
+                <p className="text-xs text-blue-500 uppercase">Em andamento</p>
+                <p className="text-3xl font-black leading-none mt-1.5 text-blue-600">{processStats.emAndamento}</p>
+                <p className="text-blue-600 mt-1">Ativos</p>
               </div>
               <div className="bg-white border-l-4 border-green-500 rounded-xl p-3 shadow-sm border border-gray-100">
-                <p className="text-xs text-emerald-300/80 uppercase">Concluídos</p>
-                <p className="text-3xl font-black leading-none mt-1.5 text-emerald-100">{processStats.concluidos}</p>
-                <p className="text-emerald-200/90 mt-1">Finalizados</p>
+                <p className="text-xs text-green-500 uppercase">Concluídos</p>
+                <p className="text-3xl font-black leading-none mt-1.5 text-green-600">{processStats.concluidos}</p>
+                <p className="text-green-600 mt-1">Finalizados</p>
               </div>
               <div className="bg-white border-l-4 border-yellow-500 rounded-xl p-3 shadow-sm border border-gray-100">
-                <p className="text-xs text-amber-300/80 uppercase">Aguardando</p>
-                <p className="text-3xl font-black leading-none mt-1.5 text-amber-100">{processStats.aguardando}</p>
-                <p className="text-amber-200/90 mt-1">Pendências</p>
+                <p className="text-xs text-yellow-500 uppercase">Aguardando</p>
+                <p className="text-3xl font-black leading-none mt-1.5 text-yellow-600">{processStats.aguardando}</p>
+                <p className="text-yellow-600 mt-1">Pendências</p>
               </div>
               <div className="bg-white border-l-4 border-red-500 rounded-xl p-3 shadow-sm border border-gray-100">
-                <p className="text-xs text-rose-300/80 uppercase">Atrasados</p>
-                <p className="text-3xl font-black leading-none mt-1.5 text-rose-100">{processStats.atrasados}</p>
-                <p className="text-rose-200/90 mt-1">Prazo vencido</p>
+                <p className="text-xs text-red-500 uppercase">Atrasados</p>
+                <p className="text-3xl font-black leading-none mt-1.5 text-red-600">{processStats.atrasados}</p>
+                <p className="text-red-600 mt-1">Prazo vencido</p>
               </div>
             </div>
 
             <div className="mt-4 grid min-w-0 grid-cols-1 md:grid-cols-2 2xl:grid-cols-4 gap-2.5 sm:gap-3">
               <div className="relative min-w-0 md:col-span-2 2xl:col-span-4">
-                <Search className="absolute left-3 top-3 text-slate-500 w-5 h-5" />
+                <Search className="absolute left-3 top-3 text-gray-500 w-5 h-5" />
                 <input
                   value={processSearch}
                   onChange={(event) => setProcessSearch(event.target.value)}
@@ -1810,23 +1810,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           </Card>
         </div>
       ) : currentSection === 'clientes' ? (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+        <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
           <h3 className="text-lg font-black mb-4">CLIENTES</h3>
 
           <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="relative md:col-span-1">
-              <Search className="absolute left-3 top-3 text-slate-500 w-4 h-4" />
+              <Search className="absolute left-3 top-3 text-gray-500 w-4 h-4" />
               <input
                 value={clientsSearch}
                 onChange={(event) => setClientsSearch(event.target.value)}
                 placeholder="Buscar por nome..."
-                className="w-full pl-9 pr-3 py-2 bg-gray-900 border border-slate-700 rounded-lg text-white font-bold"
+                className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold"
               />
             </div>
             <select
               value={clientsSort}
               onChange={(event) => setClientsSort(event.target.value as 'name_asc' | 'name_desc' | 'recent')}
-              className="w-full py-2 px-3 bg-gray-900 border border-slate-700 rounded-lg text-white font-bold"
+              className="w-full py-2 px-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold"
             >
               <option value="name_asc">Ordenar: Nome (A-Z)</option>
               <option value="name_desc">Ordenar: Nome (Z-A)</option>
@@ -1835,7 +1835,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
             <select
               value={clientsRowsLimit}
               onChange={(event) => setClientsRowsLimit(Number(event.target.value))}
-              className="w-full py-2 px-3 bg-gray-900 border border-slate-700 rounded-lg text-white font-bold"
+              className="w-full py-2 px-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold"
             >
               <option value={10}>Mostrar 10</option>
               <option value={25}>Mostrar 25</option>
@@ -1845,15 +1845,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
           {clientsError && <p className="text-sm text-red-400 font-bold mb-4">{clientsError}</p>}
 
-          <div className="mb-3 flex items-center justify-between text-xs text-slate-400 font-bold">
+          <div className="mb-3 flex items-center justify-between text-xs text-gray-500 font-bold">
             <span>Total encontrado: {clientsData.length}</span>
             <span>Exibindo: {visibleClients.length}</span>
           </div>
 
-          <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950">
+          <div className="overflow-x-auto rounded-xl border border-gray-100 bg-gray-50">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="bg-slate-950 text-slate-400 uppercase text-[10px] font-black tracking-widest">
+                <tr className="bg-gray-50 text-gray-500 uppercase text-[10px] font-black tracking-widest">
                   <th className="px-6 py-4">Usuário</th>
                   <th className="px-6 py-4">Nível</th>
                   <th className="px-6 py-4">Organização</th>
@@ -1863,22 +1863,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               <tbody className="divide-y divide-slate-800">
                 {clientsLoading ? (
                   <tr>
-                    <td colSpan={4} className="px-6 py-8 text-center text-slate-400">Carregando membros...</td>
+                    <td colSpan={4} className="px-6 py-8 text-center text-gray-500">Carregando membros...</td>
                   </tr>
                 ) : visibleClients.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-6 py-8 text-center text-slate-400">Nenhum membro encontrado.</td>
+                    <td colSpan={4} className="px-6 py-8 text-center text-gray-500">Nenhum membro encontrado.</td>
                   </tr>
                 ) : visibleClients.map((client) => (
-                  <tr key={client.id} className="hover:bg-slate-800/30">
-                    <td className="px-6 py-4 font-bold text-slate-100">{client.nome}</td>
+                  <tr key={client.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 font-bold text-gray-800">{client.nome}</td>
                     <td className="px-6 py-4">
                       <span className="text-[10px] font-black text-blue-400 uppercase border border-blue-900/50 bg-blue-900/10 px-2 py-0.5 rounded">
                         {client.accessLevel}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-slate-300 font-bold">{client.org_name}</td>
-                    <td className="px-6 py-4 text-slate-400 font-bold">{client.email}</td>
+                    <td className="px-6 py-4 text-gray-600 font-bold">{client.org_name}</td>
+                    <td className="px-6 py-4 text-gray-500 font-bold">{client.email}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1886,28 +1886,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           </div>
         </div>
       ) : activeTab === 'users' ? (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
-          <div className="p-6 border-b border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 no-print">
+        <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-2xl">
+          <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 no-print">
             <div className="relative w-full md:w-96">
-              <Search className="absolute left-3 top-2.5 text-slate-500 w-4 h-4" />
+              <Search className="absolute left-3 top-2.5 text-gray-500 w-4 h-4" />
               <input 
                 type="text" 
                 placeholder="Pesquise Por: Nome, Protocolo ou E-mail"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-gray-900 border border-slate-800 rounded-full text-white text-sm font-bold placeholder:text-slate-600 focus:ring-1 focus:ring-blue-500 outline-none"
+                className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-full text-gray-800 text-sm font-semibold placeholder:text-gray-600 focus:ring-1 focus:ring-blue-500 outline-none"
               />
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-slate-500 text-[10px] font-black uppercase">Total de Registros:</span>
-              <span className="bg-slate-800 px-2 py-0.5 rounded-md text-blue-400 font-bold text-xs">{filteredUsers.length}</span>
+              <span className="text-gray-500 text-[10px] font-black uppercase">Total de Registros:</span>
+              <span className="bg-blue-50 px-2 py-0.5 rounded-md text-blue-600 font-bold text-xs">{filteredUsers.length}</span>
             </div>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="bg-slate-950 text-slate-400 uppercase text-[10px] font-black tracking-widest">
+                <tr className="bg-gray-50 text-gray-500 uppercase text-[10px] font-black tracking-widest">
                   <th className="px-6 py-4">Nome Completo</th>
                   <th className="px-6 py-4">Telefone+DDD+País</th>
                   <th className="px-6 py-4">Protocolo SGI</th>
@@ -1918,29 +1918,29 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               </thead>
               <tbody className="divide-y divide-slate-800">
                 {filteredUsers.map(user => (
-                  <tr key={user.id} className="hover:bg-slate-800/50 transition-colors">
-                    <td className="px-6 py-4 font-bold text-slate-200">{user.name}</td>
-                    <td className="px-6 py-4 text-slate-400 font-bold">{user.phone} ({user.country})</td>
+                  <tr key={user.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 font-bold text-gray-700">{user.name}</td>
+                    <td className="px-6 py-4 text-gray-500 font-bold">{user.phone} ({user.country})</td>
                     <td className="px-6 py-4">
                       <span className="bg-blue-900/30 text-blue-400 px-2 py-1 rounded-md text-[10px] font-black">{user.protocol}</span>
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-3 py-1 rounded-full text-[10px] font-black text-white ${
-                        user.status === ProcessStatus.PENDENTE ? 'bg-slate-600' :
+                        user.status === ProcessStatus.PENDENTE ? 'bg-gray-200 text-gray-700' :
                         user.status === ProcessStatus.TRIAGEM ? 'bg-yellow-600' :
                         user.status === ProcessStatus.ANALISE ? 'bg-orange-600' : 'bg-emerald-600'
                       }`}>
                         {user.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-slate-500 text-[10px] font-bold">
+                    <td className="px-6 py-4 text-gray-500 text-[10px] font-bold">
                        {user.lastUpdate || user.registrationDate}
                     </td>
                     <td className="px-6 py-4 text-right no-print">
                       <div className="flex justify-end gap-2">
                         <button 
                           onClick={() => setSelectedUser(user)}
-                          className="p-1.5 bg-slate-800 hover:bg-slate-700 rounded-md text-slate-300"
+                          className="p-1.5 bg-gray-100 hover:bg-gray-200 rounded-md text-gray-600"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
@@ -1961,72 +1961,72 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       ) : (
         /* Management Tab Content */
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-           <div className="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-2xl p-6">
+           <div className="lg:col-span-1 bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
               <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
                 <Plus className="text-blue-500" /> Cadastrar Usuário e Nível
               </h3>
               <form onSubmit={handleCreateUser} className="space-y-4">
                  <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Nome de Usuário</label>
+                    <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Nome de Usuário</label>
                     <input 
                       required
                       type="text"
                       placeholder="Nome do Gestor"
                       value={newAdminName}
                       onChange={e => setNewAdminName(e.target.value)}
-                      className="w-full bg-gray-900 border border-slate-800 rounded-lg p-3 text-white font-bold" 
+                      className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold" 
                     />
                  </div>
                  <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">E-mail</label>
+                    <label className="text-xs font-bold text-gray-500 uppercase block mb-1">E-mail</label>
                     <input 
                       required
                       type="email"
                       placeholder="admin@sgi.com"
                       value={newAdminEmail}
                       onChange={e => setNewAdminEmail(e.target.value)}
-                      className="w-full bg-gray-900 border border-slate-800 rounded-lg p-3 text-white font-bold" 
+                      className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold" 
                     />
                  </div>
                  <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Perfil de Acesso</label>
+                    <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Perfil de Acesso</label>
                     <select
                       value={newAccessLevel}
                       onChange={(event) => setNewAccessLevel(event.target.value as AccessLevel)}
-                      className="w-full bg-gray-900 border border-slate-800 rounded-lg p-3 text-white font-bold"
+                      className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold"
                     >
                       {ACCESS_LEVELS.map((level) => (
                         <option key={level} value={level}>{level}</option>
                       ))}
                     </select>
-                    <p className="text-[11px] text-slate-500 mt-2">Diretoria/Gerência da organização: agenda, equipe e distribuição autorizada.</p>
+                    <p className="text-[11px] text-gray-500 mt-2">Diretoria/Gerência da organização: agenda, equipe e distribuição autorizada.</p>
                  </div>
                  <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Instituição / Organização</label>
+                    <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Instituição / Organização</label>
                     <select
                       value={newAdminOrgId}
                       onChange={(event) => setNewAdminOrgId(event.target.value)}
-                      className="w-full bg-gray-900 border border-slate-800 rounded-lg p-3 text-white font-bold"
+                      className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold"
                     >
                       {organizations.length === 0 && <option value="">Carregando organizações...</option>}
                       {organizations.map((org) => (
                         <option key={org.id} value={org.id}>{org.name}</option>
                       ))}
                     </select>
-                    <p className="text-[11px] text-slate-500 mt-2">Instituição atual selecionada: {organizations.find((org) => org.id === newAdminOrgId)?.name || 'Organização Padrão'}</p>
+                    <p className="text-[11px] text-gray-500 mt-2">Instituição atual selecionada: {organizations.find((org) => org.id === newAdminOrgId)?.name || 'Organização Padrão'}</p>
                  </div>
                  <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Hierarquia / Nível</label>
+                    <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Hierarquia / Nível</label>
                     <div className="space-y-2 mt-2">
-                      <label className="flex items-center gap-2 text-sm text-slate-200 font-bold">
+                      <label className="flex items-center gap-2 text-sm text-gray-700 font-bold">
                         <input type="radio" name="new_hierarchy_radio" className="w-4 h-4 accent-blue-500" checked={newAdminHierarchy === Hierarchy.FULL} onChange={() => setNewAdminHierarchy(Hierarchy.FULL)} />
                         Alteração e Edição
                       </label>
-                      <label className="flex items-center gap-2 text-sm text-slate-200 font-bold">
+                      <label className="flex items-center gap-2 text-sm text-gray-700 font-bold">
                         <input type="radio" name="new_hierarchy_radio" className="w-4 h-4 accent-blue-500" checked={newAdminHierarchy === Hierarchy.STATUS_ONLY} onChange={() => setNewAdminHierarchy(Hierarchy.STATUS_ONLY)} />
                         Somente Alteração
                       </label>
-                      <label className="flex items-center gap-2 text-sm text-slate-200 font-bold">
+                      <label className="flex items-center gap-2 text-sm text-gray-700 font-bold">
                         <input type="radio" name="new_hierarchy_radio" className="w-4 h-4 accent-blue-500" checked={newAdminHierarchy === Hierarchy.NOTES_ONLY} onChange={() => setNewAdminHierarchy(Hierarchy.NOTES_ONLY)} />
                         Somente Anotações
                       </label>
@@ -2038,14 +2038,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               </form>
            </div>
 
-           <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
-              <div className="p-4 border-b border-slate-800 flex flex-col md:flex-row gap-3 md:items-center md:justify-between bg-slate-900">
+           <div className="lg:col-span-2 bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-2xl">
+              <div className="p-4 border-b border-gray-100 flex flex-col md:flex-row gap-3 md:items-center md:justify-between bg-white">
                 <div className="flex items-center gap-2">
-                  <span className="text-slate-300 text-sm font-bold">Mostrar</span>
+                  <span className="text-gray-600 text-sm font-bold">Mostrar</span>
                   <select
                     value={configRowsLimit}
                     onChange={(event) => setConfigRowsLimit(Number(event.target.value))}
-                    className="bg-gray-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-bold"
+                    className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-gray-800 font-semibold"
                   >
                     <option value={10}>10</option>
                     <option value={25}>25</option>
@@ -2053,12 +2053,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                   </select>
                 </div>
                 <div className="relative w-full md:w-72">
-                  <Search className="absolute left-3 top-3 text-slate-500 w-4 h-4" />
+                  <Search className="absolute left-3 top-3 text-gray-500 w-4 h-4" />
                   <input
                     value={configSearch}
                     onChange={(event) => setConfigSearch(event.target.value)}
                     placeholder="Pesquisar..."
-                    className="w-full pl-9 pr-3 py-2 bg-gray-900 border border-slate-700 rounded-lg text-white font-bold"
+                    className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold"
                   />
                 </div>
               </div>
@@ -2079,7 +2079,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead>
-                    <tr className="bg-slate-950 text-slate-400 uppercase text-[10px] font-black tracking-widest">
+                    <tr className="bg-gray-50 text-gray-500 uppercase text-[10px] font-black tracking-widest">
                       <th className="px-6 py-4">Usuário</th>
                       <th className="px-6 py-4">Nível de Acesso</th>
                       <th className="px-6 py-4">Instituição</th>
@@ -2089,20 +2089,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                   <tbody className="divide-y divide-slate-800">
                     {membersLoading ? (
                       <tr>
-                        <td colSpan={4} className="px-6 py-8 text-center text-slate-400">Carregando membros...</td>
+                        <td colSpan={4} className="px-6 py-8 text-center text-gray-500">Carregando membros...</td>
                       </tr>
                     ) : managementUsers.map(u => (
-                      <tr key={`${u.user_id}-${u.org_id}`} className="hover:bg-slate-800/30">
+                      <tr key={`${u.user_id}-${u.org_id}`} className="hover:bg-gray-50">
                         <td className="px-6 py-4 font-bold flex flex-col">
                            <span>{u.name}</span>
-                           <span className="text-[10px] text-slate-500">{u.email}</span>
+                           <span className="text-[10px] text-gray-500">{u.email}</span>
                         </td>
                         <td className="px-6 py-4">
                           <span className="text-[10px] font-black text-blue-400 uppercase border border-blue-900/50 bg-blue-900/10 px-2 py-0.5 rounded">
                             {u.accessLevel.toUpperCase()}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-slate-300 font-bold">{u.org_name || 'Organização Padrão'}</td>
+                        <td className="px-6 py-4 text-gray-600 font-bold">{u.org_name || 'Organização Padrão'}</td>
                         <td className="px-6 py-4 text-right">
                            <div className="flex justify-end gap-2">
                               <button 
@@ -2113,7 +2113,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                                   setNewAccessLevel(u.accessLevel);
                                   setEditingMemberUserId(u.user_id);
                                 }}
-                                className="p-2 bg-slate-800 hover:bg-slate-700 rounded-md text-slate-400 hover:text-white transition-colors"
+                                className="p-2 bg-gray-100 hover:bg-gray-200 rounded-md text-gray-500 hover:text-white transition-colors"
                               >
                                 <Pencil className="w-4 h-4" />
                               </button>
@@ -2137,32 +2137,32 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       {/* Hierarchy Edit Modal */}
       {editingHierarchyUser && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="bg-slate-900 w-full max-w-md rounded-3xl border border-slate-800 shadow-2xl overflow-hidden">
-             <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-950">
+          <div className="bg-white w-full max-w-md rounded-3xl border border-gray-100 shadow-2xl overflow-hidden">
+             <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
                <h3 className="text-xl font-black uppercase">Editar Gestor</h3>
-               <button onClick={() => setEditingHierarchyUser(null)} className="p-2 bg-slate-800 hover:bg-slate-700 rounded-full">
+               <button onClick={() => setEditingHierarchyUser(null)} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full">
                  <X className="w-5 h-5" />
                </button>
              </div>
              <div className="p-8">
                 <form onSubmit={handleUpdateHierarchy}>
-                  <p className="text-slate-400 text-sm mb-6">Alterando dados para <strong>{editingHierarchyUser.email}</strong></p>
+                  <p className="text-gray-500 text-sm mb-6">Alterando dados para <strong>{editingHierarchyUser.email}</strong></p>
                   
                   <div className="space-y-4">
                     <div>
-                      <label className="text-[10px] font-black text-slate-500 uppercase block mb-1">Nome de Usuário</label>
+                      <label className="text-[10px] font-black text-gray-500 uppercase block mb-1">Nome de Usuário</label>
                       <input 
                         required
                         name="admin_name"
                         type="text"
                         defaultValue={editingHierarchyUser.name}
-                        className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500 mb-4" 
+                        className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500 mb-4" 
                       />
                     </div>
 
-                    <label className="text-[10px] font-black text-slate-500 uppercase block mb-1">Hierarquia / Nível</label>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-1">Hierarquia / Nível</label>
                     {Object.values(Hierarchy).map(h => (
-                      <label key={h} className="flex items-center gap-3 p-4 bg-gray-900 border border-slate-800 rounded-xl cursor-pointer hover:border-blue-500 transition-colors">
+                      <label key={h} className="flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-xl cursor-pointer hover:border-blue-500 transition-colors">
                         <input 
                           type="radio" 
                           name="hierarchy" 
@@ -2170,7 +2170,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                           defaultChecked={editingHierarchyUser.hierarchy === h} 
                           className="w-5 h-5 accent-blue-500" 
                         />
-                        <span className="font-bold text-slate-200">{h}</span>
+                        <span className="font-bold text-gray-700">{h}</span>
                       </label>
                     ))}
                     <button type="submit" className="w-full py-5 bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-widest rounded-2xl shadow-xl mt-4">
@@ -2186,10 +2186,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       {/* Details View Modal */}
       {selectedUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-slate-900 w-full max-w-2xl rounded-3xl border border-slate-800 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
-             <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-950">
+          <div className="bg-white w-full max-w-2xl rounded-3xl border border-gray-100 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+             <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
                <h3 className="text-xl font-black uppercase">Ficha Cadastral do Cliente</h3>
-               <button onClick={() => setSelectedUser(null)} className="p-2 bg-slate-800 hover:bg-slate-700 rounded-full">
+               <button onClick={() => setSelectedUser(null)} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full">
                  <X className="w-5 h-5" />
                </button>
              </div>
@@ -2197,48 +2197,48 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                 <div className="grid grid-cols-2 gap-8">
                   <div className="space-y-4">
                     <div>
-                      <label className="text-[10px] font-black text-slate-500 uppercase">Nome Completo</label>
+                      <label className="text-[10px] font-black text-gray-500 uppercase">Nome Completo</label>
                       <p className="text-lg font-black">{selectedUser.name}</p>
                     </div>
                     <div>
-                      <label className="text-[10px] font-black text-slate-500 uppercase">E-mail</label>
+                      <label className="text-[10px] font-black text-gray-500 uppercase">E-mail</label>
                       <p className="font-bold text-blue-400">{selectedUser.email}</p>
                     </div>
                     <div>
-                      <label className="text-[10px] font-black text-slate-500 uppercase">Documento / NIF-CPF</label>
+                      <label className="text-[10px] font-black text-gray-500 uppercase">Documento / NIF-CPF</label>
                       <p className="font-bold">{selectedUser.documentId} / {selectedUser.taxId}</p>
                     </div>
                     <div>
-                      <label className="text-[10px] font-black text-slate-500 uppercase">Estado Civil / País</label>
+                      <label className="text-[10px] font-black text-gray-500 uppercase">Estado Civil / País</label>
                       <p className="font-bold">{selectedUser.maritalStatus} - {selectedUser.country}</p>
                     </div>
                   </div>
                   <div className="space-y-4">
                     <div>
-                      <label className="text-[10px] font-black text-slate-500 uppercase">Protocolo SGI</label>
+                      <label className="text-[10px] font-black text-gray-500 uppercase">Protocolo SGI</label>
                       <p className="text-lg font-black text-emerald-400">{selectedUser.protocol}</p>
                     </div>
                     <div>
-                      <label className="text-[10px] font-black text-slate-500 uppercase">Unidade Atendimento</label>
+                      <label className="text-[10px] font-black text-gray-500 uppercase">Unidade Atendimento</label>
                       <p className="font-bold text-blue-300">{selectedUser.unit}</p>
                     </div>
                     <div>
-                      <label className="text-[10px] font-black text-slate-500 uppercase">Processo Judicial</label>
+                      <label className="text-[10px] font-black text-gray-500 uppercase">Processo Judicial</label>
                       <p className="font-bold">{selectedUser.processNumber || 'NÃO INFORMADO'}</p>
                     </div>
                     <div>
-                      <label className="text-[10px] font-black text-slate-500 uppercase">Status Atual</label>
+                      <label className="text-[10px] font-black text-gray-500 uppercase">Status Atual</label>
                       <p className="font-black text-orange-500 uppercase">{selectedUser.status}</p>
                     </div>
                   </div>
                 </div>
-                <div className="mt-8 pt-6 border-t border-slate-800">
-                  <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Endereço Completo</label>
-                  <p className="font-bold p-4 bg-gray-900 rounded-xl">{selectedUser.address}</p>
+                <div className="mt-8 pt-6 border-t border-gray-100">
+                  <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Endereço Completo</label>
+                  <p className="font-semibold p-4 bg-gray-50 border border-gray-200 rounded-xl">{selectedUser.address}</p>
                 </div>
                 {selectedUser.notes && (
                   <div className="mt-4">
-                    <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Observações Internas</label>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Observações Internas</label>
                     <p className="font-bold p-4 bg-blue-900/10 border border-blue-900/30 rounded-xl text-blue-200 italic">"{selectedUser.notes}"</p>
                   </div>
                 )}
@@ -2249,15 +2249,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
       {showCreateProcessModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-slate-900 w-full max-w-3xl rounded-3xl border border-slate-800 shadow-2xl overflow-hidden">
-            <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-950">
+          <div className="bg-white w-full max-w-3xl rounded-3xl border border-gray-100 shadow-2xl overflow-hidden">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
               <h3 className="text-xl font-black uppercase">Criar processo manual</h3>
               <button
                 onClick={() => {
                   setShowCreateProcessModal(false);
                   setProcessActionFeedback(null);
                 }}
-                className="p-2 bg-slate-800 hover:bg-slate-700 rounded-full"
+                className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -2266,11 +2266,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               <form onSubmit={handleCreateProcess} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Organização</label>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Organização</label>
                     <select
                       value={newProcessForm.organizationId}
                       onChange={(event) => setNewProcessForm((prev) => ({ ...prev, organizationId: event.target.value }))}
-                      className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                       required
                     >
                       <option value="">Selecione a organização</option>
@@ -2281,56 +2281,56 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                   </div>
 
                   <div className="md:col-span-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Título do processo</label>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Título do processo</label>
                     <input
                       type="text"
                       value={newProcessForm.title}
                       onChange={(event) => setNewProcessForm((prev) => ({ ...prev, title: event.target.value }))}
-                      className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="Ex.: Abertura de acompanhamento administrativo"
                     />
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Cliente</label>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Cliente</label>
                     <input
                       type="text"
                       value={newProcessForm.clientName}
                       onChange={(event) => setNewProcessForm((prev) => ({ ...prev, clientName: event.target.value }))}
-                      className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="Nome completo do cliente"
                       required
                     />
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Documento</label>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Documento</label>
                     <input
                       type="text"
                       value={newProcessForm.clientDocument}
                       onChange={(event) => setNewProcessForm((prev) => ({ ...prev, clientDocument: event.target.value }))}
-                      className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="CPF / NIF / Documento"
                     />
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Contato</label>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Contato</label>
                     <input
                       type="text"
                       value={newProcessForm.clientContact}
                       onChange={(event) => setNewProcessForm((prev) => ({ ...prev, clientContact: event.target.value }))}
-                      className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="E-mail, telefone ou WhatsApp"
                     />
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Tipo</label>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Tipo</label>
                     <select
                       value={newProcessForm.serviceUnit}
                       onChange={(event) => setNewProcessForm((prev) => ({ ...prev, serviceUnit: event.target.value as ServiceUnit }))}
-                      className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value={ServiceUnit.ADMINISTRATIVO}>Administrativo</option>
                       <option value={ServiceUnit.JURIDICO}>Jurídico / Advocacia</option>
@@ -2339,9 +2339,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-sm text-slate-300">
-                  O processo será criado manualmente com origem <span className="font-black text-white">PAINEL</span>,
-                  status inicial <span className="font-black text-white">Cadastro</span> e vinculado à organização selecionada.
+                <div className="rounded-2xl border border-gray-100 bg-gray-50/70 p-4 text-sm text-gray-600">
+                  O processo será criado manualmente com origem <span className="font-black text-gray-800">PAINEL</span>,
+                  status inicial <span className="font-black text-gray-800">Cadastro</span> e vinculado à organização selecionada.
                 </div>
 
                 <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
@@ -2351,7 +2351,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                       setShowCreateProcessModal(false);
                       setProcessActionFeedback(null);
                     }}
-                    className="px-5 py-3 rounded-xl border border-slate-700 text-slate-200 font-bold hover:bg-slate-800 transition-colors"
+                    className="px-5 py-3 rounded-xl border border-gray-200 text-gray-700 font-bold hover:bg-gray-100 transition-colors"
                   >
                     Cancelar
                   </button>
@@ -2374,10 +2374,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       {/* Edit Status Modal */}
       {editingUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-slate-900 w-full max-w-3xl rounded-3xl border border-slate-800 shadow-2xl overflow-hidden">
-             <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-950">
+          <div className="bg-white w-full max-w-3xl rounded-3xl border border-gray-100 shadow-2xl overflow-hidden">
+             <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
                <h3 className="text-xl font-black uppercase">Editar Status: {editingUser.protocol}</h3>
-               <button onClick={() => setEditingUser(null)} className="p-2 bg-slate-800 hover:bg-slate-700 rounded-full">
+               <button onClick={() => setEditingUser(null)} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full">
                  <X className="w-5 h-5" />
                </button>
              </div>
@@ -2396,18 +2396,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                   <div className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
-                        <label className="text-[10px] font-black text-slate-500 uppercase mb-2 block">Alterar Status do Processo</label>
-                        <select name="status" defaultValue={editingUser.status} className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none ring-blue-500 focus:ring-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase mb-2 block">Alterar Status do Processo</label>
+                        <select name="status" defaultValue={editingUser.status} className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none ring-blue-500 focus:ring-2">
                           {Object.values(ProcessStatus).map(s => (
                             <option key={s} value={s}>{s}</option>
                           ))}
                         </select>
                       </div>
                       <div>
-                        <label className="text-[10px] font-black text-slate-500 uppercase mb-2 block flex items-center gap-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase mb-2 block flex items-center gap-2">
                           <UserCheck className="w-3 h-3" /> Gestor do Serviço
                         </label>
-                        <select name="serviceManager" defaultValue={editingUser.serviceManager} className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none ring-blue-500 focus:ring-2">
+                        <select name="serviceManager" defaultValue={editingUser.serviceManager} className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none ring-blue-500 focus:ring-2">
                           <option value="">Selecione um gestor</option>
                           {SERVICE_MANAGERS.map(manager => (
                             <option key={manager} value={manager}>{manager}</option>
@@ -2417,98 +2417,98 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     </div>
 
                     <div>
-                      <label className="text-[10px] font-black text-slate-500 uppercase mb-2 block flex items-center gap-2">
+                      <label className="text-[10px] font-black text-gray-500 uppercase mb-2 block flex items-center gap-2">
                         <Calendar className="w-3 h-3" /> Data de Prazo
                       </label>
-                      <input name="deadline" type="date" defaultValue={editingUser.deadline} className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold" />
+                      <input name="deadline" type="date" defaultValue={editingUser.deadline} className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold" />
                     </div>
                     <div>
-                      <label className="text-[10px] font-black text-slate-500 uppercase mb-2 block flex items-center gap-2">
+                      <label className="text-[10px] font-black text-gray-500 uppercase mb-2 block flex items-center gap-2">
                         <MessageSquare className="w-3 h-3" /> Nota de Observações
                       </label>
-                      <textarea name="notes" rows={4} defaultValue={editingUser.notes} className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold resize-none" placeholder="Digite as anotações do processo..."></textarea>
+                      <textarea name="notes" rows={4} defaultValue={editingUser.notes} className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold resize-none" placeholder="Digite as anotações do processo..."></textarea>
                     </div>
 
-                    <div className="border-t border-slate-800 pt-6">
+                    <div className="border-t border-gray-100 pt-6">
                       <h4 className="text-lg font-black uppercase mb-4">Dados cadastrais do usuário</h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="md:col-span-2">
-                          <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Nome Completo</label>
+                          <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Nome Completo</label>
                           <input
                             type="text"
                             value={editingProfileForm.fullName}
                             onChange={(event) => setEditingProfileForm((prev) => ({ ...prev, fullName: event.target.value }))}
-                            className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
                         <div className="md:col-span-2">
-                          <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">E-mail</label>
+                          <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">E-mail</label>
                           <input
                             type="email"
                             value={editingProfileForm.email}
                             onChange={(event) => setEditingProfileForm((prev) => ({ ...prev, email: event.target.value }))}
-                            className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Documento de Identidade</label>
+                          <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Documento de Identidade</label>
                           <input
                             type="text"
                             value={editingProfileForm.documentId}
                             onChange={(event) => setEditingProfileForm((prev) => ({ ...prev, documentId: event.target.value }))}
-                            className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">NIF / CPF</label>
+                          <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">NIF / CPF</label>
                           <input
                             type="text"
                             value={editingProfileForm.taxId}
                             onChange={(event) => setEditingProfileForm((prev) => ({ ...prev, taxId: event.target.value }))}
-                            className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Telefone</label>
+                          <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Telefone</label>
                           <input
                             type="text"
                             value={editingProfileForm.phone}
                             onChange={(event) => setEditingProfileForm((prev) => ({ ...prev, phone: event.target.value }))}
-                            className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Estado Civil</label>
+                          <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Estado Civil</label>
                           <input
                             type="text"
                             value={editingProfileForm.maritalStatus}
                             onChange={(event) => setEditingProfileForm((prev) => ({ ...prev, maritalStatus: event.target.value }))}
-                            className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">País</label>
+                          <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">País</label>
                           <input
                             type="text"
                             value={editingProfileForm.country}
                             onChange={(event) => setEditingProfileForm((prev) => ({ ...prev, country: event.target.value }))}
-                            className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
                         <div className="md:col-span-2">
-                          <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Endereço completo (inclua CEP)</label>
+                          <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Endereço completo (inclua CEP)</label>
                           <input
                             type="text"
                             value={editingProfileForm.address}
                             onChange={(event) => setEditingProfileForm((prev) => ({ ...prev, address: event.target.value }))}
-                            className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
                       </div>
                     </div>
 
                     {editingProfileLoading && (
-                      <p className="text-sm font-bold text-slate-400">Carregando dados completos do cadastro...</p>
+                      <p className="text-sm font-bold text-gray-500">Carregando dados completos do cadastro...</p>
                     )}
                     {editingProfileError && (
                       <p className="text-sm font-bold text-amber-300">{editingProfileError}</p>
