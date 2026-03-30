@@ -88,7 +88,7 @@ const RootApp: React.FC = () => {
 
   return (
     <HashRouter>
-      <div className="min-h-screen bg-[#0f172a] text-white font-arial">
+      <div className="min-h-screen bg-gray-50 text-gray-800 font-['Inter',sans-serif]">
         <Routes>
           <Route 
             path="/login" 

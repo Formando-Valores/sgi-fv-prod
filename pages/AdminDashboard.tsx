@@ -7,6 +7,9 @@ import { SERVICE_MANAGERS } from '../constants';
 import { buildOrganizationErrorMessage, createOrganization, deleteOrganization, loadOrganizations, updateOrganization, updateOrganizationStatus } from '../organizationRepository';
 import { supabase } from '../supabase';
 import type { Process as DbProcess } from '../src/lib/processes';
+import Card from '../src/components/ui/Card';
+import Badge from '../src/components/ui/Badge';
+import Button from '../src/components/ui/Button';
 
 type AccessLevel = 'Administrador' | 'Usuário Sênior' | 'Usuário Pleno' | 'Operador' | 'Cliente';
 
@@ -123,6 +126,13 @@ const resolveAccessLevel = (role: string | null | undefined): AccessLevel => {
   if (normalized === 'cliente' || normalized === 'client') return 'Cliente';
 
   return 'Cliente';
+};
+
+const statusBadgeVariant = (status: ProcessStatus): 'success' | 'warning' | 'danger' | 'info' | 'neutral' => {
+  if (status === ProcessStatus.CONCLUIDO) return 'success';
+  if (status === ProcessStatus.ANALISE) return 'warning';
+  if (status === ProcessStatus.TRIAGEM) return 'info';
+  return 'neutral';
 };
 
 interface AdminDashboardProps {
@@ -1377,12 +1387,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   };
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-slate-950 p-4 md:p-8">
+    <div className="min-h-screen overflow-x-hidden bg-gray-50 p-4 md:p-8 text-gray-800">
       <div className="mx-auto flex min-w-0 max-w-[1600px] flex-col gap-6 lg:flex-row">
         <div className="lg:hidden mb-3">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="p-3 rounded-xl bg-slate-900 border border-slate-700 text-slate-100"
+            className="p-3 rounded-xl bg-white border border-gray-200 text-gray-700 shadow-sm"
             aria-label="Abrir menu"
           >
             <Menu className="w-5 h-5" />
@@ -1391,21 +1401,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
         {sidebarOpen && (
           <button
-            className="lg:hidden fixed inset-0 bg-black/60 z-40"
+            className="lg:hidden fixed inset-0 bg-black/30 z-40"
             onClick={() => setSidebarOpen(false)}
             aria-label="Fechar menu"
           />
         )}
 
         <aside
-          className={`fixed lg:static inset-y-0 left-0 z-50 lg:z-auto w-72 shrink-0 bg-slate-900 border border-slate-800 rounded-r-2xl lg:rounded-2xl p-5 h-full lg:h-fit transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
+          className={`fixed lg:static inset-y-0 left-0 z-50 lg:z-auto w-72 shrink-0 bg-white border border-gray-100 rounded-r-2xl lg:rounded-2xl p-5 h-full lg:h-fit transition-transform duration-300 shadow-sm ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
         >
-          <h2 className="text-xl font-black mb-1">SGI FV</h2>
-          <p className="text-slate-500 text-xs font-bold uppercase mb-6">Formando Valores</p>
+          <h2 className="text-xl font-black mb-1 text-gray-800">SGI FV</h2>
+          <p className="text-gray-500 text-xs font-bold uppercase mb-6">Formando Valores</p>
 
-          <div className="mb-6 p-3 rounded-xl bg-slate-800/50 border border-slate-700">
-            <p className="font-bold text-slate-200">{currentUser.name}</p>
-            <p className="text-[10px] uppercase tracking-widest text-slate-400">{currentUser.role === UserRole.ADMIN ? 'ADMIN' : 'CLIENTE'}</p>
+          <div className="mb-6 p-3 rounded-xl bg-gray-50 border border-gray-200">
+            <p className="font-bold text-gray-800">{currentUser.name}</p>
+            <p className="text-[10px] uppercase tracking-widest text-gray-500">{currentUser.role === UserRole.ADMIN ? 'ADMIN' : 'CLIENTE'}</p>
           </div>
 
           <nav className="space-y-2">
@@ -1414,7 +1424,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                 key={item.to}
                 to={item.to}
                 onClick={() => setSidebarOpen(false)}
-                className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${isActive ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-600'}`}
+                className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${isActive ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-white text-gray-600 border-gray-100 hover:bg-gray-50'}`}
               >
                 <item.icon className="w-4 h-4" />
                 <span className="font-bold">{item.label}</span>
@@ -1427,29 +1437,30 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       {/* Admin Header */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 no-print">
         <div>
-          <h1 className="text-2xl font-black text-white tracking-tighter flex items-center gap-2">
-            <ShieldCheck className="text-red-500" /> SGI FV - PAINEL ADMINISTRATIVO
+          <h1 className="text-2xl font-black text-gray-800 tracking-tighter flex items-center gap-2">
+            <ShieldCheck className="text-blue-500" /> SGI FV - PAINEL ADMINISTRATIVO
           </h1>
-          <p className="text-slate-400 text-xs font-bold uppercase mt-1">Bem-vindo, {currentUser.name}</p>
+          <p className="text-gray-500 text-xs font-bold uppercase mt-1">Bem-vindo, {currentUser.name}</p>
         </div>
         <div className="flex gap-2">
-          <button 
+          <Button
             onClick={handlePrint} 
             title="Clique para Imprimir Documento"
-            className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 transition-colors flex items-center gap-2 px-4 text-xs font-bold uppercase"
+            variant="secondary"
+            className="flex items-center gap-2 text-xs font-bold uppercase"
           >
             <Printer className="w-4 h-4" /> Imprimir
-          </button>
-          <button 
+          </Button>
+          <Button
             onClick={handlePrint} 
             title="Clique para Salvar como PDF"
-            className="p-2 bg-blue-900/40 hover:bg-blue-900/60 rounded-lg text-blue-300 transition-colors flex items-center gap-2 px-4 text-xs font-bold uppercase border border-blue-800"
+            className="flex items-center gap-2 text-xs font-bold uppercase"
           >
             <FileDown className="w-4 h-4" /> Gerar PDF
-          </button>
-          <button onClick={onLogout} className="p-2 bg-red-900/20 hover:bg-red-900/40 rounded-lg text-red-400 transition-colors flex items-center gap-2 px-4 text-xs font-bold uppercase">
+          </Button>
+          <Button onClick={onLogout} variant="danger" className="flex items-center gap-2 text-xs font-bold uppercase">
             <LogOut className="w-4 h-4" /> Sair
-          </button>
+          </Button>
         </div>
       </header>
 
@@ -1584,7 +1595,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         </div>
       ) : currentSection === 'processos' ? (
         <div className="min-w-0 space-y-6">
-          <div className="min-w-0 bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4">
+          <Card className="min-w-0 bg-white border-gray-100 p-4 sm:p-5">
             <div className="mb-2 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
                 <h3 className="text-3xl sm:text-4xl font-black tracking-tight leading-none">Processos</h3>
@@ -1596,35 +1607,35 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                   setProcessActionFeedback(null);
                   setShowCreateProcessModal(true);
                 }}
-                className="inline-flex items-center gap-2 shrink-0 px-4 py-2 rounded-xl border border-blue-700 bg-blue-600/15 text-blue-200 font-bold hover:bg-blue-600/25 transition-colors"
+                className="inline-flex items-center gap-2 shrink-0 px-4 py-2 rounded-lg border border-blue-100 bg-blue-50 text-blue-600 font-semibold hover:bg-blue-100 transition-colors"
               >
                 <Plus className="w-4 h-4" /> Novo processo
               </button>
             </div>
-            <p className="text-slate-400 text-sm mb-4">Visão geral em formato de planilha para filtrar, acompanhar status e agir rápido.</p>
+            <p className="text-gray-500 text-sm mb-4">Visão geral em formato de planilha para filtrar, acompanhar status e agir rápido.</p>
 
             <div className="grid min-w-0 grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5 gap-2.5 sm:gap-3">
-              <div className="bg-blue-900/15 border border-blue-700/40 rounded-xl p-3">
+              <div className="bg-white border-l-4 border-blue-500 rounded-xl p-3 shadow-sm border border-gray-100">
                 <p className="text-xs text-blue-300/80 uppercase">Processos</p>
                 <p className="text-3xl font-black leading-none mt-1.5 text-blue-100">{processStats.total}</p>
                 <p className="text-blue-200/90 mt-1">Total após filtros</p>
               </div>
-              <div className="bg-cyan-900/15 border border-cyan-700/40 rounded-xl p-3">
+              <div className="bg-white border-l-4 border-blue-400 rounded-xl p-3 shadow-sm border border-gray-100">
                 <p className="text-xs text-cyan-300/80 uppercase">Em andamento</p>
                 <p className="text-3xl font-black leading-none mt-1.5 text-cyan-100">{processStats.emAndamento}</p>
                 <p className="text-cyan-200/90 mt-1">Ativos</p>
               </div>
-              <div className="bg-emerald-900/15 border border-emerald-700/40 rounded-xl p-3">
+              <div className="bg-white border-l-4 border-green-500 rounded-xl p-3 shadow-sm border border-gray-100">
                 <p className="text-xs text-emerald-300/80 uppercase">Concluídos</p>
                 <p className="text-3xl font-black leading-none mt-1.5 text-emerald-100">{processStats.concluidos}</p>
                 <p className="text-emerald-200/90 mt-1">Finalizados</p>
               </div>
-              <div className="bg-amber-900/15 border border-amber-700/40 rounded-xl p-3">
+              <div className="bg-white border-l-4 border-yellow-500 rounded-xl p-3 shadow-sm border border-gray-100">
                 <p className="text-xs text-amber-300/80 uppercase">Aguardando</p>
                 <p className="text-3xl font-black leading-none mt-1.5 text-amber-100">{processStats.aguardando}</p>
                 <p className="text-amber-200/90 mt-1">Pendências</p>
               </div>
-              <div className="bg-rose-900/15 border border-rose-700/40 rounded-xl p-3">
+              <div className="bg-white border-l-4 border-red-500 rounded-xl p-3 shadow-sm border border-gray-100">
                 <p className="text-xs text-rose-300/80 uppercase">Atrasados</p>
                 <p className="text-3xl font-black leading-none mt-1.5 text-rose-100">{processStats.atrasados}</p>
                 <p className="text-rose-200/90 mt-1">Prazo vencido</p>
@@ -1638,13 +1649,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                   value={processSearch}
                   onChange={(event) => setProcessSearch(event.target.value)}
                   placeholder="Buscar processo, cliente, responsável..."
-                  className="w-full pl-10 pr-4 py-3 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold"
+                  className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
                 />
               </div>
               <select
                 value={processStatusFilter}
                 onChange={(event) => setProcessStatusFilter(event.target.value as 'all' | ProcessStatus)}
-                className="w-full py-3 px-4 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold"
+                className="w-full py-3 px-4 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
               >
                 <option value="all">Todos os status</option>
                 <option value={ProcessStatus.PENDENTE}>Cadastro</option>
@@ -1655,7 +1666,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               <select
                 value={processResponsibleFilter}
                 onChange={(event) => setProcessResponsibleFilter(event.target.value)}
-                className="w-full py-3 px-4 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold"
+                className="w-full py-3 px-4 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
               >
                 <option value="all">Todos os responsáveis</option>
                 {processResponsibles.map((responsible) => (
@@ -1665,7 +1676,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               <select
                 value={processTypeFilter}
                 onChange={(event) => setProcessTypeFilter(event.target.value as 'all' | ServiceUnit)}
-                className="w-full py-3 px-4 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold"
+                className="w-full py-3 px-4 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
               >
                 <option value="all">Todos os tipos</option>
                 <option value={ServiceUnit.ADMINISTRATIVO}>Administrativo</option>
@@ -1675,7 +1686,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               <select
                 value={processPeriodFilter}
                 onChange={(event) => setProcessPeriodFilter(event.target.value as 'all' | 'today' | '7d' | '30d')}
-                className="w-full py-3 px-4 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold"
+                className="w-full py-3 px-4 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
               >
                 <option value="all">Todo período</option>
                 <option value="today">Hoje</option>
@@ -1683,7 +1694,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                 <option value="30d">Últimos 30 dias</option>
               </select>
             </div>
-          </div>
+          </Card>
 
           {processesError && (
             <div className="mb-4 rounded-2xl border border-amber-700/60 bg-amber-900/20 px-4 py-3 text-sm font-bold text-amber-200">
@@ -1701,18 +1712,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
             </div>
           )}
 
-          <div className="bg-slate-900/95 border border-slate-800 rounded-2xl overflow-hidden shadow-[0_20px_50px_rgba(2,6,23,0.35)]">
-            <div className="px-4 sm:px-6 py-4 border-b border-slate-800/80 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950">
+          <Card className="bg-white border-gray-100 rounded-2xl overflow-hidden p-0">
+            <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white">
               <div>
                 <h4 className="text-2xl font-black">Lista de processos</h4>
-                <p className="text-slate-400 text-sm">Mostrando {visibleProcessRows.length} de {processRows.length} resultados</p>
+                <p className="text-gray-500 text-sm">Mostrando {visibleProcessRows.length} de {processRows.length} resultados</p>
               </div>
               <div className="flex items-center gap-2 self-start sm:self-auto">
-                <span className="text-sm text-slate-300 font-bold">Linhas</span>
+                <span className="text-sm text-gray-500 font-semibold">Linhas</span>
                 <select
                   value={processRowsLimit}
                   onChange={(event) => setProcessRowsLimit(Number(event.target.value))}
-                  className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm font-bold"
+                  className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm font-semibold text-gray-700"
                 >
                   <option value={10}>10</option>
                   <option value={25}>25</option>
@@ -1721,55 +1732,39 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               </div>
             </div>
 
-            <div className="p-4 sm:p-6 space-y-4 bg-slate-950/60">
+            <div className="p-4 sm:p-6 space-y-4 bg-gray-50/70">
               {visibleProcessRows.length === 0 ? (
-                <div className="rounded-xl border border-slate-800 bg-slate-900/70 px-4 py-10 text-center text-slate-400 font-semibold">
+                <div className="rounded-xl border border-gray-200 bg-white px-4 py-10 text-center text-gray-500 font-semibold">
                   Nenhum processo encontrado para os filtros selecionados.
                 </div>
               ) : visibleProcessRows.map((process) => (
                 <article
                   key={process.id}
-                  className="rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-4 sm:px-5 sm:py-5 hover:border-blue-700/60 hover:bg-slate-900 transition-all"
+                  className="rounded-2xl border border-gray-100 bg-white px-4 py-4 sm:px-5 sm:py-5 hover:border-blue-200 hover:bg-gray-50 transition-all shadow-sm"
                 >
                   <div className="flex flex-col gap-4">
                     <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-white font-black text-lg tracking-tight">{process.protocol}</p>
-                          <span className={`inline-flex items-center whitespace-nowrap px-3 py-1 rounded-full text-[10px] font-black border ${
-                            process.sourceLabel === 'WIX'
-                              ? 'bg-fuchsia-900/40 text-fuchsia-300 border-fuchsia-700'
-                              : 'bg-slate-800 text-slate-300 border-slate-700'
-                          }`}>
-                            {process.sourceLabel}
-                          </span>
-                          <span className={`inline-flex items-center whitespace-nowrap px-3 py-1 rounded-full text-[10px] font-black border ${
-                            process.status === ProcessStatus.CONCLUIDO
-                              ? 'bg-emerald-900/40 text-emerald-300 border-emerald-700'
-                              : process.status === ProcessStatus.ANALISE
-                                ? 'bg-orange-900/40 text-orange-300 border-orange-700'
-                                : process.status === ProcessStatus.TRIAGEM
-                                  ? 'bg-blue-900/40 text-blue-300 border-blue-700'
-                                  : 'bg-yellow-900/40 text-yellow-300 border-yellow-700'
-                          }`}>
-                            {process.status}
-                          </span>
+                          <p className="text-gray-800 font-black text-lg tracking-tight">{process.protocol}</p>
+                          <Badge variant={process.sourceLabel === 'WIX' ? 'info' : 'neutral'} className="text-xs px-2.5 py-1">{process.sourceLabel}</Badge>
+                          <Badge variant={statusBadgeVariant(process.status)} className="text-xs px-2.5 py-1">{process.status}</Badge>
                         </div>
-                        <p className="text-slate-200 font-bold mt-1">{process.name}</p>
-                        <p className="text-slate-400 text-xs mt-1">Etapa: {process.etapaAtual}{process.requestedOrganizationName !== 'Não informado' ? ` · ${process.requestedOrganizationName}` : ''}</p>
+                        <p className="text-gray-800 font-bold mt-1">{process.name}</p>
+                        <p className="text-gray-500 text-xs mt-1">Etapa: {process.etapaAtual}{process.requestedOrganizationName !== 'Não informado' ? ` · ${process.requestedOrganizationName}` : ''}</p>
                       </div>
 
                       <div className="flex items-center gap-2 self-start xl:self-auto">
                         <button
                           onClick={() => setSelectedUser(process)}
-                          className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300"
+                          className="p-2 bg-blue-500 hover:bg-blue-600 rounded-lg text-white"
                           title="Visualizar"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => setEditingUser(process)}
-                          className="p-2 bg-blue-900/30 hover:bg-blue-900/50 rounded-lg text-blue-400"
+                          className="p-2 bg-yellow-500 hover:bg-yellow-600 rounded-lg text-white"
                           title="Editar"
                         >
                           <Pencil className="w-4 h-4" />
@@ -1778,37 +1773,33 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-3 text-sm">
-                      <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3">
-                        <p className="text-[10px] uppercase tracking-widest text-slate-500 font-black">Tipo</p>
-                        <p className="text-slate-200 font-bold mt-1">{process.processType}</p>
+                      <div className="rounded-xl border border-gray-100 bg-white p-3">
+                        <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Tipo</p>
+                        <p className="text-gray-800 font-semibold mt-1">{process.processType}</p>
                       </div>
-                      <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3">
-                        <p className="text-[10px] uppercase tracking-widest text-slate-500 font-black">Responsável</p>
-                        <p className="text-slate-200 font-bold mt-1">{process.serviceManager || 'Não definido'}</p>
+                      <div className="rounded-xl border border-gray-100 bg-white p-3">
+                        <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Responsável</p>
+                        <p className="text-gray-800 font-semibold mt-1">{process.serviceManager || 'Não definido'}</p>
                       </div>
-                      <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3">
-                        <p className="text-[10px] uppercase tracking-widest text-slate-500 font-black">Início</p>
-                        <p className="text-slate-200 font-bold mt-1">{process.startDate}</p>
+                      <div className="rounded-xl border border-gray-100 bg-white p-3">
+                        <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Início</p>
+                        <p className="text-gray-800 font-semibold mt-1">{process.startDate}</p>
                       </div>
-                      <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3">
-                        <p className="text-[10px] uppercase tracking-widest text-slate-500 font-black">Prazo</p>
-                        <p className="text-slate-200 font-bold mt-1">{process.deadlineDate}</p>
+                      <div className="rounded-xl border border-gray-100 bg-white p-3">
+                        <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Prazo</p>
+                        <p className="text-gray-800 font-semibold mt-1">{process.deadlineDate}</p>
                       </div>
-                      <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3">
-                        <p className="text-[10px] uppercase tracking-widest text-slate-500 font-black">Financeiro</p>
+                      <div className="rounded-xl border border-gray-100 bg-white p-3">
+                        <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Financeiro</p>
                         <p className="mt-1">
-                          <span className="inline-flex items-center whitespace-nowrap px-2.5 py-1 rounded-full text-[10px] font-black bg-yellow-900/40 text-yellow-300 border border-yellow-700">
-                            {process.financeiro}
-                          </span>
+                          <Badge variant="warning" className="text-xs px-2.5 py-1">{process.financeiro}</Badge>
                         </p>
                       </div>
-                      <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3">
-                        <p className="text-[10px] uppercase tracking-widest text-slate-500 font-black">Prioridade & Valor</p>
+                      <div className="rounded-xl border border-gray-100 bg-white p-3">
+                        <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Prioridade & Valor</p>
                         <p className="mt-1 flex flex-wrap items-center gap-2">
-                          <span className="inline-flex items-center whitespace-nowrap px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-900/40 text-emerald-300 border border-emerald-700">
-                            {process.prioridade}
-                          </span>
-                          <span className="text-slate-100 font-black">R$ {process.valor.toLocaleString('pt-BR')}</span>
+                          <Badge variant="success" className="text-xs px-2.5 py-1">{process.prioridade}</Badge>
+                          <span className="text-gray-800 font-black">R$ {process.valor.toLocaleString('pt-BR')}</span>
                         </p>
                       </div>
                     </div>
@@ -1816,7 +1807,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                 </article>
               ))}
             </div>
-          </div>
+          </Card>
         </div>
       ) : currentSection === 'clientes' ? (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
