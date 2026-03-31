@@ -56,6 +56,48 @@ window.onunhandledrejection = function(event) {
 
 console.log('[MAIN] ✅ Global error handlers installed');
 
+const normalizeRecoveryCallbackUrl = () => {
+  const searchParams = new URLSearchParams(window.location.search);
+  const hashRaw = window.location.hash.replace(/^#/, '');
+  const hashQuery = hashRaw.includes('?') ? hashRaw.split('?').slice(1).join('?') : hashRaw;
+  const hashParams = new URLSearchParams(hashQuery);
+  const recoveryParams = new URLSearchParams();
+
+  ['code', 'type', 'access_token', 'refresh_token', 'error', 'error_description'].forEach((key) => {
+    const fromSearch = searchParams.get(key);
+    const fromHash = hashParams.get(key);
+
+    if (fromSearch) {
+      recoveryParams.set(key, fromSearch);
+      return;
+    }
+
+    if (fromHash) {
+      recoveryParams.set(key, fromHash);
+    }
+  });
+
+  const hasRecoverySignal =
+    recoveryParams.get('type') === 'recovery' ||
+    recoveryParams.has('access_token') ||
+    recoveryParams.has('refresh_token') ||
+    recoveryParams.has('code');
+
+  if (!hasRecoverySignal) {
+    return;
+  }
+
+  const targetHash = `/recovery${recoveryParams.toString() ? `?${recoveryParams.toString()}` : ''}`;
+
+  if (window.location.hash === `#${targetHash}`) {
+    return;
+  }
+
+  window.location.replace(`${window.location.origin}${window.location.pathname}#${targetHash}`);
+};
+
+normalizeRecoveryCallbackUrl();
+
 const renderImportError = (importError: any) => {
   console.error('[MAIN] ❌ Import failed:', importError);
   const rootEl = document.getElementById('root');
