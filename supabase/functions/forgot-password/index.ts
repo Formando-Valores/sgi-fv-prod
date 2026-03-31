@@ -63,8 +63,8 @@ Deno.serve(async (request) => {
       .eq('email', email)
       .maybeSingle();
 
-    if (profileLookupError || !profile?.id) {
-      return jsonResponse(200, { success: true, message: genericMessage });
+    if (profileLookupError) {
+      console.warn('[forgot-password] não foi possível buscar profile para enriquecer o e-mail', profileLookupError);
     }
 
     const { data, error } = await adminClient.auth.admin.generateLink({

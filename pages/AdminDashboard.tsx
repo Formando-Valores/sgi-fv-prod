@@ -7,6 +7,9 @@ import { SERVICE_MANAGERS } from '../constants';
 import { buildOrganizationErrorMessage, createOrganization, deleteOrganization, loadOrganizations, updateOrganization, updateOrganizationStatus } from '../organizationRepository';
 import { supabase } from '../supabase';
 import type { Process as DbProcess } from '../src/lib/processes';
+import Card from '../src/components/ui/Card';
+import Badge from '../src/components/ui/Badge';
+import Button from '../src/components/ui/Button';
 
 type AccessLevel = 'Administrador' | 'Usuário Sênior' | 'Usuário Pleno' | 'Operador' | 'Cliente';
 
@@ -28,7 +31,7 @@ type OrgMemberRow = {
   nome?: string | null;
   name?: string | null;
   full_name?: string | null;
-  organizations?: { name?: string } | null;
+  organizations?: { name?: string } | Array<{ name?: string }> | null;
 };
 
 type ProfileRow = {
@@ -39,7 +42,7 @@ type ProfileRow = {
   nome_completo?: string | null;
   nome?: string | null;
   name?: string | null;
-  organizations?: { name?: string } | null;
+  organizations?: { name?: string } | Array<{ name?: string }> | null;
 };
 
 
@@ -67,6 +70,15 @@ interface ClientProfileView {
   accessLevel: AccessLevel;
   created_at?: string;
 }
+
+type ProcessVisualOverrides = Record<
+  string,
+  {
+    deadline?: string;
+    serviceManager?: string;
+    notes?: string;
+  }
+>;
 
 const ACCESS_LEVELS: AccessLevel[] = ['Administrador', 'Usuário Sênior', 'Usuário Pleno', 'Operador', 'Cliente'];
 
@@ -102,6 +114,15 @@ const sanitizeDisplayValue = (value: string | null | undefined) => {
   return value.replace(/\s+/g, ' ').trim();
 };
 
+const extractOrganizationName = (
+  organizations: { name?: string } | Array<{ name?: string }> | null | undefined
+) => {
+  if (Array.isArray(organizations)) {
+    return sanitizeDisplayValue(organizations[0]?.name) || null;
+  }
+  return sanitizeDisplayValue(organizations?.name) || null;
+};
+
 const resolveAccessLevel = (role: string | null | undefined): AccessLevel => {
   if (!role) return 'Cliente';
 
@@ -114,6 +135,13 @@ const resolveAccessLevel = (role: string | null | undefined): AccessLevel => {
   if (normalized === 'cliente' || normalized === 'client') return 'Cliente';
 
   return 'Cliente';
+};
+
+const statusBadgeVariant = (status: ProcessStatus): 'success' | 'warning' | 'danger' | 'info' | 'neutral' => {
+  if (status === ProcessStatus.CONCLUIDO) return 'success';
+  if (status === ProcessStatus.ANALISE) return 'warning';
+  if (status === ProcessStatus.TRIAGEM) return 'info';
+  return 'neutral';
 };
 
 interface AdminDashboardProps {
@@ -152,6 +180,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [processRowsLimit, setProcessRowsLimit] = useState(10);
   const [showCreateProcessModal, setShowCreateProcessModal] = useState(false);
   const [creatingProcess, setCreatingProcess] = useState(false);
+  const [processVisualOverrides, setProcessVisualOverrides] = useState<ProcessVisualOverrides>({});
   const [processActionFeedback, setProcessActionFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [newProcessForm, setNewProcessForm] = useState({
     organizationId: '',
@@ -239,6 +268,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     return parsed.toLocaleString('pt-BR');
   };
 
+  const formatDeadlineForDisplay = (value?: string | null) => {
+    if (!value) return '';
+    const parsed = new Date(`${value}T00:00:00`);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return parsed.toLocaleDateString('pt-BR');
+  };
+
   const inferServiceUnit = (process: DbProcess): ServiceUnit => {
     const unit = sanitizeDisplayValue(process.unidade_atendimento);
     if (unit === ServiceUnit.ADMINISTRATIVO) return ServiceUnit.ADMINISTRATIVO;
@@ -264,6 +300,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       const requestedOrganizationName = sanitizeDisplayValue(process.org_nome_solicitado) || 'Não informado';
       const isExternalRequest = source.toLowerCase() === 'wix';
       const generatedValue = unit === ServiceUnit.ADMINISTRATIVO ? 5200 : unit === ServiceUnit.TECNOLOGICO ? 8200 : 1800;
+      const processOverrides = processVisualOverrides[process.id] || {};
+      const manualDeadline = sanitizeDisplayValue(processOverrides.deadline);
+      const manualServiceManager = sanitizeDisplayValue(processOverrides.serviceManager);
+      const manualNotes = sanitizeDisplayValue(processOverrides.notes);
+      const resolvedDeadlineDisplay =
+        formatDeadlineForDisplay(manualDeadline) || (isExternalRequest ? 'Aguardando análise' : '-');
 
       return {
         id: process.id,
@@ -285,14 +327,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         registrationDate: process.created_at,
         lastUpdate: process.updated_at || process.created_at,
         hierarchy: Hierarchy.STATUS_ONLY,
-        notes: isExternalRequest ? `Origem: Wix${requestedOrganizationName !== 'Não informado' ? ` · Organização solicitada: ${requestedOrganizationName}` : ''}` : undefined,
-        deadline: '',
-        serviceManager: isExternalRequest ? 'Aguardando aprovação' : 'Não definido',
+        notes:
+          manualNotes ||
+          (isExternalRequest ? `Origem: Wix${requestedOrganizationName !== 'Não informado' ? ` · Organização solicitada: ${requestedOrganizationName}` : ''}` : undefined),
+        deadline: manualDeadline,
+        serviceManager: manualServiceManager || (isExternalRequest ? 'Aguardando aprovação' : 'Não definido'),
         organizationId: process.org_id,
         organizationName: requestedOrganizationName,
         processType: unit,
         startDate: formatProcessDate(process.created_at),
-        deadlineDate: isExternalRequest ? 'Aguardando análise' : '-',
+        deadlineDate: resolvedDeadlineDisplay,
         etapaAtual: buildProcessStage(process),
         financeiro: isExternalRequest ? 'Aguardando validação' : (legacyStatus === ProcessStatus.CONCLUIDO ? 'Quitado' : 'Pendente'),
         prioridade: isExternalRequest ? 'Alta' : (legacyStatus === ProcessStatus.CONCLUIDO ? 'Média' : 'Baixa'),
@@ -541,6 +585,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     setEditingProfileSaving(true);
     setEditingProfileError('');
 
+    const normalizedDeadline = sanitizeDisplayValue(deadline);
+    const normalizedNotes = sanitizeDisplayValue(notes);
+    const normalizedServiceManager = sanitizeDisplayValue(serviceManager);
+
+    if (normalizedDeadline && !/^\d{4}-\d{2}-\d{2}$/.test(normalizedDeadline)) {
+      setEditingProfileError('Data de prazo inválida. Use o calendário para selecionar uma data válida.');
+      setEditingProfileSaving(false);
+      return;
+    }
+
     let processUpdateError = '';
     if ((currentEditingUser as AdminProcessRow | null)?.processRecordId && dbProcesses.length > 0 && processRecordId) {
       const { error } = await supabase
@@ -554,6 +608,61 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         setDbProcesses((prev) =>
           prev.map((process) => (process.id === processRecordId ? { ...process, status: statusMap[status] } : process))
         );
+      }
+    }
+
+    if (processRecordId) {
+      setProcessVisualOverrides((prev) => {
+        const existing = prev[processRecordId] || {};
+        const nextEntry = {
+          ...existing,
+          deadline: normalizedDeadline || undefined,
+          notes: normalizedNotes || undefined,
+          serviceManager: normalizedServiceManager || undefined,
+        };
+
+        if (!nextEntry.deadline && !nextEntry.notes && !nextEntry.serviceManager) {
+          const { [processRecordId]: _removed, ...rest } = prev;
+          return rest;
+        }
+
+        return { ...prev, [processRecordId]: nextEntry };
+      });
+
+      const processEventsPayload: Array<Record<string, unknown>> = [];
+
+      if (normalizedServiceManager) {
+        processEventsPayload.push({
+          org_id: (currentEditingUser as AdminProcessRow | null)?.organizationId || currentUser.organizationId || null,
+          process_id: processRecordId,
+          tipo: 'atribuicao',
+          mensagem: `Gestor do serviço definido para: ${normalizedServiceManager}.`,
+          created_by: currentUser.id,
+        });
+      }
+
+      if (normalizedDeadline) {
+        processEventsPayload.push({
+          org_id: (currentEditingUser as AdminProcessRow | null)?.organizationId || currentUser.organizationId || null,
+          process_id: processRecordId,
+          tipo: 'observacao',
+          mensagem: `Prazo atualizado para: ${formatDeadlineForDisplay(normalizedDeadline)}.`,
+          created_by: currentUser.id,
+        });
+      }
+
+      if (normalizedNotes) {
+        processEventsPayload.push({
+          org_id: (currentEditingUser as AdminProcessRow | null)?.organizationId || currentUser.organizationId || null,
+          process_id: processRecordId,
+          tipo: 'observacao',
+          mensagem: `Observação registrada: ${normalizedNotes}.`,
+          created_by: currentUser.id,
+        });
+      }
+
+      if (processEventsPayload.length > 0) {
+        await supabase.from('process_events').insert(processEventsPayload);
       }
     }
 
@@ -581,9 +690,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         country: profilePayload.pais || u.country,
         phone: profilePayload.phone || u.phone,
         status,
-        deadline,
-        notes,
-        serviceManager,
+        deadline: normalizedDeadline,
+        notes: normalizedNotes,
+        serviceManager: normalizedServiceManager,
         lastUpdate: timestamp
       } : u
     ));
@@ -618,7 +727,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         .order('created_at', { ascending: false });
 
       if (!query.error) {
-        memberRows = query.data as OrgMemberRow[] | null;
+        memberRows = query.data as unknown as OrgMemberRow[] | null;
         memberError = null;
         break;
       }
@@ -650,7 +759,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           .in('id', memberUserIds);
 
         if (!profileQuery.error) {
-          const rows = (profileQuery.data || []) as Array<{ id: string; nome_completo?: string | null; nome?: string | null; name?: string | null; email?: string | null; role?: string | null }>;
+          const rows = (profileQuery.data || []) as unknown as Array<{ id: string; nome_completo?: string | null; nome?: string | null; name?: string | null; email?: string | null; role?: string | null }>;
           profileMap = new Map(rows.map((profile) => [profile.id, profile]));
           break;
         }
@@ -687,7 +796,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       return {
         user_id: member.user_id,
         org_id: member.org_id,
-        org_name: member.organizations?.name || 'Organização Padrão',
+        org_name: extractOrganizationName(member.organizations) || 'Organização Padrão',
         name: resolvedName,
         email: resolvedEmail || '-',
         accessLevel,
@@ -714,7 +823,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         .order('created_at', { ascending: false });
 
       if (!query.error) {
-        profileRows = (query.data as ProfileRow[] | null) || [];
+        profileRows = (query.data as unknown as ProfileRow[] | null) || [];
         allProfilesError = null;
         break;
       }
@@ -778,7 +887,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         return {
           user_id: profile.id,
           org_id: sanitizeDisplayValue(profile.org_id) || defaultOrgId,
-          org_name: profile.organizations?.name || defaultOrgName,
+          org_name: extractOrganizationName(profile.organizations) || defaultOrgName,
           name: resolvedName,
           email: resolvedEmail,
           accessLevel: resolveAccessLevel(profile.role),
@@ -1151,110 +1260,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     await fetchOrgMembers();
   };
 
-  const fetchClients1 = async () => {
-    setClientsLoading(true);
-    setClientsError('');
-
-    const { data: membershipScopeRows, error: membershipScopeError } = await supabase
-      .from('org_members')
-      .select('org_id,user_id,role,organizations(name)')
-      .eq('user_id', currentUser.id);
-
-    if (membershipScopeError) {
-      setClientsError('Não foi possível validar o escopo de acesso do usuário.');
-      setClientsLoading(false);
-      return;
-    }
-
-    const hasGlobalScope = (membershipScopeRows || []).some((membership) => {
-      const role = String(membership.role || '').toLowerCase();
-      const orgName = membership.organizations?.name;
-      return (role === 'admin' || role === 'owner') && isDefaultOrganizationName(orgName);
-    });
-
-    const { data: memberRows, error: membersError } = await supabase
-      .from('org_members')
-      .select('org_id,user_id,role,organizations(name)')
-      .order('created_at', { ascending: false });
-
-    if (membersError) {
-      setClientsError('Não foi possível carregar os membros da tabela org_members.');
-      setClientsLoading(false);
-      return;
-    }
-
-    const allowedOrgIds = new Set((membershipScopeRows || []).map((row) => row.org_id));
-    const scopedMembers = (memberRows || []).filter((member) => hasGlobalScope || allowedOrgIds.has(member.org_id));
-
-    if (scopedMembers.length === 0) {
-      setClientsData([]);
-      setClientsLoading(false);
-      return;
-    }
-
-    const userIds = Array.from(new Set(scopedMembers.map((member) => member.user_id)));
-    const { data: profileRows, error: profileError } = await supabase
-      .from('profiles')
-      .select('id,nome_completo,nome,email,created_at')
-      .in('id', userIds);
-
-    if (profileError) {
-      setClientsError('Não foi possível carregar os perfis vinculados aos membros.');
-      setClientsLoading(false);
-      return;
-    }
-
-    const profileMap = new Map((profileRows || []).map((row) => [row.id, row]));
-
-    const normalizedClients: ClientProfileView[] = scopedMembers.map((member) => {
-      const profile = profileMap.get(member.user_id);
-      const email = profile?.email || '-';
-      const nome =
-        profile?.nome_completo ||
-        profile?.nome ||
-        (email !== '-' ? String(email).split('@')[0] : `Usuário ${member.user_id.slice(0, 8)}`);
-
-      return {
-        id: `${member.org_id}-${member.user_id}`,
-        user_id: member.user_id,
-        org_id: member.org_id,
-        org_name: member.organizations?.name || 'Organização Padrão',
-        nome,
-        email,
-        accessLevel: mapOrgRoleToAccessLevel(member.role),
-        created_at: profile?.created_at || undefined,
-      };
-    });
-
-    setClientsData(normalizedClients);
-    setClientsLoading(false);
-  };
-
-  useEffect(() => {
-    if (currentSection === 'clientes') {
-      fetchClients1();
-    }
-  }, [currentSection]);
-
-  const visibleClients = clientsData
-    .filter((client) =>
-      client.nome.toLowerCase().includes(clientsSearch.toLowerCase()) ||
-      client.email.toLowerCase().includes(clientsSearch.toLowerCase()) ||
-      client.org_name.toLowerCase().includes(clientsSearch.toLowerCase())
-    )
-    .sort((a, b) => {
-      if (clientsSort === 'name_asc') {
-        return a.nome.localeCompare(b.nome, 'pt-BR');
-      }
-      if (clientsSort === 'name_desc') {
-        return b.nome.localeCompare(a.nome, 'pt-BR');
-      }
-      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
-    })
-    .slice(0, clientsRowsLimit);
-
-
-
   const fetchClients = async () => {
     setClientsLoading(true);
     setClientsError('');
@@ -1272,7 +1277,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
     const hasGlobalScope = (membershipScopeRows || []).some((membership) => {
       const role = String(membership.role || '').toLowerCase();
-      const orgName = membership.organizations?.name;
+      const orgName = extractOrganizationName(membership.organizations);
       return (role === 'admin' || role === 'owner') && isDefaultOrganizationName(orgName);
     });
 
@@ -1322,7 +1327,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         id: `${member.org_id}-${member.user_id}`,
         user_id: member.user_id,
         org_id: member.org_id,
-        org_name: member.organizations?.name || 'Organização Padrão',
+        org_name: extractOrganizationName(member.organizations) || 'Organização Padrão',
         nome,
         email,
         accessLevel: mapOrgRoleToAccessLevel(member.role),
@@ -1340,7 +1345,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     }
   }, [currentSection]);
 
-  const visibleClientsFiltered = clientsData
+  const visibleClients = clientsData
     .filter((client) =>
       client.nome.toLowerCase().includes(clientsSearch.toLowerCase()) ||
       client.email.toLowerCase().includes(clientsSearch.toLowerCase()) ||
@@ -1449,12 +1454,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   };
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-slate-950 p-4 md:p-8">
+    <div className="min-h-screen overflow-x-hidden bg-gray-50 p-4 md:p-8 text-gray-800">
       <div className="mx-auto flex min-w-0 max-w-[1600px] flex-col gap-6 lg:flex-row">
         <div className="lg:hidden mb-3">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="p-3 rounded-xl bg-slate-900 border border-slate-700 text-slate-100"
+            className="p-3 rounded-xl bg-white border border-gray-200 text-gray-700 shadow-sm"
             aria-label="Abrir menu"
           >
             <Menu className="w-5 h-5" />
@@ -1463,21 +1468,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
         {sidebarOpen && (
           <button
-            className="lg:hidden fixed inset-0 bg-black/60 z-40"
+            className="lg:hidden fixed inset-0 bg-black/30 z-40"
             onClick={() => setSidebarOpen(false)}
             aria-label="Fechar menu"
           />
         )}
 
         <aside
-          className={`fixed lg:static inset-y-0 left-0 z-50 lg:z-auto w-72 shrink-0 bg-slate-900 border border-slate-800 rounded-r-2xl lg:rounded-2xl p-5 h-full lg:h-fit transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
+          className={`fixed lg:static inset-y-0 left-0 z-50 lg:z-auto w-72 shrink-0 bg-white border border-gray-100 rounded-r-2xl lg:rounded-2xl p-5 h-full lg:h-fit transition-transform duration-300 shadow-sm ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
         >
-          <h2 className="text-xl font-black mb-1">SGI FV</h2>
-          <p className="text-slate-500 text-xs font-bold uppercase mb-6">Formando Valores</p>
+          <h2 className="text-xl font-black mb-1 text-gray-800">SGI FV</h2>
+          <p className="text-gray-500 text-xs font-bold uppercase mb-6">Formando Valores</p>
 
-          <div className="mb-6 p-3 rounded-xl bg-slate-800/50 border border-slate-700">
-            <p className="font-bold text-slate-200">{currentUser.name}</p>
-            <p className="text-[10px] uppercase tracking-widest text-slate-400">{currentUser.role === UserRole.ADMIN ? 'ADMIN' : 'CLIENTE'}</p>
+          <div className="mb-6 p-3 rounded-xl bg-gray-50 border border-gray-200">
+            <p className="font-bold text-gray-800">{currentUser.name}</p>
+            <p className="text-[10px] uppercase tracking-widest text-gray-500">{currentUser.role === UserRole.ADMIN ? 'ADMIN' : 'CLIENTE'}</p>
           </div>
 
           <nav className="space-y-2">
@@ -1486,7 +1491,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                 key={item.to}
                 to={item.to}
                 onClick={() => setSidebarOpen(false)}
-                className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${isActive ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-600'}`}
+                className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${isActive ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-white text-gray-600 border-gray-100 hover:bg-gray-50'}`}
               >
                 <item.icon className="w-4 h-4" />
                 <span className="font-bold">{item.label}</span>
@@ -1499,46 +1504,47 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       {/* Admin Header */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 no-print">
         <div>
-          <h1 className="text-2xl font-black text-white tracking-tighter flex items-center gap-2">
-            <ShieldCheck className="text-red-500" /> SGI FV - PAINEL ADMINISTRATIVO
+          <h1 className="text-2xl font-black text-gray-800 tracking-tighter flex items-center gap-2">
+            <ShieldCheck className="text-blue-500" /> SGI FV - PAINEL ADMINISTRATIVO
           </h1>
-          <p className="text-slate-400 text-xs font-bold uppercase mt-1">Bem-vindo, {currentUser.name}</p>
+          <p className="text-gray-500 text-xs font-bold uppercase mt-1">Bem-vindo, {currentUser.name}</p>
         </div>
         <div className="flex gap-2">
-          <button 
+          <Button
             onClick={handlePrint} 
             title="Clique para Imprimir Documento"
-            className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 transition-colors flex items-center gap-2 px-4 text-xs font-bold uppercase"
+            variant="secondary"
+            className="flex items-center gap-2 text-xs font-bold uppercase"
           >
             <Printer className="w-4 h-4" /> Imprimir
-          </button>
-          <button 
+          </Button>
+          <Button
             onClick={handlePrint} 
             title="Clique para Salvar como PDF"
-            className="p-2 bg-blue-900/40 hover:bg-blue-900/60 rounded-lg text-blue-300 transition-colors flex items-center gap-2 px-4 text-xs font-bold uppercase border border-blue-800"
+            className="flex items-center gap-2 text-xs font-bold uppercase"
           >
             <FileDown className="w-4 h-4" /> Gerar PDF
-          </button>
-          <button onClick={onLogout} className="p-2 bg-red-900/20 hover:bg-red-900/40 rounded-lg text-red-400 transition-colors flex items-center gap-2 px-4 text-xs font-bold uppercase">
+          </Button>
+          <Button onClick={onLogout} variant="danger" className="flex items-center gap-2 text-xs font-bold uppercase">
             <LogOut className="w-4 h-4" /> Sair
-          </button>
+          </Button>
         </div>
       </header>
 
       {(currentSection === 'dashboard' || currentSection === 'configuracoes') && (
         <>
           {/* Navigation Tabs */}
-          <div className="flex border-b border-slate-800 mb-6 gap-8 no-print">
+          <div className="flex border-b border-gray-100 mb-6 gap-8 no-print">
         <button 
           onClick={() => setActiveTab('users')}
-          className={`pb-4 px-2 font-black uppercase text-xs tracking-widest transition-all relative ${activeTab === 'users' ? 'text-blue-500' : 'text-slate-500'}`}
+          className={`pb-4 px-2 font-black uppercase text-xs tracking-widest transition-all relative ${activeTab === 'users' ? 'text-blue-500' : 'text-gray-500'}`}
         >
           Visualização de Usuários
           {activeTab === 'users' && <div className="absolute bottom-0 left-0 w-full h-1 bg-blue-500 rounded-t-full"></div>}
         </button>
         <button 
           onClick={() => setActiveTab('management')}
-          className={`pb-4 px-2 font-black uppercase text-xs tracking-widest transition-all relative ${activeTab === 'management' ? 'text-blue-500' : 'text-slate-500'}`}
+          className={`pb-4 px-2 font-black uppercase text-xs tracking-widest transition-all relative ${activeTab === 'management' ? 'text-blue-500' : 'text-gray-500'}`}
         >
           Gestão de Acessos
           {activeTab === 'management' && <div className="absolute bottom-0 left-0 w-full h-1 bg-blue-500 rounded-t-full"></div>}
@@ -1550,19 +1556,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
       {currentSection === 'organizacoes' ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+          <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
             <h3 className="text-lg font-black mb-4">CADASTRAR ORGANIZAÇÃO</h3>
             <form onSubmit={handleCreateOrganization} className="space-y-4">
               <div>
-                <label className="text-xs font-bold text-slate-400 mb-2 block">Nome da organização</label>
+                <label className="text-xs font-bold text-gray-500 mb-2 block">Nome da organização</label>
                 <input
                   value={organizationName}
                   onChange={(event) => setOrganizationName(event.target.value)}
-                  className="w-full p-3 bg-gray-900 border border-slate-700 rounded-lg text-white font-bold"
+                  className="w-full p-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold"
                   placeholder="Ex.: Organização Alpha"
                 />
               </div>
-              <label className="flex items-center gap-2 text-sm text-slate-300 font-semibold">
+              <label className="flex items-center gap-2 text-sm text-gray-600 font-semibold">
                 <input
                   type="checkbox"
                   checked={organizationIsActive}
@@ -1579,20 +1585,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
             </form>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+          <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
             <h3 className="text-lg font-black mb-4">ORGANIZAÇÕES CADASTRADAS</h3>
             <div className="space-y-3">
               {organizations.map((organization) => {
                 const isEditing = editingOrganizationId === organization.id;
 
                 return (
-                  <div key={organization.id} className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
+                  <div key={organization.id} className="p-3 rounded-xl bg-gray-50 border border-gray-100 space-y-3 shadow-[0_10px_22px_rgba(15,23,42,0.06)]">
                     {isEditing ? (
                       <>
                         <input
                           value={editingOrganizationName}
                           onChange={(event) => setEditingOrganizationName(event.target.value)}
-                          className="w-full p-2 bg-slate-900 border border-slate-700 rounded-lg text-white font-bold"
+                          className="w-full p-2 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold"
                         />
                         <div className="flex gap-2">
                           <button
@@ -1605,7 +1611,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                           <button
                             type="button"
                             onClick={handleCancelEditOrganization}
-                            className="px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs font-bold"
+                            className="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold"
                           >
                             Cancelar
                           </button>
@@ -1619,7 +1625,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                             {(organization.isActive ?? true) ? 'ATIVA' : 'INATIVA'}
                           </span>
                         </div>
-                        <p className="text-xs text-slate-400">ID: {organization.id}</p>
+                        <p className="text-xs text-gray-500">ID: {organization.id}</p>
                         <div className="flex gap-2 pt-1 flex-wrap">
                           <button
                             type="button"
@@ -1649,17 +1655,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                 );
               })}
               {organizations.length === 0 && (
-                <p className="text-slate-400 text-sm">Nenhuma organização cadastrada ainda.</p>
+                <p className="text-gray-500 text-sm">Nenhuma organização cadastrada ainda.</p>
               )}
             </div>
           </div>
         </div>
       ) : currentSection === 'processos' ? (
         <div className="min-w-0 space-y-6">
-          <div className="min-w-0 bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6">
-            <div className="mb-2 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <Card className="min-w-0 bg-white border-gray-100 p-4 sm:p-5">
+            <div className="mb-2 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
-                <h3 className="text-4xl sm:text-5xl font-black tracking-tight leading-none">Processos</h3>
+                <h3 className="text-3xl sm:text-4xl font-black tracking-tight leading-none">Processos</h3>
               </div>
               <button
                 type="button"
@@ -1668,55 +1674,55 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                   setProcessActionFeedback(null);
                   setShowCreateProcessModal(true);
                 }}
-                className="inline-flex items-center gap-2 shrink-0 px-4 py-2 rounded-xl border border-blue-700 bg-blue-600/15 text-blue-200 font-bold hover:bg-blue-600/25 transition-colors"
+                className="inline-flex items-center gap-2 shrink-0 px-4 py-2 rounded-lg border border-blue-100 bg-blue-50 text-blue-600 font-semibold hover:bg-blue-100 transition-colors"
               >
                 <Plus className="w-4 h-4" /> Novo processo
               </button>
             </div>
-            <p className="text-slate-400 text-sm mb-6">Visão geral em formato de planilha para filtrar, acompanhar status e agir rápido.</p>
+            <p className="text-gray-500 text-sm mb-4">Visão geral em formato de planilha para filtrar, acompanhar status e agir rápido.</p>
 
-            <div className="grid min-w-0 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5 gap-3 sm:gap-4">
-              <div className="bg-slate-800/30 border border-slate-700 rounded-2xl p-4">
-                <p className="text-xs text-slate-400 uppercase">Processos</p>
-                <p className="text-4xl font-black leading-none mt-2">{processStats.total}</p>
-                <p className="text-slate-300 mt-1">Total após filtros</p>
+            <div className="grid min-w-0 grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5 gap-2.5 sm:gap-3">
+              <div className="bg-white border-l-4 border-blue-500 rounded-xl p-3 shadow-sm border border-gray-100">
+                <p className="text-xs text-blue-500 uppercase">Processos</p>
+                <p className="text-3xl font-black leading-none mt-1.5 text-blue-600">{processStats.total}</p>
+                <p className="text-blue-600 mt-1">Total após filtros</p>
               </div>
-              <div className="bg-slate-800/30 border border-slate-700 rounded-2xl p-4">
-                <p className="text-xs text-slate-400 uppercase">Em andamento</p>
-                <p className="text-4xl font-black leading-none mt-2">{processStats.emAndamento}</p>
-                <p className="text-slate-300 mt-1">Ativos</p>
+              <div className="bg-white border-l-4 border-blue-400 rounded-xl p-3 shadow-sm border border-gray-100">
+                <p className="text-xs text-blue-500 uppercase">Em andamento</p>
+                <p className="text-3xl font-black leading-none mt-1.5 text-blue-600">{processStats.emAndamento}</p>
+                <p className="text-blue-600 mt-1">Ativos</p>
               </div>
-              <div className="bg-slate-800/30 border border-slate-700 rounded-2xl p-4">
-                <p className="text-xs text-slate-400 uppercase">Concluídos</p>
-                <p className="text-4xl font-black leading-none mt-2">{processStats.concluidos}</p>
-                <p className="text-slate-300 mt-1">Finalizados</p>
+              <div className="bg-white border-l-4 border-green-500 rounded-xl p-3 shadow-sm border border-gray-100">
+                <p className="text-xs text-green-500 uppercase">Concluídos</p>
+                <p className="text-3xl font-black leading-none mt-1.5 text-green-600">{processStats.concluidos}</p>
+                <p className="text-green-600 mt-1">Finalizados</p>
               </div>
-              <div className="bg-slate-800/30 border border-slate-700 rounded-2xl p-4">
-                <p className="text-xs text-slate-400 uppercase">Aguardando</p>
-                <p className="text-4xl font-black leading-none mt-2">{processStats.aguardando}</p>
-                <p className="text-slate-300 mt-1">Pendências</p>
+              <div className="bg-white border-l-4 border-yellow-500 rounded-xl p-3 shadow-sm border border-gray-100">
+                <p className="text-xs text-yellow-500 uppercase">Aguardando</p>
+                <p className="text-3xl font-black leading-none mt-1.5 text-yellow-600">{processStats.aguardando}</p>
+                <p className="text-yellow-600 mt-1">Pendências</p>
               </div>
-              <div className="bg-slate-800/30 border border-slate-700 rounded-2xl p-4">
-                <p className="text-xs text-slate-400 uppercase">Atrasados</p>
-                <p className="text-4xl font-black leading-none mt-2">{processStats.atrasados}</p>
-                <p className="text-slate-300 mt-1">Prazo vencido</p>
+              <div className="bg-white border-l-4 border-red-500 rounded-xl p-3 shadow-sm border border-gray-100">
+                <p className="text-xs text-red-500 uppercase">Atrasados</p>
+                <p className="text-3xl font-black leading-none mt-1.5 text-red-600">{processStats.atrasados}</p>
+                <p className="text-red-600 mt-1">Prazo vencido</p>
               </div>
             </div>
 
-            <div className="mt-5 grid min-w-0 grid-cols-1 md:grid-cols-2 2xl:grid-cols-4 gap-3 sm:gap-4">
+            <div className="mt-4 grid min-w-0 grid-cols-1 md:grid-cols-2 2xl:grid-cols-4 gap-2.5 sm:gap-3">
               <div className="relative min-w-0 md:col-span-2 2xl:col-span-4">
-                <Search className="absolute left-3 top-3 text-slate-500 w-5 h-5" />
+                <Search className="absolute left-3 top-3 text-gray-500 w-5 h-5" />
                 <input
                   value={processSearch}
                   onChange={(event) => setProcessSearch(event.target.value)}
                   placeholder="Buscar processo, cliente, responsável..."
-                  className="w-full pl-10 pr-4 py-3 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold"
+                  className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
                 />
               </div>
               <select
                 value={processStatusFilter}
                 onChange={(event) => setProcessStatusFilter(event.target.value as 'all' | ProcessStatus)}
-                className="w-full py-3 px-4 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold"
+                className="w-full py-3 px-4 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
               >
                 <option value="all">Todos os status</option>
                 <option value={ProcessStatus.PENDENTE}>Cadastro</option>
@@ -1727,7 +1733,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               <select
                 value={processResponsibleFilter}
                 onChange={(event) => setProcessResponsibleFilter(event.target.value)}
-                className="w-full py-3 px-4 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold"
+                className="w-full py-3 px-4 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
               >
                 <option value="all">Todos os responsáveis</option>
                 {processResponsibles.map((responsible) => (
@@ -1737,7 +1743,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               <select
                 value={processTypeFilter}
                 onChange={(event) => setProcessTypeFilter(event.target.value as 'all' | ServiceUnit)}
-                className="w-full py-3 px-4 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold"
+                className="w-full py-3 px-4 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
               >
                 <option value="all">Todos os tipos</option>
                 <option value={ServiceUnit.ADMINISTRATIVO}>Administrativo</option>
@@ -1747,7 +1753,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               <select
                 value={processPeriodFilter}
                 onChange={(event) => setProcessPeriodFilter(event.target.value as 'all' | 'today' | '7d' | '30d')}
-                className="w-full py-3 px-4 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold"
+                className="w-full py-3 px-4 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
               >
                 <option value="all">Todo período</option>
                 <option value="today">Hoje</option>
@@ -1755,7 +1761,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                 <option value="30d">Últimos 30 dias</option>
               </select>
             </div>
-          </div>
+          </Card>
 
           {processesError && (
             <div className="mb-4 rounded-2xl border border-amber-700/60 bg-amber-900/20 px-4 py-3 text-sm font-bold text-amber-200">
@@ -1773,18 +1779,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
             </div>
           )}
 
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
-            <div className="px-4 sm:px-6 py-4 border-b border-slate-800 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <Card className="bg-white border-gray-100 rounded-2xl overflow-hidden p-0">
+            <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white">
               <div>
                 <h4 className="text-2xl font-black">Lista de processos</h4>
-                <p className="text-slate-400 text-sm">Mostrando {visibleProcessRows.length} de {processRows.length} resultados</p>
+                <p className="text-gray-500 text-sm">Mostrando {visibleProcessRows.length} de {processRows.length} resultados</p>
               </div>
               <div className="flex items-center gap-2 self-start sm:self-auto">
-                <span className="text-sm text-slate-300 font-bold">Linhas</span>
+                <span className="text-sm text-gray-500 font-semibold">Linhas</span>
                 <select
                   value={processRowsLimit}
                   onChange={(event) => setProcessRowsLimit(Number(event.target.value))}
-                  className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm font-bold"
+                  className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm font-semibold text-gray-700"
                 >
                   <option value={10}>10</option>
                   <option value={25}>25</option>
@@ -1793,101 +1799,101 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               </div>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="min-w-[1400px] w-full text-left text-sm">
-                <thead>
-                  <tr className="bg-slate-950 text-slate-400 uppercase text-[10px] font-black tracking-widest">
-                    <th className="px-4 py-4">Nº Processo</th>
-                    <th className="px-4 py-4">Cliente</th>
-                    <th className="px-4 py-4">Tipo</th>
-                    <th className="px-4 py-4">Origem</th>
-                    <th className="px-4 py-4">Responsável</th>
-                    <th className="px-4 py-4">Data Início</th>
-                    <th className="px-4 py-4">Prazo</th>
-                    <th className="px-4 py-4">Status</th>
-                    <th className="px-4 py-4">Etapa Atual</th>
-                    <th className="px-4 py-4">Financeiro</th>
-                    <th className="px-4 py-4">Prioridade</th>
-                    <th className="px-4 py-4">Valor</th>
-                    <th className="px-4 py-4 text-right">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800">
-                  {visibleProcessRows.map((process) => (
-                    <tr key={process.id} className="hover:bg-slate-800/40 transition-colors">
-                      <td className="px-4 py-4 font-black text-white">{process.protocol}</td>
-                      <td className="px-4 py-4 font-bold text-slate-200">{process.name}</td>
-                      <td className="px-4 py-4 text-slate-300">{process.processType}</td>
-                      <td className="px-4 py-4"><span className={`px-3 py-1 rounded-full text-[10px] font-black ${process.sourceLabel === 'WIX' ? 'bg-fuchsia-900/40 text-fuchsia-300 border border-fuchsia-700' : 'bg-slate-800 text-slate-300 border border-slate-700'}`}>{process.sourceLabel}</span></td>
-                      <td className="px-4 py-4 text-slate-300">{process.serviceManager || 'Não definido'}</td>
-                      <td className="px-4 py-4 text-slate-300">{process.startDate}</td>
-                      <td className="px-4 py-4 text-slate-300">{process.deadlineDate}</td>
-                      <td className="px-4 py-4">
-                        <span className={`px-3 py-1 rounded-full text-[10px] font-black ${
-                          process.status === ProcessStatus.CONCLUIDO
-                            ? 'bg-emerald-900/40 text-emerald-300 border border-emerald-700'
-                            : process.status === ProcessStatus.ANALISE
-                              ? 'bg-orange-900/40 text-orange-300 border border-orange-700'
-                              : process.status === ProcessStatus.TRIAGEM
-                                ? 'bg-blue-900/40 text-blue-300 border border-blue-700'
-                                : 'bg-yellow-900/40 text-yellow-300 border border-yellow-700'
-                        }`}>
-                          {process.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 text-slate-300">{process.etapaAtual}{process.requestedOrganizationName !== 'Não informado' ? ` · ${process.requestedOrganizationName}` : ''}</td>
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <span className="inline-flex items-center whitespace-nowrap px-3 py-1 rounded-full text-[10px] font-black bg-yellow-900/40 text-yellow-300 border border-yellow-700">
-                          {process.financeiro}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4">
-                        <span className="px-3 py-1 rounded-full text-[10px] font-black bg-emerald-900/40 text-emerald-300 border border-emerald-700">
-                          {process.prioridade}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 font-black text-slate-100">R$ {process.valor.toLocaleString('pt-BR')}</td>
-                      <td className="px-4 py-4 text-right">
-                        <div className="flex justify-end gap-2">
-                          <button
-                            onClick={() => setSelectedUser(process)}
-                            className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => setEditingUser(process)}
-                            className="p-2 bg-blue-900/30 hover:bg-blue-900/50 rounded-lg text-blue-400"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
+            <div className="p-4 sm:p-6 space-y-4 bg-gray-50/70">
+              {visibleProcessRows.length === 0 ? (
+                <div className="rounded-xl border border-gray-200 bg-white px-4 py-10 text-center text-gray-500 font-semibold">
+                  Nenhum processo encontrado para os filtros selecionados.
+                </div>
+              ) : visibleProcessRows.map((process) => (
+                <article
+                  key={process.id}
+                  className="rounded-2xl border border-gray-100 bg-white px-4 py-4 sm:px-5 sm:py-5 hover:border-blue-200 hover:bg-gray-50 transition-all shadow-sm"
+                >
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-gray-800 font-black text-lg tracking-tight">{process.protocol}</p>
+                          <Badge variant={process.sourceLabel === 'WIX' ? 'info' : 'neutral'} className="text-xs px-2.5 py-1">{process.sourceLabel}</Badge>
+                          <Badge variant={statusBadgeVariant(process.status)} className="text-xs px-2.5 py-1">{process.status}</Badge>
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                        <p className="text-gray-800 font-bold mt-1">{process.name}</p>
+                        <p className="text-gray-500 text-xs mt-1">Etapa: {process.etapaAtual}{process.requestedOrganizationName !== 'Não informado' ? ` · ${process.requestedOrganizationName}` : ''}</p>
+                      </div>
+
+                      <div className="flex items-center gap-2 self-start xl:self-auto">
+                        <button
+                          onClick={() => setSelectedUser(process)}
+                          className="p-2 bg-blue-500 hover:bg-blue-600 rounded-lg text-white"
+                          title="Visualizar"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setEditingUser(process)}
+                          className="p-2 bg-yellow-500 hover:bg-yellow-600 rounded-lg text-white"
+                          title="Editar"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-3 text-sm">
+                      <div className="rounded-xl border border-gray-100 bg-white p-3">
+                        <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Tipo</p>
+                        <p className="text-gray-800 font-semibold mt-1">{process.processType}</p>
+                      </div>
+                      <div className="rounded-xl border border-gray-100 bg-white p-3">
+                        <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Responsável</p>
+                        <p className="text-gray-800 font-semibold mt-1">{process.serviceManager || 'Não definido'}</p>
+                      </div>
+                      <div className="rounded-xl border border-gray-100 bg-white p-3">
+                        <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Início</p>
+                        <p className="text-gray-800 font-semibold mt-1">{process.startDate}</p>
+                      </div>
+                      <div className="rounded-xl border border-gray-100 bg-white p-3">
+                        <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Prazo</p>
+                        <p className="text-gray-800 font-semibold mt-1">{process.deadlineDate}</p>
+                      </div>
+                      <div className="rounded-xl border border-gray-100 bg-white p-3">
+                        <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Financeiro</p>
+                        <p className="mt-1">
+                          <Badge variant="warning" className="text-xs px-2.5 py-1">{process.financeiro}</Badge>
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-gray-100 bg-white p-3">
+                        <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Prioridade & Valor</p>
+                        <p className="mt-1 flex flex-wrap items-center gap-2">
+                          <Badge variant="success" className="text-xs px-2.5 py-1">{process.prioridade}</Badge>
+                          <span className="text-gray-800 font-black">R$ {process.valor.toLocaleString('pt-BR')}</span>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              ))}
             </div>
-          </div>
+          </Card>
         </div>
       ) : currentSection === 'clientes' ? (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+        <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
           <h3 className="text-lg font-black mb-4">CLIENTES</h3>
 
           <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="relative md:col-span-1">
-              <Search className="absolute left-3 top-3 text-slate-500 w-4 h-4" />
+              <Search className="absolute left-3 top-3 text-gray-500 w-4 h-4" />
               <input
                 value={clientsSearch}
                 onChange={(event) => setClientsSearch(event.target.value)}
                 placeholder="Buscar por nome..."
-                className="w-full pl-9 pr-3 py-2 bg-gray-900 border border-slate-700 rounded-lg text-white font-bold"
+                className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold"
               />
             </div>
             <select
               value={clientsSort}
               onChange={(event) => setClientsSort(event.target.value as 'name_asc' | 'name_desc' | 'recent')}
-              className="w-full py-2 px-3 bg-gray-900 border border-slate-700 rounded-lg text-white font-bold"
+              className="w-full py-2 px-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold"
             >
               <option value="name_asc">Ordenar: Nome (A-Z)</option>
               <option value="name_desc">Ordenar: Nome (Z-A)</option>
@@ -1896,7 +1902,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
             <select
               value={clientsRowsLimit}
               onChange={(event) => setClientsRowsLimit(Number(event.target.value))}
-              className="w-full py-2 px-3 bg-gray-900 border border-slate-700 rounded-lg text-white font-bold"
+              className="w-full py-2 px-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold"
             >
               <option value={10}>Mostrar 10</option>
               <option value={25}>Mostrar 25</option>
@@ -1906,15 +1912,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
           {clientsError && <p className="text-sm text-red-400 font-bold mb-4">{clientsError}</p>}
 
-          <div className="mb-3 flex items-center justify-between text-xs text-slate-400 font-bold">
+          <div className="mb-3 flex items-center justify-between text-xs text-gray-500 font-bold">
             <span>Total encontrado: {clientsData.length}</span>
             <span>Exibindo: {visibleClients.length}</span>
           </div>
 
-          <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950">
+          <div className="overflow-x-auto rounded-xl border border-gray-100 bg-gray-50">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="bg-slate-950 text-slate-400 uppercase text-[10px] font-black tracking-widest">
+                <tr className="bg-gray-50 text-gray-500 uppercase text-[10px] font-black tracking-widest">
                   <th className="px-6 py-4">Usuário</th>
                   <th className="px-6 py-4">Nível</th>
                   <th className="px-6 py-4">Organização</th>
@@ -1924,22 +1930,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               <tbody className="divide-y divide-slate-800">
                 {clientsLoading ? (
                   <tr>
-                    <td colSpan={4} className="px-6 py-8 text-center text-slate-400">Carregando membros...</td>
+                    <td colSpan={4} className="px-6 py-8 text-center text-gray-500">Carregando membros...</td>
                   </tr>
                 ) : visibleClients.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-6 py-8 text-center text-slate-400">Nenhum membro encontrado.</td>
+                    <td colSpan={4} className="px-6 py-8 text-center text-gray-500">Nenhum membro encontrado.</td>
                   </tr>
                 ) : visibleClients.map((client) => (
-                  <tr key={client.id} className="hover:bg-slate-800/30">
-                    <td className="px-6 py-4 font-bold text-slate-100">{client.nome}</td>
+                  <tr key={client.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 font-bold text-gray-800">{client.nome}</td>
                     <td className="px-6 py-4">
                       <span className="text-[10px] font-black text-blue-400 uppercase border border-blue-900/50 bg-blue-900/10 px-2 py-0.5 rounded">
                         {client.accessLevel}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-slate-300 font-bold">{client.org_name}</td>
-                    <td className="px-6 py-4 text-slate-400 font-bold">{client.email}</td>
+                    <td className="px-6 py-4 text-gray-600 font-bold">{client.org_name}</td>
+                    <td className="px-6 py-4 text-gray-500 font-bold">{client.email}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1947,28 +1953,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           </div>
         </div>
       ) : activeTab === 'users' ? (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
-          <div className="p-6 border-b border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 no-print">
+        <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
+          <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 no-print">
             <div className="relative w-full md:w-96">
-              <Search className="absolute left-3 top-2.5 text-slate-500 w-4 h-4" />
+              <Search className="absolute left-3 top-2.5 text-gray-500 w-4 h-4" />
               <input 
                 type="text" 
                 placeholder="Pesquise Por: Nome, Protocolo ou E-mail"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-gray-900 border border-slate-800 rounded-full text-white text-sm font-bold placeholder:text-slate-600 focus:ring-1 focus:ring-blue-500 outline-none"
+                className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-full text-gray-800 text-sm font-semibold placeholder:text-gray-600 focus:ring-1 focus:ring-blue-500 outline-none"
               />
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-slate-500 text-[10px] font-black uppercase">Total de Registros:</span>
-              <span className="bg-slate-800 px-2 py-0.5 rounded-md text-blue-400 font-bold text-xs">{filteredUsers.length}</span>
+              <span className="text-gray-500 text-[10px] font-black uppercase">Total de Registros:</span>
+              <span className="bg-blue-50 px-2 py-0.5 rounded-md text-blue-600 font-bold text-xs">{filteredUsers.length}</span>
             </div>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="bg-slate-950 text-slate-400 uppercase text-[10px] font-black tracking-widest">
+                <tr className="bg-gray-50 text-gray-500 uppercase text-[10px] font-black tracking-widest">
                   <th className="px-6 py-4">Nome Completo</th>
                   <th className="px-6 py-4">Telefone+DDD+País</th>
                   <th className="px-6 py-4">Protocolo SGI</th>
@@ -1979,29 +1985,29 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               </thead>
               <tbody className="divide-y divide-slate-800">
                 {filteredUsers.map(user => (
-                  <tr key={user.id} className="hover:bg-slate-800/50 transition-colors">
-                    <td className="px-6 py-4 font-bold text-slate-200">{user.name}</td>
-                    <td className="px-6 py-4 text-slate-400 font-bold">{user.phone} ({user.country})</td>
+                  <tr key={user.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 font-bold text-gray-700">{user.name}</td>
+                    <td className="px-6 py-4 text-gray-500 font-bold">{user.phone} ({user.country})</td>
                     <td className="px-6 py-4">
                       <span className="bg-blue-900/30 text-blue-400 px-2 py-1 rounded-md text-[10px] font-black">{user.protocol}</span>
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-3 py-1 rounded-full text-[10px] font-black text-white ${
-                        user.status === ProcessStatus.PENDENTE ? 'bg-slate-600' :
+                        user.status === ProcessStatus.PENDENTE ? 'bg-gray-200 text-gray-700' :
                         user.status === ProcessStatus.TRIAGEM ? 'bg-yellow-600' :
                         user.status === ProcessStatus.ANALISE ? 'bg-orange-600' : 'bg-emerald-600'
                       }`}>
                         {user.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-slate-500 text-[10px] font-bold">
+                    <td className="px-6 py-4 text-gray-500 text-[10px] font-bold">
                        {user.lastUpdate || user.registrationDate}
                     </td>
                     <td className="px-6 py-4 text-right no-print">
                       <div className="flex justify-end gap-2">
                         <button 
                           onClick={() => setSelectedUser(user)}
-                          className="p-1.5 bg-slate-800 hover:bg-slate-700 rounded-md text-slate-300"
+                          className="p-1.5 bg-gray-100 hover:bg-gray-200 rounded-md text-gray-600"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
@@ -2022,72 +2028,72 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       ) : (
         /* Management Tab Content */
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-           <div className="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-2xl p-6">
+           <div className="lg:col-span-1 bg-white border border-gray-100 rounded-2xl p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
               <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
                 <Plus className="text-blue-500" /> Cadastrar Usuário e Nível
               </h3>
               <form onSubmit={handleCreateUser} className="space-y-4">
                  <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Nome de Usuário</label>
+                    <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Nome de Usuário</label>
                     <input 
                       required
                       type="text"
                       placeholder="Nome do Gestor"
                       value={newAdminName}
                       onChange={e => setNewAdminName(e.target.value)}
-                      className="w-full bg-gray-900 border border-slate-800 rounded-lg p-3 text-white font-bold" 
+                      className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold" 
                     />
                  </div>
                  <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">E-mail</label>
+                    <label className="text-xs font-bold text-gray-500 uppercase block mb-1">E-mail</label>
                     <input 
                       required
                       type="email"
                       placeholder="admin@sgi.com"
                       value={newAdminEmail}
                       onChange={e => setNewAdminEmail(e.target.value)}
-                      className="w-full bg-gray-900 border border-slate-800 rounded-lg p-3 text-white font-bold" 
+                      className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold" 
                     />
                  </div>
                  <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Perfil de Acesso</label>
+                    <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Perfil de Acesso</label>
                     <select
                       value={newAccessLevel}
                       onChange={(event) => setNewAccessLevel(event.target.value as AccessLevel)}
-                      className="w-full bg-gray-900 border border-slate-800 rounded-lg p-3 text-white font-bold"
+                      className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold"
                     >
                       {ACCESS_LEVELS.map((level) => (
                         <option key={level} value={level}>{level}</option>
                       ))}
                     </select>
-                    <p className="text-[11px] text-slate-500 mt-2">Diretoria/Gerência da organização: agenda, equipe e distribuição autorizada.</p>
+                    <p className="text-[11px] text-gray-500 mt-2">Diretoria/Gerência da organização: agenda, equipe e distribuição autorizada.</p>
                  </div>
                  <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Instituição / Organização</label>
+                    <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Instituição / Organização</label>
                     <select
                       value={newAdminOrgId}
                       onChange={(event) => setNewAdminOrgId(event.target.value)}
-                      className="w-full bg-gray-900 border border-slate-800 rounded-lg p-3 text-white font-bold"
+                      className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold"
                     >
                       {organizations.length === 0 && <option value="">Carregando organizações...</option>}
                       {organizations.map((org) => (
                         <option key={org.id} value={org.id}>{org.name}</option>
                       ))}
                     </select>
-                    <p className="text-[11px] text-slate-500 mt-2">Instituição atual selecionada: {organizations.find((org) => org.id === newAdminOrgId)?.name || 'Organização Padrão'}</p>
+                    <p className="text-[11px] text-gray-500 mt-2">Instituição atual selecionada: {organizations.find((org) => org.id === newAdminOrgId)?.name || 'Organização Padrão'}</p>
                  </div>
                  <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Hierarquia / Nível</label>
+                    <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Hierarquia / Nível</label>
                     <div className="space-y-2 mt-2">
-                      <label className="flex items-center gap-2 text-sm text-slate-200 font-bold">
+                      <label className="flex items-center gap-2 text-sm text-gray-700 font-bold">
                         <input type="radio" name="new_hierarchy_radio" className="w-4 h-4 accent-blue-500" checked={newAdminHierarchy === Hierarchy.FULL} onChange={() => setNewAdminHierarchy(Hierarchy.FULL)} />
                         Alteração e Edição
                       </label>
-                      <label className="flex items-center gap-2 text-sm text-slate-200 font-bold">
+                      <label className="flex items-center gap-2 text-sm text-gray-700 font-bold">
                         <input type="radio" name="new_hierarchy_radio" className="w-4 h-4 accent-blue-500" checked={newAdminHierarchy === Hierarchy.STATUS_ONLY} onChange={() => setNewAdminHierarchy(Hierarchy.STATUS_ONLY)} />
                         Somente Alteração
                       </label>
-                      <label className="flex items-center gap-2 text-sm text-slate-200 font-bold">
+                      <label className="flex items-center gap-2 text-sm text-gray-700 font-bold">
                         <input type="radio" name="new_hierarchy_radio" className="w-4 h-4 accent-blue-500" checked={newAdminHierarchy === Hierarchy.NOTES_ONLY} onChange={() => setNewAdminHierarchy(Hierarchy.NOTES_ONLY)} />
                         Somente Anotações
                       </label>
@@ -2099,14 +2105,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               </form>
            </div>
 
-           <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
-              <div className="p-4 border-b border-slate-800 flex flex-col md:flex-row gap-3 md:items-center md:justify-between bg-slate-900">
+           <div className="lg:col-span-2 bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
+              <div className="p-4 border-b border-gray-100 flex flex-col md:flex-row gap-3 md:items-center md:justify-between bg-white">
                 <div className="flex items-center gap-2">
-                  <span className="text-slate-300 text-sm font-bold">Mostrar</span>
+                  <span className="text-gray-600 text-sm font-bold">Mostrar</span>
                   <select
                     value={configRowsLimit}
                     onChange={(event) => setConfigRowsLimit(Number(event.target.value))}
-                    className="bg-gray-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-bold"
+                    className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-gray-800 font-semibold"
                   >
                     <option value={10}>10</option>
                     <option value={25}>25</option>
@@ -2114,12 +2120,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                   </select>
                 </div>
                 <div className="relative w-full md:w-72">
-                  <Search className="absolute left-3 top-3 text-slate-500 w-4 h-4" />
+                  <Search className="absolute left-3 top-3 text-gray-500 w-4 h-4" />
                   <input
                     value={configSearch}
                     onChange={(event) => setConfigSearch(event.target.value)}
                     placeholder="Pesquisar..."
-                    className="w-full pl-9 pr-3 py-2 bg-gray-900 border border-slate-700 rounded-lg text-white font-bold"
+                    className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold"
                   />
                 </div>
               </div>
@@ -2140,7 +2146,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead>
-                    <tr className="bg-slate-950 text-slate-400 uppercase text-[10px] font-black tracking-widest">
+                    <tr className="bg-gray-50 text-gray-500 uppercase text-[10px] font-black tracking-widest">
                       <th className="px-6 py-4">Usuário</th>
                       <th className="px-6 py-4">Nível de Acesso</th>
                       <th className="px-6 py-4">Instituição</th>
@@ -2150,20 +2156,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                   <tbody className="divide-y divide-slate-800">
                     {membersLoading ? (
                       <tr>
-                        <td colSpan={4} className="px-6 py-8 text-center text-slate-400">Carregando membros...</td>
+                        <td colSpan={4} className="px-6 py-8 text-center text-gray-500">Carregando membros...</td>
                       </tr>
                     ) : managementUsers.map(u => (
-                      <tr key={`${u.user_id}-${u.org_id}`} className="hover:bg-slate-800/30">
+                      <tr key={`${u.user_id}-${u.org_id}`} className="hover:bg-gray-50">
                         <td className="px-6 py-4 font-bold flex flex-col">
                            <span>{u.name}</span>
-                           <span className="text-[10px] text-slate-500">{u.email}</span>
+                           <span className="text-[10px] text-gray-500">{u.email}</span>
                         </td>
                         <td className="px-6 py-4">
                           <span className="text-[10px] font-black text-blue-400 uppercase border border-blue-900/50 bg-blue-900/10 px-2 py-0.5 rounded">
                             {u.accessLevel.toUpperCase()}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-slate-300 font-bold">{u.org_name || 'Organização Padrão'}</td>
+                        <td className="px-6 py-4 text-gray-600 font-bold">{u.org_name || 'Organização Padrão'}</td>
                         <td className="px-6 py-4 text-right">
                            <div className="flex justify-end gap-2">
                               <button 
@@ -2174,7 +2180,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                                   setNewAccessLevel(u.accessLevel);
                                   setEditingMemberUserId(u.user_id);
                                 }}
-                                className="p-2 bg-slate-800 hover:bg-slate-700 rounded-md text-slate-400 hover:text-white transition-colors"
+                                className="p-2 bg-gray-100 hover:bg-gray-200 rounded-md text-gray-500 hover:text-white transition-colors"
                               >
                                 <Pencil className="w-4 h-4" />
                               </button>
@@ -2198,32 +2204,32 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       {/* Hierarchy Edit Modal */}
       {editingHierarchyUser && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="bg-slate-900 w-full max-w-md rounded-3xl border border-slate-800 shadow-2xl overflow-hidden">
-             <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-950">
+          <div className="bg-white w-full max-w-md rounded-3xl border border-gray-100 shadow-2xl overflow-hidden">
+             <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
                <h3 className="text-xl font-black uppercase">Editar Gestor</h3>
-               <button onClick={() => setEditingHierarchyUser(null)} className="p-2 bg-slate-800 hover:bg-slate-700 rounded-full">
+               <button onClick={() => setEditingHierarchyUser(null)} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full">
                  <X className="w-5 h-5" />
                </button>
              </div>
              <div className="p-8">
                 <form onSubmit={handleUpdateHierarchy}>
-                  <p className="text-slate-400 text-sm mb-6">Alterando dados para <strong>{editingHierarchyUser.email}</strong></p>
+                  <p className="text-gray-500 text-sm mb-6">Alterando dados para <strong>{editingHierarchyUser.email}</strong></p>
                   
                   <div className="space-y-4">
                     <div>
-                      <label className="text-[10px] font-black text-slate-500 uppercase block mb-1">Nome de Usuário</label>
+                      <label className="text-[10px] font-black text-gray-500 uppercase block mb-1">Nome de Usuário</label>
                       <input 
                         required
                         name="admin_name"
                         type="text"
                         defaultValue={editingHierarchyUser.name}
-                        className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500 mb-4" 
+                        className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500 mb-4" 
                       />
                     </div>
 
-                    <label className="text-[10px] font-black text-slate-500 uppercase block mb-1">Hierarquia / Nível</label>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-1">Hierarquia / Nível</label>
                     {Object.values(Hierarchy).map(h => (
-                      <label key={h} className="flex items-center gap-3 p-4 bg-gray-900 border border-slate-800 rounded-xl cursor-pointer hover:border-blue-500 transition-colors">
+                      <label key={h} className="flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-xl cursor-pointer hover:border-blue-500 transition-colors">
                         <input 
                           type="radio" 
                           name="hierarchy" 
@@ -2231,7 +2237,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                           defaultChecked={editingHierarchyUser.hierarchy === h} 
                           className="w-5 h-5 accent-blue-500" 
                         />
-                        <span className="font-bold text-slate-200">{h}</span>
+                        <span className="font-bold text-gray-700">{h}</span>
                       </label>
                     ))}
                     <button type="submit" className="w-full py-5 bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-widest rounded-2xl shadow-xl mt-4">
@@ -2247,10 +2253,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       {/* Details View Modal */}
       {selectedUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-slate-900 w-full max-w-2xl rounded-3xl border border-slate-800 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
-             <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-950">
+          <div className="bg-white w-full max-w-2xl rounded-3xl border border-gray-100 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+             <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
                <h3 className="text-xl font-black uppercase">Ficha Cadastral do Cliente</h3>
-               <button onClick={() => setSelectedUser(null)} className="p-2 bg-slate-800 hover:bg-slate-700 rounded-full">
+               <button onClick={() => setSelectedUser(null)} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full">
                  <X className="w-5 h-5" />
                </button>
              </div>
@@ -2258,48 +2264,48 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                 <div className="grid grid-cols-2 gap-8">
                   <div className="space-y-4">
                     <div>
-                      <label className="text-[10px] font-black text-slate-500 uppercase">Nome Completo</label>
+                      <label className="text-[10px] font-black text-gray-500 uppercase">Nome Completo</label>
                       <p className="text-lg font-black">{selectedUser.name}</p>
                     </div>
                     <div>
-                      <label className="text-[10px] font-black text-slate-500 uppercase">E-mail</label>
+                      <label className="text-[10px] font-black text-gray-500 uppercase">E-mail</label>
                       <p className="font-bold text-blue-400">{selectedUser.email}</p>
                     </div>
                     <div>
-                      <label className="text-[10px] font-black text-slate-500 uppercase">Documento / NIF-CPF</label>
+                      <label className="text-[10px] font-black text-gray-500 uppercase">Documento / NIF-CPF</label>
                       <p className="font-bold">{selectedUser.documentId} / {selectedUser.taxId}</p>
                     </div>
                     <div>
-                      <label className="text-[10px] font-black text-slate-500 uppercase">Estado Civil / País</label>
+                      <label className="text-[10px] font-black text-gray-500 uppercase">Estado Civil / País</label>
                       <p className="font-bold">{selectedUser.maritalStatus} - {selectedUser.country}</p>
                     </div>
                   </div>
                   <div className="space-y-4">
                     <div>
-                      <label className="text-[10px] font-black text-slate-500 uppercase">Protocolo SGI</label>
+                      <label className="text-[10px] font-black text-gray-500 uppercase">Protocolo SGI</label>
                       <p className="text-lg font-black text-emerald-400">{selectedUser.protocol}</p>
                     </div>
                     <div>
-                      <label className="text-[10px] font-black text-slate-500 uppercase">Unidade Atendimento</label>
+                      <label className="text-[10px] font-black text-gray-500 uppercase">Unidade Atendimento</label>
                       <p className="font-bold text-blue-300">{selectedUser.unit}</p>
                     </div>
                     <div>
-                      <label className="text-[10px] font-black text-slate-500 uppercase">Processo Judicial</label>
+                      <label className="text-[10px] font-black text-gray-500 uppercase">Processo Judicial</label>
                       <p className="font-bold">{selectedUser.processNumber || 'NÃO INFORMADO'}</p>
                     </div>
                     <div>
-                      <label className="text-[10px] font-black text-slate-500 uppercase">Status Atual</label>
+                      <label className="text-[10px] font-black text-gray-500 uppercase">Status Atual</label>
                       <p className="font-black text-orange-500 uppercase">{selectedUser.status}</p>
                     </div>
                   </div>
                 </div>
-                <div className="mt-8 pt-6 border-t border-slate-800">
-                  <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Endereço Completo</label>
-                  <p className="font-bold p-4 bg-gray-900 rounded-xl">{selectedUser.address}</p>
+                <div className="mt-8 pt-6 border-t border-gray-100">
+                  <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Endereço Completo</label>
+                  <p className="font-semibold p-4 bg-gray-50 border border-gray-200 rounded-xl">{selectedUser.address}</p>
                 </div>
                 {selectedUser.notes && (
                   <div className="mt-4">
-                    <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Observações Internas</label>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Observações Internas</label>
                     <p className="font-bold p-4 bg-blue-900/10 border border-blue-900/30 rounded-xl text-blue-200 italic">"{selectedUser.notes}"</p>
                   </div>
                 )}
@@ -2310,15 +2316,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
       {showCreateProcessModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-slate-900 w-full max-w-3xl rounded-3xl border border-slate-800 shadow-2xl overflow-hidden">
-            <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-950">
+          <div className="bg-white w-full max-w-3xl rounded-3xl border border-gray-100 shadow-2xl overflow-hidden">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
               <h3 className="text-xl font-black uppercase">Criar processo manual</h3>
               <button
                 onClick={() => {
                   setShowCreateProcessModal(false);
                   setProcessActionFeedback(null);
                 }}
-                className="p-2 bg-slate-800 hover:bg-slate-700 rounded-full"
+                className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -2327,11 +2333,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               <form onSubmit={handleCreateProcess} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Organização</label>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Organização</label>
                     <select
                       value={newProcessForm.organizationId}
                       onChange={(event) => setNewProcessForm((prev) => ({ ...prev, organizationId: event.target.value }))}
-                      className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                       required
                     >
                       <option value="">Selecione a organização</option>
@@ -2342,56 +2348,56 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                   </div>
 
                   <div className="md:col-span-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Título do processo</label>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Título do processo</label>
                     <input
                       type="text"
                       value={newProcessForm.title}
                       onChange={(event) => setNewProcessForm((prev) => ({ ...prev, title: event.target.value }))}
-                      className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="Ex.: Abertura de acompanhamento administrativo"
                     />
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Cliente</label>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Cliente</label>
                     <input
                       type="text"
                       value={newProcessForm.clientName}
                       onChange={(event) => setNewProcessForm((prev) => ({ ...prev, clientName: event.target.value }))}
-                      className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="Nome completo do cliente"
                       required
                     />
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Documento</label>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Documento</label>
                     <input
                       type="text"
                       value={newProcessForm.clientDocument}
                       onChange={(event) => setNewProcessForm((prev) => ({ ...prev, clientDocument: event.target.value }))}
-                      className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="CPF / NIF / Documento"
                     />
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Contato</label>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Contato</label>
                     <input
                       type="text"
                       value={newProcessForm.clientContact}
                       onChange={(event) => setNewProcessForm((prev) => ({ ...prev, clientContact: event.target.value }))}
-                      className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="E-mail, telefone ou WhatsApp"
                     />
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Tipo</label>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Tipo</label>
                     <select
                       value={newProcessForm.serviceUnit}
                       onChange={(event) => setNewProcessForm((prev) => ({ ...prev, serviceUnit: event.target.value as ServiceUnit }))}
-                      className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value={ServiceUnit.ADMINISTRATIVO}>Administrativo</option>
                       <option value={ServiceUnit.JURIDICO}>Jurídico / Advocacia</option>
@@ -2400,9 +2406,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-sm text-slate-300">
-                  O processo será criado manualmente com origem <span className="font-black text-white">PAINEL</span>,
-                  status inicial <span className="font-black text-white">Cadastro</span> e vinculado à organização selecionada.
+                <div className="rounded-2xl border border-gray-100 bg-gray-50/70 p-4 text-sm text-gray-600">
+                  O processo será criado manualmente com origem <span className="font-black text-gray-800">PAINEL</span>,
+                  status inicial <span className="font-black text-gray-800">Cadastro</span> e vinculado à organização selecionada.
                 </div>
 
                 <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
@@ -2412,7 +2418,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                       setShowCreateProcessModal(false);
                       setProcessActionFeedback(null);
                     }}
-                    className="px-5 py-3 rounded-xl border border-slate-700 text-slate-200 font-bold hover:bg-slate-800 transition-colors"
+                    className="px-5 py-3 rounded-xl border border-gray-200 text-gray-700 font-bold hover:bg-gray-100 transition-colors"
                   >
                     Cancelar
                   </button>
@@ -2435,10 +2441,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       {/* Edit Status Modal */}
       {editingUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-slate-900 w-full max-w-3xl rounded-3xl border border-slate-800 shadow-2xl overflow-hidden">
-             <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-950">
+          <div className="bg-white w-full max-w-3xl rounded-3xl border border-gray-100 shadow-2xl overflow-hidden">
+             <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
                <h3 className="text-xl font-black uppercase">Editar Status: {editingUser.protocol}</h3>
-               <button onClick={() => setEditingUser(null)} className="p-2 bg-slate-800 hover:bg-slate-700 rounded-full">
+               <button onClick={() => setEditingUser(null)} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full">
                  <X className="w-5 h-5" />
                </button>
              </div>
@@ -2457,18 +2463,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                   <div className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
-                        <label className="text-[10px] font-black text-slate-500 uppercase mb-2 block">Alterar Status do Processo</label>
-                        <select name="status" defaultValue={editingUser.status} className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none ring-blue-500 focus:ring-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase mb-2 block">Alterar Status do Processo</label>
+                        <select name="status" defaultValue={editingUser.status} className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none ring-blue-500 focus:ring-2">
                           {Object.values(ProcessStatus).map(s => (
                             <option key={s} value={s}>{s}</option>
                           ))}
                         </select>
                       </div>
                       <div>
-                        <label className="text-[10px] font-black text-slate-500 uppercase mb-2 block flex items-center gap-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase mb-2 block flex items-center gap-2">
                           <UserCheck className="w-3 h-3" /> Gestor do Serviço
                         </label>
-                        <select name="serviceManager" defaultValue={editingUser.serviceManager} className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none ring-blue-500 focus:ring-2">
+                        <select name="serviceManager" defaultValue={editingUser.serviceManager} className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none ring-blue-500 focus:ring-2">
                           <option value="">Selecione um gestor</option>
                           {SERVICE_MANAGERS.map(manager => (
                             <option key={manager} value={manager}>{manager}</option>
@@ -2478,98 +2484,98 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     </div>
 
                     <div>
-                      <label className="text-[10px] font-black text-slate-500 uppercase mb-2 block flex items-center gap-2">
+                      <label className="text-[10px] font-black text-gray-500 uppercase mb-2 block flex items-center gap-2">
                         <Calendar className="w-3 h-3" /> Data de Prazo
                       </label>
-                      <input name="deadline" type="date" defaultValue={editingUser.deadline} className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold" />
+                      <input name="deadline" type="date" defaultValue={editingUser.deadline} className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold" />
                     </div>
                     <div>
-                      <label className="text-[10px] font-black text-slate-500 uppercase mb-2 block flex items-center gap-2">
+                      <label className="text-[10px] font-black text-gray-500 uppercase mb-2 block flex items-center gap-2">
                         <MessageSquare className="w-3 h-3" /> Nota de Observações
                       </label>
-                      <textarea name="notes" rows={4} defaultValue={editingUser.notes} className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold resize-none" placeholder="Digite as anotações do processo..."></textarea>
+                      <textarea name="notes" rows={4} defaultValue={editingUser.notes} className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold resize-none" placeholder="Digite as anotações do processo..."></textarea>
                     </div>
 
-                    <div className="border-t border-slate-800 pt-6">
+                    <div className="border-t border-gray-100 pt-6">
                       <h4 className="text-lg font-black uppercase mb-4">Dados cadastrais do usuário</h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="md:col-span-2">
-                          <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Nome Completo</label>
+                          <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Nome Completo</label>
                           <input
                             type="text"
                             value={editingProfileForm.fullName}
                             onChange={(event) => setEditingProfileForm((prev) => ({ ...prev, fullName: event.target.value }))}
-                            className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
                         <div className="md:col-span-2">
-                          <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">E-mail</label>
+                          <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">E-mail</label>
                           <input
                             type="email"
                             value={editingProfileForm.email}
                             onChange={(event) => setEditingProfileForm((prev) => ({ ...prev, email: event.target.value }))}
-                            className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Documento de Identidade</label>
+                          <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Documento de Identidade</label>
                           <input
                             type="text"
                             value={editingProfileForm.documentId}
                             onChange={(event) => setEditingProfileForm((prev) => ({ ...prev, documentId: event.target.value }))}
-                            className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">NIF / CPF</label>
+                          <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">NIF / CPF</label>
                           <input
                             type="text"
                             value={editingProfileForm.taxId}
                             onChange={(event) => setEditingProfileForm((prev) => ({ ...prev, taxId: event.target.value }))}
-                            className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Telefone</label>
+                          <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Telefone</label>
                           <input
                             type="text"
                             value={editingProfileForm.phone}
                             onChange={(event) => setEditingProfileForm((prev) => ({ ...prev, phone: event.target.value }))}
-                            className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Estado Civil</label>
+                          <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Estado Civil</label>
                           <input
                             type="text"
                             value={editingProfileForm.maritalStatus}
                             onChange={(event) => setEditingProfileForm((prev) => ({ ...prev, maritalStatus: event.target.value }))}
-                            className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">País</label>
+                          <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">País</label>
                           <input
                             type="text"
                             value={editingProfileForm.country}
                             onChange={(event) => setEditingProfileForm((prev) => ({ ...prev, country: event.target.value }))}
-                            className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
                         <div className="md:col-span-2">
-                          <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Endereço completo (inclua CEP)</label>
+                          <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Endereço completo (inclua CEP)</label>
                           <input
                             type="text"
                             value={editingProfileForm.address}
                             onChange={(event) => setEditingProfileForm((prev) => ({ ...prev, address: event.target.value }))}
-                            className="w-full bg-gray-900 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
                       </div>
                     </div>
 
                     {editingProfileLoading && (
-                      <p className="text-sm font-bold text-slate-400">Carregando dados completos do cadastro...</p>
+                      <p className="text-sm font-bold text-gray-500">Carregando dados completos do cadastro...</p>
                     )}
                     {editingProfileError && (
                       <p className="text-sm font-bold text-amber-300">{editingProfileError}</p>

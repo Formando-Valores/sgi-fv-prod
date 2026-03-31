@@ -41,7 +41,7 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
   const [success, setSuccess] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  const inputClass = 'w-full p-3 bg-gray-900 border border-slate-700 rounded-lg text-white font-bold outline-none focus:ring-2 focus:ring-blue-500';
+  const inputClass = 'w-full p-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500';
 
   const validatePassword = (pass: string) => {
     const hasMinLength = pass.length >= 8;
@@ -297,24 +297,24 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
 
   if (success) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gradient-to-b from-slate-900 to-slate-950">
-        <div className="w-full max-w-md bg-slate-800 p-8 rounded-2xl shadow-2xl border border-slate-700 text-center">
+      <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gray-50">
+        <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-[0_16px_34px_rgba(15,23,42,0.08)] border border-gray-100 text-center">
           <div className="w-16 h-16 bg-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
             <CheckCircle2 className="w-8 h-8 text-white" />
           </div>
-          <h2 className="text-xl font-bold text-white mb-2">Conta Criada!</h2>
-          <p className="text-slate-400">Redirecionando para o login...</p>
+          <h2 className="text-xl font-bold text-gray-800 mb-2">Conta Criada!</h2>
+          <p className="text-gray-500">Redirecionando para o login...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gradient-to-b from-slate-900 to-slate-950">
-      <div className="w-full max-w-4xl bg-slate-800 p-4 sm:p-8 rounded-2xl shadow-2xl border border-slate-700">
+    <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gray-50">
+      <div className="w-full max-w-4xl bg-white p-4 sm:p-8 rounded-2xl shadow-[0_16px_34px_rgba(15,23,42,0.08)] border border-gray-100">
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold tracking-wider text-white">SGI FV</h1>
-          <p className="text-slate-400 font-semibold uppercase text-xs mt-1">Criar Nova Conta</p>
+          <h1 className="text-2xl font-bold tracking-wider text-gray-800">SGI FV</h1>
+          <p className="text-gray-500 font-semibold uppercase text-xs mt-1">Criar Nova Conta</p>
         </div>
 
         <div className="p-2 sm:p-6">
@@ -322,7 +322,7 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
             <h2 className="text-2xl sm:text-3xl font-bold">Solicitar Registro</h2>
             <button 
               onClick={() => goToRoute('/login')}
-              className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm font-bold"
+              className="flex items-center gap-2 text-gray-500 hover:text-gray-800 transition-colors text-sm font-bold"
             >
               <ArrowLeft className="w-4 h-4" /> VOLTAR AO LOGIN
             </button>
@@ -331,32 +331,32 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
           <div className="space-y-8">
             {/* Secção 1 */}
             <section>
-              <h3 className="text-blue-400 font-bold uppercase text-xs tracking-[0.2em] mb-4 flex items-center gap-2">
-                <span className="w-6 h-px bg-blue-400"></span> 1. Dados de Identificação
+              <h3 className="text-blue-600 font-bold uppercase text-xs tracking-[0.2em] mb-4 flex items-center gap-2">
+                <span className="w-6 h-px bg-blue-600"></span> 1. Dados de Identificação
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
-                  <label className="text-xs font-bold text-slate-400 mb-2 block">Nome Completo</label>
+                  <label className="text-xs font-bold text-gray-500 mb-2 block">Nome Completo</label>
                   <input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className={inputClass} />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-400 mb-2 block">E-mail para Login</label>
+                  <label className="text-xs font-bold text-gray-500 mb-2 block">E-mail para Login</label>
                   <input type="email" required value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className={inputClass} placeholder="exemplo@email.com" />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-400 mb-2 block">Documento Identidade</label>
+                  <label className="text-xs font-bold text-gray-500 mb-2 block">Documento Identidade</label>
                   <input required value={formData.documentId} onChange={e => setFormData({...formData, documentId: e.target.value})} className={inputClass} />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-400 mb-2 block">Identificação Fiscal (NIF/CPF)</label>
+                  <label className="text-xs font-bold text-gray-500 mb-2 block">Identificação Fiscal (NIF/CPF)</label>
                   <input required value={formData.taxId} onChange={e => setFormData({...formData, taxId: e.target.value})} className={inputClass} />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-400 mb-2 block">Senha</label>
+                  <label className="text-xs font-bold text-gray-500 mb-2 block">Senha</label>
                   <input type="password" required value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className={inputClass} />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-400 mb-2 block">Confirmar Senha</label>
+                  <label className="text-xs font-bold text-gray-500 mb-2 block">Confirmar Senha</label>
                   <input type="password" required value={formData.confirmPassword} onChange={e => setFormData({...formData, confirmPassword: e.target.value})} className={inputClass} />
                 </div>
               </div>
@@ -364,16 +364,16 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
 
             {/* Secção 2 */}
             <section>
-              <h3 className="text-blue-400 font-bold uppercase text-xs tracking-[0.2em] mb-4 flex items-center gap-2">
-                <span className="w-6 h-px bg-blue-400"></span> 2. Contato & Morada
+              <h3 className="text-blue-600 font-bold uppercase text-xs tracking-[0.2em] mb-4 flex items-center gap-2">
+                <span className="w-6 h-px bg-blue-600"></span> 2. Contato & Morada
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
-                  <label className="text-xs font-bold text-slate-400 mb-2 block">Endereço Completo</label>
+                  <label className="text-xs font-bold text-gray-500 mb-2 block">Endereço Completo</label>
                   <input required value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className={inputClass} />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-400 mb-2 block">Estado Civil</label>
+                  <label className="text-xs font-bold text-gray-500 mb-2 block">Estado Civil</label>
                   <select value={formData.maritalStatus} onChange={e => setFormData({...formData, maritalStatus: e.target.value})} className={inputClass}>
                     <option value="Solteiro">Solteiro</option>
                     <option value="Casado">Casado</option>
@@ -382,7 +382,7 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-400 mb-2 block">Selecione o País (DDD)</label>
+                  <label className="text-xs font-bold text-gray-500 mb-2 block">Selecione o País (DDD)</label>
                   <select value={formData.country} onChange={e => setFormData({...formData, country: e.target.value})} className={inputClass}>
                     {COUNTRIES.map(c => (
                       <option key={c.name} value={c.name}>{c.flag} {c.name} ({c.code})</option>
@@ -390,11 +390,11 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-400 mb-2 block">Celular / WhatsApp (apenas números)</label>
+                  <label className="text-xs font-bold text-gray-500 mb-2 block">Celular / WhatsApp (apenas números)</label>
                   <input required type="tel" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value.replace(/\D/g, '')})} className={inputClass} placeholder="Ex: 11999999999" />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-400 mb-2 block">Nº DO PROCESSO JUDICIAL (Opcional)</label>
+                  <label className="text-xs font-bold text-gray-500 mb-2 block">Nº DO PROCESSO JUDICIAL (Opcional)</label>
                   <input value={formData.processNumber} onChange={e => setFormData({...formData, processNumber: e.target.value})} className={inputClass} />
                 </div>
               </div>
@@ -402,12 +402,12 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
 
             {/* Secção 3 */}
             <section>
-              <h3 className="text-blue-400 font-bold uppercase text-xs tracking-[0.2em] mb-4 flex items-center gap-2">
-                <span className="w-6 h-px bg-blue-400"></span> 3. Unidade de Atendimento
+              <h3 className="text-blue-600 font-bold uppercase text-xs tracking-[0.2em] mb-4 flex items-center gap-2">
+                <span className="w-6 h-px bg-blue-600"></span> 3. Unidade de Atendimento
               </h3>
 
               <div className="mb-4">
-                <label className="text-xs font-bold text-slate-400 mb-2 block">Organização</label>
+                <label className="text-xs font-bold text-gray-500 mb-2 block">Organização</label>
                 <select
                   required
                   value={formData.organizationId}
@@ -423,10 +423,10 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {Object.values(ServiceUnit).map(unit => (
-                  <label key={unit} className={`cursor-pointer p-4 rounded-xl border-2 transition-all ${formData.unit === unit ? 'bg-blue-600/20 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)]' : 'bg-gray-900 border-slate-800'}`}>
+                  <label key={unit} className={`cursor-pointer p-4 rounded-xl border-2 transition-all ${formData.unit === unit ? 'bg-blue-50 border-blue-500 shadow-[0_10px_20px_rgba(59,130,246,0.25)]' : 'bg-white border-gray-200'}`}>
                     <input type="radio" name="unit" className="hidden" value={unit} checked={formData.unit === unit} onChange={() => setFormData({...formData, unit})} />
                     <div className="text-center">
-                      <p className={`text-sm font-bold ${formData.unit === unit ? 'text-white' : 'text-slate-500'}`}>{unit}</p>
+                      <p className={`text-sm font-bold ${formData.unit === unit ? 'text-blue-700' : 'text-gray-600'}`}>{unit}</p>
                     </div>
                   </label>
                 ))}
@@ -434,7 +434,7 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
             </section>
 
             {error && (
-              <div className="p-4 bg-red-900/30 border border-red-800 rounded-lg text-red-200 text-sm font-bold text-center">
+              <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm font-bold text-center">
                 {error}
               </div>
             )}
@@ -463,7 +463,7 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
         </div>
       </div>
       
-      <p className="mt-8 text-slate-600 text-[10px] uppercase tracking-tighter">
+      <p className="mt-8 text-gray-500 text-[10px] uppercase tracking-tighter">
         © 2026 SGI FV - Sistema de Gestão Integrada
       </p>
     </div>
