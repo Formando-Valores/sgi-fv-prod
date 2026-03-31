@@ -272,6 +272,8 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
               email: formData.email,
               fullName: formData.name,
               source: 'cadastro interno',
+              profile: 'USUÁRIO OPERADOR',
+              temporaryPassword: formData.password,
               loginUrl,
             },
           })

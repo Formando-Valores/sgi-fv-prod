@@ -3,7 +3,7 @@
  * Sistema de Gestão Integrada - Formando Valores
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AlertCircle, Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { ProcessStatus, ServiceUnit, User, UserRole } from '../types';
@@ -26,6 +26,39 @@ const isAdminRole = (value: unknown): boolean => {
 
 const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 
+const extractRecoveryParamsFromUrl = () => {
+  const href = window.location.href;
+  const searchParams = new URLSearchParams(window.location.search);
+  const tokenParams = new URLSearchParams();
+
+  ['code', 'type', 'token', 'email', 'token_hash', 'access_token', 'refresh_token', 'error', 'error_description'].forEach((key) => {
+    const value = searchParams.get(key);
+    if (value) {
+      tokenParams.set(key, value);
+    }
+  });
+
+  href
+    .split('#')
+    .slice(1)
+    .forEach((segment) => {
+      const normalized = segment.includes('?') ? segment.split('?').slice(1).join('?') : segment;
+      if (!normalized.includes('=')) {
+        return;
+      }
+
+      const params = new URLSearchParams(normalized);
+      ['code', 'type', 'token', 'email', 'token_hash', 'access_token', 'refresh_token', 'error', 'error_description'].forEach((key) => {
+        const value = params.get(key);
+        if (value && !tokenParams.has(key)) {
+          tokenParams.set(key, value);
+        }
+      });
+    });
+
+  return tokenParams;
+};
+
 const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -38,6 +71,24 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
   const [forgotPasswordError, setForgotPasswordError] = useState('');
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const recoveryParams = extractRecoveryParamsFromUrl();
+    const hasRecoverySignal =
+      recoveryParams.get('type') === 'recovery' ||
+      (recoveryParams.has('token') && recoveryParams.has('email')) ||
+      recoveryParams.has('token_hash') ||
+      recoveryParams.has('access_token') ||
+      recoveryParams.has('refresh_token') ||
+      recoveryParams.has('code');
+
+    if (!hasRecoverySignal) {
+      return;
+    }
+
+    const query = recoveryParams.toString();
+    navigate(`/recovery${query ? `?${query}` : ''}`, { replace: true });
+  }, [navigate]);
 
   const handleForgotPassword = async () => {
     setForgotPasswordError('');
