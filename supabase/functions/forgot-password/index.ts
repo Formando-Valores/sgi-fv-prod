@@ -79,17 +79,17 @@ Deno.serve(async (request) => {
       return jsonResponse(200, { success: true, message: genericMessage });
     }
 
-    const generatedTokenHash =
-      data?.properties?.hashed_token ||
-      data?.properties?.token_hash ||
-      '';
+    const generatedOtpToken = data?.properties?.email_otp || '';
+    const generatedTokenHash = data?.properties?.hashed_token || data?.properties?.token_hash || '';
 
-    if (!generatedTokenHash) {
+    if (!generatedOtpToken && !generatedTokenHash) {
       return jsonResponse(200, { success: true, message: genericMessage });
     }
 
     const separator = recoveryRedirectUrl.includes('?') ? '&' : '?';
-    const generatedResetUrl = `${recoveryRedirectUrl}${separator}token_hash=${encodeURIComponent(generatedTokenHash)}&type=recovery`;
+    const generatedResetUrl = generatedOtpToken
+      ? `${recoveryRedirectUrl}${separator}token=${encodeURIComponent(generatedOtpToken)}&type=recovery&email=${encodeURIComponent(email)}`
+      : `${recoveryRedirectUrl}${separator}token_hash=${encodeURIComponent(generatedTokenHash)}&type=recovery`;
 
     const emailResult = await sendPasswordResetEmail({
       email,

@@ -27,6 +27,8 @@ const extractRecoveryParams = () => {
   const hashParams = new URLSearchParams(hashQuery);
 
   return {
+    email: hashParams.get('email') ?? searchParams.get('email'),
+    token: hashParams.get('token') ?? searchParams.get('token'),
     tokenHash: hashParams.get('token_hash') ?? searchParams.get('token_hash'),
     accessToken: hashParams.get('access_token') ?? searchParams.get('access_token'),
     refreshToken: hashParams.get('refresh_token') ?? searchParams.get('refresh_token'),
@@ -60,7 +62,24 @@ const PasswordRecovery: React.FC = () => {
         return;
       }
 
-      const { tokenHash, accessToken, refreshToken, code, type } = extractRecoveryParams();
+      const { email, token, tokenHash, accessToken, refreshToken, code, type } = extractRecoveryParams();
+
+      if (token && email) {
+        const { error } = await supabase.auth.verifyOtp({
+          email,
+          token,
+          type: 'recovery',
+        });
+
+        if (error) {
+          setFeedback(error.message || 'Não foi possível validar o link de recuperação.');
+          setState('error');
+          return;
+        }
+
+        setState('ready');
+        return;
+      }
 
       if (tokenHash) {
         const { error } = await supabase.auth.verifyOtp({

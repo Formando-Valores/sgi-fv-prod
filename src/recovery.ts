@@ -41,17 +41,21 @@ const redirectToSpaRecovery = () => {
     const accessToken = hashParams.get('access_token');
     const refreshToken = hashParams.get('refresh_token');
     const code = hashParams.get('code');
+    const token = hashParams.get('token');
+    const email = hashParams.get('email');
     const tokenHash = hashParams.get('token_hash');
     const type = hashParams.get('type');
 
     if (accessToken) tokenParams.set('access_token', accessToken);
     if (refreshToken) tokenParams.set('refresh_token', refreshToken);
     if (code) tokenParams.set('code', code);
+    if (token) tokenParams.set('token', token);
+    if (email) tokenParams.set('email', email);
     if (tokenHash) tokenParams.set('token_hash', tokenHash);
     if (type) tokenParams.set('type', type);
   }
 
-  ['code', 'type', 'token_hash', 'access_token', 'refresh_token'].forEach((key) => {
+  ['code', 'type', 'token', 'email', 'token_hash', 'access_token', 'refresh_token'].forEach((key) => {
     const value = searchParams.get(key);
     if (value && !tokenParams.has(key)) tokenParams.set(key, value);
   });
