@@ -104,7 +104,10 @@ export async function getCurrentUserContext(): Promise<UserContext | null> {
   }
   
   // 4. Monta o contexto completo
-  const org = membership.organizations as { id: string; slug: string; name: string };
+  const orgRelation = Array.isArray(membership.organizations)
+    ? membership.organizations[0]
+    : membership.organizations;
+  const org = (orgRelation || null) as { id: string; slug: string; name: string } | null;
   
   return {
     id: user.id,

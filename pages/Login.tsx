@@ -3,7 +3,7 @@
  * Sistema de Gestão Integrada - Formando Valores
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AlertCircle, Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { ProcessStatus, ServiceUnit, User, UserRole } from '../types';
@@ -26,6 +26,39 @@ const isAdminRole = (value: unknown): boolean => {
 
 const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 
+const extractRecoveryParamsFromUrl = () => {
+  const href = window.location.href;
+  const searchParams = new URLSearchParams(window.location.search);
+  const tokenParams = new URLSearchParams();
+
+  ['code', 'type', 'token', 'email', 'token_hash', 'access_token', 'refresh_token', 'error', 'error_description'].forEach((key) => {
+    const value = searchParams.get(key);
+    if (value) {
+      tokenParams.set(key, value);
+    }
+  });
+
+  href
+    .split('#')
+    .slice(1)
+    .forEach((segment) => {
+      const normalized = segment.includes('?') ? segment.split('?').slice(1).join('?') : segment;
+      if (!normalized.includes('=')) {
+        return;
+      }
+
+      const params = new URLSearchParams(normalized);
+      ['code', 'type', 'token', 'email', 'token_hash', 'access_token', 'refresh_token', 'error', 'error_description'].forEach((key) => {
+        const value = params.get(key);
+        if (value && !tokenParams.has(key)) {
+          tokenParams.set(key, value);
+        }
+      });
+    });
+
+  return tokenParams;
+};
+
 const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -38,6 +71,24 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
   const [forgotPasswordError, setForgotPasswordError] = useState('');
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const recoveryParams = extractRecoveryParamsFromUrl();
+    const hasRecoverySignal =
+      recoveryParams.get('type') === 'recovery' ||
+      (recoveryParams.has('token') && recoveryParams.has('email')) ||
+      recoveryParams.has('token_hash') ||
+      recoveryParams.has('access_token') ||
+      recoveryParams.has('refresh_token') ||
+      recoveryParams.has('code');
+
+    if (!hasRecoverySignal) {
+      return;
+    }
+
+    const query = recoveryParams.toString();
+    navigate(`/recovery${query ? `?${query}` : ''}`, { replace: true });
+  }, [navigate]);
 
   const handleForgotPassword = async () => {
     setForgotPasswordError('');
@@ -60,7 +111,7 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
       const loginUrl = `${appOrigin}${window.location.pathname.includes('#') ? '' : '/#/login'}`;
       const redirectTo = `${appOrigin}/recovery.html`;
 
-      const { error: forgotError } = await supabase.functions.invoke(SUPABASE_EDGE_FUNCTIONS.FORGOT_PASSWORD, {
+      const { data: forgotData, error: forgotError } = await supabase.functions.invoke(SUPABASE_EDGE_FUNCTIONS.FORGOT_PASSWORD, {
         body: {
           email: forgotPasswordEmail,
           loginUrl,
@@ -68,8 +119,18 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
         },
       });
 
-      if (forgotError) {
+      const functionSucceeded = !forgotError && (forgotData?.success ?? true);
+
+      if (!functionSucceeded) {
         console.error('[login] falha ao solicitar redefinição de senha', forgotError);
+
+        const { error: fallbackError } = await supabase.auth.resetPasswordForEmail(forgotPasswordEmail, {
+          redirectTo,
+        });
+
+        if (fallbackError) {
+          console.error('[login] fallback resetPasswordForEmail também falhou', fallbackError);
+        }
       }
 
       setForgotPasswordMessage('Se o email estiver cadastrado, você receberá instruções para redefinir sua senha.');
@@ -280,35 +341,35 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
 
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gradient-to-b from-slate-900 to-slate-950">
-      <div className="w-full max-w-md bg-slate-800 p-8 rounded-2xl shadow-2xl border border-slate-700">
+    <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gray-50">
+      <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold tracking-wider text-white">SGI FV</h1>
-          <p className="text-slate-400 font-semibold uppercase text-xs mt-1">Formando Valores</p>
+          <h1 className="text-2xl font-bold tracking-wider text-gray-800">SGI FV</h1>
+          <p className="text-gray-500 font-semibold uppercase text-xs mt-1">Formando Valores</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-6">
           {showForgotPassword ? (
-            <div className="space-y-4 rounded-xl border border-blue-800/80 bg-blue-950/30 p-4">
+            <div className="space-y-4 rounded-xl border border-blue-100 bg-blue-50 p-4">
               <div>
-                <h3 className="text-sm font-black uppercase tracking-wider text-blue-200">Recuperar acesso</h3>
-                <p className="mt-1 text-sm text-slate-300">
+                <h3 className="text-sm font-black uppercase tracking-wider text-blue-700">Recuperar acesso</h3>
+                <p className="mt-1 text-sm text-gray-600">
                   Informe seu e-mail para receber um link seguro de redefinição de senha.
                 </p>
               </div>
 
               <div className="space-y-3">
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wide text-slate-400 mb-2">
+                  <label className="block text-xs font-bold uppercase tracking-wide text-gray-500 mb-2">
                     E-mail cadastrado
                   </label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-3.5 text-slate-500 w-5 h-5" />
+                    <Mail className="absolute left-3 top-3.5 text-gray-400 w-5 h-5" />
                     <input
                       type="email"
                       value={forgotPasswordEmail}
                       onChange={(event) => setForgotPasswordEmail(event.target.value)}
-                      className="w-full rounded-lg border border-slate-700 bg-gray-900 py-3 pl-10 pr-4 text-white font-bold placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full rounded-lg border border-gray-200 bg-white py-3 pl-10 pr-4 text-gray-800 font-semibold placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="seu@email.com"
                       required={showForgotPassword}
                       disabled={forgotPasswordLoading}
@@ -317,11 +378,11 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
                 </div>
 
                 {forgotPasswordError && (
-                  <p className="text-sm font-bold text-red-300">{forgotPasswordError}</p>
+                  <p className="text-sm font-bold text-red-600">{forgotPasswordError}</p>
                 )}
 
                 {forgotPasswordMessage && (
-                  <p className="text-sm font-bold text-emerald-300">{forgotPasswordMessage}</p>
+                  <p className="text-sm font-bold text-emerald-600">{forgotPasswordMessage}</p>
                 )}
 
                 <button
@@ -340,7 +401,7 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
                     setForgotPasswordError('');
                     setForgotPasswordMessage('');
                   }}
-                  className="w-full rounded-lg border border-slate-600 px-4 py-3 text-sm font-black uppercase tracking-wider text-slate-200 transition-colors hover:border-slate-400 hover:text-white"
+                  className="w-full rounded-lg border border-gray-200 bg-gray-100 px-4 py-3 text-sm font-black uppercase tracking-wider text-gray-700 transition-colors hover:bg-gray-200"
                 >
                   Voltar ao login
                 </button>
@@ -349,15 +410,15 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
           ) : (
             <>
               <div>
-                <label className="block text-sm font-bold text-slate-300 mb-2">Usuário - e-mail</label>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Usuário - e-mail</label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-3.5 text-slate-500 w-5 h-5" />
+                  <Mail className="absolute left-3 top-3.5 text-gray-400 w-5 h-5" />
                   <input
                     type="email"
                     placeholder="seu@email.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 bg-gray-900 border border-slate-700 rounded-lg text-white font-bold placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required={!showForgotPassword}
                     disabled={isLoading}
                   />
@@ -365,22 +426,22 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-slate-300 mb-2">Senha Privada</label>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Senha Privada</label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-3.5 text-slate-500 w-5 h-5" />
+                  <Lock className="absolute left-3 top-3.5 text-gray-400 w-5 h-5" />
                   <input
                     type={showPassword ? 'text' : 'password'}
                     placeholder="******"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-10 pr-12 py-3 bg-gray-900 border border-slate-700 rounded-lg text-white font-bold placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full pl-10 pr-12 py-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required={!showForgotPassword}
                     disabled={isLoading}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-3.5 text-slate-500 hover:text-slate-300 transition-colors"
+                    className="absolute right-3 top-3.5 text-gray-400 hover:text-gray-600 transition-colors"
                   >
                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
@@ -394,7 +455,7 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
                       setForgotPasswordError('');
                       setForgotPasswordMessage('');
                     }}
-                    className="text-sm font-bold text-blue-300 hover:text-blue-200 transition-colors"
+                    className="text-sm font-bold text-blue-600 hover:text-blue-700 transition-colors"
                   >
                     Esqueci minha senha
                   </button>
@@ -402,9 +463,9 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
               </div>
 
               {error && (
-                <div className="flex items-center gap-2 p-3 bg-red-900/30 border border-red-800 rounded-lg">
-                  <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
-                  <p className="text-red-200 text-sm font-bold">{error}</p>
+                <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+                  <p className="text-red-700 text-sm font-bold">{error}</p>
                 </div>
               )}
 
@@ -426,18 +487,18 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
           )}
         </form>
 
-        <div className="mt-8 pt-6 border-t border-slate-700 text-center">
-          <p className="text-slate-400 text-sm mb-4">Ainda não possui acesso?</p>
+        <div className="mt-8 pt-6 border-t border-gray-200 text-center">
+          <p className="text-gray-500 text-sm mb-4">Ainda não possui acesso?</p>
           <Link
             to="/register"
-            className="inline-block px-6 py-2 border-2 border-slate-600 hover:border-slate-400 text-slate-300 font-bold rounded-full transition-all"
+            className="inline-block px-6 py-2 border-2 border-gray-300 hover:border-gray-400 text-gray-700 font-bold rounded-full transition-all"
           >
             REGISTRE-SE AGORA
           </Link>
         </div>
       </div>
       
-      <p className="mt-8 text-slate-600 text-[10px] uppercase tracking-tighter">
+      <p className="mt-8 text-gray-500 text-[10px] uppercase tracking-tighter">
         © 2026 SGI FV - Sistema de Gestão Integrada
       </p>
     </div>

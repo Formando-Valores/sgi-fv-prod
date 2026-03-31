@@ -24,11 +24,6 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
 
   return (
   <div className="min-h-screen bg-slate-950 p-4 md:p-8">
-
-    {/* Aviso Palmeiras */}
-    <div className="w-full bg-green-600 text-white text-center font-bold py-3 rounded mb-6 shadow-lg">
-      🏆 O Palmeiras é campeão mundial de 1951
-    </div>
       {/* Top Header */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 no-print">
         <div>
