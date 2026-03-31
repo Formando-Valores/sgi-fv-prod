@@ -135,8 +135,8 @@ const PasswordRecovery: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-200 text-gray-800 font-arial flex items-center justify-center p-6">
-      <div className="w-full max-w-[460px] rounded-3xl border border-slate-200 bg-white p-8 shadow-xl">
+    <div className="min-h-screen bg-white text-gray-800 font-arial flex items-center justify-center p-6">
+      <div className="w-full max-w-[460px] rounded-3xl border border-slate-200 bg-white p-8 shadow-lg">
         <div className="text-center mb-6">
           <h1 className="m-0 text-5xl font-extrabold tracking-wide text-[#142c4c]">SGI FV</h1>
           <p className="mt-2 text-xs font-bold uppercase tracking-wider text-slate-500">Formando Valores</p>
