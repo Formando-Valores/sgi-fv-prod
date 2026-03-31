@@ -54,7 +54,7 @@ Deno.serve(async (request) => {
 
   const recoveryRedirectUrl =
     redirectTo ||
-    `${String(Deno.env.get('APP_URL') ?? Deno.env.get('SITE_URL') ?? 'https://sgi-fv-prod.vercel.app').replace(/\/$/, '')}/#/recovery`;
+    `${String(Deno.env.get('APP_URL') ?? Deno.env.get('SITE_URL') ?? 'https://sgi-fv-prod.vercel.app').replace(/\/$/, '')}/recovery.html`;
 
   try {
     const { data: profile, error: profileLookupError } = await adminClient

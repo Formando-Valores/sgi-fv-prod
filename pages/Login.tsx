@@ -58,7 +58,7 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
     try {
       const appOrigin = window.location.origin.replace(/\/$/, '');
       const loginUrl = `${appOrigin}${window.location.pathname.includes('#') ? '' : '/#/login'}`;
-      const redirectTo = `${appOrigin}/#/recovery`;
+      const redirectTo = `${appOrigin}/recovery.html`;
 
       const { error: forgotError } = await supabase.functions.invoke(SUPABASE_EDGE_FUNCTIONS.FORGOT_PASSWORD, {
         body: {

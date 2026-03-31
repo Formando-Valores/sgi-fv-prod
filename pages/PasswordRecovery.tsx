@@ -135,18 +135,18 @@ const PasswordRecovery: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0f172a] text-white font-arial flex items-center justify-center p-6">
-      <div className="w-full max-w-[460px] rounded-3xl border border-slate-700 bg-slate-800 p-8 shadow-2xl">
+    <div className="min-h-screen bg-gray-200 text-gray-800 font-arial flex items-center justify-center p-6">
+      <div className="w-full max-w-[460px] rounded-3xl border border-slate-200 bg-white p-8 shadow-xl">
         <div className="text-center mb-6">
-          <h1 className="m-0 text-3xl font-extrabold tracking-wide">Formando Valores</h1>
-          <p className="mt-2 text-xs font-bold uppercase tracking-wider text-slate-400">Redefinição de senha</p>
+          <h1 className="m-0 text-5xl font-extrabold tracking-wide text-[#142c4c]">SGI FV</h1>
+          <p className="mt-2 text-xs font-bold uppercase tracking-wider text-slate-500">Formando Valores</p>
         </div>
 
         <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
-          <p className="m-0 text-slate-300 leading-relaxed">Defina uma nova senha para concluir o acesso à sua conta.</p>
+          <p className="m-0 text-slate-600 leading-relaxed">Defina uma nova senha para concluir o acesso à sua conta.</p>
 
           <label className="flex flex-col gap-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Nova senha</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Nova senha</span>
             <input
               type="password"
               value={password}
@@ -155,12 +155,12 @@ const PasswordRecovery: React.FC = () => {
               minLength={8}
               disabled={!canSubmit}
               placeholder="Digite sua nova senha"
-              className="rounded-xl border border-slate-600 bg-slate-900 px-4 py-3 font-bold text-white outline-none"
+              className="rounded-xl border border-slate-300 bg-white px-4 py-3 font-bold text-slate-800 outline-none"
             />
           </label>
 
           <label className="flex flex-col gap-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Confirmar nova senha</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Confirmar nova senha</span>
             <input
               type="password"
               value={confirmPassword}
@@ -169,12 +169,12 @@ const PasswordRecovery: React.FC = () => {
               minLength={8}
               disabled={!canSubmit}
               placeholder="Confirme sua nova senha"
-              className="rounded-xl border border-slate-600 bg-slate-900 px-4 py-3 font-bold text-white outline-none"
+              className="rounded-xl border border-slate-300 bg-white px-4 py-3 font-bold text-slate-800 outline-none"
             />
           </label>
 
           {feedback && (
-            <p className={`m-0 text-sm font-bold ${feedback.includes('sucesso') ? 'text-emerald-300' : 'text-rose-300'}`}>
+            <p className={`m-0 text-sm font-bold ${feedback.includes('sucesso') ? 'text-emerald-600' : 'text-rose-600'}`}>
               {feedback}
             </p>
           )}
@@ -187,7 +187,7 @@ const PasswordRecovery: React.FC = () => {
             {isSubmitting ? 'Atualizando...' : 'Atualizar senha'}
           </button>
 
-          <Link to="/login" className="text-center font-bold text-blue-300 no-underline">
+          <Link to="/login" className="text-center font-bold text-blue-600 no-underline">
             Voltar para o login
           </Link>
         </form>
