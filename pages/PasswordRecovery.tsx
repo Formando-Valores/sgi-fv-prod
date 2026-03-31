@@ -27,9 +27,11 @@ const extractRecoveryParams = () => {
   const hashParams = new URLSearchParams(hashQuery);
 
   return {
+    tokenHash: hashParams.get('token_hash') ?? searchParams.get('token_hash'),
     accessToken: hashParams.get('access_token') ?? searchParams.get('access_token'),
     refreshToken: hashParams.get('refresh_token') ?? searchParams.get('refresh_token'),
     code: hashParams.get('code') ?? searchParams.get('code'),
+    type: hashParams.get('type') ?? searchParams.get('type'),
   };
 };
 
@@ -58,7 +60,23 @@ const PasswordRecovery: React.FC = () => {
         return;
       }
 
-      const { accessToken, refreshToken, code } = extractRecoveryParams();
+      const { tokenHash, accessToken, refreshToken, code, type } = extractRecoveryParams();
+
+      if (tokenHash) {
+        const { error } = await supabase.auth.verifyOtp({
+          token_hash: tokenHash,
+          type: 'recovery',
+        });
+
+        if (error) {
+          setFeedback(error.message || 'Não foi possível validar o link de recuperação.');
+          setState('error');
+          return;
+        }
+
+        setState('ready');
+        return;
+      }
 
       if (accessToken && refreshToken) {
         const { error } = await supabase.auth.setSession({
@@ -85,6 +103,12 @@ const PasswordRecovery: React.FC = () => {
         }
 
         setState('ready');
+        return;
+      }
+
+      if (type === 'recovery') {
+        setFeedback('Link de recuperação inválido ou expirado. Solicite um novo link.');
+        setState('error');
         return;
       }
 

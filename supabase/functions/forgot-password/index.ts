@@ -79,21 +79,23 @@ Deno.serve(async (request) => {
       return jsonResponse(200, { success: true, message: genericMessage });
     }
 
-    const generatedActionLink =
-      data?.properties?.action_link ||
+    const generatedTokenHash =
       data?.properties?.hashed_token ||
-      data?.action_link ||
+      data?.properties?.token_hash ||
       '';
 
-    if (!generatedActionLink || generatedActionLink === data?.properties?.hashed_token) {
+    if (!generatedTokenHash) {
       return jsonResponse(200, { success: true, message: genericMessage });
     }
+
+    const separator = recoveryRedirectUrl.includes('?') ? '&' : '?';
+    const generatedResetUrl = `${recoveryRedirectUrl}${separator}token_hash=${encodeURIComponent(generatedTokenHash)}&type=recovery`;
 
     const emailResult = await sendPasswordResetEmail({
       email,
       fullName: String(profile?.nome_completo ?? '').trim(),
       loginUrl,
-      resetUrl: generatedActionLink,
+      resetUrl: generatedResetUrl,
     });
 
     if (!emailResult.ok) {

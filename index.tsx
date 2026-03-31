@@ -63,7 +63,7 @@ const normalizeRecoveryCallbackUrl = () => {
   const hashParams = new URLSearchParams(hashQuery);
   const recoveryParams = new URLSearchParams();
 
-  ['code', 'type', 'access_token', 'refresh_token', 'error', 'error_description'].forEach((key) => {
+  ['code', 'type', 'token_hash', 'access_token', 'refresh_token', 'error', 'error_description'].forEach((key) => {
     const fromSearch = searchParams.get(key);
     const fromHash = hashParams.get(key);
 
@@ -79,6 +79,7 @@ const normalizeRecoveryCallbackUrl = () => {
 
   const hasRecoverySignal =
     recoveryParams.get('type') === 'recovery' ||
+    recoveryParams.has('token_hash') ||
     recoveryParams.has('access_token') ||
     recoveryParams.has('refresh_token') ||
     recoveryParams.has('code');

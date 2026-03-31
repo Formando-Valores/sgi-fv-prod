@@ -31,7 +31,7 @@ const extractRecoveryParamsFromUrl = () => {
   const searchParams = new URLSearchParams(window.location.search);
   const tokenParams = new URLSearchParams();
 
-  ['code', 'type', 'access_token', 'refresh_token', 'error', 'error_description'].forEach((key) => {
+  ['code', 'type', 'token_hash', 'access_token', 'refresh_token', 'error', 'error_description'].forEach((key) => {
     const value = searchParams.get(key);
     if (value) {
       tokenParams.set(key, value);
@@ -48,7 +48,7 @@ const extractRecoveryParamsFromUrl = () => {
       }
 
       const params = new URLSearchParams(normalized);
-      ['code', 'type', 'access_token', 'refresh_token', 'error', 'error_description'].forEach((key) => {
+      ['code', 'type', 'token_hash', 'access_token', 'refresh_token', 'error', 'error_description'].forEach((key) => {
         const value = params.get(key);
         if (value && !tokenParams.has(key)) {
           tokenParams.set(key, value);
@@ -76,6 +76,7 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
     const recoveryParams = extractRecoveryParamsFromUrl();
     const hasRecoverySignal =
       recoveryParams.get('type') === 'recovery' ||
+      recoveryParams.has('token_hash') ||
       recoveryParams.has('access_token') ||
       recoveryParams.has('refresh_token') ||
       recoveryParams.has('code');
