@@ -408,6 +408,41 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     atrasados: processRows.filter((process) => process.status !== ProcessStatus.CONCLUIDO && Boolean(process.deadline)).length,
   };
 
+  const dashboardHighlights = [
+    {
+      key: 'usuarios',
+      label: 'Usuários cadastrados',
+      value: users.length,
+      helper: `${filteredUsers.length} visíveis no filtro atual`,
+      icon: Users2,
+      styles: 'border-blue-100 bg-blue-50 text-blue-700',
+    },
+    {
+      key: 'processos-ativos',
+      label: 'Processos em andamento',
+      value: processStats.emAndamento,
+      helper: `${processStats.total} processos no total`,
+      icon: FolderKanban,
+      styles: 'border-indigo-100 bg-indigo-50 text-indigo-700',
+    },
+    {
+      key: 'prioridade',
+      label: 'Demandas que exigem atenção',
+      value: processRows.filter((process) => process.status === ProcessStatus.TRIAGEM || process.status === ProcessStatus.ANALISE).length,
+      helper: 'Triagem + Análise',
+      icon: MessageSquare,
+      styles: 'border-amber-100 bg-amber-50 text-amber-700',
+    },
+    {
+      key: 'novos',
+      label: 'Novos nos últimos 7 dias',
+      value: processRows.filter((process) => isWithinPeriod(process.registrationDate, '7d')).length,
+      helper: 'Velocidade de entrada',
+      icon: Calendar,
+      styles: 'border-emerald-100 bg-emerald-50 text-emerald-700',
+    },
+  ];
+
   const resetNewProcessForm = () => {
     setNewProcessForm({
       organizationId: newAdminOrgId || organizations[0]?.id || '',
@@ -1530,6 +1565,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           </Button>
         </div>
       </header>
+
+      {currentSection === 'dashboard' && (
+        <section className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 no-print">
+          {dashboardHighlights.map((item) => (
+            <article key={item.key} className={`rounded-2xl border p-4 shadow-sm ${item.styles}`}>
+              <div className="mb-2 flex items-start justify-between gap-2">
+                <p className="text-[11px] font-black uppercase tracking-widest">{item.label}</p>
+                <item.icon className="h-5 w-5 opacity-80" />
+              </div>
+              <p className="text-3xl font-black leading-none">{item.value}</p>
+              <p className="mt-2 text-xs font-semibold opacity-80">{item.helper}</p>
+            </article>
+          ))}
+        </section>
+      )}
 
       {(currentSection === 'dashboard' || currentSection === 'configuracoes') && (
         <>
