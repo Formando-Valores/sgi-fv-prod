@@ -26,6 +26,12 @@ export default defineConfig(({ mode }) => {
         sourcemap: !isProd,
         // Remove console logs in production
         minify: 'terser',
+        rollupOptions: {
+          input: {
+            main: path.resolve(__dirname, 'index.html'),
+            recovery: path.resolve(__dirname, 'recovery.html'),
+          },
+        },
         terserOptions: {
           compress: {
             drop_console: isProd,

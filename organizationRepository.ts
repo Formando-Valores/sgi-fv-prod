@@ -52,6 +52,7 @@ const toOrganization = (row: Record<string, unknown>): MutableOrganization | nul
 
   return {
     id: String(idValue),
+    slug: String(row.slug ?? slugify(String(organizationName ?? idValue))),
     name: organizationName ?? `Organização ${idValue}`,
     isActive: toBoolean(activeRaw) ?? true,
   };
@@ -201,6 +202,7 @@ export const createOrganization = async (organizationName: string, isActive = tr
           return {
             organization: {
               id: organizationId,
+              slug: slugify(normalizedName),
               name: normalizedName,
               isActive,
             } as MutableOrganization,
