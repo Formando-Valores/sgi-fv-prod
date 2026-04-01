@@ -76,8 +76,13 @@ Deno.serve(async (request) => {
   });
 
   if (!emailResult.ok) {
+    console.error('[send-access-credentials] falha ao enviar e-mail', {
+      email,
+      error: emailResult.error,
+    });
     return jsonResponse(503, { success: false, error: emailResult.error });
   }
 
+  console.info('[send-access-credentials] e-mail enviado com sucesso', { email });
   return jsonResponse(200, { success: true });
 });

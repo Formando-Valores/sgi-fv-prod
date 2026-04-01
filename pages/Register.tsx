@@ -266,25 +266,51 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
         setCurrentUser(newUser);
 
         const loginUrl = `${window.location.origin}${window.location.pathname.includes('#') ? '' : '/#/login'}`;
-        void supabase.functions
-          .invoke(SUPABASE_EDGE_FUNCTIONS.SEND_ACCESS_CREDENTIALS, {
-            body: {
-              email: formData.email,
-              fullName: formData.name,
-              source: 'cadastro interno',
-              profile: 'USUÁRIO OPERADOR',
-              temporaryPassword: formData.password,
-              loginUrl,
-            },
-          })
-          .then((credentialEmailResult) => {
-            if (credentialEmailResult.error) {
-              console.warn('[register] não foi possível enviar o e-mail de acesso', credentialEmailResult.error);
-            }
-          })
-          .catch((credentialEmailError) => {
-            console.warn('[register] falha assíncrona ao solicitar e-mail de acesso', credentialEmailError);
+        const credentialPayload = {
+          email: formData.email,
+          fullName: formData.name,
+          source: 'cadastro interno',
+          profile: 'USUÁRIO OPERADOR',
+          temporaryPassword: formData.password,
+          loginUrl,
+        };
+
+        const { data: credentialEmailData, error: credentialEmailError } = await supabase.functions.invoke(
+          SUPABASE_EDGE_FUNCTIONS.SEND_ACCESS_CREDENTIALS,
+          { body: credentialPayload }
+        );
+
+        if (credentialEmailError || credentialEmailData?.success === false) {
+          console.warn('[register] envio via supabase.functions.invoke falhou, tentando fallback HTTP direto', {
+            credentialEmailError,
+            credentialEmailData,
           });
+
+          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+          const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+          if (supabaseUrl && supabaseAnonKey) {
+            const fallbackResponse = await fetch(`${supabaseUrl}/functions/v1/${SUPABASE_EDGE_FUNCTIONS.SEND_ACCESS_CREDENTIALS}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': supabaseAnonKey,
+                'Authorization': `Bearer ${supabaseAnonKey}`,
+              },
+              body: JSON.stringify(credentialPayload),
+            });
+
+            if (!fallbackResponse.ok) {
+              const fallbackBody = await fallbackResponse.text();
+              console.warn('[register] fallback HTTP direto também falhou', {
+                status: fallbackResponse.status,
+                body: fallbackBody,
+              });
+            }
+          } else {
+            console.warn('[register] fallback HTTP não executado: VITE_SUPABASE_URL/VITE_SUPABASE_ANON_KEY ausentes');
+          }
+        }
 
         setSuccess(true);
         setTimeout(() => goToRoute('/login'), 1200);
