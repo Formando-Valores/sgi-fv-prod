@@ -1533,6 +1533,32 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               </NavLink>
             ))}
           </nav>
+
+          <div className="mt-6 border-t border-gray-200 pt-4">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3">Módulos</p>
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs font-extrabold uppercase text-gray-600">Core</p>
+                <p className="text-xs text-gray-500 mt-1">login • gestão de usuários • permissões</p>
+              </div>
+              <div>
+                <p className="text-xs font-extrabold uppercase text-gray-600">Operações</p>
+                <p className="text-xs text-gray-500 mt-1">tarefas • projetos • histórico</p>
+              </div>
+              <div>
+                <p className="text-xs font-extrabold uppercase text-gray-600">Financeiro</p>
+                <p className="text-xs text-gray-500 mt-1">pagamentos • custos • receitas</p>
+              </div>
+              <div>
+                <p className="text-xs font-extrabold uppercase text-gray-600">Clientes</p>
+                <p className="text-xs text-gray-500 mt-1">cadastro • contratos • histórico</p>
+              </div>
+              <div>
+                <p className="text-xs font-extrabold uppercase text-gray-600">IA</p>
+                <p className="text-xs text-gray-500 mt-1">análise de dados • geração de relatórios</p>
+              </div>
+            </div>
+          </div>
         </aside>
 
         <div className="min-w-0 flex-1 lg:pl-0">

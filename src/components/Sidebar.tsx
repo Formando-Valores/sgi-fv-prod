@@ -65,6 +65,32 @@ const Sidebar: React.FC = () => {
             {item.label}
           </NavLink>
         ))}
+
+        <div className="mt-6 border-t border-slate-800 pt-4">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3">Módulos</p>
+          <div className="space-y-3">
+            <div>
+              <p className="text-xs font-extrabold uppercase text-slate-300">Core</p>
+              <p className="text-xs text-slate-500 mt-1">login • gestão de usuários • permissões</p>
+            </div>
+            <div>
+              <p className="text-xs font-extrabold uppercase text-slate-300">Operações</p>
+              <p className="text-xs text-slate-500 mt-1">tarefas • projetos • histórico</p>
+            </div>
+            <div>
+              <p className="text-xs font-extrabold uppercase text-slate-300">Financeiro</p>
+              <p className="text-xs text-slate-500 mt-1">pagamentos • custos • receitas</p>
+            </div>
+            <div>
+              <p className="text-xs font-extrabold uppercase text-slate-300">Clientes</p>
+              <p className="text-xs text-slate-500 mt-1">cadastro • contratos • histórico</p>
+            </div>
+            <div>
+              <p className="text-xs font-extrabold uppercase text-slate-300">IA</p>
+              <p className="text-xs text-slate-500 mt-1">análise de dados • geração de relatórios</p>
+            </div>
+          </div>
+        </div>
       </nav>
 
       {/* Footer */}
