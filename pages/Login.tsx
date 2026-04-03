@@ -277,17 +277,11 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
         const contextOrganizationName = contextData?.org_name ?? contextByEmailData?.org_name;
         const contextOrganizationSlug = contextData?.org_slug ?? contextByEmailData?.org_slug;
 
-        const hasDefaultOrganizationAccess =
-          contextOrganizationSlug === 'default' ||
-          (!!defaultOrganization?.id && contextOrganizationId === defaultOrganization.id) ||
-          (!!defaultOrganization?.id && profileOrgId === defaultOrganization.id);
-
         const hasAdminRole =
           isAdminRole(profile?.role) ||
           isAdminRole(contextRole) ||
           isAdminRole(existingUser?.role) ||
-          ADMIN_CREDENTIALS.some((adminEmail) => adminEmail.toLowerCase() === (data.user.email || '').toLowerCase()) ||
-          hasDefaultOrganizationAccess;
+          ADMIN_CREDENTIALS.some((adminEmail) => adminEmail.toLowerCase() === (data.user.email || '').toLowerCase());
 
         const normalizedRole = hasAdminRole ? UserRole.ADMIN : UserRole.CLIENT;
 
