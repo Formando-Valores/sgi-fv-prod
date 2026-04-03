@@ -71,6 +71,20 @@ interface ClientProfileView {
   created_at?: string;
 }
 
+interface NewClientFormState {
+  fullName: string;
+  email: string;
+  phone: string;
+  documentId: string;
+  taxId: string;
+  address: string;
+  country: string;
+  maritalStatus: string;
+  organizationId: string;
+  accessLevel: AccessLevel;
+  grantSystemAccess: boolean;
+}
+
 type ProcessVisualOverrides = Record<
   string,
   {
@@ -204,6 +218,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [clientsSearch, setClientsSearch] = useState('');
   const [clientsRowsLimit, setClientsRowsLimit] = useState(10);
   const [clientsSort, setClientsSort] = useState<'name_asc' | 'name_desc' | 'recent'>('name_asc');
+  const [showCreateClientModal, setShowCreateClientModal] = useState(false);
+  const [creatingClient, setCreatingClient] = useState(false);
+  const [clientFormError, setClientFormError] = useState('');
+  const [clientFormSuccess, setClientFormSuccess] = useState('');
+  const [newClientForm, setNewClientForm] = useState<NewClientFormState>({
+    fullName: '',
+    email: '',
+    phone: '',
+    documentId: '',
+    taxId: '',
+    address: '',
+    country: 'Brasil',
+    maritalStatus: 'Solteiro',
+    organizationId: '',
+    accessLevel: 'Cliente',
+    grantSystemAccess: false,
+  });
   const [dbProcesses, setDbProcesses] = useState<DbProcess[]>([]);
   const [processesLoading, setProcessesLoading] = useState(false);
   const [processesError, setProcessesError] = useState('');
@@ -1397,6 +1428,159 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     })
     .slice(0, clientsRowsLimit);
 
+  const resetNewClientForm = () => {
+    setNewClientForm({
+      fullName: '',
+      email: '',
+      phone: '',
+      documentId: '',
+      taxId: '',
+      address: '',
+      country: 'Brasil',
+      maritalStatus: 'Solteiro',
+      organizationId: organizations[0]?.id || '',
+      accessLevel: 'Cliente',
+      grantSystemAccess: false,
+    });
+    setClientFormError('');
+    setClientFormSuccess('');
+  };
+
+  const handleCreateClient = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setClientFormError('');
+    setClientFormSuccess('');
+
+    const name = sanitizeDisplayValue(newClientForm.fullName);
+    const email = sanitizeDisplayValue(newClientForm.email);
+    const selectedOrg = organizations.find((org) => org.id === newClientForm.organizationId);
+
+    if (!name) {
+      setClientFormError('Informe o nome do cliente.');
+      return;
+    }
+
+    if (!email) {
+      setClientFormError('Informe o e-mail do cliente.');
+      return;
+    }
+
+    if (!selectedOrg) {
+      setClientFormError('Selecione uma organização válida.');
+      return;
+    }
+
+    setCreatingClient(true);
+
+    try {
+      const normalizedRole = mapAccessLevelToOrgRole(newClientForm.accessLevel);
+
+      if (newClientForm.grantSystemAccess) {
+        const { data: existingProfile, error: lookupError } = await supabase
+          .from('profiles')
+          .select('id,email')
+          .eq('email', email)
+          .maybeSingle();
+
+        if (lookupError) {
+          setClientFormError('Não foi possível validar o perfil no banco de dados.');
+          return;
+        }
+
+        if (!existingProfile?.id) {
+          setClientFormError('Para liberar acesso ao sistema, este e-mail precisa já ter conta criada no Auth.');
+          return;
+        }
+
+        const { error: updateProfileError } = await supabase
+          .from('profiles')
+          .update({
+            nome_completo: name,
+            name,
+            documento_identidade: sanitizeDisplayValue(newClientForm.documentId) || null,
+            nif_cpf: sanitizeDisplayValue(newClientForm.taxId) || null,
+            estado_civil: sanitizeDisplayValue(newClientForm.maritalStatus) || null,
+            phone: sanitizeDisplayValue(newClientForm.phone) || null,
+            endereco: sanitizeDisplayValue(newClientForm.address) || null,
+            pais: sanitizeDisplayValue(newClientForm.country) || null,
+            role: newClientForm.accessLevel,
+            org_id: selectedOrg.id,
+          })
+          .eq('id', existingProfile.id);
+
+        if (updateProfileError) {
+          setClientFormError('Não foi possível atualizar o perfil do cliente.');
+          return;
+        }
+
+        const { error: upsertMemberError } = await supabase
+          .from('org_members')
+          .upsert(
+            {
+              org_id: selectedOrg.id,
+              user_id: existingProfile.id,
+              role: normalizedRole,
+            },
+            { onConflict: 'org_id,user_id' }
+          );
+
+        if (upsertMemberError) {
+          setClientFormError('Perfil atualizado, mas não foi possível vincular cliente à organização.');
+          return;
+        }
+
+        await fetchClients();
+      } else {
+        const tempId = `local-${Date.now()}`;
+        const now = new Date().toLocaleString('pt-BR');
+
+        setUsers((prev) => [
+          {
+            id: tempId,
+            name,
+            email,
+            role: UserRole.CLIENT,
+            documentId: sanitizeDisplayValue(newClientForm.documentId) || '---',
+            taxId: sanitizeDisplayValue(newClientForm.taxId) || '---',
+            address: sanitizeDisplayValue(newClientForm.address) || '---',
+            maritalStatus: sanitizeDisplayValue(newClientForm.maritalStatus) || '---',
+            country: sanitizeDisplayValue(newClientForm.country) || '---',
+            phone: sanitizeDisplayValue(newClientForm.phone) || '---',
+            unit: ServiceUnit.ADMINISTRATIVO,
+            status: ProcessStatus.PENDENTE,
+            protocol: `CLI-${new Date().getFullYear()}-${String(prev.length + 1).padStart(3, '0')}`,
+            registrationDate: now,
+            lastUpdate: now,
+            hierarchy: Hierarchy.NOTES_ONLY,
+            organizationId: selectedOrg.id,
+            organizationName: selectedOrg.name,
+          },
+          ...prev,
+        ]);
+
+        setClientsData((prev) => [
+          {
+            id: `${selectedOrg.id}-${tempId}`,
+            user_id: tempId,
+            org_id: selectedOrg.id,
+            org_name: selectedOrg.name,
+            nome: name,
+            email,
+            accessLevel: newClientForm.accessLevel,
+            created_at: new Date().toISOString(),
+          },
+          ...prev,
+        ]);
+      }
+
+      setClientFormSuccess('Cliente cadastrado com sucesso.');
+      resetNewClientForm();
+      setShowCreateClientModal(false);
+    } finally {
+      setCreatingClient(false);
+    }
+  };
+
   const handleCreateOrganization = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setOrgError('');
@@ -1533,6 +1717,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               </NavLink>
             ))}
           </nav>
+
         </aside>
 
         <div className="min-w-0 flex-1 lg:pl-0">
@@ -1928,7 +2113,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         </div>
       ) : currentSection === 'clientes' ? (
         <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
-          <h3 className="text-lg font-black mb-4">CLIENTES</h3>
+          <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <h3 className="text-lg font-black">CLIENTES</h3>
+            <Button
+              onClick={() => {
+                resetNewClientForm();
+                setShowCreateClientModal(true);
+              }}
+              className="flex items-center gap-2 text-xs font-bold uppercase"
+            >
+              <Plus className="w-4 h-4" /> Novo cliente
+            </Button>
+          </div>
 
           <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="relative md:col-span-1">
@@ -2248,6 +2444,179 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                 </table>
               </div>
            </div>
+        </div>
+      )}
+
+      {showCreateClientModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-4xl rounded-3xl border border-gray-100 shadow-2xl overflow-hidden">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+              <h3 className="text-xl font-black uppercase">Cadastrar novo cliente</h3>
+              <button
+                onClick={() => {
+                  setShowCreateClientModal(false);
+                  setClientFormError('');
+                  setClientFormSuccess('');
+                }}
+                className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-8 max-h-[85vh] overflow-y-auto">
+              <form onSubmit={handleCreateClient} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Nome completo</label>
+                    <input
+                      type="text"
+                      value={newClientForm.fullName}
+                      onChange={(event) => setNewClientForm((prev) => ({ ...prev, fullName: event.target.value }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Nome completo do cliente"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">E-mail</label>
+                    <input
+                      type="email"
+                      value={newClientForm.email}
+                      onChange={(event) => setNewClientForm((prev) => ({ ...prev, email: event.target.value }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="cliente@empresa.com"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Telefone</label>
+                    <input
+                      type="text"
+                      value={newClientForm.phone}
+                      onChange={(event) => setNewClientForm((prev) => ({ ...prev, phone: event.target.value }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="+55 (11) 99999-9999"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Documento de identidade</label>
+                    <input
+                      type="text"
+                      value={newClientForm.documentId}
+                      onChange={(event) => setNewClientForm((prev) => ({ ...prev, documentId: event.target.value }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="RG / BI / Passaporte"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">NIF / CPF</label>
+                    <input
+                      type="text"
+                      value={newClientForm.taxId}
+                      onChange={(event) => setNewClientForm((prev) => ({ ...prev, taxId: event.target.value }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Número fiscal"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Estado civil</label>
+                    <input
+                      type="text"
+                      value={newClientForm.maritalStatus}
+                      onChange={(event) => setNewClientForm((prev) => ({ ...prev, maritalStatus: event.target.value }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Solteiro(a), Casado(a)..."
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">País</label>
+                    <input
+                      type="text"
+                      value={newClientForm.country}
+                      onChange={(event) => setNewClientForm((prev) => ({ ...prev, country: event.target.value }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Brasil"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Organização</label>
+                    <select
+                      value={newClientForm.organizationId}
+                      onChange={(event) => setNewClientForm((prev) => ({ ...prev, organizationId: event.target.value }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    >
+                      <option value="">Selecione a organização</option>
+                      {organizations.map((organization) => (
+                        <option key={organization.id} value={organization.id}>{organization.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Endereço</label>
+                    <input
+                      type="text"
+                      value={newClientForm.address}
+                      onChange={(event) => setNewClientForm((prev) => ({ ...prev, address: event.target.value }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Rua, número, complemento, cidade"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Perfil no sistema</label>
+                    <select
+                      value={newClientForm.accessLevel}
+                      onChange={(event) => setNewClientForm((prev) => ({ ...prev, accessLevel: event.target.value as AccessLevel }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      {ACCESS_LEVELS.map((level) => (
+                        <option key={level} value={level}>{level}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex items-center">
+                    <label className="flex items-center gap-3 p-4 rounded-xl border border-gray-200 w-full">
+                      <input
+                        type="checkbox"
+                        checked={newClientForm.grantSystemAccess}
+                        onChange={(event) => setNewClientForm((prev) => ({ ...prev, grantSystemAccess: event.target.checked }))}
+                        className="w-4 h-4 accent-blue-600"
+                      />
+                      <span className="text-sm font-semibold text-gray-700">Cliente terá acesso ao sistema</span>
+                    </label>
+                  </div>
+                </div>
+
+                {clientFormError && (
+                  <p className="text-sm font-bold text-red-500">{clientFormError}</p>
+                )}
+                {clientFormSuccess && (
+                  <p className="text-sm font-bold text-emerald-600">{clientFormSuccess}</p>
+                )}
+
+                <div className="rounded-2xl border border-gray-100 bg-gray-50/70 p-4 text-sm text-gray-600">
+                  Quando o acesso ao sistema estiver marcado, o e-mail informado precisa já existir no Auth para vínculo automático.
+                </div>
+
+                <div className="flex justify-end gap-3">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      setShowCreateClientModal(false);
+                      setClientFormError('');
+                      setClientFormSuccess('');
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button type="submit" className="flex items-center gap-2" disabled={creatingClient}>
+                    <Check className="w-4 h-4" /> {creatingClient ? 'Salvando...' : 'Salvar cliente'}
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
         </div>
       )}
 
