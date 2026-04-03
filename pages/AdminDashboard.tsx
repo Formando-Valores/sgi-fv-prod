@@ -2310,38 +2310,38 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                  <X className="w-5 h-5" />
                </button>
              </div>
-             <div className="p-8 overflow-y-auto">
-                <div className="grid grid-cols-2 gap-8">
-                  <div className="space-y-4">
+             <div className="p-6 sm:p-8 overflow-y-auto">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+                  <div className="space-y-4 min-w-0">
                     <div>
                       <label className="text-[10px] font-black text-gray-500 uppercase">Nome Completo</label>
-                      <p className="text-lg font-black">{selectedUser.name}</p>
+                      <p className="text-lg font-black break-words">{selectedUser.name}</p>
                     </div>
                     <div>
                       <label className="text-[10px] font-black text-gray-500 uppercase">E-mail</label>
-                      <p className="font-bold text-blue-400">{selectedUser.email}</p>
+                      <p className="font-bold text-blue-400 break-all leading-snug">{selectedUser.email}</p>
                     </div>
                     <div>
                       <label className="text-[10px] font-black text-gray-500 uppercase">Documento / NIF-CPF</label>
-                      <p className="font-bold">{selectedUser.documentId} / {selectedUser.taxId}</p>
+                      <p className="font-bold break-words">{selectedUser.documentId} / {selectedUser.taxId}</p>
                     </div>
                     <div>
                       <label className="text-[10px] font-black text-gray-500 uppercase">Estado Civil / País</label>
-                      <p className="font-bold">{selectedUser.maritalStatus} - {selectedUser.country}</p>
+                      <p className="font-bold break-words">{selectedUser.maritalStatus} - {selectedUser.country}</p>
                     </div>
                   </div>
-                  <div className="space-y-4">
+                  <div className="space-y-4 min-w-0">
                     <div>
                       <label className="text-[10px] font-black text-gray-500 uppercase">Protocolo SGI</label>
-                      <p className="text-lg font-black text-emerald-400">{selectedUser.protocol}</p>
+                      <p className="text-lg font-black text-emerald-400 break-words">{selectedUser.protocol}</p>
                     </div>
                     <div>
                       <label className="text-[10px] font-black text-gray-500 uppercase">Unidade Atendimento</label>
-                      <p className="font-bold text-blue-300">{selectedUser.unit}</p>
+                      <p className="font-bold text-blue-300 break-words leading-snug">{selectedUser.unit}</p>
                     </div>
                     <div>
                       <label className="text-[10px] font-black text-gray-500 uppercase">Processo Judicial</label>
-                      <p className="font-bold">{selectedUser.processNumber || 'NÃO INFORMADO'}</p>
+                      <p className="font-bold break-words">{selectedUser.processNumber || 'NÃO INFORMADO'}</p>
                     </div>
                     <div>
                       <label className="text-[10px] font-black text-gray-500 uppercase">Status Atual</label>
