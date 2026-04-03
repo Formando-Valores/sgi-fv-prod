@@ -1374,20 +1374,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       .in('id', userIds);
 
     if (profileError) {
-      setClientsError('Não foi possível carregar os perfis vinculados aos membros.');
-      setClientsLoading(false);
-      return;
+      console.warn('[clientes] falha ao carregar perfis; exibindo listagem parcial', profileError);
+      setClientsError('Alguns dados de perfil não puderam ser carregados agora. A listagem exibida pode estar parcial.');
+    } else {
+      setClientsError('');
     }
 
-    const profileMap = new Map((profileRows || []).map((row) => [row.id, row]));
+    const profileMap = new Map(((profileRows || []) as Array<{ id: string; nome_completo?: string | null; nome?: string | null; email?: string | null; created_at?: string | null }>).map((row) => [row.id, row]));
 
     const normalizedClients: ClientProfileView[] = scopedMembers.map((member) => {
       const profile = profileMap.get(member.user_id);
-      const email = profile?.email || '-';
+      const email = profile?.email || 'sem-email@nao-informado';
       const nome =
         profile?.nome_completo ||
         profile?.nome ||
-        (email !== '-' ? String(email).split('@')[0] : `Usuário ${member.user_id.slice(0, 8)}`);
+        (email !== 'sem-email@nao-informado' ? String(email).split('@')[0] : `Usuário ${member.user_id.slice(0, 8)}`);
 
       return {
         id: `${member.org_id}-${member.user_id}`,
@@ -2156,7 +2157,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
             </select>
           </div>
 
-          {clientsError && <p className="text-sm text-red-400 font-bold mb-4">{clientsError}</p>}
+          {clientsError && <p className="text-sm text-amber-600 font-bold mb-4">{clientsError}</p>}
 
           <div className="mb-3 flex items-center justify-between text-xs text-gray-500 font-bold">
             <span>Total encontrado: {clientsData.length}</span>
