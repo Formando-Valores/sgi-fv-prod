@@ -30,18 +30,24 @@ Deno.serve(async (request) => {
   const supabaseUrl = Deno.env.get('URL_SUPABASE') ?? Deno.env.get('SUPABASE_URL') ?? '';
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? Deno.env.get('SUPABASE_PUBLISHABLE_KEY') ?? '';
 
-  if (!supabaseUrl || !anonKey || !jwt) {
-    return jsonResponse(401, { success: false, error: 'Sessão inválida para envio do e-mail de acesso.' });
+  if (!supabaseUrl || !anonKey) {
+    return jsonResponse(500, { success: false, error: 'Configuração do Supabase ausente para envio de credenciais.' });
   }
 
-  const client = createClient(supabaseUrl, anonKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-    global: { headers: { Authorization: `Bearer ${jwt}` } },
-  });
+  let authenticatedEmail: string | null = null;
 
-  const { data: userData, error: userError } = await client.auth.getUser(jwt);
-  if (userError || !userData.user?.email) {
-    return jsonResponse(401, { success: false, error: 'Usuário autenticado não encontrado.' });
+  if (jwt) {
+    const client = createClient(supabaseUrl, anonKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+      global: { headers: { Authorization: `Bearer ${jwt}` } },
+    });
+
+    const { data: userData, error: userError } = await client.auth.getUser(jwt);
+    if (userError || !userData.user?.email) {
+      return jsonResponse(401, { success: false, error: 'Usuário autenticado não encontrado.' });
+    }
+
+    authenticatedEmail = userData.user.email.toLowerCase();
   }
 
   const payload = await request.json();
@@ -49,12 +55,14 @@ Deno.serve(async (request) => {
   const fullName = String(payload.fullName ?? '').trim();
   const loginUrl = String(payload.loginUrl ?? '').trim();
   const source = String(payload.source ?? 'cadastro interno').trim();
+  const profile = String(payload.profile ?? 'USUÁRIO OPERADOR').trim();
+  const temporaryPassword = String(payload.temporaryPassword ?? '').trim();
 
   if (!email) {
     return jsonResponse(400, { success: false, error: 'E-mail é obrigatório.' });
   }
 
-  if (email !== userData.user.email.toLowerCase()) {
+  if (authenticatedEmail && email !== authenticatedEmail) {
     return jsonResponse(403, { success: false, error: 'Só é permitido enviar credenciais para o próprio cadastro autenticado.' });
   }
 
@@ -63,11 +71,18 @@ Deno.serve(async (request) => {
     fullName,
     loginUrl,
     source,
+    profile,
+    temporaryPassword,
   });
 
   if (!emailResult.ok) {
+    console.error('[send-access-credentials] falha ao enviar e-mail', {
+      email,
+      error: emailResult.error,
+    });
     return jsonResponse(503, { success: false, error: emailResult.error });
   }
 
+  console.info('[send-access-credentials] e-mail enviado com sucesso', { email });
   return jsonResponse(200, { success: true });
 });

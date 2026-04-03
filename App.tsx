@@ -15,6 +15,7 @@ console.log('[APP] ✅ React imported');
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import PasswordRecovery from './pages/PasswordRecovery';
 import UserDashboard from './pages/UserDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import { User, UserRole } from './types';
@@ -88,7 +89,7 @@ const RootApp: React.FC = () => {
 
   return (
     <HashRouter>
-      <div className="min-h-screen bg-[#0f172a] text-white font-arial">
+      <div className="min-h-screen bg-gray-50 text-gray-800 font-['Inter',sans-serif]">
         <Routes>
           <Route 
             path="/login" 
@@ -98,6 +99,7 @@ const RootApp: React.FC = () => {
             path="/register" 
             element={currentUser ? <Navigate to="/dashboard" /> : <Register setUsers={setUsers} setCurrentUser={setCurrentUser} />} 
           />
+          <Route path="/recovery" element={<PasswordRecovery />} />
           <Route path="/dashboard" element={renderDashboardRoute('dashboard')} />
           <Route path="/dashboard/processos" element={renderDashboardRoute('processos')} />
           <Route path="/dashboard/clientes" element={renderDashboardRoute('clientes')} />
