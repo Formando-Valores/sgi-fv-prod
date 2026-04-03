@@ -65,6 +65,7 @@ const Sidebar: React.FC = () => {
             {item.label}
           </NavLink>
         ))}
+
       </nav>
 
       {/* Footer */}
