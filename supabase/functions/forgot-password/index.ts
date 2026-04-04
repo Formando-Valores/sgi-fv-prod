@@ -63,8 +63,8 @@ Deno.serve(async (request) => {
       .eq('email', email)
       .maybeSingle();
 
-    if (profileLookupError || !profile?.id) {
-      return jsonResponse(200, { success: true, message: genericMessage });
+    if (profileLookupError) {
+      console.warn('[forgot-password] não foi possível buscar profile para enriquecer o e-mail', profileLookupError);
     }
 
     const { data, error } = await adminClient.auth.admin.generateLink({
@@ -79,21 +79,23 @@ Deno.serve(async (request) => {
       return jsonResponse(200, { success: true, message: genericMessage });
     }
 
-    const generatedActionLink =
-      data?.properties?.action_link ||
-      data?.properties?.hashed_token ||
-      data?.action_link ||
-      '';
+    const generatedOtpToken = data?.properties?.email_otp || '';
+    const generatedTokenHash = data?.properties?.hashed_token || data?.properties?.token_hash || '';
 
-    if (!generatedActionLink || generatedActionLink === data?.properties?.hashed_token) {
+    if (!generatedOtpToken && !generatedTokenHash) {
       return jsonResponse(200, { success: true, message: genericMessage });
     }
+
+    const separator = recoveryRedirectUrl.includes('?') ? '&' : '?';
+    const generatedResetUrl = generatedOtpToken
+      ? `${recoveryRedirectUrl}${separator}token=${encodeURIComponent(generatedOtpToken)}&type=recovery&email=${encodeURIComponent(email)}`
+      : `${recoveryRedirectUrl}${separator}token_hash=${encodeURIComponent(generatedTokenHash)}&type=recovery`;
 
     const emailResult = await sendPasswordResetEmail({
       email,
       fullName: String(profile?.nome_completo ?? '').trim(),
       loginUrl,
-      resetUrl: generatedActionLink,
+      resetUrl: generatedResetUrl,
     });
 
     if (!emailResult.ok) {

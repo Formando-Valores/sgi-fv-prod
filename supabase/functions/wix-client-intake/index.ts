@@ -244,10 +244,16 @@ Deno.serve(async (request) => {
       ]);
     }
 
+    const appUrl = String(Deno.env.get('APP_URL') ?? Deno.env.get('SITE_URL') ?? 'https://sgi-fv-prod.vercel.app').replace(/\/$/, '');
+    const loginUrl = `${appUrl}/#/login`;
+
     const emailResult = await sendAccessCredentialsEmail({
       email,
       fullName,
+      loginUrl,
       source: `formulário externo • ${siteName}`,
+      profile: 'USUÁRIO OPERADOR',
+      temporaryPassword: password,
     });
 
     return buildResponse(200, {
