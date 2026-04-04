@@ -39,7 +39,8 @@ const SERVICE_CATALOG: GuidedService[] = [
 const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) => {
   const [selectedArea, setSelectedArea] = React.useState<ServiceArea | null>(null);
   const [selectedServiceId, setSelectedServiceId] = React.useState<string>('');
-  const [paymentConfirmed, setPaymentConfirmed] = React.useState(false);
+  const [paymentMethod, setPaymentMethod] = React.useState<'cartao' | 'boleto' | ''>('');
+  const [paymentStatus, setPaymentStatus] = React.useState<'idle' | 'initiated' | 'awaiting_confirmation' | 'confirmed'>('idle');
   const [selectedSlot, setSelectedSlot] = React.useState<string>('');
 
   const steps = [
@@ -136,7 +137,8 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
                   const nextArea = areaButton.id as ServiceArea;
                   setSelectedArea(nextArea);
                   setSelectedServiceId('');
-                  setPaymentConfirmed(false);
+                  setPaymentMethod('');
+                  setPaymentStatus('idle');
                   setSelectedSlot('');
                   void logTimelineEvent(`Área selecionada no primeiro acesso: ${nextArea}.`);
                 }}
@@ -157,7 +159,8 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
                     type="button"
                     onClick={() => {
                       setSelectedServiceId(service.id);
-                      setPaymentConfirmed(false);
+                      setPaymentMethod('');
+                      setPaymentStatus('idle');
                       setSelectedSlot('');
                       void logTimelineEvent(`Serviço escolhido no primeiro acesso: ${service.name} (${service.priceLabel}).`);
                     }}
@@ -177,21 +180,61 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
               <p className="text-xs font-black uppercase text-gray-500">Resumo do serviço</p>
               <p className="font-bold text-gray-800">{selectedService.name}</p>
               <p className="text-sm text-blue-600 font-semibold">{selectedService.priceLabel}</p>
-              <button
-                type="button"
-                disabled={!canContinueToPayment}
-                onClick={() => {
-                  setPaymentConfirmed(true);
-                  void logTimelineEvent(`Pagamento confirmado para o serviço ${selectedService.name}.`);
-                }}
-                className="mt-3 rounded-xl bg-blue-600 text-white font-bold px-4 py-2 disabled:opacity-50"
-              >
-                Continuar para pagamento
-              </button>
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  disabled={!canContinueToPayment}
+                  onClick={() => {
+                    setPaymentMethod('cartao');
+                    setPaymentStatus('confirmed');
+                    void logTimelineEvent(`Pagamento iniciado no Stripe por cartão para ${selectedService.name}.`);
+                    void logTimelineEvent(`Pagamento confirmado automaticamente (cartão) para ${selectedService.name}.`);
+                  }}
+                  className="rounded-xl bg-blue-600 text-white font-bold px-4 py-2 disabled:opacity-50"
+                >
+                  Pagar com cartão
+                </button>
+                <button
+                  type="button"
+                  disabled={!canContinueToPayment}
+                  onClick={() => {
+                    setPaymentMethod('boleto');
+                    setPaymentStatus('awaiting_confirmation');
+                    void logTimelineEvent(`Pagamento iniciado no Stripe por boleto para ${selectedService.name}. Aguardando confirmação.`);
+                  }}
+                  className="rounded-xl border border-blue-200 bg-white text-blue-700 font-bold px-4 py-2 disabled:opacity-50"
+                >
+                  Pagar com boleto
+                </button>
+              </div>
+
+              {paymentStatus === 'awaiting_confirmation' && (
+                <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                  <p className="text-sm font-semibold text-amber-700">
+                    Aguardando confirmação de pagamento do boleto. Após confirmação, o fluxo continuará automaticamente.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPaymentStatus('confirmed');
+                      void logTimelineEvent(`Pagamento confirmado após compensação de boleto para ${selectedService.name}.`);
+                    }}
+                    className="mt-2 rounded-lg bg-amber-600 text-white px-3 py-2 text-sm font-bold"
+                  >
+                    Confirmar pagamento do boleto
+                  </button>
+                </div>
+              )}
+
+              {paymentStatus === 'confirmed' && (
+                <p className="mt-3 text-sm font-semibold text-emerald-700">
+                  Pagamento confirmado via {paymentMethod === 'cartao' ? 'cartão de crédito' : 'boleto'}.
+                </p>
+              )}
             </div>
           )}
 
-          {paymentConfirmed && (
+          {paymentStatus === 'confirmed' && (
             <div className="mt-4 rounded-xl border border-gray-200 bg-white p-4">
               <p className="text-xs font-black uppercase text-gray-500 mb-2">Agenda disponível (ordem equilibrada)</p>
               <div className="space-y-2">
