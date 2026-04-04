@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { sendPasswordResetEmail } from './accessEmail.ts';
+import * as accessEmail from './accessEmail.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -107,3 +107,19 @@ Deno.serve(async (request) => {
     return jsonResponse(200, { success: true, message: genericMessage });
   }
 });
+
+async function sendPasswordResetEmail(payload: {
+  email: string;
+  fullName?: string;
+  loginUrl?: string;
+  resetUrl: string;
+}) {
+  if (typeof accessEmail.sendPasswordResetEmail === 'function') {
+    return accessEmail.sendPasswordResetEmail(payload);
+  }
+
+  return {
+    ok: false,
+    error: 'Função sendPasswordResetEmail indisponível no módulo accessEmail.ts',
+  };
+}
