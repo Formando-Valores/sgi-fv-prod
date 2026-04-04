@@ -1,5 +1,4 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import * as accessEmail from './accessEmail.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,6 +8,14 @@ const corsHeaders = {
 
 const genericMessage = 'Se o email estiver cadastrado, você receberá instruções para redefinir sua senha.';
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const escapeHtml = (value: string) =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 
 const jsonResponse = (status: number, body: Record<string, unknown>) =>
   new Response(JSON.stringify(body), {
@@ -65,6 +72,11 @@ Deno.serve(async (request) => {
 
     if (profileLookupError) {
       console.warn('[forgot-password] não foi possível buscar profile para enriquecer o e-mail', profileLookupError);
+      return jsonResponse(500, { success: false, error: 'Não foi possível validar o cadastro deste e-mail.' });
+    }
+
+    if (!profile?.id) {
+      return jsonResponse(404, { success: false, error: 'E-mail não cadastrado no sistema.' });
     }
 
     const { data, error } = await adminClient.auth.admin.generateLink({
@@ -114,12 +126,67 @@ async function sendPasswordResetEmail(payload: {
   loginUrl?: string;
   resetUrl: string;
 }) {
-  if (typeof accessEmail.sendPasswordResetEmail === 'function') {
-    return accessEmail.sendPasswordResetEmail(payload);
+  const resendApiKey = Deno.env.get('RESEND_API_KEY') ?? '';
+  const from = Deno.env.get('FROM_EMAIL') ?? Deno.env.get('ACCESS_EMAIL_FROM') ?? '';
+  const replyTo = Deno.env.get('ACCESS_EMAIL_REPLY_TO') ?? '';
+
+  if (!resendApiKey || !from) {
+    return {
+      ok: false,
+      error: 'Serviço de e-mail não configurado. Defina RESEND_API_KEY e FROM_EMAIL.',
+    };
   }
 
-  return {
-    ok: false,
-    error: 'Função sendPasswordResetEmail indisponível no módulo accessEmail.ts',
-  };
+  const recipientName = payload.fullName?.trim() || 'cliente';
+  const loginUrl = payload.loginUrl?.trim() || 'https://sgi-fv-prod.vercel.app/#/login';
+  const resetUrl = payload.resetUrl.trim();
+
+  const html = `
+    <div style="font-family:Arial,sans-serif;line-height:1.6;color:#0f172a">
+      <h2>Redefinição de senha</h2>
+      <p>Olá, <strong>${escapeHtml(recipientName)}</strong>.</p>
+      <p>Recebemos uma solicitação para redefinir a senha da sua conta na plataforma Formando Valores.</p>
+      <p>Para criar uma nova senha com segurança, clique no botão abaixo:</p>
+      <p style="margin:24px 0;">
+        <a href="${escapeHtml(resetUrl)}" style="display:inline-block;padding:12px 18px;border-radius:10px;background:#2563eb;color:#ffffff;text-decoration:none;font-weight:700;">
+          Redefinir minha senha
+        </a>
+      </p>
+      <p>Se você não solicitou esta alteração, pode ignorar este e-mail.</p>
+      <p>Após redefinir sua senha, você poderá acessar a plataforma em:</p>
+      <p><a href="${escapeHtml(loginUrl)}">${escapeHtml(loginUrl)}</a></p>
+    </div>
+  `;
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${resendApiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: `Formando Valores <${from}>`,
+      to: [payload.email],
+      reply_to: replyTo || undefined,
+      subject: 'Redefinição de senha - Formando Valores',
+      html,
+      text: [
+        `Olá, ${recipientName}.`,
+        'Recebemos uma solicitação para redefinir a senha da sua conta na plataforma Formando Valores.',
+        `Abra este link para redefinir sua senha: ${resetUrl}`,
+        `Depois disso, acesse: ${loginUrl}`,
+        'Se você não solicitou esta alteração, ignore este e-mail.',
+      ].join('\n'),
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    return {
+      ok: false,
+      error: `Falha ao enviar e-mail de redefinição: ${errorText || response.statusText}`,
+    };
+  }
+
+  return { ok: true };
 }
