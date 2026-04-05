@@ -53,7 +53,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
   const currentStepIndex = steps.findIndex(s => s.label === currentUser.status);
   const guidedServices = selectedArea ? SERVICE_CATALOG.filter((service) => service.area === selectedArea) : [];
   const selectedService = guidedServices.find((service) => service.id === selectedServiceId) ?? null;
-  const canContinueToPayment = Boolean(selectedArea && selectedService);
+  const canContinueToPayment = Boolean(selectedArea && selectedService && selectedSlot);
   const isOnboardingFlow = currentUser.status !== ProcessStatus.CONCLUIDO;
 
   const availableSlots = React.useMemo(() => {
@@ -180,6 +180,46 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
               <p className="text-xs font-black uppercase text-gray-500">Resumo do serviço</p>
               <p className="font-bold text-gray-800">{selectedService.name}</p>
               <p className="text-sm text-blue-600 font-semibold">{selectedService.priceLabel}</p>
+            </div>
+          )}
+
+          {selectedService && (
+            <div className="mt-4 rounded-xl border border-gray-200 bg-white p-4">
+              <p className="text-xs font-black uppercase text-gray-500 mb-2">Agenda disponível (ordem equilibrada)</p>
+              <div className="space-y-2">
+                {availableSlots.map((slot) => (
+                  <button
+                    key={slot.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedSlot(slot.id);
+                      setPaymentMethod('');
+                      setPaymentStatus('idle');
+                      void logTimelineEvent(`Responsável definido: ${slot.professional}. Horário escolhido: ${slot.datetime}.`);
+                    }}
+                    className={`w-full text-left rounded-lg border p-3 ${selectedSlot === slot.id ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-gray-200'}`}
+                  >
+                    <p className="font-semibold text-gray-800">{slot.professional}</p>
+                    <p className="text-sm text-gray-500">{slot.datetime} • carga atual: {slot.load}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {selectedService && (
+            <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
+              <p className="text-xs font-black uppercase text-gray-500">Pagamento (após seleção da agenda)</p>
+              {!selectedSlot && (
+                <p className="mt-2 text-sm font-semibold text-amber-700">
+                  Selecione primeiro um horário na agenda para liberar o pagamento.
+                </p>
+              )}
+              {selectedSlot && (
+                <p className="mt-2 text-sm font-semibold text-blue-700">
+                  Horário selecionado. Agora escolha a forma de pagamento.
+                </p>
+              )}
               <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <button
                   type="button"
@@ -187,7 +227,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
                   onClick={() => {
                     setPaymentMethod('cartao');
                     setPaymentStatus('confirmed');
-                    void logTimelineEvent(`Pagamento iniciado no Stripe por cartão para ${selectedService.name}.`);
+                    void logTimelineEvent(`Pagamento iniciado no Stripe por cartão para ${selectedService.name}, após seleção de horário.`);
                     void logTimelineEvent(`Pagamento confirmado automaticamente (cartão) para ${selectedService.name}.`);
                   }}
                   className="rounded-xl bg-blue-600 text-white font-bold px-4 py-2 disabled:opacity-50"
@@ -200,7 +240,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
                   onClick={() => {
                     setPaymentMethod('boleto');
                     setPaymentStatus('awaiting_confirmation');
-                    void logTimelineEvent(`Pagamento iniciado no Stripe por boleto para ${selectedService.name}. Aguardando confirmação.`);
+                    void logTimelineEvent(`Pagamento iniciado no Stripe por boleto para ${selectedService.name}, após seleção de horário. Aguardando confirmação.`);
                   }}
                   className="rounded-xl border border-blue-200 bg-white text-blue-700 font-bold px-4 py-2 disabled:opacity-50"
                 >
@@ -231,28 +271,6 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
                   Pagamento confirmado via {paymentMethod === 'cartao' ? 'cartão de crédito' : 'boleto'}.
                 </p>
               )}
-            </div>
-          )}
-
-          {paymentStatus === 'confirmed' && (
-            <div className="mt-4 rounded-xl border border-gray-200 bg-white p-4">
-              <p className="text-xs font-black uppercase text-gray-500 mb-2">Agenda disponível (ordem equilibrada)</p>
-              <div className="space-y-2">
-                {availableSlots.map((slot) => (
-                  <button
-                    key={slot.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedSlot(slot.id);
-                      void logTimelineEvent(`Responsável definido: ${slot.professional}. Horário escolhido: ${slot.datetime}.`);
-                    }}
-                    className={`w-full text-left rounded-lg border p-3 ${selectedSlot === slot.id ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-gray-200'}`}
-                  >
-                    <p className="font-semibold text-gray-800">{slot.professional}</p>
-                    <p className="text-sm text-gray-500">{slot.datetime} • carga atual: {slot.load}</p>
-                  </button>
-                ))}
-              </div>
             </div>
           )}
         </section>
