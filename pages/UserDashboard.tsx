@@ -42,6 +42,8 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
   const [paymentMethod, setPaymentMethod] = React.useState<'cartao' | 'boleto' | ''>('');
   const [paymentStatus, setPaymentStatus] = React.useState<'idle' | 'initiated' | 'awaiting_confirmation' | 'confirmed'>('idle');
   const [selectedSlot, setSelectedSlot] = React.useState<string>('');
+  const [initialStageFinished, setInitialStageFinished] = React.useState(false);
+  const [processStatus, setProcessStatus] = React.useState<ProcessStatus>(currentUser.status);
 
   const steps = [
     { label: ProcessStatus.PENDENTE, color: 'bg-slate-500' },
@@ -50,11 +52,11 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
     { label: ProcessStatus.CONCLUIDO, color: 'bg-[#39ff14]' },
   ];
 
-  const currentStepIndex = steps.findIndex(s => s.label === currentUser.status);
+  const currentStepIndex = steps.findIndex(s => s.label === processStatus);
   const guidedServices = selectedArea ? SERVICE_CATALOG.filter((service) => service.area === selectedArea) : [];
   const selectedService = guidedServices.find((service) => service.id === selectedServiceId) ?? null;
   const canContinueToPayment = Boolean(selectedArea && selectedService && selectedSlot);
-  const isOnboardingFlow = currentUser.status !== ProcessStatus.CONCLUIDO;
+  const isOnboardingFlow = processStatus !== ProcessStatus.CONCLUIDO && !initialStageFinished;
 
   const availableSlots = React.useMemo(() => {
     const base = [
@@ -140,6 +142,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
                   setPaymentMethod('');
                   setPaymentStatus('idle');
                   setSelectedSlot('');
+                  setInitialStageFinished(false);
                   void logTimelineEvent(`Área selecionada no primeiro acesso: ${nextArea}.`);
                 }}
                 className={`rounded-xl border px-3 py-2 text-sm font-bold transition-colors ${selectedArea === areaButton.id ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-gray-200 text-gray-700'}`}
@@ -162,6 +165,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
                       setPaymentMethod('');
                       setPaymentStatus('idle');
                       setSelectedSlot('');
+                      setInitialStageFinished(false);
                       void logTimelineEvent(`Serviço escolhido no primeiro acesso: ${service.name} (${service.priceLabel}).`);
                     }}
                     className={`text-left rounded-xl border p-3 ${selectedServiceId === service.id ? 'border-blue-200 bg-blue-50' : 'border-gray-200 bg-white'}`}
@@ -267,12 +271,36 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
               )}
 
               {paymentStatus === 'confirmed' && (
-                <p className="mt-3 text-sm font-semibold text-emerald-700">
-                  Pagamento confirmado via {paymentMethod === 'cartao' ? 'cartão de crédito' : 'boleto'}.
-                </p>
+                <div className="mt-3 space-y-3">
+                  <p className="text-sm font-semibold text-emerald-700">
+                    Pagamento confirmado via {paymentMethod === 'cartao' ? 'cartão de crédito' : 'boleto'}.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInitialStageFinished(true);
+                      if (processStatus === ProcessStatus.PENDENTE) {
+                        setProcessStatus(ProcessStatus.TRIAGEM);
+                      }
+                      void logTimelineEvent(`Etapa inicial finalizada após pagamento confirmado. Serviço encaminhado para recebimento pelo profissional.`);
+                    }}
+                    className="rounded-xl bg-emerald-600 text-white font-bold px-4 py-2"
+                  >
+                    Finalizar etapa inicial e encaminhar ao profissional
+                  </button>
+                </div>
               )}
             </div>
           )}
+        </section>
+      )}
+
+      {initialStageFinished && (
+        <section className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 sm:p-6">
+          <h2 className="text-lg font-black text-emerald-800">Etapa inicial concluída</h2>
+          <p className="text-sm font-semibold text-emerald-700 mt-1">
+            O serviço foi encaminhado para recebimento pelo profissional responsável e seguirá para as próximas etapas.
+          </p>
         </section>
       )}
 
