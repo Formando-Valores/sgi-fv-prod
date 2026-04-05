@@ -21,6 +21,13 @@ type GuidedService = {
   deadline?: string;
 };
 
+type AvailableProfessional = {
+  id: string;
+  professional: string;
+  roleLabel: string;
+  email?: string | null;
+};
+
 const SERVICE_CATALOG: GuidedService[] = [
   { id: 'jur-001', area: 'juridico', category: 'Serviços Avulsos', name: 'Consulta Oral/Online', priceLabel: '50€' },
   { id: 'jur-002', area: 'juridico', category: 'Serviços Avulsos', name: 'Consulta Urgente', priceLabel: '75€' },
@@ -47,6 +54,9 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
   const [isCreatingProcess, setIsCreatingProcess] = React.useState(false);
   const [createdProcessId, setCreatedProcessId] = React.useState<string | null>(null);
   const [processCreationError, setProcessCreationError] = React.useState<string | null>(null);
+  const [availableProfessionals, setAvailableProfessionals] = React.useState<AvailableProfessional[]>([]);
+  const [isLoadingProfessionals, setIsLoadingProfessionals] = React.useState(false);
+  const [professionalsError, setProfessionalsError] = React.useState<string | null>(null);
 
   const steps = [
     { label: ProcessStatus.PENDENTE, color: 'bg-slate-500' },
@@ -61,24 +71,90 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
   const canContinueToPayment = Boolean(selectedArea && selectedService && selectedSlot);
   const isOnboardingFlow = processStatus !== ProcessStatus.CONCLUIDO && !initialStageFinished;
 
-  const availableSlots = React.useMemo(() => {
-    const base = [
-      { id: 'slot-1', professional: 'Dr. Adriano Duarte', load: 2, datetime: '2026-04-08 10:00' },
-      { id: 'slot-2', professional: 'Dra. Ana Rocha', load: 1, datetime: '2026-04-08 14:30' },
-      { id: 'slot-3', professional: 'Dr. Bruno Matos', load: 3, datetime: '2026-04-09 09:00' },
-    ];
+  React.useEffect(() => {
+    const loadProfessionals = async () => {
+      if (!currentUser.organizationId) {
+        setAvailableProfessionals([]);
+        return;
+      }
 
-    return base.sort((a, b) => a.load - b.load || a.professional.localeCompare(b.professional));
-  }, []);
+      setIsLoadingProfessionals(true);
+      setProfessionalsError(null);
+
+      try {
+        const { data: members, error: membersError } = await supabase
+          .from('org_members')
+          .select('user_id,role')
+          .eq('org_id', currentUser.organizationId)
+          .in('role', ['owner', 'admin']);
+
+        if (membersError) {
+          throw membersError;
+        }
+
+        const memberRows = (members || []) as Array<{ user_id: string; role: string }>;
+        const userIds = memberRows.map((member) => member.user_id).filter(Boolean);
+
+        if (!userIds.length) {
+          setAvailableProfessionals([]);
+          return;
+        }
+
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id,nome_completo,nome,name,email')
+          .in('id', userIds);
+
+        if (profilesError) {
+          throw profilesError;
+        }
+
+        const profileMap = new Map(
+          ((profiles || []) as Array<{ id: string; nome_completo?: string | null; nome?: string | null; name?: string | null; email?: string | null }>)
+            .map((profile) => [profile.id, profile]),
+        );
+
+        const mappedProfessionals = memberRows
+          .map((member) => {
+            const profile = profileMap.get(member.user_id);
+            const professionalName = profile?.nome_completo || profile?.nome || profile?.name || profile?.email || 'Profissional';
+            return {
+              id: member.user_id,
+              professional: professionalName,
+              roleLabel: member.role === 'owner' ? 'Proprietário' : 'Administrador',
+              email: profile?.email || null,
+            } as AvailableProfessional;
+          })
+          .sort((a, b) => a.professional.localeCompare(b.professional));
+
+        setAvailableProfessionals(mappedProfessionals);
+      } catch {
+        setProfessionalsError('Não foi possível carregar os profissionais administradores.');
+        setAvailableProfessionals([]);
+      } finally {
+        setIsLoadingProfessionals(false);
+      }
+    };
+
+    void loadProfessionals();
+  }, [currentUser.organizationId]);
 
   const handlePrint = () => {
     window.print();
   };
 
   const selectedSlotData = React.useMemo(
-    () => availableSlots.find((slot) => slot.id === selectedSlot) ?? null,
-    [availableSlots, selectedSlot],
+    () => availableProfessionals.find((professional) => professional.id === selectedSlot) ?? null,
+    [availableProfessionals, selectedSlot],
   );
+
+  React.useEffect(() => {
+    if (selectedSlot && !selectedSlotData) {
+      setSelectedSlot('');
+      setPaymentMethod('');
+      setPaymentStatus('idle');
+    }
+  }, [selectedSlot, selectedSlotData]);
 
   const logTimelineEvent = async (message: string) => {
     try {
@@ -250,25 +326,38 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
 
           {selectedService && (
             <div className="mt-4 rounded-xl border border-gray-200 bg-white p-4">
-              <p className="text-xs font-black uppercase text-gray-500 mb-2">Agenda disponível (ordem equilibrada)</p>
-              <div className="space-y-2">
-                {availableSlots.map((slot) => (
-                  <button
-                    key={slot.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedSlot(slot.id);
-                      setPaymentMethod('');
-                      setPaymentStatus('idle');
-                      void logTimelineEvent(`Responsável definido: ${slot.professional}. Horário escolhido: ${slot.datetime}.`);
-                    }}
-                    className={`w-full text-left rounded-lg border p-3 ${selectedSlot === slot.id ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-gray-200'}`}
-                  >
-                    <p className="font-semibold text-gray-800">{slot.professional}</p>
-                    <p className="text-sm text-gray-500">{slot.datetime} • carga atual: {slot.load}</p>
-                  </button>
-                ))}
-              </div>
+              <p className="text-xs font-black uppercase text-gray-500 mb-2">Profissionais administradores disponíveis</p>
+              {isLoadingProfessionals && (
+                <p className="text-sm font-semibold text-gray-500">Carregando profissionais...</p>
+              )}
+              {professionalsError && (
+                <p className="text-sm font-semibold text-red-600">{professionalsError}</p>
+              )}
+              {!isLoadingProfessionals && !professionalsError && availableProfessionals.length === 0 && (
+                <p className="text-sm font-semibold text-amber-700">
+                  Nenhum administrador disponível nesta organização para receber o serviço.
+                </p>
+              )}
+              {!isLoadingProfessionals && !professionalsError && availableProfessionals.length > 0 && (
+                <div className="space-y-2">
+                  {availableProfessionals.map((slot) => (
+                    <button
+                      key={slot.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedSlot(slot.id);
+                        setPaymentMethod('');
+                        setPaymentStatus('idle');
+                        void logTimelineEvent(`Profissional selecionado pelo cliente: ${slot.professional} (${slot.roleLabel}).`);
+                      }}
+                      className={`w-full text-left rounded-lg border p-3 ${selectedSlot === slot.id ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-gray-200'}`}
+                    >
+                      <p className="font-semibold text-gray-800">{slot.professional}</p>
+                      <p className="text-sm text-gray-500">{slot.roleLabel}{slot.email ? ` • ${slot.email}` : ''}</p>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -277,12 +366,12 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
               <p className="text-xs font-black uppercase text-gray-500">Pagamento (após seleção da agenda)</p>
               {!selectedSlot && (
                 <p className="mt-2 text-sm font-semibold text-amber-700">
-                  Selecione primeiro um horário na agenda para liberar o pagamento.
+                  Selecione primeiro um profissional para liberar o pagamento.
                 </p>
               )}
               {selectedSlot && (
                 <p className="mt-2 text-sm font-semibold text-blue-700">
-                  Horário selecionado. Agora escolha a forma de pagamento.
+                  Profissional selecionado. Agora escolha a forma de pagamento.
                 </p>
               )}
               <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -292,7 +381,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
                   onClick={() => {
                     setPaymentMethod('cartao');
                     setPaymentStatus('confirmed');
-                    void logTimelineEvent(`Pagamento iniciado no Stripe por cartão para ${selectedService.name}, após seleção de horário.`);
+                    void logTimelineEvent(`Pagamento iniciado no Stripe por cartão para ${selectedService.name}, após seleção do profissional.`);
                     void logTimelineEvent(`Pagamento confirmado automaticamente (cartão) para ${selectedService.name}.`);
                   }}
                   className="rounded-xl bg-blue-600 text-white font-bold px-4 py-2 disabled:opacity-50"
@@ -305,7 +394,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
                   onClick={() => {
                     setPaymentMethod('boleto');
                     setPaymentStatus('awaiting_confirmation');
-                    void logTimelineEvent(`Pagamento iniciado no Stripe por boleto para ${selectedService.name}, após seleção de horário. Aguardando confirmação.`);
+                    void logTimelineEvent(`Pagamento iniciado no Stripe por boleto para ${selectedService.name}, após seleção do profissional. Aguardando confirmação.`);
                   }}
                   className="rounded-xl border border-blue-200 bg-white text-blue-700 font-bold px-4 py-2 disabled:opacity-50"
                 >
