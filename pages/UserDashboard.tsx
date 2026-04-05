@@ -44,6 +44,9 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
   const [selectedSlot, setSelectedSlot] = React.useState<string>('');
   const [initialStageFinished, setInitialStageFinished] = React.useState(false);
   const [processStatus, setProcessStatus] = React.useState<ProcessStatus>(currentUser.status);
+  const [isCreatingProcess, setIsCreatingProcess] = React.useState(false);
+  const [createdProcessId, setCreatedProcessId] = React.useState<string | null>(null);
+  const [processCreationError, setProcessCreationError] = React.useState<string | null>(null);
 
   const steps = [
     { label: ProcessStatus.PENDENTE, color: 'bg-slate-500' },
@@ -72,6 +75,11 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
     window.print();
   };
 
+  const selectedSlotData = React.useMemo(
+    () => availableSlots.find((slot) => slot.id === selectedSlot) ?? null,
+    [availableSlots, selectedSlot],
+  );
+
   const logTimelineEvent = async (message: string) => {
     try {
       await supabase.from('process_events').insert({
@@ -83,6 +91,59 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
       });
     } catch {
       // não bloqueia fluxo do usuário
+    }
+  };
+
+  const handleFinalizeInitialStage = async () => {
+    if (!selectedService || !selectedSlotData || !currentUser.organizationId) {
+      setProcessCreationError('Não foi possível gerar o processo. Verifique serviço, agenda e organização.');
+      return;
+    }
+
+    setIsCreatingProcess(true);
+    setProcessCreationError(null);
+
+    try {
+      const processTitle = `${selectedService.name} - ${selectedSlotData.professional}`;
+      const { data: createdProcess, error: processError } = await supabase
+        .from('processes')
+        .insert({
+          org_id: currentUser.organizationId,
+          titulo: processTitle,
+          status: 'triagem',
+          cliente_nome: currentUser.name,
+          cliente_documento: currentUser.documentId || null,
+          cliente_contato: currentUser.phone || currentUser.email || null,
+          origem_canal: 'portal_cliente',
+          unidade_atendimento: selectedService.area,
+          org_nome_solicitado: currentUser.organizationName || null,
+        })
+        .select('id')
+        .single();
+
+      if (processError || !createdProcess) {
+        throw processError || new Error('Falha ao criar processo');
+      }
+
+      setCreatedProcessId(createdProcess.id);
+
+      await supabase.from('process_events').insert({
+        org_id: currentUser.organizationId,
+        process_id: createdProcess.id,
+        tipo: 'registro',
+        mensagem: `Processo criado a partir do onboarding. Profissional indicado: ${selectedSlotData.professional}. Serviço: ${selectedService.name}.`,
+        created_by: currentUser.id,
+      });
+
+      setInitialStageFinished(true);
+      if (processStatus === ProcessStatus.PENDENTE) {
+        setProcessStatus(ProcessStatus.TRIAGEM);
+      }
+      await logTimelineEvent(`Etapa inicial finalizada após pagamento confirmado. Processo ${createdProcess.id} gerado e encaminhado para recebimento pelo profissional.`);
+    } catch {
+      setProcessCreationError('Falha ao gerar processo para o profissional. Tente novamente.');
+    } finally {
+      setIsCreatingProcess(false);
     }
   };
 
@@ -277,17 +338,17 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
                   </p>
                   <button
                     type="button"
+                    disabled={isCreatingProcess}
                     onClick={() => {
-                      setInitialStageFinished(true);
-                      if (processStatus === ProcessStatus.PENDENTE) {
-                        setProcessStatus(ProcessStatus.TRIAGEM);
-                      }
-                      void logTimelineEvent(`Etapa inicial finalizada após pagamento confirmado. Serviço encaminhado para recebimento pelo profissional.`);
+                      void handleFinalizeInitialStage();
                     }}
-                    className="rounded-xl bg-emerald-600 text-white font-bold px-4 py-2"
+                    className="rounded-xl bg-emerald-600 text-white font-bold px-4 py-2 disabled:opacity-60"
                   >
-                    Finalizar etapa inicial e encaminhar ao profissional
+                    {isCreatingProcess ? 'Gerando processo...' : 'Finalizar etapa inicial e encaminhar ao profissional'}
                   </button>
+                  {processCreationError && (
+                    <p className="text-sm font-semibold text-red-600">{processCreationError}</p>
+                  )}
                 </div>
               )}
             </div>
@@ -301,6 +362,11 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
           <p className="text-sm font-semibold text-emerald-700 mt-1">
             O serviço foi encaminhado para recebimento pelo profissional responsável e seguirá para as próximas etapas.
           </p>
+          {createdProcessId && (
+            <p className="text-xs font-bold text-emerald-800 mt-2">
+              Processo gerado: {createdProcessId}
+            </p>
+          )}
         </section>
       )}
 
