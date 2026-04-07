@@ -20,6 +20,7 @@ import UserDashboard from './pages/UserDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import { User, UserRole } from './types';
 import { INITIAL_MOCK_USERS } from './constants';
+import { supabase } from './supabase';
 
 const parseStorageItem = <T,>(key: string, fallback: T): T => {
   const rawValue = localStorage.getItem(key);
@@ -56,6 +57,48 @@ const RootApp: React.FC = () => {
     } else {
       localStorage.removeItem('sgi_current_user');
     }
+  }, [currentUser]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const syncStoredUserWithAuthSession = async () => {
+      const { data, error } = await supabase.auth.getSession();
+
+      if (error) {
+        if (mounted) {
+          setCurrentUser(null);
+        }
+        return;
+      }
+
+      const sessionUser = data.session?.user;
+
+      if (!sessionUser) {
+        if (mounted) {
+          setCurrentUser(null);
+        }
+        return;
+      }
+
+      if (!currentUser) {
+        return;
+      }
+
+      const sameAccount =
+        currentUser.id === sessionUser.id ||
+        currentUser.email.toLowerCase() === (sessionUser.email || '').toLowerCase();
+
+      if (!sameAccount && mounted) {
+        setCurrentUser(null);
+      }
+    };
+
+    void syncStoredUserWithAuthSession();
+
+    return () => {
+      mounted = false;
+    };
   }, [currentUser]);
 
   const handleLogout = () => {
