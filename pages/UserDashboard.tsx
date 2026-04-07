@@ -82,52 +82,78 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
       setProfessionalsError(null);
 
       try {
+        let memberRows: Array<{ user_id: string; role: string }> = [];
+
         const { data: members, error: membersError } = await supabase
           .from('org_members')
           .select('user_id,role')
           .eq('org_id', currentUser.organizationId)
           .in('role', ['owner', 'admin']);
 
-        if (membersError) {
-          throw membersError;
+        if (!membersError) {
+          memberRows = (members || []) as Array<{ user_id: string; role: string }>;
         }
 
-        const memberRows = (members || []) as Array<{ user_id: string; role: string }>;
         const userIds = memberRows.map((member) => member.user_id).filter(Boolean);
 
-        if (!userIds.length) {
-          setAvailableProfessionals([]);
-          return;
+        const profileMap = new Map<string, { id: string; nome_completo?: string | null; nome?: string | null; name?: string | null; email?: string | null; role?: string | null }>();
+
+        if (userIds.length > 0) {
+          const { data: profilesByMembers, error: profilesByMembersError } = await supabase
+            .from('profiles')
+            .select('id,nome_completo,nome,name,email,role')
+            .in('id', userIds);
+
+          if (profilesByMembersError) {
+            throw profilesByMembersError;
+          }
+
+          ((profilesByMembers || []) as Array<{ id: string; nome_completo?: string | null; nome?: string | null; name?: string | null; email?: string | null; role?: string | null }>)
+            .forEach((profile) => profileMap.set(profile.id, profile));
         }
 
-        const { data: profiles, error: profilesError } = await supabase
+        const { data: fallbackProfiles, error: fallbackProfilesError } = await supabase
           .from('profiles')
-          .select('id,nome_completo,nome,name,email')
-          .in('id', userIds);
+          .select('id,nome_completo,nome,name,email,role')
+          .eq('org_id', currentUser.organizationId)
+          .or('role.eq.admin,role.eq.owner,role.eq.ADMIN,role.eq.OWNER,role.eq.Administrador,role.eq.administrador');
 
-        if (profilesError) {
-          throw profilesError;
+        if (!fallbackProfilesError) {
+          ((fallbackProfiles || []) as Array<{ id: string; nome_completo?: string | null; nome?: string | null; name?: string | null; email?: string | null; role?: string | null }>)
+            .forEach((profile) => {
+              if (!profileMap.has(profile.id)) {
+                profileMap.set(profile.id, profile);
+              }
+            });
         }
 
-        const profileMap = new Map(
-          ((profiles || []) as Array<{ id: string; nome_completo?: string | null; nome?: string | null; name?: string | null; email?: string | null }>)
-            .map((profile) => [profile.id, profile]),
-        );
+        const fromMembers = memberRows.map((member) => {
+          const profile = profileMap.get(member.user_id);
+          const professionalName = profile?.nome_completo || profile?.nome || profile?.name || profile?.email || 'Profissional';
+          return {
+            id: member.user_id,
+            professional: professionalName,
+            roleLabel: member.role === 'owner' ? 'Proprietário' : 'Administrador',
+            email: profile?.email || null,
+          } as AvailableProfessional;
+        });
 
-        const mappedProfessionals = memberRows
-          .map((member) => {
-            const profile = profileMap.get(member.user_id);
-            const professionalName = profile?.nome_completo || profile?.nome || profile?.name || profile?.email || 'Profissional';
-            return {
-              id: member.user_id,
-              professional: professionalName,
-              roleLabel: member.role === 'owner' ? 'Proprietário' : 'Administrador',
-              email: profile?.email || null,
-            } as AvailableProfessional;
-          })
-          .sort((a, b) => a.professional.localeCompare(b.professional));
+        const fromProfiles = Array.from(profileMap.values()).map((profile) => {
+          const roleNormalized = (profile.role || '').toLowerCase();
+          return {
+            id: profile.id,
+            professional: profile.nome_completo || profile.nome || profile.name || profile.email || 'Profissional',
+            roleLabel: roleNormalized === 'owner' ? 'Proprietário' : 'Administrador',
+            email: profile.email || null,
+          } as AvailableProfessional;
+        });
 
-        setAvailableProfessionals(mappedProfessionals);
+        const uniqueById = new Map<string, AvailableProfessional>();
+        [...fromMembers, ...fromProfiles].forEach((professional) => {
+          uniqueById.set(professional.id, professional);
+        });
+
+        setAvailableProfessionals(Array.from(uniqueById.values()).sort((a, b) => a.professional.localeCompare(b.professional)));
       } catch {
         setProfessionalsError('Não foi possível carregar os profissionais administradores.');
         setAvailableProfessionals([]);
