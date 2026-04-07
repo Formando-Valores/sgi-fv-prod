@@ -172,14 +172,14 @@ Deno.serve(async (request) => {
     const generatedOtpToken = data?.properties?.email_otp || '';
     const generatedTokenHash = data?.properties?.hashed_token || data?.properties?.token_hash || '';
 
-    if (!generatedOtpToken && !generatedTokenHash) {
+    if (!generatedTokenHash && !generatedOtpToken) {
       return jsonResponse(200, { success: true, message: genericMessage });
     }
 
     const separator = recoveryRedirectUrl.includes('?') ? '&' : '?';
-    const generatedResetUrl = generatedOtpToken
-      ? `${recoveryRedirectUrl}${separator}token=${encodeURIComponent(generatedOtpToken)}&type=recovery&email=${encodeURIComponent(email)}`
-      : `${recoveryRedirectUrl}${separator}token_hash=${encodeURIComponent(generatedTokenHash)}&type=recovery`;
+    const generatedResetUrl = generatedTokenHash
+      ? `${recoveryRedirectUrl}${separator}token_hash=${encodeURIComponent(generatedTokenHash)}&type=recovery`
+      : `${recoveryRedirectUrl}${separator}token=${encodeURIComponent(generatedOtpToken)}&type=recovery&email=${encodeURIComponent(email)}`;
 
     const emailResult = await sendPasswordResetEmail({
       email,

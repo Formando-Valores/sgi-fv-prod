@@ -6,34 +6,20 @@ type RecoveryState = 'bootstrapping' | 'ready' | 'error';
 
 const extractRecoveryParams = () => {
   const searchParams = new URLSearchParams(window.location.search);
-  const hash = window.location.hash || '';
-
-  const tokenLikeSegment = hash
-    .split('#')
-    .find((segment) => /(access_token|refresh_token|code)=/.test(segment));
-
-  const hashQuery = (() => {
-    if (!tokenLikeSegment) {
-      return '';
-    }
-
-    if (tokenLikeSegment.includes('?')) {
-      return tokenLikeSegment.split('?').slice(1).join('?');
-    }
-
-    return tokenLikeSegment.startsWith('/') ? '' : tokenLikeSegment;
-  })();
-
+  const hashRaw = window.location.hash.replace(/^#/, '');
+  const hashQuery = hashRaw.includes('?')
+    ? hashRaw.split('?').slice(1).join('?')
+    : (hashRaw.includes('=') ? hashRaw : '');
   const hashParams = new URLSearchParams(hashQuery);
 
   return {
-    email: hashParams.get('email') ?? searchParams.get('email'),
-    token: hashParams.get('token') ?? searchParams.get('token'),
-    tokenHash: hashParams.get('token_hash') ?? searchParams.get('token_hash'),
-    accessToken: hashParams.get('access_token') ?? searchParams.get('access_token'),
-    refreshToken: hashParams.get('refresh_token') ?? searchParams.get('refresh_token'),
-    code: hashParams.get('code') ?? searchParams.get('code'),
-    type: hashParams.get('type') ?? searchParams.get('type'),
+    email: searchParams.get('email') ?? hashParams.get('email'),
+    token: searchParams.get('token') ?? hashParams.get('token'),
+    tokenHash: searchParams.get('token_hash') ?? hashParams.get('token_hash'),
+    accessToken: searchParams.get('access_token') ?? hashParams.get('access_token'),
+    refreshToken: searchParams.get('refresh_token') ?? hashParams.get('refresh_token'),
+    code: searchParams.get('code') ?? hashParams.get('code'),
+    type: searchParams.get('type') ?? hashParams.get('type'),
   };
 };
 
