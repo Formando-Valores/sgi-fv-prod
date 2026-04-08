@@ -93,7 +93,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
 
   React.useEffect(() => {
     const loadProfessionals = async () => {
-      if (!currentUser.organizationId || !selectedServiceId) {
+      if (!selectedServiceId) {
         setAvailableProfessionals([]);
         return;
       }
@@ -102,49 +102,87 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
       setProfessionalsError(null);
 
       try {
-        let memberRows: Array<{ user_id: string; role: string }> = [];
+        let professionalsBase: AvailableProfessional[] = [];
 
-        const { data: members, error: membersError } = await supabase
-          .from('org_members')
-          .select('user_id,role')
-          .eq('org_id', currentUser.organizationId)
-          .in('role', ['owner', 'admin']);
+        const { data: contextAdmins, error: contextAdminsError } = await supabase
+          .from('v_user_context')
+          .select('user_id,email,nome_completo,org_id,org_role,org_slug,org_name')
+          .eq('org_slug', 'default')
+          .in('org_role', ['admin', 'owner']);
 
-        if (!membersError) {
-          memberRows = (members || []) as Array<{ user_id: string; role: string }>;
+        if (!contextAdminsError && (contextAdmins || []).length > 0) {
+          professionalsBase = ((contextAdmins || []) as Array<{
+            user_id?: string | null;
+            email?: string | null;
+            nome_completo?: string | null;
+            org_id?: string | null;
+            org_role?: string | null;
+          }>)
+            .filter((admin) => {
+              if (!admin.user_id) return false;
+              if (!currentUser.organizationId) return true;
+              return !admin.org_id || admin.org_id === currentUser.organizationId;
+            })
+            .map((admin) => ({
+              id: admin.user_id as string,
+              professional: admin.nome_completo || admin.email || 'Administrador',
+              roleLabel: (admin.org_role || '').toLowerCase() === 'owner' ? 'Proprietário' : 'Administrador',
+              email: admin.email || null,
+              availableSlots: [],
+              isAvailableNow: false,
+              nextAvailableSlot: null,
+              statusLabel: 'Indisponível',
+              activeServiceCount: 0,
+              scheduledTodayCount: 0,
+              totalOpenDemands: 0,
+              loadScore: 0,
+            }));
         }
 
-        const userIds = memberRows.map((member) => member.user_id).filter(Boolean);
-
+        let memberRows: Array<{ user_id: string; role: string }> = [];
         const profileMap = new Map<string, { id: string; nome_completo?: string | null; nome?: string | null; name?: string | null; email?: string | null; role?: string | null }>();
 
-        if (userIds.length > 0) {
-          const { data: profilesByMembers, error: profilesByMembersError } = await supabase
-            .from('profiles')
-            .select('id,nome_completo,nome,name,email,role')
-            .in('id', userIds);
+        if (currentUser.organizationId) {
+          const { data: members, error: membersError } = await supabase
+            .from('org_members')
+            .select('user_id,role')
+            .eq('org_id', currentUser.organizationId)
+            .in('role', ['owner', 'admin']);
 
-          if (profilesByMembersError) {
-            throw profilesByMembersError;
+          if (!membersError) {
+            memberRows = (members || []) as Array<{ user_id: string; role: string }>;
           }
 
-          ((profilesByMembers || []) as Array<{ id: string; nome_completo?: string | null; nome?: string | null; name?: string | null; email?: string | null; role?: string | null }>)
-            .forEach((profile) => profileMap.set(profile.id, profile));
-        }
+          const userIds = memberRows.map((member) => member.user_id).filter(Boolean);
 
-        const { data: fallbackProfiles, error: fallbackProfilesError } = await supabase
-          .from('profiles')
-          .select('id,nome_completo,nome,name,email,role')
-          .eq('org_id', currentUser.organizationId)
-          .or('role.eq.admin,role.eq.owner,role.eq.ADMIN,role.eq.OWNER,role.eq.Administrador,role.eq.administrador');
+          if (userIds.length > 0) {
+            const { data: profilesByMembers, error: profilesByMembersError } = await supabase
+              .from('profiles')
+              .select('id,nome_completo,nome,name,email,role')
+              .in('id', userIds);
 
-        if (!fallbackProfilesError) {
-          ((fallbackProfiles || []) as Array<{ id: string; nome_completo?: string | null; nome?: string | null; name?: string | null; email?: string | null; role?: string | null }>)
-            .forEach((profile) => {
-              if (!profileMap.has(profile.id)) {
-                profileMap.set(profile.id, profile);
-              }
-            });
+            if (profilesByMembersError) {
+              throw profilesByMembersError;
+            }
+
+            ((profilesByMembers || []) as Array<{ id: string; nome_completo?: string | null; nome?: string | null; name?: string | null; email?: string | null; role?: string | null }>)
+              .forEach((profile) => profileMap.set(profile.id, profile));
+          }
+
+          const { data: fallbackProfiles, error: fallbackProfilesError } = await supabase
+            .from('profiles')
+            .select('id,nome_completo,nome,name,email,role')
+            .eq('org_id', currentUser.organizationId)
+            .or('role.eq.admin,role.eq.owner,role.eq.ADMIN,role.eq.OWNER,role.eq.Administrador,role.eq.administrador');
+
+          if (!fallbackProfilesError) {
+            ((fallbackProfiles || []) as Array<{ id: string; nome_completo?: string | null; nome?: string | null; name?: string | null; email?: string | null; role?: string | null }>)
+              .forEach((profile) => {
+                if (!profileMap.has(profile.id)) {
+                  profileMap.set(profile.id, profile);
+                }
+              });
+          }
         }
 
         const fromMembers = memberRows.map((member) => {
@@ -189,7 +227,9 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
           uniqueById.set(professional.id, professional);
         });
 
-        let professionalsBase = Array.from(uniqueById.values());
+        if (professionalsBase.length === 0) {
+          professionalsBase = Array.from(uniqueById.values());
+        }
 
         if (professionalsBase.length === 0) {
           const localUsers = (() => {
