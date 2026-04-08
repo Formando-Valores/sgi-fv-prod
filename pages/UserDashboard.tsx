@@ -3,6 +3,7 @@ import React from 'react';
 import { LogOut, Printer, FileDown, User as UserIcon, Calendar, Clock, Landmark, Activity, UserCheck, MessageSquare } from 'lucide-react';
 import { User, ProcessStatus } from '../types';
 import { supabase } from '../supabase';
+import { SERVICE_MANAGERS } from '../constants';
 
 interface UserDashboardProps {
   currentUser: User;
@@ -53,6 +54,7 @@ const SERVICE_CATALOG: GuidedService[] = [
 ];
 
 const AUTO_ASSIGNMENT_ENABLED = false;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) => {
   const [selectedArea, setSelectedArea] = React.useState<ServiceArea | null>(null);
@@ -187,9 +189,55 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
           uniqueById.set(professional.id, professional);
         });
 
-        const professionalsBase = Array.from(uniqueById.values());
+        let professionalsBase = Array.from(uniqueById.values());
 
-        const professionalIds = professionalsBase.map((professional) => professional.id);
+        if (professionalsBase.length === 0) {
+          const localUsers = (() => {
+            try {
+              const raw = localStorage.getItem('sgi_users');
+              return raw ? JSON.parse(raw) as Array<{ id?: string; name?: string; email?: string; role?: string }> : [];
+            } catch {
+              return [] as Array<{ id?: string; name?: string; email?: string; role?: string }>;
+            }
+          })();
+
+          const localAdmins = localUsers.filter((user) => (user.role || '').toString().toUpperCase() === 'ADMIN');
+          if (localAdmins.length > 0) {
+            professionalsBase = localAdmins.map((admin, index) => ({
+              id: admin.id || `fallback-admin-${index}`,
+              professional: admin.name || admin.email || `Administrador ${index + 1}`,
+              roleLabel: 'Administrador',
+              email: admin.email || null,
+              availableSlots: [],
+              isAvailableNow: false,
+              nextAvailableSlot: null,
+              statusLabel: 'Disponível agora',
+              activeServiceCount: 0,
+              scheduledTodayCount: 0,
+              totalOpenDemands: 0,
+              loadScore: 0,
+            }));
+          }
+        }
+
+        if (professionalsBase.length === 0) {
+          professionalsBase = SERVICE_MANAGERS.map((name, index) => ({
+            id: `fallback-manager-${index}`,
+            professional: name,
+            roleLabel: 'Administrador',
+            email: null,
+            availableSlots: [],
+            isAvailableNow: false,
+            nextAvailableSlot: null,
+            statusLabel: 'Disponível agora',
+            activeServiceCount: 0,
+            scheduledTodayCount: 0,
+            totalOpenDemands: 0,
+            loadScore: 0,
+          }));
+        }
+
+        const professionalIds = professionalsBase.map((professional) => professional.id).filter((id) => UUID_PATTERN.test(id));
         let processRows: Array<{ responsavel_user_id: string | null; status: string | null; created_at: string | null }> = [];
 
         if (professionalIds.length > 0) {
