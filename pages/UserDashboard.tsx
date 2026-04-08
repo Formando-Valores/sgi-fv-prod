@@ -38,6 +38,24 @@ type AvailableProfessional = {
   isRecommended?: boolean;
 };
 
+type ProcessStep = {
+  name: string;
+  status: 'pendente' | 'em_andamento' | 'concluido';
+  responsible: string;
+  updatedAt: string;
+  notes?: string;
+};
+
+type ServiceProcessView = {
+  id: string;
+  serviceName: string;
+  scheduledSlot: string;
+  assignedProfessional: string;
+  statusLabel: 'aguardando atendimento' | 'em atendimento' | 'aguardando documentos' | 'em análise' | 'finalizado';
+  createdAt: string;
+  steps: ProcessStep[];
+};
+
 const SERVICE_CATALOG: GuidedService[] = [
   { id: 'jur-001', area: 'juridico', category: 'Serviços Avulsos', name: 'Consulta Oral/Online', priceLabel: '50€' },
   { id: 'jur-002', area: 'juridico', category: 'Serviços Avulsos', name: 'Consulta Urgente', priceLabel: '75€' },
@@ -55,6 +73,7 @@ const SERVICE_CATALOG: GuidedService[] = [
 
 const AUTO_ASSIGNMENT_ENABLED = false;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const PROCESS_STEP_NAMES = ['Atendimento iniciado', 'Coleta de informações', 'Análise', 'Execução', 'Finalização'];
 
 const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) => {
   const [selectedArea, setSelectedArea] = React.useState<ServiceArea | null>(null);
@@ -67,6 +86,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
   const [processStatus, setProcessStatus] = React.useState<ProcessStatus>(currentUser.status);
   const [isCreatingProcess, setIsCreatingProcess] = React.useState(false);
   const [createdProcessId, setCreatedProcessId] = React.useState<string | null>(null);
+  const [serviceProcess, setServiceProcess] = React.useState<ServiceProcessView | null>(null);
   const [processCreationError, setProcessCreationError] = React.useState<string | null>(null);
   const [availableProfessionals, setAvailableProfessionals] = React.useState<AvailableProfessional[]>([]);
   const [isLoadingProfessionals, setIsLoadingProfessionals] = React.useState(false);
@@ -393,6 +413,11 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
       return;
     }
 
+    if (createdProcessId && serviceProcess) {
+      setInitialStageFinished(true);
+      return;
+    }
+
     setIsCreatingProcess(true);
     setProcessCreationError(null);
 
@@ -407,6 +432,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
           cliente_nome: currentUser.name,
           cliente_documento: currentUser.documentId || null,
           cliente_contato: currentUser.phone || currentUser.email || null,
+          responsavel_user_id: UUID_PATTERN.test(selectedSlotData.id) ? selectedSlotData.id : null,
           origem_canal: 'portal_cliente',
           unidade_atendimento: selectedService.area,
           org_nome_solicitado: currentUser.organizationName || null,
@@ -426,6 +452,30 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
         tipo: 'registro',
         mensagem: `Processo criado a partir do onboarding. Profissional indicado: ${selectedSlotData.professional}. Horário previsto: ${selectedAdminScheduleSlot || 'a confirmar'}. Serviço: ${selectedService.name}.`,
         created_by: currentUser.id,
+      });
+      await supabase.from('process_events').insert({
+        org_id: currentUser.organizationId,
+        process_id: createdProcess.id,
+        tipo: 'atribuicao',
+        mensagem: `Atendimento atribuído para ${selectedSlotData.professional}. Outros administradores da organização podem assumir se necessário.`,
+        created_by: currentUser.id,
+      });
+
+      const now = new Date().toLocaleString('pt-BR');
+      setServiceProcess({
+        id: createdProcess.id,
+        serviceName: selectedService.name,
+        scheduledSlot: selectedAdminScheduleSlot || 'a confirmar',
+        assignedProfessional: selectedSlotData.professional,
+        statusLabel: 'aguardando atendimento',
+        createdAt: now,
+        steps: PROCESS_STEP_NAMES.map((stepName, index) => ({
+          name: stepName,
+          status: index === 0 ? 'em_andamento' : 'pendente',
+          responsible: selectedSlotData.professional,
+          updatedAt: now,
+          notes: index === 0 ? 'Pagamento confirmado e atendimento iniciado.' : '',
+        })),
       });
 
       setInitialStageFinished(true);
@@ -632,6 +682,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
                     setPaymentStatus('confirmed');
                     void logTimelineEvent(`Pagamento iniciado no Stripe por cartão para ${selectedService.name}, após seleção do profissional.`);
                     void logTimelineEvent(`Pagamento confirmado automaticamente (cartão) para ${selectedService.name}.`);
+                    void handleFinalizeInitialStage();
                   }}
                   className="rounded-xl bg-blue-600 text-white font-bold px-4 py-2 disabled:opacity-50"
                 >
@@ -661,6 +712,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
                     onClick={() => {
                       setPaymentStatus('confirmed');
                       void logTimelineEvent(`Pagamento confirmado após compensação de boleto para ${selectedService.name}.`);
+                      void handleFinalizeInitialStage();
                     }}
                     className="mt-2 rounded-lg bg-amber-600 text-white px-3 py-2 text-sm font-bold"
                   >
@@ -705,6 +757,31 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
               Processo gerado: {createdProcessId}
             </p>
           )}
+        </section>
+      )}
+
+      {serviceProcess && (
+        <section className="mb-6 rounded-2xl border border-blue-200 bg-blue-50 p-4 sm:p-6">
+          <h2 className="text-lg font-black text-blue-800">PROCESSO EM ANDAMENTO</h2>
+          <p className="text-sm font-semibold text-emerald-700 mt-1">Pagamento confirmado! Seu atendimento foi iniciado.</p>
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+            <p><span className="font-black text-gray-600 uppercase text-xs">Profissional responsável</span><br />{serviceProcess.assignedProfessional}</p>
+            <p><span className="font-black text-gray-600 uppercase text-xs">Status</span><br />{serviceProcess.statusLabel}</p>
+            <p><span className="font-black text-gray-600 uppercase text-xs">Serviço</span><br />{serviceProcess.serviceName}</p>
+            <p><span className="font-black text-gray-600 uppercase text-xs">Data/Hora</span><br />{serviceProcess.createdAt} • {serviceProcess.scheduledSlot}</p>
+          </div>
+          <div className="mt-4 space-y-2">
+            {serviceProcess.steps.map((step) => (
+              <div key={step.name} className="rounded-lg border border-blue-100 bg-white p-3">
+                <p className="text-sm font-bold text-gray-800">{step.name}</p>
+                <p className="text-xs text-gray-500">Status: {step.status} • Responsável: {step.responsible} • Atualizado: {step.updatedAt}</p>
+                {step.notes && <p className="text-xs text-gray-600 mt-1">{step.notes}</p>}
+              </div>
+            ))}
+          </div>
+          <button type="button" className="mt-4 rounded-xl border border-blue-200 bg-white text-blue-700 font-bold px-4 py-2">
+            Acompanhar atendimento
+          </button>
         </section>
       )}
 
