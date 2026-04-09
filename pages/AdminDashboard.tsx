@@ -68,6 +68,7 @@ interface ClientProfileView {
   nome: string;
   email: string;
   accessLevel: AccessLevel;
+  source: 'org_members+profiles' | 'org_members_only' | 'local_manual';
   created_at?: string;
 }
 
@@ -204,6 +205,40 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [clientsSearch, setClientsSearch] = useState('');
   const [clientsRowsLimit, setClientsRowsLimit] = useState(10);
   const [clientsSort, setClientsSort] = useState<'name_asc' | 'name_desc' | 'recent'>('name_asc');
+  const [showCreateClientModal, setShowCreateClientModal] = useState(false);
+  const [creatingClient, setCreatingClient] = useState(false);
+  const [clientFormError, setClientFormError] = useState('');
+  const [clientFormSuccess, setClientFormSuccess] = useState('');
+  const [showEditClientModal, setShowEditClientModal] = useState(false);
+  const [savingClientEdit, setSavingClientEdit] = useState(false);
+  const [clientEditError, setClientEditError] = useState('');
+  const [clientEditSuccess, setClientEditSuccess] = useState('');
+  const [editingClient, setEditingClient] = useState<ClientProfileView | null>(null);
+  const [editClientForm, setEditClientForm] = useState<EditClientFormState>({
+    fullName: '',
+    email: '',
+    phone: '',
+    documentId: '',
+    taxId: '',
+    address: '',
+    country: 'Brasil',
+    maritalStatus: 'Solteiro',
+    organizationId: '',
+    accessLevel: 'Cliente',
+  });
+  const [newClientForm, setNewClientForm] = useState<NewClientFormState>({
+    fullName: '',
+    email: '',
+    phone: '',
+    documentId: '',
+    taxId: '',
+    address: '',
+    country: 'Brasil',
+    maritalStatus: 'Solteiro',
+    organizationId: '',
+    accessLevel: 'Cliente',
+    grantSystemAccess: false,
+  });
   const [dbProcesses, setDbProcesses] = useState<DbProcess[]>([]);
   const [processesLoading, setProcessesLoading] = useState(false);
   const [processesError, setProcessesError] = useState('');
@@ -1299,14 +1334,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     setClientsLoading(true);
     setClientsError('');
 
-    const { data: membershipScopeRows, error: membershipScopeError } = await supabase
-      .from('org_members')
-      .select('org_id,user_id,role,organizations(name)')
-      .eq('user_id', currentUser.id);
+    if (!name) {
+      setClientFormError('Informe o nome do cliente.');
+      return;
+    }
 
-    if (membershipScopeError) {
-      setClientsError('Não foi possível validar o escopo de acesso do usuário.');
-      setClientsLoading(false);
+    if (!email) {
+      setClientFormError('Informe o e-mail do cliente.');
       return;
     }
 
@@ -1316,47 +1350,187 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       return (role === 'admin' || role === 'owner') && isDefaultOrganizationName(orgName);
     });
 
-    const { data: memberRows, error: membersError } = await supabase
-      .from('org_members')
-      .select('org_id,user_id,role,organizations(name)')
-      .order('created_at', { ascending: false });
+    setCreatingClient(true);
 
-    if (membersError) {
-      setClientsError('Não foi possível carregar os membros da tabela org_members.');
-      setClientsLoading(false);
+    try {
+      const normalizedRole = mapAccessLevelToOrgRole(newClientForm.accessLevel);
+
+      if (newClientForm.grantSystemAccess) {
+        const { data: existingProfile, error: lookupError } = await supabase
+          .from('profiles')
+          .select('id,email')
+          .eq('email', email)
+          .maybeSingle();
+
+        if (lookupError) {
+          setClientFormError('Não foi possível validar o perfil no banco de dados.');
+          return;
+        }
+
+        if (!existingProfile?.id) {
+          setClientFormError('Para liberar acesso ao sistema, este e-mail precisa já ter conta criada no Auth.');
+          return;
+        }
+
+        const { error: updateProfileError } = await supabase
+          .from('profiles')
+          .update({
+            nome_completo: name,
+            name,
+            documento_identidade: sanitizeDisplayValue(newClientForm.documentId) || null,
+            nif_cpf: sanitizeDisplayValue(newClientForm.taxId) || null,
+            estado_civil: sanitizeDisplayValue(newClientForm.maritalStatus) || null,
+            phone: sanitizeDisplayValue(newClientForm.phone) || null,
+            endereco: sanitizeDisplayValue(newClientForm.address) || null,
+            pais: sanitizeDisplayValue(newClientForm.country) || null,
+            role: newClientForm.accessLevel,
+            org_id: selectedOrg.id,
+          })
+          .eq('id', existingProfile.id);
+
+        if (updateProfileError) {
+          setClientFormError('Não foi possível atualizar o perfil do cliente.');
+          return;
+        }
+
+        const { error: upsertMemberError } = await supabase
+          .from('org_members')
+          .upsert(
+            {
+              org_id: selectedOrg.id,
+              user_id: existingProfile.id,
+              role: normalizedRole,
+            },
+            { onConflict: 'org_id,user_id' }
+          );
+
+        if (upsertMemberError) {
+          setClientFormError('Perfil atualizado, mas não foi possível vincular cliente à organização.');
+          return;
+        }
+
+        await fetchClients();
+      } else {
+        const tempId = `local-${Date.now()}`;
+        const now = new Date().toLocaleString('pt-BR');
+
+        setUsers((prev) => [
+          {
+            id: tempId,
+            name,
+            email,
+            role: UserRole.CLIENT,
+            documentId: sanitizeDisplayValue(newClientForm.documentId) || '---',
+            taxId: sanitizeDisplayValue(newClientForm.taxId) || '---',
+            address: sanitizeDisplayValue(newClientForm.address) || '---',
+            maritalStatus: sanitizeDisplayValue(newClientForm.maritalStatus) || '---',
+            country: sanitizeDisplayValue(newClientForm.country) || '---',
+            phone: sanitizeDisplayValue(newClientForm.phone) || '---',
+            unit: ServiceUnit.ADMINISTRATIVO,
+            status: ProcessStatus.PENDENTE,
+            protocol: `CLI-${new Date().getFullYear()}-${String(prev.length + 1).padStart(3, '0')}`,
+            registrationDate: now,
+            lastUpdate: now,
+            hierarchy: Hierarchy.NOTES_ONLY,
+            organizationId: selectedOrg.id,
+            organizationName: selectedOrg.name,
+          },
+          ...prev,
+        ]);
+
+        setClientsData((prev) => [
+          {
+            id: `${selectedOrg.id}-${tempId}`,
+            user_id: tempId,
+            org_id: selectedOrg.id,
+            org_name: selectedOrg.name,
+            nome: name,
+            email,
+            accessLevel: newClientForm.accessLevel,
+            source: 'local_manual',
+            created_at: new Date().toISOString(),
+          },
+          ...prev,
+        ]);
+      }
+
+      setClientFormSuccess('Cliente cadastrado com sucesso.');
+      resetNewClientForm();
+      setShowCreateClientModal(false);
+    } finally {
+      setCreatingClient(false);
+    }
+  };
+
+  const handleStartEditClient = async (client: ClientProfileView) => {
+    setEditingClient(client);
+    setClientEditError('');
+    setClientEditSuccess('');
+
+    const baseForm: EditClientFormState = {
+      fullName: client.nome,
+      email: client.email === 'sem-email@nao-informado' ? '' : client.email,
+      phone: '',
+      documentId: '',
+      taxId: '',
+      address: '',
+      country: 'Brasil',
+      maritalStatus: 'Solteiro',
+      organizationId: client.org_id,
+      accessLevel: client.accessLevel,
+    };
+
+    setEditClientForm(baseForm);
+    setShowEditClientModal(true);
+
+    if (client.user_id.startsWith('local-')) {
+      const localUser = users.find((user) => user.id === client.user_id);
+      if (!localUser) return;
+      setEditClientForm({
+        fullName: localUser.name || baseForm.fullName,
+        email: localUser.email || baseForm.email,
+        phone: localUser.phone === '---' ? '' : localUser.phone,
+        documentId: localUser.documentId === '---' ? '' : localUser.documentId,
+        taxId: localUser.taxId === '---' ? '' : localUser.taxId,
+        address: localUser.address === '---' ? '' : localUser.address,
+        country: localUser.country === '---' ? 'Brasil' : localUser.country,
+        maritalStatus: localUser.maritalStatus === '---' ? 'Solteiro' : localUser.maritalStatus,
+        organizationId: localUser.organizationId || baseForm.organizationId,
+        accessLevel: client.accessLevel,
+      });
       return;
     }
 
-    const allowedOrgIds = new Set((membershipScopeRows || []).map((row) => row.org_id));
-    const scopedMembers = (memberRows || []).filter((member) => hasGlobalScope || allowedOrgIds.has(member.org_id));
-
-    if (scopedMembers.length === 0) {
-      setClientsData([]);
-      setClientsLoading(false);
-      return;
-    }
-
-    const userIds = Array.from(new Set(scopedMembers.map((member) => member.user_id)));
-    const { data: profileRows, error: profileError } = await supabase
+    const { data: profileData, error } = await supabase
       .from('profiles')
-      .select('id,nome_completo,nome,email,created_at')
-      .in('id', userIds);
+      .select('nome_completo,nome,email,phone,documento_identidade,nif_cpf,endereco,pais,estado_civil')
+      .eq('id', client.user_id)
+      .maybeSingle();
 
-    if (profileError) {
-      setClientsError('Não foi possível carregar os perfis vinculados aos membros.');
-      setClientsLoading(false);
+    if (error) {
+      setClientEditError('Não foi possível carregar todos os dados do cliente. Você ainda pode editar os campos disponíveis.');
       return;
     }
 
-    const profileMap = new Map((profileRows || []).map((row) => [row.id, row]));
+    if (!profileData) return;
 
-    const normalizedClients: ClientProfileView[] = scopedMembers.map((member) => {
-      const profile = profileMap.get(member.user_id);
-      const email = profile?.email || '-';
-      const nome =
-        profile?.nome_completo ||
-        profile?.nome ||
-        (email !== '-' ? String(email).split('@')[0] : `Usuário ${member.user_id.slice(0, 8)}`);
+    setEditClientForm({
+      fullName: sanitizeDisplayValue(profileData.nome_completo) || sanitizeDisplayValue(profileData.nome) || baseForm.fullName,
+      email: sanitizeDisplayValue(profileData.email) || baseForm.email,
+      phone: sanitizeDisplayValue(profileData.phone),
+      documentId: sanitizeDisplayValue(profileData.documento_identidade),
+      taxId: sanitizeDisplayValue(profileData.nif_cpf),
+      address: sanitizeDisplayValue(profileData.endereco),
+      country: sanitizeDisplayValue(profileData.pais) || 'Brasil',
+      maritalStatus: sanitizeDisplayValue(profileData.estado_civil) || 'Solteiro',
+      organizationId: baseForm.organizationId,
+      accessLevel: client.accessLevel,
+    });
+  };
+
+  const handleSaveClientEdit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!editingClient) return;
 
       return {
         id: `${member.org_id}-${member.user_id}`,
@@ -1370,15 +1544,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       };
     });
 
-    setClientsData(normalizedClients);
-    setClientsLoading(false);
-  };
-
-  useEffect(() => {
-    if (currentSection === 'clientes') {
-      fetchClients();
+    const selectedOrg = organizations.find((org) => org.id === editClientForm.organizationId);
+    if (!selectedOrg) {
+      setClientEditError('Selecione uma organização válida.');
+      return;
     }
-  }, [currentSection]);
+
+    const normalizedName = sanitizeDisplayValue(editClientForm.fullName);
+    if (!normalizedName) {
+      setClientEditError('Informe o nome do cliente.');
+      return;
+    }
 
   const visibleClients = clientsData
     .filter((client) =>
@@ -1393,9 +1569,30 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       if (clientsSort === 'name_desc') {
         return b.nome.localeCompare(a.nome, 'pt-BR');
       }
-      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
-    })
-    .slice(0, clientsRowsLimit);
+
+      setClientsData((prev) =>
+        prev.map((client) =>
+          client.id === editingClient.id
+            ? {
+                ...client,
+                nome: normalizedName,
+                email: sanitizeDisplayValue(editClientForm.email) || 'sem-email@nao-informado',
+                org_id: selectedOrg.id,
+                org_name: selectedOrg.name,
+                accessLevel: editClientForm.accessLevel,
+              }
+            : client
+        )
+      );
+
+      setClientEditSuccess('Cadastro do cliente atualizado com sucesso.');
+      setShowEditClientModal(false);
+      setEditingClient(null);
+      await fetchClients();
+    } finally {
+      setSavingClientEdit(false);
+    }
+  };
 
   const handleCreateOrganization = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -1533,6 +1730,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               </NavLink>
             ))}
           </nav>
+
         </aside>
 
         <div className="min-w-0 flex-1 lg:pl-0">
@@ -1960,7 +2158,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
             </select>
           </div>
 
-          {clientsError && <p className="text-sm text-red-400 font-bold mb-4">{clientsError}</p>}
+          {clientsError && <p className="text-sm text-amber-600 font-bold mb-4">{clientsError}</p>}
 
           <div className="mb-3 flex items-center justify-between text-xs text-gray-500 font-bold">
             <span>Total encontrado: {clientsData.length}</span>
@@ -1975,6 +2173,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                   <th className="px-6 py-4">Nível</th>
                   <th className="px-6 py-4">Organização</th>
                   <th className="px-6 py-4">Email</th>
+                  <th className="px-6 py-4">Origem</th>
+                  <th className="px-6 py-4 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800">
@@ -2248,6 +2448,332 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                 </table>
               </div>
            </div>
+        </div>
+      )}
+
+      {showCreateClientModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-4xl rounded-3xl border border-gray-100 shadow-2xl overflow-hidden">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+              <h3 className="text-xl font-black uppercase">Cadastrar novo cliente</h3>
+              <button
+                onClick={() => {
+                  setShowCreateClientModal(false);
+                  setClientFormError('');
+                  setClientFormSuccess('');
+                }}
+                className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-8 max-h-[85vh] overflow-y-auto">
+              <form onSubmit={handleCreateClient} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Nome completo</label>
+                    <input
+                      type="text"
+                      value={newClientForm.fullName}
+                      onChange={(event) => setNewClientForm((prev) => ({ ...prev, fullName: event.target.value }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Nome completo do cliente"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">E-mail</label>
+                    <input
+                      type="email"
+                      value={newClientForm.email}
+                      onChange={(event) => setNewClientForm((prev) => ({ ...prev, email: event.target.value }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="cliente@empresa.com"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Telefone</label>
+                    <input
+                      type="text"
+                      value={newClientForm.phone}
+                      onChange={(event) => setNewClientForm((prev) => ({ ...prev, phone: event.target.value }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="+55 (11) 99999-9999"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Documento de identidade</label>
+                    <input
+                      type="text"
+                      value={newClientForm.documentId}
+                      onChange={(event) => setNewClientForm((prev) => ({ ...prev, documentId: event.target.value }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="RG / BI / Passaporte"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">NIF / CPF</label>
+                    <input
+                      type="text"
+                      value={newClientForm.taxId}
+                      onChange={(event) => setNewClientForm((prev) => ({ ...prev, taxId: event.target.value }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Número fiscal"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Estado civil</label>
+                    <input
+                      type="text"
+                      value={newClientForm.maritalStatus}
+                      onChange={(event) => setNewClientForm((prev) => ({ ...prev, maritalStatus: event.target.value }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Solteiro(a), Casado(a)..."
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">País</label>
+                    <input
+                      type="text"
+                      value={newClientForm.country}
+                      onChange={(event) => setNewClientForm((prev) => ({ ...prev, country: event.target.value }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Brasil"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Organização</label>
+                    <select
+                      value={newClientForm.organizationId}
+                      onChange={(event) => setNewClientForm((prev) => ({ ...prev, organizationId: event.target.value }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    >
+                      <option value="">Selecione a organização</option>
+                      {organizations.map((organization) => (
+                        <option key={organization.id} value={organization.id}>{organization.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Endereço</label>
+                    <input
+                      type="text"
+                      value={newClientForm.address}
+                      onChange={(event) => setNewClientForm((prev) => ({ ...prev, address: event.target.value }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Rua, número, complemento, cidade"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Perfil no sistema</label>
+                    <select
+                      value={newClientForm.accessLevel}
+                      onChange={(event) => setNewClientForm((prev) => ({ ...prev, accessLevel: event.target.value as AccessLevel }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      {ACCESS_LEVELS.map((level) => (
+                        <option key={level} value={level}>{level}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex items-center">
+                    <label className="flex items-center gap-3 p-4 rounded-xl border border-gray-200 w-full">
+                      <input
+                        type="checkbox"
+                        checked={newClientForm.grantSystemAccess}
+                        onChange={(event) => setNewClientForm((prev) => ({ ...prev, grantSystemAccess: event.target.checked }))}
+                        className="w-4 h-4 accent-blue-600"
+                      />
+                      <span className="text-sm font-semibold text-gray-700">Cliente terá acesso ao sistema</span>
+                    </label>
+                  </div>
+                </div>
+
+                {clientFormError && (
+                  <p className="text-sm font-bold text-red-500">{clientFormError}</p>
+                )}
+                {clientFormSuccess && (
+                  <p className="text-sm font-bold text-emerald-600">{clientFormSuccess}</p>
+                )}
+
+                <div className="rounded-2xl border border-gray-100 bg-gray-50/70 p-4 text-sm text-gray-600">
+                  Quando o acesso ao sistema estiver marcado, o e-mail informado precisa já existir no Auth para vínculo automático.
+                </div>
+
+                <div className="flex justify-end gap-3">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      setShowCreateClientModal(false);
+                      setClientFormError('');
+                      setClientFormSuccess('');
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button type="submit" className="flex items-center gap-2" disabled={creatingClient}>
+                    <Check className="w-4 h-4" /> {creatingClient ? 'Salvando...' : 'Salvar cliente'}
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEditClientModal && editingClient && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-4xl rounded-3xl border border-gray-100 shadow-2xl overflow-hidden">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+              <div>
+                <h3 className="text-xl font-black uppercase">Editar cadastro do cliente</h3>
+                <p className="text-xs font-semibold text-gray-500 mt-1">
+                  Origem: {editingClient.source === 'org_members+profiles' ? 'org_members + profiles' : editingClient.source === 'org_members_only' ? 'somente org_members' : 'cadastro manual'}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowEditClientModal(false);
+                  setEditingClient(null);
+                  setClientEditError('');
+                  setClientEditSuccess('');
+                }}
+                className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-8 max-h-[85vh] overflow-y-auto">
+              <form onSubmit={handleSaveClientEdit} className="space-y-6">
+                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-xs font-semibold text-gray-600">
+                  ID do cliente: <span className="font-black text-gray-800">{editingClient.user_id}</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Nome completo</label>
+                    <input
+                      type="text"
+                      value={editClientForm.fullName}
+                      onChange={(event) => setEditClientForm((prev) => ({ ...prev, fullName: event.target.value }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">E-mail</label>
+                    <input
+                      type="email"
+                      value={editClientForm.email}
+                      onChange={(event) => setEditClientForm((prev) => ({ ...prev, email: event.target.value }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Telefone</label>
+                    <input
+                      type="text"
+                      value={editClientForm.phone}
+                      onChange={(event) => setEditClientForm((prev) => ({ ...prev, phone: event.target.value }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Documento de identidade</label>
+                    <input
+                      type="text"
+                      value={editClientForm.documentId}
+                      onChange={(event) => setEditClientForm((prev) => ({ ...prev, documentId: event.target.value }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">NIF / CPF</label>
+                    <input
+                      type="text"
+                      value={editClientForm.taxId}
+                      onChange={(event) => setEditClientForm((prev) => ({ ...prev, taxId: event.target.value }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Estado civil</label>
+                    <input
+                      type="text"
+                      value={editClientForm.maritalStatus}
+                      onChange={(event) => setEditClientForm((prev) => ({ ...prev, maritalStatus: event.target.value }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">País</label>
+                    <input
+                      type="text"
+                      value={editClientForm.country}
+                      onChange={(event) => setEditClientForm((prev) => ({ ...prev, country: event.target.value }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Organização</label>
+                    <select
+                      value={editClientForm.organizationId}
+                      onChange={(event) => setEditClientForm((prev) => ({ ...prev, organizationId: event.target.value }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      {organizations.map((organization) => (
+                        <option key={organization.id} value={organization.id}>{organization.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Endereço</label>
+                    <input
+                      type="text"
+                      value={editClientForm.address}
+                      onChange={(event) => setEditClientForm((prev) => ({ ...prev, address: event.target.value }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Perfil no sistema</label>
+                    <select
+                      value={editClientForm.accessLevel}
+                      onChange={(event) => setEditClientForm((prev) => ({ ...prev, accessLevel: event.target.value as AccessLevel }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      {ACCESS_LEVELS.map((level) => (
+                        <option key={level} value={level}>{level}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {clientEditError && <p className="text-sm font-bold text-red-500">{clientEditError}</p>}
+                {clientEditSuccess && <p className="text-sm font-bold text-emerald-600">{clientEditSuccess}</p>}
+
+                <div className="flex justify-end gap-3">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      setShowEditClientModal(false);
+                      setEditingClient(null);
+                      setClientEditError('');
+                      setClientEditSuccess('');
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button type="submit" disabled={savingClientEdit} className="flex items-center gap-2">
+                    <Check className="w-4 h-4" /> {savingClientEdit ? 'Salvando...' : 'Salvar alterações'}
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
         </div>
       )}
 
