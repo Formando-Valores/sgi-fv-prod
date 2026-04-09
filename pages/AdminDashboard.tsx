@@ -72,33 +72,6 @@ interface ClientProfileView {
   created_at?: string;
 }
 
-interface NewClientFormState {
-  fullName: string;
-  email: string;
-  phone: string;
-  documentId: string;
-  taxId: string;
-  address: string;
-  country: string;
-  maritalStatus: string;
-  organizationId: string;
-  accessLevel: AccessLevel;
-  grantSystemAccess: boolean;
-}
-
-interface EditClientFormState {
-  fullName: string;
-  email: string;
-  phone: string;
-  documentId: string;
-  taxId: string;
-  address: string;
-  country: string;
-  maritalStatus: string;
-  organizationId: string;
-  accessLevel: AccessLevel;
-}
-
 type ProcessVisualOverrides = Record<
   string,
   {
@@ -1361,133 +1334,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     setClientsLoading(true);
     setClientsError('');
 
-    const { data: membershipScopeRows, error: membershipScopeError } = await supabase
-      .from('org_members')
-      .select('org_id,user_id,role,organizations(name)')
-      .eq('user_id', currentUser.id);
-
-    if (membershipScopeError) {
-      setClientsError('Não foi possível validar o escopo de acesso do usuário.');
-      setClientsLoading(false);
-      return;
-    }
-
-    const hasGlobalScope = (membershipScopeRows || []).some((membership) => {
-      const role = String(membership.role || '').toLowerCase();
-      const orgName = extractOrganizationName(membership.organizations);
-      return (role === 'admin' || role === 'owner') && isDefaultOrganizationName(orgName);
-    });
-
-    const { data: memberRows, error: membersError } = await supabase
-      .from('org_members')
-      .select('org_id,user_id,role,organizations(name)')
-      .order('created_at', { ascending: false });
-
-    if (membersError) {
-      setClientsError('Não foi possível carregar os membros da tabela org_members.');
-      setClientsLoading(false);
-      return;
-    }
-
-    const allowedOrgIds = new Set((membershipScopeRows || []).map((row) => row.org_id));
-    const scopedMembers = (memberRows || []).filter((member) => hasGlobalScope || allowedOrgIds.has(member.org_id));
-
-    if (scopedMembers.length === 0) {
-      setClientsData([]);
-      setClientsLoading(false);
-      return;
-    }
-
-    const userIds = Array.from(new Set(scopedMembers.map((member) => member.user_id)));
-    const { data: profileRows, error: profileError } = await supabase
-      .from('profiles')
-      .select('id,nome_completo,nome,email,created_at')
-      .in('id', userIds);
-
-    if (profileError) {
-      console.warn('[clientes] falha ao carregar perfis; exibindo listagem parcial', profileError);
-      setClientsError('Alguns dados de perfil não puderam ser carregados agora. A listagem exibida pode estar parcial.');
-    } else {
-      setClientsError('');
-    }
-
-    const profileMap = new Map(((profileRows || []) as Array<{ id: string; nome_completo?: string | null; nome?: string | null; email?: string | null; created_at?: string | null }>).map((row) => [row.id, row]));
-
-    const normalizedClients: ClientProfileView[] = scopedMembers.map((member) => {
-      const profile = profileMap.get(member.user_id);
-      const email = profile?.email || 'sem-email@nao-informado';
-      const nome =
-        profile?.nome_completo ||
-        profile?.nome ||
-        (email !== 'sem-email@nao-informado' ? String(email).split('@')[0] : `Usuário ${member.user_id.slice(0, 8)}`);
-
-      return {
-        id: `${member.org_id}-${member.user_id}`,
-        user_id: member.user_id,
-        org_id: member.org_id,
-        org_name: extractOrganizationName(member.organizations) || 'Organização Padrão',
-        nome,
-        email,
-        accessLevel: mapOrgRoleToAccessLevel(member.role),
-        source: profile ? 'org_members+profiles' : 'org_members_only',
-        created_at: profile?.created_at || undefined,
-      };
-    });
-
-    setClientsData(normalizedClients);
-    setClientsLoading(false);
-  };
-
-  useEffect(() => {
-    if (currentSection === 'clientes') {
-      fetchClients();
-    }
-  }, [currentSection]);
-
-  const visibleClients = clientsData
-    .filter((client) =>
-      client.nome.toLowerCase().includes(clientsSearch.toLowerCase()) ||
-      client.email.toLowerCase().includes(clientsSearch.toLowerCase()) ||
-      client.org_name.toLowerCase().includes(clientsSearch.toLowerCase())
-    )
-    .sort((a, b) => {
-      if (clientsSort === 'name_asc') {
-        return a.nome.localeCompare(b.nome, 'pt-BR');
-      }
-      if (clientsSort === 'name_desc') {
-        return b.nome.localeCompare(a.nome, 'pt-BR');
-      }
-      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
-    })
-    .slice(0, clientsRowsLimit);
-
-  const resetNewClientForm = () => {
-    setNewClientForm({
-      fullName: '',
-      email: '',
-      phone: '',
-      documentId: '',
-      taxId: '',
-      address: '',
-      country: 'Brasil',
-      maritalStatus: 'Solteiro',
-      organizationId: organizations[0]?.id || '',
-      accessLevel: 'Cliente',
-      grantSystemAccess: false,
-    });
-    setClientFormError('');
-    setClientFormSuccess('');
-  };
-
-  const handleCreateClient = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setClientFormError('');
-    setClientFormSuccess('');
-
-    const name = sanitizeDisplayValue(newClientForm.fullName);
-    const email = sanitizeDisplayValue(newClientForm.email);
-    const selectedOrg = organizations.find((org) => org.id === newClientForm.organizationId);
-
     if (!name) {
       setClientFormError('Informe o nome do cliente.');
       return;
@@ -1498,10 +1344,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       return;
     }
 
-    if (!selectedOrg) {
-      setClientFormError('Selecione uma organização válida.');
-      return;
-    }
+    const hasGlobalScope = (membershipScopeRows || []).some((membership) => {
+      const role = String(membership.role || '').toLowerCase();
+      const orgName = extractOrganizationName(membership.organizations);
+      return (role === 'admin' || role === 'owner') && isDefaultOrganizationName(orgName);
+    });
 
     setCreatingClient(true);
 
@@ -1685,8 +1532,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     event.preventDefault();
     if (!editingClient) return;
 
-    setClientEditError('');
-    setClientEditSuccess('');
+      return {
+        id: `${member.org_id}-${member.user_id}`,
+        user_id: member.user_id,
+        org_id: member.org_id,
+        org_name: extractOrganizationName(member.organizations) || 'Organização Padrão',
+        nome,
+        email,
+        accessLevel: mapOrgRoleToAccessLevel(member.role),
+        created_at: profile?.created_at || undefined,
+      };
+    });
 
     const selectedOrg = organizations.find((org) => org.id === editClientForm.organizationId);
     if (!selectedOrg) {
@@ -1700,67 +1556,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       return;
     }
 
-    setSavingClientEdit(true);
-
-    try {
-      if (editingClient.user_id.startsWith('local-')) {
-        setUsers((prev) =>
-          prev.map((user) =>
-            user.id === editingClient.user_id
-              ? {
-                  ...user,
-                  name: normalizedName,
-                  email: sanitizeDisplayValue(editClientForm.email) || user.email,
-                  phone: sanitizeDisplayValue(editClientForm.phone) || '---',
-                  documentId: sanitizeDisplayValue(editClientForm.documentId) || '---',
-                  taxId: sanitizeDisplayValue(editClientForm.taxId) || '---',
-                  address: sanitizeDisplayValue(editClientForm.address) || '---',
-                  country: sanitizeDisplayValue(editClientForm.country) || '---',
-                  maritalStatus: sanitizeDisplayValue(editClientForm.maritalStatus) || '---',
-                  organizationId: selectedOrg.id,
-                  organizationName: selectedOrg.name,
-                }
-              : user
-          )
-        );
-      } else {
-        const { error: updateProfileError } = await supabase
-          .from('profiles')
-          .update({
-            nome_completo: normalizedName,
-            name: normalizedName,
-            email: sanitizeDisplayValue(editClientForm.email) || null,
-            phone: sanitizeDisplayValue(editClientForm.phone) || null,
-            documento_identidade: sanitizeDisplayValue(editClientForm.documentId) || null,
-            nif_cpf: sanitizeDisplayValue(editClientForm.taxId) || null,
-            endereco: sanitizeDisplayValue(editClientForm.address) || null,
-            pais: sanitizeDisplayValue(editClientForm.country) || null,
-            estado_civil: sanitizeDisplayValue(editClientForm.maritalStatus) || null,
-            role: editClientForm.accessLevel,
-            org_id: selectedOrg.id,
-          })
-          .eq('id', editingClient.user_id);
-
-        if (updateProfileError) {
-          setClientEditError('Não foi possível atualizar os dados de perfil do cliente.');
-          return;
-        }
-
-        const { error: upsertMemberError } = await supabase
-          .from('org_members')
-          .upsert(
-            {
-              org_id: selectedOrg.id,
-              user_id: editingClient.user_id,
-              role: mapAccessLevelToOrgRole(editClientForm.accessLevel),
-            },
-            { onConflict: 'org_id,user_id' }
-          );
-
-        if (upsertMemberError) {
-          setClientEditError('Perfil atualizado, mas houve erro ao atualizar vínculo da organização.');
-          return;
-        }
+  const visibleClients = clientsData
+    .filter((client) =>
+      client.nome.toLowerCase().includes(clientsSearch.toLowerCase()) ||
+      client.email.toLowerCase().includes(clientsSearch.toLowerCase()) ||
+      client.org_name.toLowerCase().includes(clientsSearch.toLowerCase())
+    )
+    .sort((a, b) => {
+      if (clientsSort === 'name_asc') {
+        return a.nome.localeCompare(b.nome, 'pt-BR');
+      }
+      if (clientsSort === 'name_desc') {
+        return b.nome.localeCompare(a.nome, 'pt-BR');
       }
 
       setClientsData((prev) =>
@@ -2319,18 +2126,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         </div>
       ) : currentSection === 'clientes' ? (
         <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
-          <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <h3 className="text-lg font-black">CLIENTES</h3>
-            <Button
-              onClick={() => {
-                resetNewClientForm();
-                setShowCreateClientModal(true);
-              }}
-              className="flex items-center gap-2 text-xs font-bold uppercase"
-            >
-              <Plus className="w-4 h-4" /> Novo cliente
-            </Button>
-          </div>
+          <h3 className="text-lg font-black mb-4">CLIENTES</h3>
 
           <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="relative md:col-span-1">
@@ -2384,11 +2180,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               <tbody className="divide-y divide-slate-800">
                 {clientsLoading ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-8 text-center text-gray-500">Carregando membros...</td>
+                    <td colSpan={4} className="px-6 py-8 text-center text-gray-500">Carregando membros...</td>
                   </tr>
                 ) : visibleClients.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-8 text-center text-gray-500">Nenhum membro encontrado.</td>
+                    <td colSpan={4} className="px-6 py-8 text-center text-gray-500">Nenhum membro encontrado.</td>
                   </tr>
                 ) : visibleClients.map((client) => (
                   <tr key={client.id} className="hover:bg-gray-50">
@@ -2400,23 +2196,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     </td>
                     <td className="px-6 py-4 text-gray-600 font-bold">{client.org_name}</td>
                     <td className="px-6 py-4 text-gray-500 font-bold">{client.email}</td>
-                    <td className="px-6 py-4">
-                      <span className="text-[10px] font-black uppercase text-gray-500">
-                        {client.source === 'org_members+profiles'
-                          ? 'org_members + profiles'
-                          : client.source === 'org_members_only'
-                            ? 'somente org_members'
-                            : 'cadastro manual'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button
-                        onClick={() => void handleStartEditClient(client)}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-100 font-bold text-xs"
-                      >
-                        <Pencil className="w-3.5 h-3.5" /> Editar
-                      </button>
-                    </td>
                   </tr>
                 ))}
               </tbody>
