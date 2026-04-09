@@ -72,6 +72,44 @@ interface ClientProfileView {
   created_at?: string;
 }
 
+interface NewClientFormState {
+  fullName: string;
+  email: string;
+  phone: string;
+  documentId: string;
+  taxId: string;
+  address: string;
+  country: string;
+  maritalStatus: string;
+  organizationId: string;
+  accessLevel: AccessLevel;
+  grantSystemAccess: boolean;
+}
+
+interface EditClientFormState {
+  fullName: string;
+  email: string;
+  phone: string;
+  documentId: string;
+  taxId: string;
+  address: string;
+  country: string;
+  maritalStatus: string;
+  organizationId: string;
+  accessLevel: AccessLevel;
+}
+
+type ClientOverrideMap = Record<
+  string,
+  {
+    fullName?: string;
+    email?: string;
+    organizationId?: string;
+    organizationName?: string;
+    accessLevel?: AccessLevel;
+  }
+>;
+
 type ProcessVisualOverrides = Record<
   string,
   {
@@ -226,6 +264,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     organizationId: '',
     accessLevel: 'Cliente',
   });
+  const [clientOverrides, setClientOverrides] = useState<ClientOverrideMap>(() => {
+    try {
+      const raw = localStorage.getItem('sgi_client_overrides');
+      if (!raw) return {};
+      return JSON.parse(raw) as ClientOverrideMap;
+    } catch {
+      return {};
+    }
+  });
   const [newClientForm, setNewClientForm] = useState<NewClientFormState>({
     fullName: '',
     email: '',
@@ -258,6 +305,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
   const location = useLocation();
   const currentSection = section ?? (location.pathname.split('/')[2] as 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes') ?? 'dashboard';
+
+  useEffect(() => {
+    localStorage.setItem('sgi_client_overrides', JSON.stringify(clientOverrides));
+  }, [clientOverrides]);
 
   const sidebarLinks = [
     { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -1507,39 +1558,34 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       .eq('id', client.user_id)
       .maybeSingle();
 
-    if (error) {
-      setClientEditError('Não foi possível carregar todos os dados do cliente. Você ainda pode editar os campos disponíveis.');
-      return;
+    if (profileError) {
+      console.warn('[clientes] falha ao carregar perfis; exibindo listagem parcial', profileError);
+      setClientsError('Alguns dados de perfil não puderam ser carregados agora. A listagem exibida pode estar parcial.');
+    } else {
+      setClientsError('');
     }
 
-    if (!profileData) return;
+    const profileMap = new Map(((profileRows || []) as Array<{ id: string; nome_completo?: string | null; nome?: string | null; email?: string | null; created_at?: string | null }>).map((row) => [row.id, row]));
 
-    setEditClientForm({
-      fullName: sanitizeDisplayValue(profileData.nome_completo) || sanitizeDisplayValue(profileData.nome) || baseForm.fullName,
-      email: sanitizeDisplayValue(profileData.email) || baseForm.email,
-      phone: sanitizeDisplayValue(profileData.phone),
-      documentId: sanitizeDisplayValue(profileData.documento_identidade),
-      taxId: sanitizeDisplayValue(profileData.nif_cpf),
-      address: sanitizeDisplayValue(profileData.endereco),
-      country: sanitizeDisplayValue(profileData.pais) || 'Brasil',
-      maritalStatus: sanitizeDisplayValue(profileData.estado_civil) || 'Solteiro',
-      organizationId: baseForm.organizationId,
-      accessLevel: client.accessLevel,
-    });
-  };
-
-  const handleSaveClientEdit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!editingClient) return;
+    const normalizedClients: ClientProfileView[] = scopedMembers.map((member) => {
+      const override = clientOverrides[member.user_id];
+      const profile = profileMap.get(member.user_id);
+      const email = sanitizeDisplayValue(override?.email) || profile?.email || 'sem-email@nao-informado';
+      const nome =
+        sanitizeDisplayValue(override?.fullName) ||
+        profile?.nome_completo ||
+        profile?.nome ||
+        (email !== 'sem-email@nao-informado' ? String(email).split('@')[0] : `Usuário ${member.user_id.slice(0, 8)}`);
 
       return {
-        id: `${member.org_id}-${member.user_id}`,
+        id: `${sanitizeDisplayValue(override?.organizationId) || member.org_id}-${member.user_id}`,
         user_id: member.user_id,
-        org_id: member.org_id,
-        org_name: extractOrganizationName(member.organizations) || 'Organização Padrão',
+        org_id: sanitizeDisplayValue(override?.organizationId) || member.org_id,
+        org_name: sanitizeDisplayValue(override?.organizationName) || extractOrganizationName(member.organizations) || 'Organização Padrão',
         nome,
         email,
-        accessLevel: mapOrgRoleToAccessLevel(member.role),
+        accessLevel: override?.accessLevel || mapOrgRoleToAccessLevel(member.role),
+        source: profile ? 'org_members+profiles' : 'org_members_only',
         created_at: profile?.created_at || undefined,
       };
     });
@@ -1555,6 +1601,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       setClientEditError('Informe o nome do cliente.');
       return;
     }
+  }, [currentSection, clientOverrides]);
 
   const visibleClients = clientsData
     .filter((client) =>
@@ -1584,6 +1631,365 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
             : client
         )
       );
+
+      setClientEditSuccess('Cadastro do cliente atualizado com sucesso.');
+      setShowEditClientModal(false);
+      setEditingClient(null);
+      await fetchClients();
+    } finally {
+      setSavingClientEdit(false);
+    }
+  };
+
+  const resetNewClientForm = () => {
+    setNewClientForm({
+      fullName: '',
+      email: '',
+      phone: '',
+      documentId: '',
+      taxId: '',
+      address: '',
+      country: 'Brasil',
+      maritalStatus: 'Solteiro',
+      organizationId: organizations[0]?.id || '',
+      accessLevel: 'Cliente',
+      grantSystemAccess: false,
+    });
+    setClientFormError('');
+    setClientFormSuccess('');
+  };
+
+  const handleCreateClient = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setClientFormError('');
+    setClientFormSuccess('');
+
+    const name = sanitizeDisplayValue(newClientForm.fullName);
+    const email = sanitizeDisplayValue(newClientForm.email);
+    const selectedOrg = organizations.find((org) => org.id === newClientForm.organizationId);
+
+    if (!name) {
+      setClientFormError('Informe o nome do cliente.');
+      return;
+    }
+
+    if (!email) {
+      setClientFormError('Informe o e-mail do cliente.');
+      return;
+    }
+
+    if (!selectedOrg) {
+      setClientFormError('Selecione uma organização válida.');
+      return;
+    }
+
+    setCreatingClient(true);
+
+    try {
+      const normalizedRole = mapAccessLevelToOrgRole(newClientForm.accessLevel);
+
+      if (newClientForm.grantSystemAccess) {
+        const { data: existingProfile, error: lookupError } = await supabase
+          .from('profiles')
+          .select('id,email')
+          .eq('email', email)
+          .maybeSingle();
+
+        if (lookupError) {
+          setClientFormError('Não foi possível validar o perfil no banco de dados.');
+          return;
+        }
+
+        if (!existingProfile?.id) {
+          setClientFormError('Para liberar acesso ao sistema, este e-mail precisa já ter conta criada no Auth.');
+          return;
+        }
+
+        const { error: updateProfileError } = await supabase
+          .from('profiles')
+          .update({
+            nome_completo: name,
+            name,
+            documento_identidade: sanitizeDisplayValue(newClientForm.documentId) || null,
+            nif_cpf: sanitizeDisplayValue(newClientForm.taxId) || null,
+            estado_civil: sanitizeDisplayValue(newClientForm.maritalStatus) || null,
+            phone: sanitizeDisplayValue(newClientForm.phone) || null,
+            endereco: sanitizeDisplayValue(newClientForm.address) || null,
+            pais: sanitizeDisplayValue(newClientForm.country) || null,
+            role: newClientForm.accessLevel,
+            org_id: selectedOrg.id,
+          })
+          .eq('id', existingProfile.id);
+
+        if (updateProfileError) {
+          setClientFormError('Não foi possível atualizar o perfil do cliente.');
+          return;
+        }
+
+        const { error: upsertMemberError } = await supabase
+          .from('org_members')
+          .upsert(
+            {
+              org_id: selectedOrg.id,
+              user_id: existingProfile.id,
+              role: normalizedRole,
+            },
+            { onConflict: 'org_id,user_id' }
+          );
+
+        if (upsertMemberError) {
+          setClientFormError('Perfil atualizado, mas não foi possível vincular cliente à organização.');
+          return;
+        }
+
+        setClientOverrides((prev) => ({
+          ...prev,
+          [existingProfile.id]: {
+            fullName: name,
+            email,
+            organizationId: selectedOrg.id,
+            organizationName: selectedOrg.name,
+            accessLevel: newClientForm.accessLevel,
+          },
+        }));
+
+        await fetchClients();
+      } else {
+        const tempId = `local-${Date.now()}`;
+        const now = new Date().toLocaleString('pt-BR');
+
+        setUsers((prev) => [
+          {
+            id: tempId,
+            name,
+            email,
+            role: UserRole.CLIENT,
+            documentId: sanitizeDisplayValue(newClientForm.documentId) || '---',
+            taxId: sanitizeDisplayValue(newClientForm.taxId) || '---',
+            address: sanitizeDisplayValue(newClientForm.address) || '---',
+            maritalStatus: sanitizeDisplayValue(newClientForm.maritalStatus) || '---',
+            country: sanitizeDisplayValue(newClientForm.country) || '---',
+            phone: sanitizeDisplayValue(newClientForm.phone) || '---',
+            unit: ServiceUnit.ADMINISTRATIVO,
+            status: ProcessStatus.PENDENTE,
+            protocol: `CLI-${new Date().getFullYear()}-${String(prev.length + 1).padStart(3, '0')}`,
+            registrationDate: now,
+            lastUpdate: now,
+            hierarchy: Hierarchy.NOTES_ONLY,
+            organizationId: selectedOrg.id,
+            organizationName: selectedOrg.name,
+          },
+          ...prev,
+        ]);
+
+        setClientsData((prev) => [
+          {
+            id: `${selectedOrg.id}-${tempId}`,
+            user_id: tempId,
+            org_id: selectedOrg.id,
+            org_name: selectedOrg.name,
+            nome: name,
+            email,
+            accessLevel: newClientForm.accessLevel,
+            source: 'local_manual',
+            created_at: new Date().toISOString(),
+          },
+          ...prev,
+        ]);
+
+        setClientOverrides((prev) => ({
+          ...prev,
+          [tempId]: {
+            fullName: name,
+            email,
+            organizationId: selectedOrg.id,
+            organizationName: selectedOrg.name,
+            accessLevel: newClientForm.accessLevel,
+          },
+        }));
+      }
+
+      setClientFormSuccess('Cliente cadastrado com sucesso.');
+      resetNewClientForm();
+      setShowCreateClientModal(false);
+    } finally {
+      setCreatingClient(false);
+    }
+  };
+
+  const handleStartEditClient = async (client: ClientProfileView) => {
+    setEditingClient(client);
+    setClientEditError('');
+    setClientEditSuccess('');
+
+    const baseForm: EditClientFormState = {
+      fullName: client.nome,
+      email: client.email === 'sem-email@nao-informado' ? '' : client.email,
+      phone: '',
+      documentId: '',
+      taxId: '',
+      address: '',
+      country: 'Brasil',
+      maritalStatus: 'Solteiro',
+      organizationId: client.org_id,
+      accessLevel: client.accessLevel,
+    };
+
+    setEditClientForm(baseForm);
+    setShowEditClientModal(true);
+
+    if (client.user_id.startsWith('local-')) {
+      const localUser = users.find((user) => user.id === client.user_id);
+      if (!localUser) return;
+      setEditClientForm({
+        fullName: localUser.name || baseForm.fullName,
+        email: localUser.email || baseForm.email,
+        phone: localUser.phone === '---' ? '' : localUser.phone,
+        documentId: localUser.documentId === '---' ? '' : localUser.documentId,
+        taxId: localUser.taxId === '---' ? '' : localUser.taxId,
+        address: localUser.address === '---' ? '' : localUser.address,
+        country: localUser.country === '---' ? 'Brasil' : localUser.country,
+        maritalStatus: localUser.maritalStatus === '---' ? 'Solteiro' : localUser.maritalStatus,
+        organizationId: localUser.organizationId || baseForm.organizationId,
+        accessLevel: client.accessLevel,
+      });
+      return;
+    }
+
+    const { data: profileData, error } = await supabase
+      .from('profiles')
+      .select('nome_completo,nome,email,phone,documento_identidade,nif_cpf,endereco,pais,estado_civil')
+      .eq('id', client.user_id)
+      .maybeSingle();
+
+    if (error) {
+      setClientEditError('Não foi possível carregar todos os dados do cliente. Você ainda pode editar os campos disponíveis.');
+      return;
+    }
+
+    if (!profileData) return;
+
+    setEditClientForm({
+      fullName: sanitizeDisplayValue(profileData.nome_completo) || sanitizeDisplayValue(profileData.nome) || baseForm.fullName,
+      email: sanitizeDisplayValue(profileData.email) || baseForm.email,
+      phone: sanitizeDisplayValue(profileData.phone),
+      documentId: sanitizeDisplayValue(profileData.documento_identidade),
+      taxId: sanitizeDisplayValue(profileData.nif_cpf),
+      address: sanitizeDisplayValue(profileData.endereco),
+      country: sanitizeDisplayValue(profileData.pais) || 'Brasil',
+      maritalStatus: sanitizeDisplayValue(profileData.estado_civil) || 'Solteiro',
+      organizationId: baseForm.organizationId,
+      accessLevel: client.accessLevel,
+    });
+  };
+
+  const handleSaveClientEdit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!editingClient) return;
+
+    setClientEditError('');
+    setClientEditSuccess('');
+
+    const selectedOrg = organizations.find((org) => org.id === editClientForm.organizationId);
+    if (!selectedOrg) {
+      setClientEditError('Selecione uma organização válida.');
+      return;
+    }
+
+    const normalizedName = sanitizeDisplayValue(editClientForm.fullName);
+    if (!normalizedName) {
+      setClientEditError('Informe o nome do cliente.');
+      return;
+    }
+
+    setSavingClientEdit(true);
+
+    try {
+      if (editingClient.user_id.startsWith('local-')) {
+        setUsers((prev) =>
+          prev.map((user) =>
+            user.id === editingClient.user_id
+              ? {
+                  ...user,
+                  name: normalizedName,
+                  email: sanitizeDisplayValue(editClientForm.email) || user.email,
+                  phone: sanitizeDisplayValue(editClientForm.phone) || '---',
+                  documentId: sanitizeDisplayValue(editClientForm.documentId) || '---',
+                  taxId: sanitizeDisplayValue(editClientForm.taxId) || '---',
+                  address: sanitizeDisplayValue(editClientForm.address) || '---',
+                  country: sanitizeDisplayValue(editClientForm.country) || '---',
+                  maritalStatus: sanitizeDisplayValue(editClientForm.maritalStatus) || '---',
+                  organizationId: selectedOrg.id,
+                  organizationName: selectedOrg.name,
+                }
+              : user
+          )
+        );
+      } else {
+        const { error: updateProfileError } = await supabase
+          .from('profiles')
+          .update({
+            nome_completo: normalizedName,
+            name: normalizedName,
+            email: sanitizeDisplayValue(editClientForm.email) || null,
+            phone: sanitizeDisplayValue(editClientForm.phone) || null,
+            documento_identidade: sanitizeDisplayValue(editClientForm.documentId) || null,
+            nif_cpf: sanitizeDisplayValue(editClientForm.taxId) || null,
+            endereco: sanitizeDisplayValue(editClientForm.address) || null,
+            pais: sanitizeDisplayValue(editClientForm.country) || null,
+            estado_civil: sanitizeDisplayValue(editClientForm.maritalStatus) || null,
+            role: editClientForm.accessLevel,
+            org_id: selectedOrg.id,
+          })
+          .eq('id', editingClient.user_id);
+
+        if (updateProfileError) {
+          setClientEditError('Não foi possível atualizar os dados de perfil do cliente.');
+          return;
+        }
+
+        const { error: upsertMemberError } = await supabase
+          .from('org_members')
+          .upsert(
+            {
+              org_id: selectedOrg.id,
+              user_id: editingClient.user_id,
+              role: mapAccessLevelToOrgRole(editClientForm.accessLevel),
+            },
+            { onConflict: 'org_id,user_id' }
+          );
+
+        if (upsertMemberError) {
+          setClientEditError('Perfil atualizado, mas houve erro ao atualizar vínculo da organização.');
+          return;
+        }
+      }
+
+      setClientsData((prev) =>
+        prev.map((client) =>
+          client.id === editingClient.id
+            ? {
+                ...client,
+                nome: normalizedName,
+                email: sanitizeDisplayValue(editClientForm.email) || 'sem-email@nao-informado',
+                org_id: selectedOrg.id,
+                org_name: selectedOrg.name,
+                accessLevel: editClientForm.accessLevel,
+              }
+            : client
+        )
+      );
+
+      setClientOverrides((prev) => ({
+        ...prev,
+        [editingClient.user_id]: {
+          fullName: normalizedName,
+          email: sanitizeDisplayValue(editClientForm.email) || 'sem-email@nao-informado',
+          organizationId: selectedOrg.id,
+          organizationName: selectedOrg.name,
+          accessLevel: editClientForm.accessLevel,
+        },
+      }));
 
       setClientEditSuccess('Cadastro do cliente atualizado com sucesso.');
       setShowEditClientModal(false);
@@ -2126,7 +2532,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         </div>
       ) : currentSection === 'clientes' ? (
         <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
-          <h3 className="text-lg font-black mb-4">CLIENTES</h3>
+          <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <h3 className="text-lg font-black">CLIENTES</h3>
+            <Button
+              onClick={() => {
+                resetNewClientForm();
+                setShowCreateClientModal(true);
+              }}
+              className="flex items-center gap-2 text-xs font-bold uppercase"
+            >
+              <Plus className="w-4 h-4" /> Novo cliente
+            </Button>
+          </div>
 
           <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="relative md:col-span-1">
@@ -2180,11 +2597,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               <tbody className="divide-y divide-slate-800">
                 {clientsLoading ? (
                   <tr>
-                    <td colSpan={4} className="px-6 py-8 text-center text-gray-500">Carregando membros...</td>
+                    <td colSpan={6} className="px-6 py-8 text-center text-gray-500">Carregando membros...</td>
                   </tr>
                 ) : visibleClients.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-6 py-8 text-center text-gray-500">Nenhum membro encontrado.</td>
+                    <td colSpan={6} className="px-6 py-8 text-center text-gray-500">Nenhum membro encontrado.</td>
                   </tr>
                 ) : visibleClients.map((client) => (
                   <tr key={client.id} className="hover:bg-gray-50">
@@ -2196,6 +2613,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     </td>
                     <td className="px-6 py-4 text-gray-600 font-bold">{client.org_name}</td>
                     <td className="px-6 py-4 text-gray-500 font-bold">{client.email}</td>
+                    <td className="px-6 py-4">
+                      <span className="text-[10px] font-black uppercase text-gray-500">
+                        {client.source === 'org_members+profiles'
+                          ? 'org_members + profiles'
+                          : client.source === 'org_members_only'
+                            ? 'somente org_members'
+                            : 'cadastro manual'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <button
+                        onClick={() => void handleStartEditClient(client)}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-100 font-bold text-xs"
+                      >
+                        <Pencil className="w-3.5 h-3.5" /> Editar
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
