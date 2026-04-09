@@ -25,33 +25,24 @@ Deno.serve(async (request) => {
   }
 
   const supabaseUrl = Deno.env.get('URL_SUPABASE') ?? Deno.env.get('SUPABASE_URL') ?? '';
-  const anonKey = Deno.env.get('ANON_KEY_SUPABASE') ?? Deno.env.get('SUPABASE_ANON_KEY') ?? '';
   const serviceRoleKey = Deno.env.get('SERVICE_ROLE_KEY_SUPABASE') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
-  if (!supabaseUrl || !anonKey || !serviceRoleKey) {
+  if (!supabaseUrl || !serviceRoleKey) {
     return jsonResponse(500, { success: false, error: 'Configuração do Supabase ausente na Edge Function.' });
-  }
-
-  const authHeader = request.headers.get('Authorization') || '';
-  if (!authHeader) {
-    return jsonResponse(401, { success: false, error: 'Autenticação obrigatória.' });
-  }
-
-  const authClient = createClient(supabaseUrl, anonKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-    global: { headers: { Authorization: authHeader } },
-  });
-
-  const { data: authData, error: authError } = await authClient.auth.getUser();
-  const currentUser = authData?.user;
-
-  if (authError || !currentUser) {
-    return jsonResponse(401, { success: false, error: 'Usuário não autenticado.' });
   }
 
   const adminClient = createClient(supabaseUrl, serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
+
+  const authHeader = request.headers.get('Authorization') || '';
+  const accessToken = authHeader.replace('Bearer', '').trim();
+  let requesterUserId: string | null = null;
+
+  if (accessToken) {
+    const { data: authData } = await adminClient.auth.getUser(accessToken);
+    requesterUserId = authData.user?.id ?? null;
+  }
 
   const payload = await request.json().catch(() => ({}));
   const organizationId = String(payload.organizationId ?? '').trim();
@@ -78,9 +69,9 @@ Deno.serve(async (request) => {
         org_id: organizationId,
         titulo: processTitle,
         status: 'triagem',
-        cliente_nome: clientName || currentUser.email || 'Cliente',
+        cliente_nome: clientName || 'Cliente',
         cliente_documento: clientDocument,
-        cliente_contato: clientContact || currentUser.email || null,
+        cliente_contato: clientContact || null,
         responsavel_user_id: assignedAdminId,
         origem_canal: 'portal_cliente',
         unidade_atendimento: serviceArea || null,
@@ -99,14 +90,14 @@ Deno.serve(async (request) => {
         process_id: createdProcess.id,
         tipo: 'registro',
         mensagem: `Atendimento criado após pagamento confirmado. Serviço: ${serviceName}.`,
-        created_by: currentUser.id,
+        created_by: requesterUserId,
       },
       {
         org_id: organizationId,
         process_id: createdProcess.id,
         tipo: 'atribuicao',
         mensagem: `Atribuído inicialmente para ${assignedProfessionalName || 'profissional a definir'}. Continuidade permitida para admins da organização.`,
-        created_by: currentUser.id,
+        created_by: requesterUserId,
       },
     ]);
 
