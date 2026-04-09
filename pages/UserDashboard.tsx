@@ -4,6 +4,7 @@ import { LogOut, Printer, FileDown, User as UserIcon, Calendar, Clock, Landmark,
 import { User, ProcessStatus } from '../types';
 import { supabase } from '../supabase';
 import { SERVICE_MANAGERS } from '../constants';
+import { SUPABASE_EDGE_FUNCTIONS } from '../src/lib/supabaseFunctions';
 
 interface UserDashboardProps {
   currentUser: User;
@@ -423,25 +424,51 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
 
     try {
       const processTitle = `${selectedService.name} - ${selectedSlotData.professional} (${selectedAdminScheduleSlot || 'horário a confirmar'})`;
-      const { data: createdProcess, error: processError } = await supabase
-        .from('processes')
-        .insert({
-          org_id: currentUser.organizationId,
-          titulo: processTitle,
-          status: 'triagem',
-          cliente_nome: currentUser.name,
-          cliente_documento: currentUser.documentId || null,
-          cliente_contato: currentUser.phone || currentUser.email || null,
-          responsavel_user_id: UUID_PATTERN.test(selectedSlotData.id) ? selectedSlotData.id : null,
-          origem_canal: 'portal_cliente',
-          unidade_atendimento: selectedService.area,
-          org_nome_solicitado: currentUser.organizationName || null,
-        })
-        .select('id')
-        .single();
+      let createdProcess: { id: string } | null = null;
 
-      if (processError || !createdProcess) {
-        throw processError || new Error('Falha ao criar processo');
+      const { data: functionResult, error: functionError } = await supabase.functions.invoke(
+        SUPABASE_EDGE_FUNCTIONS.CREATE_CLIENT_PROCESS,
+        {
+          body: {
+            organizationId: currentUser.organizationId,
+            serviceName: selectedService.name,
+            serviceArea: selectedService.area,
+            scheduledSlot: selectedAdminScheduleSlot || null,
+            assignedProfessionalName: selectedSlotData.professional,
+            assignedAdminId: UUID_PATTERN.test(selectedSlotData.id) ? selectedSlotData.id : null,
+            clientName: currentUser.name,
+            clientDocument: currentUser.documentId || null,
+            clientContact: currentUser.phone || currentUser.email || null,
+            organizationName: currentUser.organizationName || null,
+          },
+        },
+      );
+
+      if (!functionError && functionResult?.success && functionResult?.processId) {
+        createdProcess = { id: functionResult.processId as string };
+      } else {
+        const { data: directCreatedProcess, error: processError } = await supabase
+          .from('processes')
+          .insert({
+            org_id: currentUser.organizationId,
+            titulo: processTitle,
+            status: 'triagem',
+            cliente_nome: currentUser.name,
+            cliente_documento: currentUser.documentId || null,
+            cliente_contato: currentUser.phone || currentUser.email || null,
+            responsavel_user_id: UUID_PATTERN.test(selectedSlotData.id) ? selectedSlotData.id : null,
+            origem_canal: 'portal_cliente',
+            unidade_atendimento: selectedService.area,
+            org_nome_solicitado: currentUser.organizationName || null,
+          })
+          .select('id')
+          .single();
+
+        if (processError || !directCreatedProcess) {
+          throw processError || functionError || new Error('Falha ao criar processo');
+        }
+
+        createdProcess = { id: directCreatedProcess.id };
       }
 
       setCreatedProcessId(createdProcess.id);
