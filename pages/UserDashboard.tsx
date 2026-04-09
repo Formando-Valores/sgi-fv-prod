@@ -423,7 +423,6 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
     setProcessCreationError(null);
 
     try {
-      const processTitle = `${selectedService.name} - ${selectedSlotData.professional} (${selectedAdminScheduleSlot || 'horário a confirmar'})`;
       let createdProcess: { id: string } | null = null;
 
       const { data: functionResult, error: functionError } = await supabase.functions.invoke(
@@ -447,28 +446,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
       if (!functionError && functionResult?.success && functionResult?.processId) {
         createdProcess = { id: functionResult.processId as string };
       } else {
-        const { data: directCreatedProcess, error: processError } = await supabase
-          .from('processes')
-          .insert({
-            org_id: currentUser.organizationId,
-            titulo: processTitle,
-            status: 'triagem',
-            cliente_nome: currentUser.name,
-            cliente_documento: currentUser.documentId || null,
-            cliente_contato: currentUser.phone || currentUser.email || null,
-            responsavel_user_id: UUID_PATTERN.test(selectedSlotData.id) ? selectedSlotData.id : null,
-            origem_canal: 'portal_cliente',
-            unidade_atendimento: selectedService.area,
-            org_nome_solicitado: currentUser.organizationName || null,
-          })
-          .select('id')
-          .single();
-
-        if (processError || !directCreatedProcess) {
-          throw processError || functionError || new Error('Falha ao criar processo');
-        }
-
-        createdProcess = { id: directCreatedProcess.id };
+        throw functionError || new Error(functionResult?.error || 'Falha ao criar processo');
       }
 
       setCreatedProcessId(createdProcess.id);
