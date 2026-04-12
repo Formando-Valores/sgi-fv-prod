@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { LogOut, Printer, FileDown, User as UserIcon, Calendar, Clock, Landmark, Activity, UserCheck, MessageSquare } from 'lucide-react';
-import { User, ProcessStatus } from '../types';
+import { User, ProcessStatus, UserRole } from '../types';
 import { supabase } from '../supabase';
 import { SERVICE_MANAGERS } from '../constants';
 import { SUPABASE_EDGE_FUNCTIONS } from '../src/lib/supabaseFunctions';
@@ -58,6 +58,20 @@ type ServiceProcessView = {
   timeline: Array<{ date: string; message: string }>;
 };
 
+type DashboardProcessRow = {
+  id: string;
+  titulo?: string | null;
+  protocolo?: string | null;
+  status?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  unidade_atendimento?: string | null;
+  cliente_nome?: string | null;
+  cliente_contato?: string | null;
+  responsavel_user_id?: string | null;
+  data_conclusao?: string | null;
+};
+
 const SERVICE_CATALOG: GuidedService[] = [
   { id: 'adm-001', area: 'administrativo', category: 'Administrativo', name: 'Regularização de documentos', priceLabel: '80€' },
   { id: 'adm-002', area: 'administrativo', category: 'Administrativo', name: 'Abertura de atividade', priceLabel: '120€' },
@@ -92,6 +106,13 @@ const parsePriceLabel = (priceLabel: string): number | null => {
   const numericValue = Number(normalized);
   return Number.isFinite(numericValue) ? numericValue : null;
 };
+const mapDbStatusToProcessStatus = (status?: string | null): ProcessStatus => {
+  const normalized = (status || '').toLowerCase();
+  if (normalized === 'triagem') return ProcessStatus.TRIAGEM;
+  if (normalized === 'analise' || normalized === 'análise') return ProcessStatus.ANALISE;
+  if (normalized === 'concluido') return ProcessStatus.CONCLUIDO;
+  return ProcessStatus.PENDENTE;
+};
 
 const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) => {
   const [selectedArea, setSelectedArea] = React.useState<ServiceArea | null>(null);
@@ -110,6 +131,11 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
   const [availableProfessionals, setAvailableProfessionals] = React.useState<AvailableProfessional[]>([]);
   const [isLoadingProfessionals, setIsLoadingProfessionals] = React.useState(false);
   const [professionalsError, setProfessionalsError] = React.useState<string | null>(null);
+  const [dashboardProcesses, setDashboardProcesses] = React.useState<DashboardProcessRow[]>([]);
+  const [dashboardProcessFilter, setDashboardProcessFilter] = React.useState<'todos' | 'andamento' | 'concluidos'>('todos');
+  const [dashboardProcessSearch, setDashboardProcessSearch] = React.useState('');
+  const [selectedDashboardProcessId, setSelectedDashboardProcessId] = React.useState<string | null>(null);
+  const [dashboardProcessesLoading, setDashboardProcessesLoading] = React.useState(false);
   const [processComments, setProcessComments] = React.useState<Array<{ id: string; text: string; createdAt: string }>>([]);
   const [newComment, setNewComment] = React.useState('');
   const [processFiles, setProcessFiles] = React.useState<Array<{ id: string; name: string; sizeLabel: string; uploadedAt: string }>>([]);
@@ -137,47 +163,74 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
   );
   const isOnboardingFlow = processStatus !== ProcessStatus.CONCLUIDO && (!initialStageFinished || allowNewRequest);
   const displaySectorName = processStatus === ProcessStatus.PENDENTE ? 'Atendimento ao Associado' : 'Setor Jurídico Conveniado à AI';
+  const filteredDashboardProcesses = dashboardProcesses.filter((processRow) => {
+    const normalizedStatus = (processRow.status || '').toLowerCase();
+    const isConcluded = normalizedStatus === 'concluido';
+    if (dashboardProcessFilter === 'andamento' && isConcluded) return false;
+    if (dashboardProcessFilter === 'concluidos' && !isConcluded) return false;
+
+    if (!dashboardProcessSearch.trim()) return true;
+    const target = `${processRow.id} ${processRow.protocolo || ''} ${processRow.titulo || ''} ${processRow.unidade_atendimento || ''} ${processRow.status || ''} ${processRow.cliente_nome || ''}`.toLowerCase();
+    return target.includes(dashboardProcessSearch.toLowerCase());
+  });
 
   React.useEffect(() => {
-    const loadCurrentClientProcess = async () => {
-      if (!currentUser.organizationId || !currentUser.email || allowNewRequest) return;
-      if (createdProcessId && serviceProcess) return;
+    const loadDashboardProcesses = async () => {
+      if (!currentUser.organizationId) return;
+      setDashboardProcessesLoading(true);
 
-      const emailContact = currentUser.email.trim();
-      const userName = currentUser.name.trim();
-      const processQuery = supabase
+      const baseQuery = supabase
         .from('processes')
-        .select('id,titulo,status,created_at,cliente_nome,cliente_contato')
+        .select('id,titulo,protocolo,status,created_at,updated_at,unidade_atendimento,cliente_nome,cliente_contato,responsavel_user_id,data_conclusao')
         .eq('org_id', currentUser.organizationId)
-        .neq('status', 'concluido')
         .order('created_at', { ascending: false });
 
-      if (emailContact && userName) {
-        processQuery.or(`cliente_contato.eq.${emailContact},cliente_nome.eq.${userName}`);
-      } else if (emailContact) {
-        processQuery.eq('cliente_contato', emailContact);
-      } else if (userName) {
-        processQuery.eq('cliente_nome', userName);
-      } else {
+      const isClient = currentUser.role !== UserRole.ADMIN;
+      if (isClient) {
+        const email = currentUser.email?.trim();
+        const name = currentUser.name?.trim();
+        if (email && name) {
+          baseQuery.or(`cliente_contato.eq.${email},cliente_nome.eq.${name}`);
+        } else if (email) {
+          baseQuery.eq('cliente_contato', email);
+        } else if (name) {
+          baseQuery.eq('cliente_nome', name);
+        }
+      }
+
+      const { data, error } = await baseQuery;
+      if (error) {
+        console.error('Erro ao carregar processos do dashboard:', error);
+        setDashboardProcesses([]);
+        setDashboardProcessesLoading(false);
         return;
       }
 
-      const { data: processRows, error: processRowsError } = await processQuery.limit(1);
-      if (processRowsError) {
-        console.error('Erro ao recuperar processo atual do cliente:', processRowsError);
-        return;
+      const rows = (data || []) as DashboardProcessRow[];
+      setDashboardProcesses(rows);
+      if (!selectedDashboardProcessId && rows.length === 1) {
+        setSelectedDashboardProcessId(rows[0].id);
       }
+      setDashboardProcessesLoading(false);
+    };
 
-      const currentProcess = (processRows || [])[0] as { id: string; titulo?: string | null; status?: string | null; created_at?: string | null } | undefined;
-      if (!currentProcess?.id) return;
+    void loadDashboardProcesses();
+  }, [currentUser.email, currentUser.name, currentUser.organizationId, currentUser.role, selectedDashboardProcessId]);
 
+  React.useEffect(() => {
+    const selectedRow = selectedDashboardProcessId
+      ? dashboardProcesses.find((row) => row.id === selectedDashboardProcessId)
+      : dashboardProcesses[0];
+    if (!selectedRow?.id || allowNewRequest) return;
+
+    const loadSelectedProcessDetails = async () => {
       const { data: processEvents, error: processEventsError } = await supabase
         .from('process_events')
         .select('mensagem,created_at')
-        .eq('process_id', currentProcess.id)
+        .eq('process_id', selectedRow.id)
         .order('created_at', { ascending: true });
       if (processEventsError) {
-        console.error('Erro ao carregar eventos do processo recuperado:', processEventsError);
+        console.error('Erro ao carregar eventos do processo selecionado:', processEventsError);
       }
 
       const eventList = (processEvents || []) as Array<{ mensagem?: string | null; created_at?: string | null }>;
@@ -186,38 +239,37 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
         message: event.mensagem || 'Atualização registrada',
       }));
 
-      const now = currentProcess.created_at ? new Date(currentProcess.created_at).toLocaleString('pt-BR') : new Date().toLocaleString('pt-BR');
-      const title = currentProcess.titulo || 'Solicitação de atendimento';
+      const createdAtLabel = selectedRow.created_at ? new Date(selectedRow.created_at).toLocaleString('pt-BR') : new Date().toLocaleString('pt-BR');
+      const title = selectedRow.titulo || 'Solicitação de atendimento';
       const assignedProfessional = title.includes(' - ') ? title.split(' - ')[1]?.split('(')[0]?.trim() || 'Profissional a definir' : 'Profissional a definir';
       const serviceName = title.includes(' - ') ? title.split(' - ')[0].trim() : title;
       const scheduledSlot = title.includes('(') && title.includes(')') ? title.split('(').pop()?.replace(')', '').trim() || 'a confirmar' : 'a confirmar';
 
-      setCreatedProcessId(currentProcess.id);
+      setCreatedProcessId(selectedRow.id);
       setInitialStageFinished(true);
+      setProcessStatus(mapDbStatusToProcessStatus(selectedRow.status));
       setServiceProcess({
-        id: currentProcess.id,
+        id: selectedRow.id,
         serviceName,
         scheduledSlot,
         assignedProfessional,
-        statusLabel: PROCESS_STATUS_LABEL_MAP[(currentProcess.status || '').toLowerCase()] || 'aguardando atendimento',
-        createdAt: now,
+        statusLabel: PROCESS_STATUS_LABEL_MAP[(selectedRow.status || '').toLowerCase()] || 'aguardando atendimento',
+        createdAt: createdAtLabel,
         steps: PROCESS_STEP_NAMES.map((stepName, index) => ({
           name: stepName,
-          status: (currentProcess.status || '').toLowerCase() === 'concluido'
+          status: (selectedRow.status || '').toLowerCase() === 'concluido'
             ? 'concluido'
-            : index === 0
-              ? 'em_andamento'
-              : 'pendente',
+            : index === 0 ? 'em_andamento' : 'pendente',
           responsible: assignedProfessional,
-          updatedAt: now,
-          notes: index === 0 ? 'Processo recuperado para acompanhamento.' : '',
+          updatedAt: createdAtLabel,
+          notes: index === 0 ? 'Processo carregado no dashboard principal.' : '',
         })),
         timeline,
       });
     };
 
-    void loadCurrentClientProcess();
-  }, [allowNewRequest, createdProcessId, currentUser.email, currentUser.name, currentUser.organizationId, serviceProcess]);
+    void loadSelectedProcessDetails();
+  }, [allowNewRequest, dashboardProcesses, selectedDashboardProcessId]);
 
   React.useEffect(() => {
     const loadProfessionals = async () => {
@@ -706,6 +758,64 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
           <li>Após aprovação, envie anexos e comentários dentro da OS.</li>
           <li>Acompanhe o histórico, baixe relatório técnico e comprovantes financeiros.</li>
         </ol>
+      </section>
+
+      <section className="mb-6 bg-white border border-gray-100 rounded-2xl p-4 sm:p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
+        <h2 className="text-lg font-black text-gray-800">Acompanhamento dos Meus Processos</h2>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {[
+            { id: 'andamento', label: 'Em andamento' },
+            { id: 'concluidos', label: 'Concluídos' },
+            { id: 'todos', label: 'Todos' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setDashboardProcessFilter(tab.id as 'todos' | 'andamento' | 'concluidos')}
+              className={`rounded-lg px-3 py-2 text-xs font-black uppercase ${dashboardProcessFilter === tab.id ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        <input
+          value={dashboardProcessSearch}
+          onChange={(event) => setDashboardProcessSearch(event.target.value)}
+          placeholder="Buscar por nº processo, OS, serviço, status..."
+          className="mt-3 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+        />
+
+        {dashboardProcessesLoading ? (
+          <p className="mt-3 text-sm text-gray-500 font-semibold">Carregando processos...</p>
+        ) : filteredDashboardProcesses.length === 0 ? (
+          <p className="mt-3 text-sm text-gray-600 font-semibold">
+            Você ainda não possui processos cadastrados. Clique em Nova Ordem de Serviço para iniciar um atendimento.
+          </p>
+        ) : (
+          <div className="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-2">
+            {filteredDashboardProcesses.map((processRow) => {
+              const isSelected = selectedDashboardProcessId === processRow.id || (!selectedDashboardProcessId && filteredDashboardProcesses.length === 1);
+              const statusNormalized = (processRow.status || '').toLowerCase();
+              const situation = statusNormalized === 'concluido' ? 'Concluído' : 'Em andamento';
+              return (
+                <button
+                  key={processRow.id}
+                  type="button"
+                  onClick={() => setSelectedDashboardProcessId(processRow.id)}
+                  className={`text-left rounded-xl border p-3 ${isSelected ? 'border-blue-300 bg-blue-50' : 'border-gray-200 bg-white'}`}
+                >
+                  <p className="text-xs text-gray-500 font-black uppercase">Processo {processRow.id}</p>
+                  <p className="text-sm font-bold text-gray-800">OS: {processRow.protocolo || processRow.id}</p>
+                  <p className="text-xs text-gray-600">Área: {processRow.unidade_atendimento || '-'}</p>
+                  <p className="text-xs text-gray-600">Serviço: {processRow.titulo || '-'}</p>
+                  <p className="text-xs text-gray-600">Status: {processRow.status || '-'}</p>
+                  <p className="text-xs text-gray-600">Abertura: {processRow.created_at ? new Date(processRow.created_at).toLocaleString('pt-BR') : '-'}</p>
+                  <p className="text-xs text-gray-700 font-bold">Situação: {situation}</p>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </section>
 
       {isOnboardingFlow && (

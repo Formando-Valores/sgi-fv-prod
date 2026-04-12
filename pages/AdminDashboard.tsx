@@ -1581,6 +1581,69 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         </section>
       )}
 
+      {currentSection === 'dashboard' && (
+        <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-4 sm:p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)] no-print">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <h2 className="text-lg font-black text-gray-800">Painel Geral de Processos</h2>
+            <span className="text-xs font-bold uppercase text-gray-500">Todos os processos cadastrados</span>
+          </div>
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2">
+            <input
+              value={processSearch}
+              onChange={(event) => setProcessSearch(event.target.value)}
+              placeholder="Buscar cliente, nº processo, OS, serviço..."
+              className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 xl:col-span-2"
+            />
+            <select
+              value={processStatusFilter}
+              onChange={(event) => setProcessStatusFilter(event.target.value as 'all' | ProcessStatus)}
+              className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700"
+            >
+              <option value="all">Todos os status</option>
+              <option value={ProcessStatus.PENDENTE}>Cadastro</option>
+              <option value={ProcessStatus.TRIAGEM}>Triagem</option>
+              <option value={ProcessStatus.ANALISE}>Análise</option>
+              <option value={ProcessStatus.CONCLUIDO}>Concluído</option>
+            </select>
+            <select
+              value={processPeriodFilter}
+              onChange={(event) => setProcessPeriodFilter(event.target.value as 'all' | 'today' | '7d' | '30d')}
+              className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700"
+            >
+              <option value="all">Todo período</option>
+              <option value="today">Hoje</option>
+              <option value="7d">Últimos 7 dias</option>
+              <option value="30d">Últimos 30 dias</option>
+            </select>
+          </div>
+
+          <div className="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-3 max-h-80 overflow-auto">
+            {visibleProcessRows.slice(0, 12).map((process) => (
+              <article key={process.id} className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                <p className="text-xs font-black uppercase text-gray-500">{process.processRecordId}</p>
+                <p className="text-sm font-bold text-gray-800">OS: {process.protocol}</p>
+                <p className="text-xs text-gray-600">Área: {process.processType}</p>
+                <p className="text-xs text-gray-600">Serviço: {process.etapaAtual}</p>
+                <p className="text-xs text-gray-600">Status: {process.status}</p>
+                <p className="text-xs text-gray-600">Setor responsável: {process.serviceManager || 'Não definido'}</p>
+                <p className="text-xs text-gray-600">Abertura: {process.startDate}</p>
+                <p className="text-xs font-bold text-gray-700">Situação: {process.status === ProcessStatus.CONCLUIDO ? 'Concluído' : 'Em andamento'}</p>
+                <button
+                  type="button"
+                  onClick={() => setSelectedUser(process)}
+                  className="mt-2 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white"
+                >
+                  Abrir acompanhamento
+                </button>
+              </article>
+            ))}
+            {visibleProcessRows.length === 0 && (
+              <p className="text-sm font-semibold text-gray-500">Nenhum processo encontrado para os filtros atuais.</p>
+            )}
+          </div>
+        </section>
+      )}
+
       {(currentSection === 'dashboard' || currentSection === 'configuracoes') && (
         <>
           {/* Navigation Tabs */}
