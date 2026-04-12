@@ -178,6 +178,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
     const loadDashboardProcesses = async () => {
       if (!currentUser.organizationId) return;
       setDashboardProcessesLoading(true);
+      const localStorageKey = `sgi_dashboard_processes_${currentUser.id}`;
 
       const baseQuery = supabase
         .from('processes')
@@ -188,11 +189,20 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
       const isClient = currentUser.role !== UserRole.ADMIN;
       if (isClient) {
         const email = currentUser.email?.trim();
+        const phone = currentUser.phone?.trim();
         const name = currentUser.name?.trim();
-        if (email && name) {
+        if (email && phone && name) {
+          baseQuery.or(`cliente_contato.eq.${email},cliente_contato.eq.${phone},cliente_nome.eq.${name}`);
+        } else if (email && phone) {
+          baseQuery.or(`cliente_contato.eq.${email},cliente_contato.eq.${phone}`);
+        } else if (email && name) {
           baseQuery.or(`cliente_contato.eq.${email},cliente_nome.eq.${name}`);
+        } else if (phone && name) {
+          baseQuery.or(`cliente_contato.eq.${phone},cliente_nome.eq.${name}`);
         } else if (email) {
           baseQuery.eq('cliente_contato', email);
+        } else if (phone) {
+          baseQuery.eq('cliente_contato', phone);
         } else if (name) {
           baseQuery.eq('cliente_nome', name);
         }
@@ -201,13 +211,20 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
       const { data, error } = await baseQuery;
       if (error) {
         console.error('Erro ao carregar processos do dashboard:', error);
-        setDashboardProcesses([]);
+        try {
+          const fallbackRaw = localStorage.getItem(localStorageKey);
+          const fallbackRows = fallbackRaw ? JSON.parse(fallbackRaw) as DashboardProcessRow[] : [];
+          setDashboardProcesses(fallbackRows);
+        } catch {
+          setDashboardProcesses([]);
+        }
         setDashboardProcessesLoading(false);
         return;
       }
 
       const rows = (data || []) as DashboardProcessRow[];
       setDashboardProcesses(rows);
+      localStorage.setItem(localStorageKey, JSON.stringify(rows));
       if (!selectedDashboardProcessId && rows.length === 1) {
         setSelectedDashboardProcessId(rows[0].id);
       }
@@ -216,6 +233,11 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
 
     void loadDashboardProcesses();
   }, [currentUser.email, currentUser.name, currentUser.organizationId, currentUser.role, selectedDashboardProcessId]);
+
+  React.useEffect(() => {
+    if (!currentUser.id) return;
+    localStorage.setItem(`sgi_dashboard_processes_${currentUser.id}`, JSON.stringify(dashboardProcesses));
+  }, [currentUser.id, dashboardProcesses]);
 
   React.useEffect(() => {
     const selectedRow = selectedDashboardProcessId
@@ -645,7 +667,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
             assignedAdminId: UUID_PATTERN.test(selectedSlotData.id) ? selectedSlotData.id : null,
             clientName: currentUser.name,
             clientDocument: currentUser.documentId || null,
-            clientContact: currentUser.phone || currentUser.email || null,
+            clientContact: currentUser.email || currentUser.phone || null,
             organizationName: currentUser.organizationName || null,
           },
         },
@@ -658,6 +680,23 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
       }
 
       setCreatedProcessId(createdProcess.id);
+      setSelectedDashboardProcessId(createdProcess.id);
+      setDashboardProcesses((previous) => [
+        {
+          id: createdProcess.id,
+          titulo: selectedService.name,
+          protocolo: createdProcess.id,
+          status: 'triagem',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          unidade_atendimento: selectedService.area,
+          cliente_nome: currentUser.name,
+          cliente_contato: currentUser.email || currentUser.phone || null,
+          responsavel_user_id: UUID_PATTERN.test(selectedSlotData.id) ? selectedSlotData.id : null,
+          data_conclusao: null,
+        },
+        ...previous.filter((row) => row.id !== createdProcess.id),
+      ]);
 
       await supabase.from('process_events').insert({
         org_id: currentUser.organizationId,
