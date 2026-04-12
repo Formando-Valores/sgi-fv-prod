@@ -179,54 +179,103 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
       if (!currentUser.organizationId) return;
       setDashboardProcessesLoading(true);
       const localStorageKey = `sgi_dashboard_processes_${currentUser.id}`;
+      const cachedRows = (() => {
+        try {
+          const fallbackRaw = localStorage.getItem(localStorageKey);
+          return fallbackRaw ? JSON.parse(fallbackRaw) as DashboardProcessRow[] : [];
+        } catch {
+          return [] as DashboardProcessRow[];
+        }
+      })();
 
-      const baseQuery = supabase
+      if (cachedRows.length > 0) {
+        setDashboardProcesses(cachedRows);
+        if (!selectedDashboardProcessId) {
+          setSelectedDashboardProcessId(cachedRows[0].id);
+        }
+      }
+
+      const remoteQuery = supabase
         .from('processes')
         .select('id,titulo,protocolo,status,created_at,updated_at,unidade_atendimento,cliente_nome,cliente_contato,responsavel_user_id,data_conclusao')
         .eq('org_id', currentUser.organizationId)
         .order('created_at', { ascending: false });
 
+      const clientFilters: string[] = [];
       const isClient = currentUser.role !== UserRole.ADMIN;
       if (isClient) {
-        const email = currentUser.email?.trim();
+        const email = currentUser.email?.trim().toLowerCase();
         const phone = currentUser.phone?.trim();
         const name = currentUser.name?.trim();
-        if (email && phone && name) {
-          baseQuery.or(`cliente_contato.eq.${email},cliente_contato.eq.${phone},cliente_nome.eq.${name}`);
-        } else if (email && phone) {
-          baseQuery.or(`cliente_contato.eq.${email},cliente_contato.eq.${phone}`);
-        } else if (email && name) {
-          baseQuery.or(`cliente_contato.eq.${email},cliente_nome.eq.${name}`);
-        } else if (phone && name) {
-          baseQuery.or(`cliente_contato.eq.${phone},cliente_nome.eq.${name}`);
-        } else if (email) {
-          baseQuery.eq('cliente_contato', email);
-        } else if (phone) {
-          baseQuery.eq('cliente_contato', phone);
-        } else if (name) {
-          baseQuery.eq('cliente_nome', name);
-        }
+        if (email) clientFilters.push(`cliente_contato.eq.${email}`);
+        if (phone) clientFilters.push(`cliente_contato.eq.${phone}`);
+        if (name) clientFilters.push(`cliente_nome.eq.${name}`);
       }
 
-      const { data, error } = await baseQuery;
+      if (clientFilters.length > 0) {
+        remoteQuery.or(clientFilters.join(','));
+      }
+
+      const { data, error } = await remoteQuery;
       if (error) {
         console.error('Erro ao carregar processos do dashboard:', error);
-        try {
-          const fallbackRaw = localStorage.getItem(localStorageKey);
-          const fallbackRows = fallbackRaw ? JSON.parse(fallbackRaw) as DashboardProcessRow[] : [];
-          setDashboardProcesses(fallbackRows);
-        } catch {
-          setDashboardProcesses([]);
-        }
+        setDashboardProcesses(cachedRows);
         setDashboardProcessesLoading(false);
         return;
       }
 
-      const rows = (data || []) as DashboardProcessRow[];
-      setDashboardProcesses(rows);
-      localStorage.setItem(localStorageKey, JSON.stringify(rows));
-      if (!selectedDashboardProcessId && rows.length === 1) {
-        setSelectedDashboardProcessId(rows[0].id);
+      let rows = (data || []) as DashboardProcessRow[];
+
+      if (isClient && currentUser.id) {
+        const { data: eventRows, error: eventError } = await supabase
+          .from('process_events')
+          .select('process_id')
+          .eq('org_id', currentUser.organizationId)
+          .eq('created_by', currentUser.id)
+          .not('process_id', 'is', null);
+
+        if (eventError) {
+          console.error('Erro ao carregar vínculo de processos do cliente:', eventError);
+        } else {
+          const processIds = Array.from(
+            new Set(
+              ((eventRows || []) as Array<{ process_id?: string | null }>)
+                .map((row) => row.process_id)
+                .filter((value): value is string => Boolean(value)),
+            ),
+          );
+
+          if (processIds.length > 0) {
+            const { data: ownedRows, error: ownedError } = await supabase
+              .from('processes')
+              .select('id,titulo,protocolo,status,created_at,updated_at,unidade_atendimento,cliente_nome,cliente_contato,responsavel_user_id,data_conclusao')
+              .eq('org_id', currentUser.organizationId)
+              .in('id', processIds)
+              .order('created_at', { ascending: false });
+
+            if (ownedError) {
+              console.error('Erro ao carregar processos vinculados por histórico:', ownedError);
+            } else {
+              const mergeMap = new Map<string, DashboardProcessRow>();
+              rows.forEach((row) => mergeMap.set(row.id, row));
+              ((ownedRows || []) as DashboardProcessRow[]).forEach((row) => mergeMap.set(row.id, row));
+              rows = Array.from(mergeMap.values()).sort((a, b) => {
+                const aTime = new Date(a.created_at || 0).getTime();
+                const bTime = new Date(b.created_at || 0).getTime();
+                return bTime - aTime;
+              });
+            }
+          }
+        }
+      }
+
+      const rowsToUse = rows.length > 0 ? rows : cachedRows;
+      setDashboardProcesses(rowsToUse);
+      if (rows.length > 0) {
+        localStorage.setItem(localStorageKey, JSON.stringify(rows));
+      }
+      if (!selectedDashboardProcessId && rowsToUse.length > 0) {
+        setSelectedDashboardProcessId(rowsToUse[0].id);
       }
       setDashboardProcessesLoading(false);
     };
