@@ -85,7 +85,9 @@ type ProcessChecklistItem = {
   text: string;
   completed: boolean;
   createdAt: string;
+  createdByName?: string;
   updatedAt?: string;
+  updatedByName?: string;
 };
 
 const CHECKLIST_EVENT_PREFIX = 'CHECKLIST_EVENT:';
@@ -279,7 +281,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     sanitizeDisplayValue((user as AdminProcessRow | null)?.processRecordId || user?.id);
 
   const buildChecklistFromEvents = (
-    events: Array<{ mensagem?: string | null; created_at?: string | null }>
+    events: Array<{ mensagem?: string | null; created_at?: string | null; created_by?: string | null }>,
+    userNameById: Record<string, string>
   ): ProcessChecklistItem[] => {
     const checklistMap = new Map<string, ProcessChecklistItem>();
 
@@ -294,6 +297,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           itemId?: string;
           text?: string;
           completed?: boolean;
+          actorName?: string;
         };
 
         if (!payload?.action || !payload.itemId) return;
@@ -304,6 +308,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
             text: payload.text,
             completed: false,
             createdAt: event.created_at || new Date().toISOString(),
+            createdByName: payload.actorName || (event.created_by ? userNameById[event.created_by] : '') || 'Administrador',
           });
           return;
         }
@@ -314,6 +319,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
             ...existing,
             completed: Boolean(payload.completed),
             updatedAt: event.created_at || existing.updatedAt,
+            updatedByName: payload.actorName || (event.created_by ? userNameById[event.created_by] : '') || existing.updatedByName || 'Administrador',
           });
         }
       } catch {
@@ -591,7 +597,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
       const { data, error } = await supabase
         .from('process_events')
-        .select('mensagem,created_at')
+        .select('mensagem,created_at,created_by')
         .eq('process_id', processId)
         .eq('tipo', 'observacao')
         .order('created_at', { ascending: true });
@@ -602,9 +608,29 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         return;
       }
 
-      const checklist = buildChecklistFromEvents(
-        (data || []) as Array<{ mensagem?: string | null; created_at?: string | null }>
-      );
+      const events = (data || []) as Array<{ mensagem?: string | null; created_at?: string | null; created_by?: string | null }>;
+      const userIds = Array.from(new Set(events.map((event) => event.created_by).filter(Boolean))) as string[];
+      let userNameById: Record<string, string> = {};
+
+      if (userIds.length > 0) {
+        const { data: profileRows } = await supabase
+          .from('profiles')
+          .select('id,nome_completo,nome,name,email')
+          .in('id', userIds);
+
+        userNameById = ((profileRows || []) as Array<{ id: string; nome_completo?: string | null; nome?: string | null; name?: string | null; email?: string | null }>)
+          .reduce<Record<string, string>>((accumulator, profile) => {
+            accumulator[profile.id] =
+              sanitizeDisplayValue(profile.nome_completo) ||
+              sanitizeDisplayValue(profile.nome) ||
+              sanitizeDisplayValue(profile.name) ||
+              sanitizeDisplayValue(profile.email) ||
+              'Administrador';
+            return accumulator;
+          }, {});
+      }
+
+      const checklist = buildChecklistFromEvents(events, userNameById);
       setProcessChecklist(checklist);
       setChecklistLoading(false);
     };
@@ -626,6 +652,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       text: normalizedText,
       completed: false,
       createdAt: nowIso,
+      createdByName: currentUser.name || 'Administrador',
     };
 
     setProcessChecklist((prev) => [...prev, newItem]);
@@ -636,7 +663,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       org_id: (editingUser as AdminProcessRow | null)?.organizationId || currentUser.organizationId || null,
       process_id: processId,
       tipo: 'observacao',
-      mensagem: `${CHECKLIST_EVENT_PREFIX}${JSON.stringify({ action: 'add', itemId, text: normalizedText })}`,
+      mensagem: `${CHECKLIST_EVENT_PREFIX}${JSON.stringify({ action: 'add', itemId, text: normalizedText, actorName: currentUser.name || 'Administrador' })}`,
       created_by: currentUser.id,
     });
 
@@ -661,7 +688,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       org_id: (editingUser as AdminProcessRow | null)?.organizationId || currentUser.organizationId || null,
       process_id: processId,
       tipo: 'observacao',
-      mensagem: `${CHECKLIST_EVENT_PREFIX}${JSON.stringify({ action: 'toggle', itemId, completed })}`,
+      mensagem: `${CHECKLIST_EVENT_PREFIX}${JSON.stringify({ action: 'toggle', itemId, completed, actorName: currentUser.name || 'Administrador' })}`,
       created_by: currentUser.id,
     });
 
@@ -2819,8 +2846,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                                   {item.text}
                                 </p>
                                 <p className="text-[11px] text-gray-500">
-                                  Criado em {new Date(item.createdAt).toLocaleString('pt-BR')}
-                                  {item.updatedAt ? ` • Atualizado em ${new Date(item.updatedAt).toLocaleString('pt-BR')}` : ''}
+                                  Criado por {item.createdByName || 'Administrador'} em {new Date(item.createdAt).toLocaleString('pt-BR')}
+                                  {item.updatedAt ? ` • Atualizado por ${item.updatedByName || 'Administrador'} em ${new Date(item.updatedAt).toLocaleString('pt-BR')}` : ''}
                                 </p>
                               </div>
                             </label>
