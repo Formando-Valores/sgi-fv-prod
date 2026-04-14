@@ -234,6 +234,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [editingProfileSaving, setEditingProfileSaving] = useState(false);
   const [processChecklist, setProcessChecklist] = useState<ProcessChecklistItem[]>([]);
   const [newChecklistText, setNewChecklistText] = useState('');
+  const [editingChecklistItemId, setEditingChecklistItemId] = useState<string | null>(null);
+  const [editingChecklistText, setEditingChecklistText] = useState('');
   const [checklistLoading, setChecklistLoading] = useState(false);
   const [checklistError, setChecklistError] = useState('');
 
@@ -293,7 +295,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
       try {
         const payload = JSON.parse(rawMessage.slice(CHECKLIST_EVENT_PREFIX.length)) as {
-          action?: 'add' | 'toggle';
+          action?: 'add' | 'toggle' | 'edit' | 'delete';
           itemId?: string;
           text?: string;
           completed?: boolean;
@@ -321,6 +323,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
             updatedAt: event.created_at || existing.updatedAt,
             updatedByName: payload.actorName || (event.created_by ? userNameById[event.created_by] : '') || existing.updatedByName || 'Administrador',
           });
+          return;
+        }
+
+        if (payload.action === 'edit' && checklistMap.has(payload.itemId) && payload.text) {
+          const existing = checklistMap.get(payload.itemId)!;
+          checklistMap.set(payload.itemId, {
+            ...existing,
+            text: payload.text,
+            updatedAt: event.created_at || existing.updatedAt,
+            updatedByName: payload.actorName || (event.created_by ? userNameById[event.created_by] : '') || existing.updatedByName || 'Administrador',
+          });
+          return;
+        }
+
+        if (payload.action === 'delete' && checklistMap.has(payload.itemId)) {
+          checklistMap.delete(payload.itemId);
         }
       } catch {
         // ignora mensagens antigas de outros formatos
@@ -633,6 +651,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       const checklist = buildChecklistFromEvents(events, userNameById);
       setProcessChecklist(checklist);
       setChecklistLoading(false);
+      setEditingChecklistItemId(null);
+      setEditingChecklistText('');
     };
 
     void loadChecklist();
@@ -697,6 +717,73 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       setProcessChecklist((prev) =>
         prev.map((item) => (item.id === itemId ? { ...item, completed: !completed } : item))
       );
+    }
+  };
+
+  const handleEditChecklistItem = async (itemId: string, text: string) => {
+    const processId = getEditingProcessRecordId(editingUser);
+    const normalizedText = sanitizeDisplayValue(text);
+    if (!processId || !normalizedText) return;
+
+    setChecklistError('');
+    const currentItem = processChecklist.find((item) => item.id === itemId);
+    if (!currentItem) return;
+
+    setProcessChecklist((prev) =>
+      prev.map((item) =>
+        item.id === itemId
+          ? { ...item, text: normalizedText, updatedAt: new Date().toISOString(), updatedByName: currentUser.name || 'Administrador' }
+          : item
+      )
+    );
+
+    const { error } = await supabase.from('process_events').insert({
+      org_id: (editingUser as AdminProcessRow | null)?.organizationId || currentUser.organizationId || null,
+      process_id: processId,
+      tipo: 'observacao',
+      mensagem: `${CHECKLIST_EVENT_PREFIX}${JSON.stringify({ action: 'edit', itemId, text: normalizedText, actorName: currentUser.name || 'Administrador' })}`,
+      created_by: currentUser.id,
+    });
+
+    if (error) {
+      setChecklistError('Não foi possível editar o item do checklist.');
+      setProcessChecklist((prev) =>
+        prev.map((item) =>
+          item.id === itemId
+            ? { ...item, text: currentItem.text, updatedAt: currentItem.updatedAt, updatedByName: currentItem.updatedByName }
+            : item
+        )
+      );
+      return;
+    }
+
+    setEditingChecklistItemId(null);
+    setEditingChecklistText('');
+  };
+
+  const handleDeleteChecklistItem = async (itemId: string) => {
+    const processId = getEditingProcessRecordId(editingUser);
+    if (!processId) return;
+
+    setChecklistError('');
+    const previousItems = processChecklist;
+    setProcessChecklist((prev) => prev.filter((item) => item.id !== itemId));
+    if (editingChecklistItemId === itemId) {
+      setEditingChecklistItemId(null);
+      setEditingChecklistText('');
+    }
+
+    const { error } = await supabase.from('process_events').insert({
+      org_id: (editingUser as AdminProcessRow | null)?.organizationId || currentUser.organizationId || null,
+      process_id: processId,
+      tipo: 'observacao',
+      mensagem: `${CHECKLIST_EVENT_PREFIX}${JSON.stringify({ action: 'delete', itemId, actorName: currentUser.name || 'Administrador' })}`,
+      created_by: currentUser.id,
+    });
+
+    if (error) {
+      setChecklistError('Não foi possível excluir o item do checklist.');
+      setProcessChecklist(previousItems);
     }
   };
 
@@ -2834,23 +2921,75 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                       ) : (
                         <div className="space-y-2">
                           {processChecklist.map((item) => (
-                            <label key={item.id} className="flex items-start gap-3 rounded-xl border border-gray-200 bg-white p-3">
+                            <div key={item.id} className="flex items-start gap-3 rounded-xl border border-gray-200 bg-white p-3">
                               <input
                                 type="checkbox"
                                 checked={item.completed}
                                 onChange={(event) => void handleToggleChecklistItem(item.id, event.target.checked)}
                                 className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600"
                               />
-                              <div>
-                                <p className={`text-sm font-semibold ${item.completed ? 'line-through text-gray-400' : 'text-gray-800'}`}>
-                                  {item.text}
-                                </p>
+                              <div className="flex-1 min-w-0">
+                                {editingChecklistItemId === item.id ? (
+                                  <div className="flex flex-col sm:flex-row gap-2 mb-1">
+                                    <input
+                                      type="text"
+                                      value={editingChecklistText}
+                                      onChange={(event) => setEditingChecklistText(event.target.value)}
+                                      className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm font-semibold"
+                                    />
+                                    <div className="flex gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => void handleEditChecklistItem(item.id, editingChecklistText)}
+                                        disabled={!sanitizeDisplayValue(editingChecklistText)}
+                                        className="px-2 py-1 rounded-lg bg-blue-600 text-white text-[11px] font-black uppercase disabled:opacity-50"
+                                      >
+                                        Salvar
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setEditingChecklistItemId(null);
+                                          setEditingChecklistText('');
+                                        }}
+                                        className="px-2 py-1 rounded-lg border border-gray-300 text-[11px] font-black uppercase"
+                                      >
+                                        Cancelar
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <p className={`text-sm font-semibold ${item.completed ? 'line-through text-gray-400' : 'text-gray-800'}`}>
+                                    {item.text}
+                                  </p>
+                                )}
                                 <p className="text-[11px] text-gray-500">
                                   Criado por {item.createdByName || 'Administrador'} em {new Date(item.createdAt).toLocaleString('pt-BR')}
                                   {item.updatedAt ? ` • Atualizado por ${item.updatedByName || 'Administrador'} em ${new Date(item.updatedAt).toLocaleString('pt-BR')}` : ''}
                                 </p>
                               </div>
-                            </label>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingChecklistItemId(item.id);
+                                    setEditingChecklistText(item.text);
+                                  }}
+                                  className="p-1.5 rounded-md border border-gray-200 text-gray-600 hover:bg-gray-100"
+                                  title="Editar item"
+                                >
+                                  <Pencil className="w-3 h-3" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleDeleteChecklistItem(item.id)}
+                                  className="p-1.5 rounded-md border border-red-200 text-red-600 hover:bg-red-50"
+                                  title="Excluir item"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
                           ))}
                         </div>
                       )}
