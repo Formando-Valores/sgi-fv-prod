@@ -140,6 +140,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
   const [newComment, setNewComment] = React.useState('');
   const [processFiles, setProcessFiles] = React.useState<Array<{ id: string; name: string; sizeLabel: string; uploadedAt: string }>>([]);
   const [financeEntries, setFinanceEntries] = React.useState<Array<{ id: string; serviceName: string; totalLabel: string; paidAt: string }>>([]);
+  const [resolvedOrganizationId, setResolvedOrganizationId] = React.useState<string | null>(currentUser.organizationId ?? null);
 
   const steps = [
     { label: ProcessStatus.PENDENTE, color: 'bg-slate-500' },
@@ -163,6 +164,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
   );
   const isOnboardingFlow = processStatus !== ProcessStatus.CONCLUIDO && (!initialStageFinished || allowNewRequest);
   const displaySectorName = processStatus === ProcessStatus.PENDENTE ? 'Atendimento ao Associado' : 'Setor Jurídico Conveniado à AI';
+  const activeOrganizationId = currentUser.organizationId ?? resolvedOrganizationId;
   const filteredDashboardProcesses = dashboardProcesses.filter((processRow) => {
     const normalizedStatus = (processRow.status || '').toLowerCase();
     const isConcluded = normalizedStatus === 'concluido';
@@ -175,8 +177,62 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
   });
 
   React.useEffect(() => {
+    setResolvedOrganizationId(currentUser.organizationId ?? null);
+  }, [currentUser.organizationId]);
+
+  React.useEffect(() => {
+    if (currentUser.organizationId) return;
+
+    const resolveOrganization = async () => {
+      const lookupByUserId = await supabase
+        .from('v_user_context')
+        .select('org_id')
+        .eq('user_id', currentUser.id)
+        .not('org_id', 'is', null)
+        .limit(1)
+        .maybeSingle();
+
+      const byUserId = lookupByUserId.data?.org_id ? String(lookupByUserId.data.org_id) : null;
+      if (byUserId) {
+        setResolvedOrganizationId(byUserId);
+        return;
+      }
+
+      if (currentUser.email) {
+        const lookupByEmail = await supabase
+          .from('v_user_context')
+          .select('org_id')
+          .eq('email', currentUser.email)
+          .not('org_id', 'is', null)
+          .limit(1)
+          .maybeSingle();
+
+        const byEmail = lookupByEmail.data?.org_id ? String(lookupByEmail.data.org_id) : null;
+        if (byEmail) {
+          setResolvedOrganizationId(byEmail);
+          return;
+        }
+      }
+
+      const defaultOrgLookup = await supabase
+        .from('organizations')
+        .select('id')
+        .eq('slug', 'default')
+        .limit(1)
+        .maybeSingle();
+
+      const defaultOrgId = defaultOrgLookup.data?.id ? String(defaultOrgLookup.data.id) : null;
+      if (defaultOrgId) {
+        setResolvedOrganizationId(defaultOrgId);
+      }
+    };
+
+    void resolveOrganization();
+  }, [currentUser.email, currentUser.id, currentUser.organizationId]);
+
+  React.useEffect(() => {
     const loadDashboardProcesses = async () => {
-      if (!currentUser.organizationId) return;
+      if (!activeOrganizationId) return;
       setDashboardProcessesLoading(true);
       const localStorageKey = `sgi_dashboard_processes_${currentUser.id}`;
       const cachedRows = (() => {
@@ -198,7 +254,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
       const remoteQuery = supabase
         .from('processes')
         .select('id,titulo,protocolo,status,created_at,updated_at,unidade_atendimento,cliente_nome,cliente_contato,responsavel_user_id,data_conclusao')
-        .eq('org_id', currentUser.organizationId)
+        .eq('org_id', activeOrganizationId)
         .order('created_at', { ascending: false });
 
       const clientFilters: string[] = [];
@@ -230,7 +286,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
         const { data: eventRows, error: eventError } = await supabase
           .from('process_events')
           .select('process_id')
-          .eq('org_id', currentUser.organizationId)
+          .eq('org_id', activeOrganizationId)
           .eq('created_by', currentUser.id)
           .not('process_id', 'is', null);
 
@@ -249,7 +305,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
             const { data: ownedRows, error: ownedError } = await supabase
               .from('processes')
               .select('id,titulo,protocolo,status,created_at,updated_at,unidade_atendimento,cliente_nome,cliente_contato,responsavel_user_id,data_conclusao')
-              .eq('org_id', currentUser.organizationId)
+              .eq('org_id', activeOrganizationId)
               .in('id', processIds)
               .order('created_at', { ascending: false });
 
@@ -281,7 +337,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
     };
 
     void loadDashboardProcesses();
-  }, [currentUser.email, currentUser.name, currentUser.organizationId, currentUser.role, selectedDashboardProcessId]);
+  }, [activeOrganizationId, currentUser.email, currentUser.id, currentUser.name, currentUser.role, selectedDashboardProcessId]);
 
   React.useEffect(() => {
     if (!currentUser.id) return;
@@ -371,8 +427,8 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
           }>)
             .filter((admin) => {
               if (!admin.user_id) return false;
-              if (!currentUser.organizationId) return true;
-              return !admin.org_id || admin.org_id === currentUser.organizationId;
+              if (!activeOrganizationId) return true;
+              return !admin.org_id || admin.org_id === activeOrganizationId;
             })
             .map((admin) => ({
               id: admin.user_id as string,
@@ -393,11 +449,11 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
         let memberRows: Array<{ user_id: string; role: string }> = [];
         const profileMap = new Map<string, { id: string; nome_completo?: string | null; nome?: string | null; name?: string | null; email?: string | null; role?: string | null }>();
 
-        if (currentUser.organizationId) {
+        if (activeOrganizationId) {
           const { data: members, error: membersError } = await supabase
             .from('org_members')
             .select('user_id,role')
-            .eq('org_id', currentUser.organizationId)
+            .eq('org_id', activeOrganizationId)
             .in('role', ['owner', 'admin']);
 
           if (!membersError) {
@@ -423,7 +479,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
           const { data: fallbackProfiles, error: fallbackProfilesError } = await supabase
             .from('profiles')
             .select('id,nome_completo,nome,name,email,role')
-            .eq('org_id', currentUser.organizationId)
+            .eq('org_id', activeOrganizationId)
             .or('role.eq.admin,role.eq.owner,role.eq.ADMIN,role.eq.OWNER,role.eq.Administrador,role.eq.administrador');
 
           if (!fallbackProfilesError) {
@@ -535,7 +591,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
           const { data: processData } = await supabase
             .from('processes')
             .select('responsavel_user_id,status,created_at')
-            .eq('org_id', currentUser.organizationId)
+            .eq('org_id', activeOrganizationId)
             .in('responsavel_user_id', professionalIds);
 
           processRows = (processData || []) as Array<{ responsavel_user_id: string | null; status: string | null; created_at: string | null }>;
@@ -604,7 +660,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
     };
 
     void loadProfessionals();
-  }, [currentUser.organizationId, selectedServiceId]);
+  }, [activeOrganizationId, currentUser.organizationId, selectedServiceId]);
 
   const handlePrint = () => {
     window.print();
@@ -677,7 +733,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
     try {
       await supabase.from('process_events').insert({
         process_id: null,
-        org_id: currentUser.organizationId ?? null,
+        org_id: activeOrganizationId ?? null,
         created_by: currentUser.id,
         tipo: 'registro',
         mensagem: message,
@@ -688,7 +744,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
   };
 
   const handleFinalizeInitialStage = async () => {
-    if (!selectedService || !selectedSlotData || !currentUser.organizationId) {
+    if (!selectedService || !selectedSlotData || !activeOrganizationId) {
       setProcessCreationError('Não foi possível gerar o processo. Verifique serviço, agenda e organização.');
       return;
     }
@@ -708,7 +764,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
         SUPABASE_EDGE_FUNCTIONS.CREATE_CLIENT_PROCESS,
         {
           body: {
-            organizationId: currentUser.organizationId,
+            organizationId: activeOrganizationId,
             serviceName: selectedService.name,
             serviceArea: selectedService.area,
             scheduledSlot: selectedAdminScheduleSlot || null,
@@ -748,14 +804,14 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
       ]);
 
       await supabase.from('process_events').insert({
-        org_id: currentUser.organizationId,
+        org_id: activeOrganizationId,
         process_id: createdProcess.id,
         tipo: 'registro',
         mensagem: `Processo criado a partir do onboarding. Profissional indicado: ${selectedSlotData.professional}. Horário previsto: ${selectedAdminScheduleSlot || 'a confirmar'}. Serviço: ${selectedService.name}.`,
         created_by: currentUser.id,
       });
       await supabase.from('process_events').insert({
-        org_id: currentUser.organizationId,
+        org_id: activeOrganizationId,
         process_id: createdProcess.id,
         tipo: 'atribuicao',
         mensagem: `Atendimento atribuído para ${selectedSlotData.professional}. Outros administradores da organização podem assumir se necessário.`,
