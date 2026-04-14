@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { LogOut, Printer, FileDown, Eye, Pencil, Search, Users, ShieldCheck, X, Plus, Trash2, Calendar, MessageSquare, Check, User as UserIcon, UserCheck, LayoutDashboard, FolderKanban, Users2, Settings, Menu, Building2 } from 'lucide-react';
+import { LogOut, Printer, FileDown, Eye, Pencil, Search, Users, ShieldCheck, X, Plus, Trash2, Calendar, MessageSquare, Check, User as UserIcon, UserCheck, LayoutDashboard, FolderKanban, Users2, Settings, Menu, Building2, Flag } from 'lucide-react';
 import { User, ProcessStatus, UserRole, Hierarchy, ServiceUnit, Organization } from '../types';
 import { NavLink, useLocation } from 'react-router-dom';
 import { SERVICE_MANAGERS } from '../constants';
@@ -79,6 +79,14 @@ type ProcessVisualOverrides = Record<
     notes?: string;
   }
 >;
+
+type ProcessChecklistItem = {
+  id: string;
+  text: string;
+  completed: boolean;
+  createdAt: string;
+  updatedAt?: string;
+};
 
 const ACCESS_LEVELS: AccessLevel[] = ['Administrador', 'Usuário Sênior', 'Usuário Pleno', 'Operador', 'Cliente'];
 
@@ -220,6 +228,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [editingProfileLoading, setEditingProfileLoading] = useState(false);
   const [editingProfileError, setEditingProfileError] = useState('');
   const [editingProfileSaving, setEditingProfileSaving] = useState(false);
+  const [processChecklist, setProcessChecklist] = useState<ProcessChecklistItem[]>([]);
+  const [newChecklistText, setNewChecklistText] = useState('');
+  const [checklistLoading, setChecklistLoading] = useState(false);
+  const [checklistError, setChecklistError] = useState('');
 
   const location = useLocation();
   const currentSection = section ?? (location.pathname.split('/')[2] as 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes') ?? 'dashboard';
@@ -259,6 +271,58 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     if (normalized === 'analise') return ProcessStatus.ANALISE;
     if (normalized === 'triagem') return ProcessStatus.TRIAGEM;
     return ProcessStatus.PENDENTE;
+  };
+
+  const getEditingProcessRecordId = (user: AdminProcessRow | User | null) =>
+    sanitizeDisplayValue((user as AdminProcessRow | null)?.processRecordId || user?.id);
+
+  const buildChecklistFromEvents = (
+    events: Array<{ mensagem?: string | null; created_at?: string | null }>
+  ): ProcessChecklistItem[] => {
+    const checklistMap = new Map<string, ProcessChecklistItem>();
+
+    events.forEach((event) => {
+      const rawMessage = sanitizeDisplayValue(event.mensagem);
+      if (!rawMessage) return;
+
+      try {
+        const payload = JSON.parse(rawMessage) as {
+          action?: 'add' | 'toggle';
+          itemId?: string;
+          text?: string;
+          completed?: boolean;
+        };
+
+        if (!payload?.action || !payload.itemId) return;
+
+        if (payload.action === 'add' && payload.text) {
+          checklistMap.set(payload.itemId, {
+            id: payload.itemId,
+            text: payload.text,
+            completed: false,
+            createdAt: event.created_at || new Date().toISOString(),
+          });
+          return;
+        }
+
+        if (payload.action === 'toggle' && checklistMap.has(payload.itemId)) {
+          const existing = checklistMap.get(payload.itemId)!;
+          checklistMap.set(payload.itemId, {
+            ...existing,
+            completed: Boolean(payload.completed),
+            updatedAt: event.created_at || existing.updatedAt,
+          });
+        }
+      } catch {
+        // ignora mensagens antigas de outros formatos
+      }
+    });
+
+    return Array.from(checklistMap.values()).sort((a, b) => {
+      const aTime = new Date(a.createdAt).getTime();
+      const bTime = new Date(b.createdAt).getTime();
+      return aTime - bTime;
+    });
   };
 
   const formatProcessDate = (value?: string | null) => {
@@ -508,6 +572,103 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     if (!editingUser) return;
     void hydrateEditingProfileForm(editingUser);
   }, [editingUser]);
+
+  useEffect(() => {
+    const processId = getEditingProcessRecordId(editingUser);
+    if (!processId) {
+      setProcessChecklist([]);
+      setChecklistError('');
+      setNewChecklistText('');
+      return;
+    }
+
+    const loadChecklist = async () => {
+      setChecklistLoading(true);
+      setChecklistError('');
+
+      const { data, error } = await supabase
+        .from('process_events')
+        .select('mensagem,created_at')
+        .eq('process_id', processId)
+        .eq('tipo', 'checklist')
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        setChecklistError('Não foi possível carregar o checklist deste processo.');
+        setChecklistLoading(false);
+        return;
+      }
+
+      const checklist = buildChecklistFromEvents(
+        (data || []) as Array<{ mensagem?: string | null; created_at?: string | null }>
+      );
+      setProcessChecklist(checklist);
+      setChecklistLoading(false);
+    };
+
+    void loadChecklist();
+  }, [editingUser]);
+
+  const handleAddChecklistItem = async () => {
+    const processId = getEditingProcessRecordId(editingUser);
+    const normalizedText = sanitizeDisplayValue(newChecklistText);
+
+    if (!processId || !normalizedText) return;
+
+    const itemId = crypto.randomUUID();
+    const nowIso = new Date().toISOString();
+
+    const newItem: ProcessChecklistItem = {
+      id: itemId,
+      text: normalizedText,
+      completed: false,
+      createdAt: nowIso,
+    };
+
+    setProcessChecklist((prev) => [...prev, newItem]);
+    setNewChecklistText('');
+    setChecklistError('');
+
+    const { error } = await supabase.from('process_events').insert({
+      org_id: (editingUser as AdminProcessRow | null)?.organizationId || currentUser.organizationId || null,
+      process_id: processId,
+      tipo: 'checklist',
+      mensagem: JSON.stringify({ action: 'add', itemId, text: normalizedText }),
+      created_by: currentUser.id,
+    });
+
+    if (error) {
+      setChecklistError('Não foi possível salvar o novo item do checklist.');
+      setProcessChecklist((prev) => prev.filter((item) => item.id !== itemId));
+    }
+  };
+
+  const handleToggleChecklistItem = async (itemId: string, completed: boolean) => {
+    const processId = getEditingProcessRecordId(editingUser);
+    if (!processId) return;
+
+    setChecklistError('');
+    setProcessChecklist((prev) =>
+      prev.map((item) =>
+        item.id === itemId ? { ...item, completed, updatedAt: new Date().toISOString() } : item
+      )
+    );
+
+    const { error } = await supabase.from('process_events').insert({
+      org_id: (editingUser as AdminProcessRow | null)?.organizationId || currentUser.organizationId || null,
+      process_id: processId,
+      tipo: 'checklist',
+      mensagem: JSON.stringify({ action: 'toggle', itemId, completed }),
+      created_by: currentUser.id,
+    });
+
+    if (error) {
+      setChecklistError('Não foi possível atualizar o checklist.');
+      setProcessChecklist((prev) =>
+        prev.map((item) => (item.id === itemId ? { ...item, completed: !completed } : item))
+      );
+    }
+  };
 
 
   const fetchProcesses = async () => {
@@ -2607,6 +2768,66 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                         <MessageSquare className="w-3 h-3" /> Nota de Observações
                       </label>
                       <textarea name="notes" rows={4} defaultValue={editingUser.notes} className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold resize-none" placeholder="Digite as anotações do processo..."></textarea>
+                    </div>
+
+                    <div className="rounded-2xl border border-gray-200 bg-gray-50/70 p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Flag className="w-4 h-4 text-blue-600" />
+                        <h4 className="text-sm font-black uppercase text-gray-700">Checklist do processo</h4>
+                      </div>
+                      <p className="text-xs text-gray-500 mb-3">
+                        Todos os administradores podem criar itens e marcar como concluídos.
+                      </p>
+
+                      <div className="flex flex-col sm:flex-row gap-2 mb-3">
+                        <input
+                          type="text"
+                          value={newChecklistText}
+                          onChange={(event) => setNewChecklistText(event.target.value)}
+                          placeholder="Adicionar novo item ao checklist"
+                          className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-800 font-semibold"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => void handleAddChecklistItem()}
+                          disabled={!sanitizeDisplayValue(newChecklistText)}
+                          className="rounded-xl bg-blue-600 text-white px-4 py-2 text-xs font-black uppercase disabled:opacity-60"
+                        >
+                          Adicionar
+                        </button>
+                      </div>
+
+                      {checklistLoading ? (
+                        <p className="text-xs font-semibold text-gray-500">Carregando checklist...</p>
+                      ) : processChecklist.length === 0 ? (
+                        <p className="text-xs font-semibold text-gray-500">Nenhum item criado para este processo.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {processChecklist.map((item) => (
+                            <label key={item.id} className="flex items-start gap-3 rounded-xl border border-gray-200 bg-white p-3">
+                              <input
+                                type="checkbox"
+                                checked={item.completed}
+                                onChange={(event) => void handleToggleChecklistItem(item.id, event.target.checked)}
+                                className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600"
+                              />
+                              <div>
+                                <p className={`text-sm font-semibold ${item.completed ? 'line-through text-gray-400' : 'text-gray-800'}`}>
+                                  {item.text}
+                                </p>
+                                <p className="text-[11px] text-gray-500">
+                                  Criado em {new Date(item.createdAt).toLocaleString('pt-BR')}
+                                  {item.updatedAt ? ` • Atualizado em ${new Date(item.updatedAt).toLocaleString('pt-BR')}` : ''}
+                                </p>
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+
+                      {checklistError && (
+                        <p className="mt-2 text-xs font-semibold text-red-600">{checklistError}</p>
+                      )}
                     </div>
 
                     <div className="border-t border-gray-100 pt-6">
