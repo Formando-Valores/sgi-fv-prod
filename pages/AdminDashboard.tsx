@@ -88,6 +88,8 @@ type ProcessChecklistItem = {
   updatedAt?: string;
 };
 
+const CHECKLIST_EVENT_PREFIX = 'CHECKLIST_EVENT:';
+
 const ACCESS_LEVELS: AccessLevel[] = ['Administrador', 'Usuário Sênior', 'Usuário Pleno', 'Operador', 'Cliente'];
 
 const mapOrgRoleToAccessLevel = (role: string | null | undefined): AccessLevel => {
@@ -284,9 +286,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     events.forEach((event) => {
       const rawMessage = sanitizeDisplayValue(event.mensagem);
       if (!rawMessage) return;
+      if (!rawMessage.startsWith(CHECKLIST_EVENT_PREFIX)) return;
 
       try {
-        const payload = JSON.parse(rawMessage) as {
+        const payload = JSON.parse(rawMessage.slice(CHECKLIST_EVENT_PREFIX.length)) as {
           action?: 'add' | 'toggle';
           itemId?: string;
           text?: string;
@@ -590,7 +593,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         .from('process_events')
         .select('mensagem,created_at')
         .eq('process_id', processId)
-        .eq('tipo', 'checklist')
+        .eq('tipo', 'observacao')
         .order('created_at', { ascending: true });
 
       if (error) {
@@ -632,8 +635,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const { error } = await supabase.from('process_events').insert({
       org_id: (editingUser as AdminProcessRow | null)?.organizationId || currentUser.organizationId || null,
       process_id: processId,
-      tipo: 'checklist',
-      mensagem: JSON.stringify({ action: 'add', itemId, text: normalizedText }),
+      tipo: 'observacao',
+      mensagem: `${CHECKLIST_EVENT_PREFIX}${JSON.stringify({ action: 'add', itemId, text: normalizedText })}`,
       created_by: currentUser.id,
     });
 
@@ -657,8 +660,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const { error } = await supabase.from('process_events').insert({
       org_id: (editingUser as AdminProcessRow | null)?.organizationId || currentUser.organizationId || null,
       process_id: processId,
-      tipo: 'checklist',
-      mensagem: JSON.stringify({ action: 'toggle', itemId, completed }),
+      tipo: 'observacao',
+      mensagem: `${CHECKLIST_EVENT_PREFIX}${JSON.stringify({ action: 'toggle', itemId, completed })}`,
       created_by: currentUser.id,
     });
 
