@@ -759,10 +759,13 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
 
     try {
       let createdProcess: { id: string } | null = null;
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
 
       const { data: functionResult, error: functionError } = await supabase.functions.invoke(
         SUPABASE_EDGE_FUNCTIONS.CREATE_CLIENT_PROCESS,
         {
+          headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
           body: {
             organizationId: activeOrganizationId,
             serviceName: selectedService.name,
@@ -773,6 +776,8 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
             clientName: currentUser.name,
             clientDocument: currentUser.documentId || null,
             clientContact: currentUser.email || currentUser.phone || null,
+            clientEmail: currentUser.email || null,
+            clientUserId: currentUser.id || null,
             organizationName: currentUser.organizationName || null,
           },
         },

@@ -1020,6 +1020,46 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     setEditingProfileSaving(false);
   };
 
+  const handleDeleteProcess = async (process: AdminProcessRow) => {
+    const processId = sanitizeDisplayValue(process.processRecordId || process.id);
+    if (!processId) return;
+
+    const confirmed = window.confirm(`Deseja realmente excluir o processo ${process.protocol}? Esta ação não pode ser desfeita.`);
+    if (!confirmed) return;
+
+    setProcessActionFeedback(null);
+
+    const { error: deleteEventsError } = await supabase
+      .from('process_events')
+      .delete()
+      .eq('process_id', processId);
+
+    if (deleteEventsError) {
+      setProcessActionFeedback({ type: 'error', message: 'Não foi possível excluir os eventos do processo.' });
+      return;
+    }
+
+    const { error: deleteProcessError } = await supabase
+      .from('processes')
+      .delete()
+      .eq('id', processId);
+
+    if (deleteProcessError) {
+      setProcessActionFeedback({ type: 'error', message: 'Não foi possível excluir o processo selecionado.' });
+      return;
+    }
+
+    setDbProcesses((previous) => previous.filter((row) => row.id !== processId));
+    if (editingUser && sanitizeDisplayValue((editingUser as AdminProcessRow).processRecordId || editingUser.id) === processId) {
+      setEditingUser(null);
+    }
+    if (selectedUser && sanitizeDisplayValue((selectedUser as AdminProcessRow).processRecordId || selectedUser.id) === processId) {
+      setSelectedUser(null);
+    }
+
+    setProcessActionFeedback({ type: 'success', message: `Processo ${process.protocol} excluído com sucesso.` });
+  };
+
   const fetchOrgMembers = async () => {
     setMembersLoading(true);
     setMembersError('');
@@ -2226,6 +2266,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                           title="Editar"
                         >
                           <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => void handleDeleteProcess(process)}
+                          className="p-2 bg-red-500 hover:bg-red-600 rounded-lg text-white"
+                          title="Excluir processo"
+                        >
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </div>
