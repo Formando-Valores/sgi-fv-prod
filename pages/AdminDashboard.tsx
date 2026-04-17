@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { LogOut, Printer, FileDown, Eye, Pencil, Search, Users, ShieldCheck, X, Plus, Trash2, Calendar, MessageSquare, Check, User as UserIcon, UserCheck, LayoutDashboard, FolderKanban, Users2, Settings, Menu, Building2 } from 'lucide-react';
+import { LogOut, Printer, FileDown, Eye, Pencil, Search, Users, ShieldCheck, X, Plus, Trash2, Calendar, MessageSquare, Check, User as UserIcon, UserCheck, LayoutDashboard, FolderKanban, Users2, Settings, Menu, Building2, Flag } from 'lucide-react';
 import { User, ProcessStatus, UserRole, Hierarchy, ServiceUnit, Organization } from '../types';
 import { NavLink, useLocation } from 'react-router-dom';
 import { SERVICE_MANAGERS } from '../constants';
@@ -80,6 +80,18 @@ type ProcessVisualOverrides = Record<
     notes?: string;
   }
 >;
+
+type ProcessChecklistItem = {
+  id: string;
+  text: string;
+  completed: boolean;
+  createdAt: string;
+  createdByName?: string;
+  updatedAt?: string;
+  updatedByName?: string;
+};
+
+const CHECKLIST_EVENT_PREFIX = 'CHECKLIST_EVENT:';
 
 const ACCESS_LEVELS: AccessLevel[] = ['Administrador', 'Usuário Sênior', 'Usuário Pleno', 'Operador', 'Cliente'];
 
@@ -255,6 +267,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [editingProfileLoading, setEditingProfileLoading] = useState(false);
   const [editingProfileError, setEditingProfileError] = useState('');
   const [editingProfileSaving, setEditingProfileSaving] = useState(false);
+  const [processChecklist, setProcessChecklist] = useState<ProcessChecklistItem[]>([]);
+  const [newChecklistText, setNewChecklistText] = useState('');
+  const [editingChecklistItemId, setEditingChecklistItemId] = useState<string | null>(null);
+  const [editingChecklistText, setEditingChecklistText] = useState('');
+  const [checklistLoading, setChecklistLoading] = useState(false);
+  const [checklistError, setChecklistError] = useState('');
 
   const location = useLocation();
   const currentSection = section ?? (location.pathname.split('/')[2] as 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes') ?? 'dashboard';
@@ -294,6 +312,79 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     if (normalized === 'analise') return ProcessStatus.ANALISE;
     if (normalized === 'triagem') return ProcessStatus.TRIAGEM;
     return ProcessStatus.PENDENTE;
+  };
+
+  const getEditingProcessRecordId = (user: AdminProcessRow | User | null) =>
+    sanitizeDisplayValue((user as AdminProcessRow | null)?.processRecordId || user?.id);
+
+  const buildChecklistFromEvents = (
+    events: Array<{ mensagem?: string | null; created_at?: string | null; created_by?: string | null }>,
+    userNameById: Record<string, string>
+  ): ProcessChecklistItem[] => {
+    const checklistMap = new Map<string, ProcessChecklistItem>();
+
+    events.forEach((event) => {
+      const rawMessage = sanitizeDisplayValue(event.mensagem);
+      if (!rawMessage) return;
+      if (!rawMessage.startsWith(CHECKLIST_EVENT_PREFIX)) return;
+
+      try {
+        const payload = JSON.parse(rawMessage.slice(CHECKLIST_EVENT_PREFIX.length)) as {
+          action?: 'add' | 'toggle' | 'edit' | 'delete';
+          itemId?: string;
+          text?: string;
+          completed?: boolean;
+          actorName?: string;
+        };
+
+        if (!payload?.action || !payload.itemId) return;
+
+        if (payload.action === 'add' && payload.text) {
+          checklistMap.set(payload.itemId, {
+            id: payload.itemId,
+            text: payload.text,
+            completed: false,
+            createdAt: event.created_at || new Date().toISOString(),
+            createdByName: payload.actorName || (event.created_by ? userNameById[event.created_by] : '') || 'Administrador',
+          });
+          return;
+        }
+
+        if (payload.action === 'toggle' && checklistMap.has(payload.itemId)) {
+          const existing = checklistMap.get(payload.itemId)!;
+          checklistMap.set(payload.itemId, {
+            ...existing,
+            completed: Boolean(payload.completed),
+            updatedAt: event.created_at || existing.updatedAt,
+            updatedByName: payload.actorName || (event.created_by ? userNameById[event.created_by] : '') || existing.updatedByName || 'Administrador',
+          });
+          return;
+        }
+
+        if (payload.action === 'edit' && checklistMap.has(payload.itemId) && payload.text) {
+          const existing = checklistMap.get(payload.itemId)!;
+          checklistMap.set(payload.itemId, {
+            ...existing,
+            text: payload.text,
+            updatedAt: event.created_at || existing.updatedAt,
+            updatedByName: payload.actorName || (event.created_by ? userNameById[event.created_by] : '') || existing.updatedByName || 'Administrador',
+          });
+          return;
+        }
+
+        if (payload.action === 'delete' && checklistMap.has(payload.itemId)) {
+          checklistMap.delete(payload.itemId);
+        }
+      } catch {
+        // ignora mensagens antigas de outros formatos
+      }
+    });
+
+    return Array.from(checklistMap.values()).sort((a, b) => {
+      const aTime = new Date(a.createdAt).getTime();
+      const bTime = new Date(b.createdAt).getTime();
+      return aTime - bTime;
+    });
   };
 
   const formatProcessDate = (value?: string | null) => {
@@ -478,6 +569,49 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     },
   ];
 
+  const statusDistribution = [
+    { label: 'Triagem', value: processRows.filter((process) => process.status === ProcessStatus.TRIAGEM).length, color: '#4F8FE8' },
+    { label: 'Em andamento', value: processRows.filter((process) => process.status === ProcessStatus.ANALISE).length, color: '#F5B83B' },
+    { label: 'Cadastro', value: processRows.filter((process) => process.status === ProcessStatus.PENDENTE).length, color: '#8C6DD7' },
+    { label: 'Concluído', value: processRows.filter((process) => process.status === ProcessStatus.CONCLUIDO).length, color: '#52B788' },
+  ];
+
+  const serviceDistribution = Array.from(
+    processRows.reduce<Map<string, number>>((accumulator, process) => {
+      accumulator.set(process.processType, (accumulator.get(process.processType) || 0) + 1);
+      return accumulator;
+    }, new Map<string, number>()),
+  ).map(([label, value], index) => ({
+    label,
+    value,
+    color: ['#4F8FE8', '#52B788', '#8C6DD7', '#F5B83B'][index % 4],
+  }));
+
+  const totalForStatus = statusDistribution.reduce((sum, item) => sum + item.value, 0) || 1;
+  const totalForService = serviceDistribution.reduce((sum, item) => sum + item.value, 0) || 1;
+
+  const statusDonutStyle = {
+    background: `conic-gradient(${statusDistribution
+      .map((item, index) => {
+        const start = statusDistribution.slice(0, index).reduce((sum, segment) => sum + segment.value, 0);
+        const end = start + item.value;
+        return `${item.color} ${(start / totalForStatus) * 100}% ${(end / totalForStatus) * 100}%`;
+      })
+      .join(', ')})`,
+  };
+
+  const serviceDonutStyle = {
+    background: `conic-gradient(${serviceDistribution
+      .map((item, index) => {
+        const start = serviceDistribution.slice(0, index).reduce((sum, segment) => sum + segment.value, 0);
+        const end = start + item.value;
+        return `${item.color} ${(start / totalForService) * 100}% ${(end / totalForService) * 100}%`;
+      })
+      .join(', ')})`,
+  };
+
+  const dashboardRecentRows = processRows.slice(0, 5);
+
   const resetNewProcessForm = () => {
     setNewProcessForm({
       organizationId: newAdminOrgId || organizations[0]?.id || '',
@@ -543,6 +677,193 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     if (!editingUser) return;
     void hydrateEditingProfileForm(editingUser);
   }, [editingUser]);
+
+  useEffect(() => {
+    const processId = getEditingProcessRecordId(editingUser);
+    if (!processId) {
+      setProcessChecklist([]);
+      setChecklistError('');
+      setNewChecklistText('');
+      return;
+    }
+
+    const loadChecklist = async () => {
+      setChecklistLoading(true);
+      setChecklistError('');
+
+      const { data, error } = await supabase
+        .from('process_events')
+        .select('mensagem,created_at,created_by')
+        .eq('process_id', processId)
+        .eq('tipo', 'observacao')
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        setChecklistError('Não foi possível carregar o checklist deste processo.');
+        setChecklistLoading(false);
+        return;
+      }
+
+      const events = (data || []) as Array<{ mensagem?: string | null; created_at?: string | null; created_by?: string | null }>;
+      const userIds = Array.from(new Set(events.map((event) => event.created_by).filter(Boolean))) as string[];
+      let userNameById: Record<string, string> = {};
+
+      if (userIds.length > 0) {
+        const { data: profileRows } = await supabase
+          .from('profiles')
+          .select('id,nome_completo,nome,name,email')
+          .in('id', userIds);
+
+        userNameById = ((profileRows || []) as Array<{ id: string; nome_completo?: string | null; nome?: string | null; name?: string | null; email?: string | null }>)
+          .reduce<Record<string, string>>((accumulator, profile) => {
+            accumulator[profile.id] =
+              sanitizeDisplayValue(profile.nome_completo) ||
+              sanitizeDisplayValue(profile.nome) ||
+              sanitizeDisplayValue(profile.name) ||
+              sanitizeDisplayValue(profile.email) ||
+              'Administrador';
+            return accumulator;
+          }, {});
+      }
+
+      const checklist = buildChecklistFromEvents(events, userNameById);
+      setProcessChecklist(checklist);
+      setChecklistLoading(false);
+      setEditingChecklistItemId(null);
+      setEditingChecklistText('');
+    };
+
+    void loadChecklist();
+  }, [editingUser]);
+
+  const handleAddChecklistItem = async () => {
+    const processId = getEditingProcessRecordId(editingUser);
+    const normalizedText = sanitizeDisplayValue(newChecklistText);
+
+    if (!processId || !normalizedText) return;
+
+    const itemId = crypto.randomUUID();
+    const nowIso = new Date().toISOString();
+
+    const newItem: ProcessChecklistItem = {
+      id: itemId,
+      text: normalizedText,
+      completed: false,
+      createdAt: nowIso,
+      createdByName: currentUser.name || 'Administrador',
+    };
+
+    setProcessChecklist((prev) => [...prev, newItem]);
+    setNewChecklistText('');
+    setChecklistError('');
+
+    const { error } = await supabase.from('process_events').insert({
+      org_id: (editingUser as AdminProcessRow | null)?.organizationId || currentUser.organizationId || null,
+      process_id: processId,
+      tipo: 'observacao',
+      mensagem: `${CHECKLIST_EVENT_PREFIX}${JSON.stringify({ action: 'add', itemId, text: normalizedText, actorName: currentUser.name || 'Administrador' })}`,
+      created_by: currentUser.id,
+    });
+
+    if (error) {
+      setChecklistError('Não foi possível salvar o novo item do checklist.');
+      setProcessChecklist((prev) => prev.filter((item) => item.id !== itemId));
+    }
+  };
+
+  const handleToggleChecklistItem = async (itemId: string, completed: boolean) => {
+    const processId = getEditingProcessRecordId(editingUser);
+    if (!processId) return;
+
+    setChecklistError('');
+    setProcessChecklist((prev) =>
+      prev.map((item) =>
+        item.id === itemId ? { ...item, completed, updatedAt: new Date().toISOString() } : item
+      )
+    );
+
+    const { error } = await supabase.from('process_events').insert({
+      org_id: (editingUser as AdminProcessRow | null)?.organizationId || currentUser.organizationId || null,
+      process_id: processId,
+      tipo: 'observacao',
+      mensagem: `${CHECKLIST_EVENT_PREFIX}${JSON.stringify({ action: 'toggle', itemId, completed, actorName: currentUser.name || 'Administrador' })}`,
+      created_by: currentUser.id,
+    });
+
+    if (error) {
+      setChecklistError('Não foi possível atualizar o checklist.');
+      setProcessChecklist((prev) =>
+        prev.map((item) => (item.id === itemId ? { ...item, completed: !completed } : item))
+      );
+    }
+  };
+
+  const handleEditChecklistItem = async (itemId: string, text: string) => {
+    const processId = getEditingProcessRecordId(editingUser);
+    const normalizedText = sanitizeDisplayValue(text);
+    if (!processId || !normalizedText) return;
+
+    setChecklistError('');
+    const currentItem = processChecklist.find((item) => item.id === itemId);
+    if (!currentItem) return;
+
+    setProcessChecklist((prev) =>
+      prev.map((item) =>
+        item.id === itemId
+          ? { ...item, text: normalizedText, updatedAt: new Date().toISOString(), updatedByName: currentUser.name || 'Administrador' }
+          : item
+      )
+    );
+
+    const { error } = await supabase.from('process_events').insert({
+      org_id: (editingUser as AdminProcessRow | null)?.organizationId || currentUser.organizationId || null,
+      process_id: processId,
+      tipo: 'observacao',
+      mensagem: `${CHECKLIST_EVENT_PREFIX}${JSON.stringify({ action: 'edit', itemId, text: normalizedText, actorName: currentUser.name || 'Administrador' })}`,
+      created_by: currentUser.id,
+    });
+
+    if (error) {
+      setChecklistError('Não foi possível editar o item do checklist.');
+      setProcessChecklist((prev) =>
+        prev.map((item) =>
+          item.id === itemId
+            ? { ...item, text: currentItem.text, updatedAt: currentItem.updatedAt, updatedByName: currentItem.updatedByName }
+            : item
+        )
+      );
+      return;
+    }
+
+    setEditingChecklistItemId(null);
+    setEditingChecklistText('');
+  };
+
+  const handleDeleteChecklistItem = async (itemId: string) => {
+    const processId = getEditingProcessRecordId(editingUser);
+    if (!processId) return;
+
+    setChecklistError('');
+    const previousItems = processChecklist;
+    setProcessChecklist((prev) => prev.filter((item) => item.id !== itemId));
+    if (editingChecklistItemId === itemId) {
+      setEditingChecklistItemId(null);
+      setEditingChecklistText('');
+    }
+
+    const { error } = await supabase.from('process_events').insert({
+      org_id: (editingUser as AdminProcessRow | null)?.organizationId || currentUser.organizationId || null,
+      process_id: processId,
+      tipo: 'observacao',
+      mensagem: `${CHECKLIST_EVENT_PREFIX}${JSON.stringify({ action: 'delete', itemId, actorName: currentUser.name || 'Administrador' })}`,
+      created_by: currentUser.id,
+    });
+
+    if (error) {
+      setChecklistError('Não foi possível excluir o item do checklist.');
+      setProcessChecklist(previousItems);
+    }
+  };
 
 
   const fetchProcesses = async () => {
@@ -775,6 +1096,46 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
     setEditingProfileError([processUpdateError, profileUpdateError].filter(Boolean).join(' '));
     setEditingProfileSaving(false);
+  };
+
+  const handleDeleteProcess = async (process: AdminProcessRow) => {
+    const processId = sanitizeDisplayValue(process.processRecordId || process.id);
+    if (!processId) return;
+
+    const confirmed = window.confirm(`Deseja realmente excluir o processo ${process.protocol}? Esta ação não pode ser desfeita.`);
+    if (!confirmed) return;
+
+    setProcessActionFeedback(null);
+
+    const { error: deleteEventsError } = await supabase
+      .from('process_events')
+      .delete()
+      .eq('process_id', processId);
+
+    if (deleteEventsError) {
+      setProcessActionFeedback({ type: 'error', message: 'Não foi possível excluir os eventos do processo.' });
+      return;
+    }
+
+    const { error: deleteProcessError } = await supabase
+      .from('processes')
+      .delete()
+      .eq('id', processId);
+
+    if (deleteProcessError) {
+      setProcessActionFeedback({ type: 'error', message: 'Não foi possível excluir o processo selecionado.' });
+      return;
+    }
+
+    setDbProcesses((previous) => previous.filter((row) => row.id !== processId));
+    if (editingUser && sanitizeDisplayValue((editingUser as AdminProcessRow).processRecordId || editingUser.id) === processId) {
+      setEditingUser(null);
+    }
+    if (selectedUser && sanitizeDisplayValue((selectedUser as AdminProcessRow).processRecordId || selectedUser.id) === processId) {
+      setSelectedUser(null);
+    }
+
+    setProcessActionFeedback({ type: 'success', message: `Processo ${process.protocol} excluído com sucesso.` });
   };
 
   const fetchOrgMembers = async () => {
@@ -1334,13 +1695,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     setClientsLoading(true);
     setClientsError('');
 
-    if (!name) {
-      setClientFormError('Informe o nome do cliente.');
-      return;
-    }
+    const { data: membershipScopeRows, error: membershipScopeError } = await supabase
+      .from('org_members')
+      .select('org_id,user_id,role,organizations(name)')
+      .eq('user_id', currentUser.id);
 
-    if (!email) {
-      setClientFormError('Informe o e-mail do cliente.');
+    if (membershipScopeError) {
+      setClientsError('Não foi possível validar o escopo de acesso do usuário.');
+      setClientsLoading(false);
       return;
     }
 
@@ -1349,110 +1711,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       const orgName = extractOrganizationName(membership.organizations);
       return (role === 'admin' || role === 'owner') && isDefaultOrganizationName(orgName);
     });
-
-    setCreatingClient(true);
-
-    try {
-      const normalizedRole = mapAccessLevelToOrgRole(newClientForm.accessLevel);
-
-      if (newClientForm.grantSystemAccess) {
-        const { data: existingProfile, error: lookupError } = await supabase
-          .from('profiles')
-          .select('id,email')
-          .eq('email', email)
-          .maybeSingle();
-
-        if (lookupError) {
-          setClientFormError('Não foi possível validar o perfil no banco de dados.');
-          return;
-        }
-
-        if (!existingProfile?.id) {
-          setClientFormError('Para liberar acesso ao sistema, este e-mail precisa já ter conta criada no Auth.');
-          return;
-        }
-
-        const { error: updateProfileError } = await supabase
-          .from('profiles')
-          .update({
-            nome_completo: name,
-            name,
-            documento_identidade: sanitizeDisplayValue(newClientForm.documentId) || null,
-            nif_cpf: sanitizeDisplayValue(newClientForm.taxId) || null,
-            estado_civil: sanitizeDisplayValue(newClientForm.maritalStatus) || null,
-            phone: sanitizeDisplayValue(newClientForm.phone) || null,
-            endereco: sanitizeDisplayValue(newClientForm.address) || null,
-            pais: sanitizeDisplayValue(newClientForm.country) || null,
-            role: newClientForm.accessLevel,
-            org_id: selectedOrg.id,
-          })
-          .eq('id', existingProfile.id);
-
-        if (updateProfileError) {
-          setClientFormError('Não foi possível atualizar o perfil do cliente.');
-          return;
-        }
-
-        const { error: upsertMemberError } = await supabase
-          .from('org_members')
-          .upsert(
-            {
-              org_id: selectedOrg.id,
-              user_id: existingProfile.id,
-              role: normalizedRole,
-            },
-            { onConflict: 'org_id,user_id' }
-          );
-
-        if (upsertMemberError) {
-          setClientFormError('Perfil atualizado, mas não foi possível vincular cliente à organização.');
-          return;
-        }
-
-        await fetchClients();
-      } else {
-        const tempId = `local-${Date.now()}`;
-        const now = new Date().toLocaleString('pt-BR');
-
-        setUsers((prev) => [
-          {
-            id: tempId,
-            name,
-            email,
-            role: UserRole.CLIENT,
-            documentId: sanitizeDisplayValue(newClientForm.documentId) || '---',
-            taxId: sanitizeDisplayValue(newClientForm.taxId) || '---',
-            address: sanitizeDisplayValue(newClientForm.address) || '---',
-            maritalStatus: sanitizeDisplayValue(newClientForm.maritalStatus) || '---',
-            country: sanitizeDisplayValue(newClientForm.country) || '---',
-            phone: sanitizeDisplayValue(newClientForm.phone) || '---',
-            unit: ServiceUnit.ADMINISTRATIVO,
-            status: ProcessStatus.PENDENTE,
-            protocol: `CLI-${new Date().getFullYear()}-${String(prev.length + 1).padStart(3, '0')}`,
-            registrationDate: now,
-            lastUpdate: now,
-            hierarchy: Hierarchy.NOTES_ONLY,
-            organizationId: selectedOrg.id,
-            organizationName: selectedOrg.name,
-          },
-          ...prev,
-        ]);
-
-        setClientsData((prev) => [
-          {
-            id: `${selectedOrg.id}-${tempId}`,
-            user_id: tempId,
-            org_id: selectedOrg.id,
-            org_name: selectedOrg.name,
-            nome: name,
-            email,
-            accessLevel: newClientForm.accessLevel,
-            source: 'local_manual',
-            created_at: new Date().toISOString(),
-          },
-          ...prev,
-        ]);
-      }
 
       setClientFormSuccess('Cliente cadastrado com sucesso.');
       resetNewClientForm();
@@ -1765,9 +2023,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       </header>
 
       {currentSection === 'dashboard' && (
-        <section className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 no-print">
+        <section className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5 no-print">
           {dashboardHighlights.map((item) => (
-            <article key={item.key} className={`rounded-2xl border p-4 shadow-sm ${item.styles}`}>
+            <article key={item.key} className={`rounded-2xl border p-4 shadow-sm ${item.styles} min-h-[112px]`}>
               <div className="mb-2 flex items-start justify-between gap-2">
                 <p className="text-[11px] font-black uppercase tracking-widest">{item.label}</p>
                 <item.icon className="h-5 w-5 opacity-80" />
@@ -1779,7 +2037,168 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         </section>
       )}
 
-      {(currentSection === 'dashboard' || currentSection === 'configuracoes') && (
+      {currentSection === 'dashboard' && (
+        <section className="mb-6 space-y-4 no-print">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            <article className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+              <h3 className="text-base font-black text-gray-800">Processos por status</h3>
+              <p className="text-xs font-semibold text-gray-500">Distribuição atual dos processos cadastrados</p>
+              <div className="mt-4 flex flex-col md:flex-row gap-6 items-center">
+                <div className="relative h-40 w-40 rounded-full" style={statusDonutStyle}>
+                  <div className="absolute inset-5 rounded-full bg-white flex flex-col items-center justify-center">
+                    <p className="text-3xl font-black text-gray-800">{processStats.total}</p>
+                    <p className="text-xs font-semibold text-gray-500">Total</p>
+                  </div>
+                </div>
+                <div className="w-full space-y-2">
+                  {statusDistribution.map((item) => (
+                    <div key={item.label} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                        <span className="font-semibold text-gray-700">{item.label}</span>
+                      </div>
+                      <span className="font-black text-gray-800">{item.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </article>
+
+            <article className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+              <h3 className="text-base font-black text-gray-800">Processos em andamento por serviço</h3>
+              <p className="text-xs font-semibold text-gray-500">Distribuição dos processos em andamento</p>
+              <div className="mt-4 flex flex-col md:flex-row gap-6 items-center">
+                <div className="relative h-40 w-40 rounded-full" style={serviceDonutStyle}>
+                  <div className="absolute inset-5 rounded-full bg-white flex flex-col items-center justify-center">
+                    <p className="text-3xl font-black text-gray-800">{processStats.emAndamento}</p>
+                    <p className="text-xs font-semibold text-gray-500">Ativos</p>
+                  </div>
+                </div>
+                <div className="w-full space-y-2">
+                  {serviceDistribution.length === 0 ? (
+                    <p className="text-sm text-gray-500 font-semibold">Sem dados para exibir.</p>
+                  ) : serviceDistribution.map((item) => (
+                    <div key={item.label} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                        <span className="font-semibold text-gray-700">{item.label}</span>
+                      </div>
+                      <span className="font-black text-gray-800">{item.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+            <article className="xl:col-span-2 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-black text-gray-800">Evolução dos processos</h3>
+                <p className="text-xs font-bold text-blue-600">TOTAL: {dashboardHighlights[3].value} novos processos</p>
+              </div>
+              <p className="text-xs font-semibold text-gray-500 mb-3">Novos processos cadastrados nos últimos 7 dias</p>
+              <div className="grid grid-cols-7 gap-2 items-end h-36">
+                {[...Array(7)].map((_, index) => {
+                  const date = new Date();
+                  date.setDate(date.getDate() - (6 - index));
+                  const isoDay = date.toISOString().slice(0, 10);
+                  const dayCount = processRows.filter((process) => (process.registrationDate || '').slice(0, 10) === isoDay).length;
+                  const barHeight = Math.max(12, dayCount * 18);
+
+                  return (
+                    <div key={isoDay} className="flex flex-col items-center gap-2">
+                      <div className="w-full rounded-md bg-blue-100/80 relative" style={{ height: `${barHeight}px` }}>
+                        <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] font-black text-blue-600">{dayCount}</span>
+                      </div>
+                      <span className="text-[10px] font-semibold text-gray-500">{isoDay.slice(8, 10)}/{isoDay.slice(5, 7)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </article>
+
+            <article className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+              <h3 className="text-base font-black text-gray-800">Tempo médio em andamento</h3>
+              <p className="text-xs font-semibold text-gray-500 mb-3">Média de dias por serviço</p>
+              <div className="space-y-2">
+                {serviceDistribution.slice(0, 3).map((service, index) => {
+                  const serviceRows = processRows.filter((row) => row.processType === service.label);
+                  const daysAverage = serviceRows.length === 0
+                    ? 0
+                    : (serviceRows.reduce((acc, row) => {
+                      const diff = (Date.now() - new Date(row.registrationDate).getTime()) / (1000 * 60 * 60 * 24);
+                      return acc + (Number.isFinite(diff) ? diff : 0);
+                    }, 0) / serviceRows.length);
+                  const cardStyles = ['bg-blue-50 text-blue-700', 'bg-emerald-50 text-emerald-700', 'bg-violet-50 text-violet-700'][index % 3];
+
+                  return (
+                    <div key={service.label} className={`rounded-xl p-3 ${cardStyles}`}>
+                      <p className="text-xl font-black">{daysAverage.toFixed(1)} dias</p>
+                      <p className="text-xs font-semibold">{service.label}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </article>
+          </div>
+
+          <article className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <div>
+                <h3 className="text-base font-black text-gray-800">Processos recentes</h3>
+                <p className="text-xs font-semibold text-gray-500">Últimos processos cadastrados</p>
+              </div>
+              <button onClick={() => setProcessRowsLimit(50)} className="text-xs font-black text-blue-600">
+                Ver todos os processos
+              </button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                  <tr>
+                    <th className="px-4 py-3 text-left">Protocolo</th>
+                    <th className="px-4 py-3 text-left">OS</th>
+                    <th className="px-4 py-3 text-left">Serviço</th>
+                    <th className="px-4 py-3 text-left">Status</th>
+                    <th className="px-4 py-3 text-left">Abertura</th>
+                    <th className="px-4 py-3 text-left">Setor responsável</th>
+                    <th className="px-4 py-3 text-left">Ação</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dashboardRecentRows.map((process) => (
+                    <tr key={process.id} className="border-t border-gray-100">
+                      <td className="px-4 py-3 font-bold text-gray-800">{process.protocol}</td>
+                      <td className="px-4 py-3 text-gray-600">{process.processRecordId}</td>
+                      <td className="px-4 py-3 text-gray-700">{process.processType}</td>
+                      <td className="px-4 py-3">
+                        <Badge variant={statusBadgeVariant(process.status)} className="text-xs px-2 py-1">{process.status}</Badge>
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">{process.startDate}</td>
+                      <td className="px-4 py-3 text-gray-600">{process.serviceManager || 'Não definido'}</td>
+                      <td className="px-4 py-3">
+                        <button onClick={() => setSelectedUser(process)} className="text-blue-600 font-bold text-xs">
+                          Abrir acompanhamento
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {dashboardRecentRows.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-6 text-center text-gray-500 font-semibold">
+                        Nenhum processo encontrado.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+      )}
+
+      {currentSection === 'configuracoes' && (
         <>
           {/* Navigation Tabs */}
           <div className="flex border-b border-gray-100 mb-6 gap-8 no-print">
@@ -2084,6 +2503,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                         >
                           <Pencil className="w-4 h-4" />
                         </button>
+                        <button
+                          onClick={() => void handleDeleteProcess(process)}
+                          className="p-2 bg-red-500 hover:bg-red-600 rounded-lg text-white"
+                          title="Excluir processo"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
 
@@ -2202,7 +2628,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
             </table>
           </div>
         </div>
-      ) : activeTab === 'users' ? (
+      ) : currentSection === 'configuracoes' && activeTab === 'users' ? (
         <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
           <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 no-print">
             <div className="relative w-full md:w-96">
@@ -2275,7 +2701,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
             </table>
           </div>
         </div>
-      ) : (
+      ) : currentSection === 'configuracoes' ? (
         /* Management Tab Content */
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
            <div className="lg:col-span-1 bg-white border border-gray-100 rounded-2xl p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
@@ -2449,7 +2875,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               </div>
            </div>
         </div>
-      )}
+      ) : null}
 
       {showCreateClientModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
@@ -3070,6 +3496,118 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                         <MessageSquare className="w-3 h-3" /> Nota de Observações
                       </label>
                       <textarea name="notes" rows={4} defaultValue={editingUser.notes} className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold resize-none" placeholder="Digite as anotações do processo..."></textarea>
+                    </div>
+
+                    <div className="rounded-2xl border border-gray-200 bg-gray-50/70 p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Flag className="w-4 h-4 text-blue-600" />
+                        <h4 className="text-sm font-black uppercase text-gray-700">Checklist do processo</h4>
+                      </div>
+                      <p className="text-xs text-gray-500 mb-3">
+                        Todos os administradores podem criar itens e marcar como concluídos.
+                      </p>
+
+                      <div className="flex flex-col sm:flex-row gap-2 mb-3">
+                        <input
+                          type="text"
+                          value={newChecklistText}
+                          onChange={(event) => setNewChecklistText(event.target.value)}
+                          placeholder="Adicionar novo item ao checklist"
+                          className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-800 font-semibold"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => void handleAddChecklistItem()}
+                          disabled={!sanitizeDisplayValue(newChecklistText)}
+                          className="rounded-xl bg-blue-600 text-white px-4 py-2 text-xs font-black uppercase disabled:opacity-60"
+                        >
+                          Adicionar
+                        </button>
+                      </div>
+
+                      {checklistLoading ? (
+                        <p className="text-xs font-semibold text-gray-500">Carregando checklist...</p>
+                      ) : processChecklist.length === 0 ? (
+                        <p className="text-xs font-semibold text-gray-500">Nenhum item criado para este processo.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {processChecklist.map((item) => (
+                            <div key={item.id} className="flex items-start gap-3 rounded-xl border border-gray-200 bg-white p-3">
+                              <input
+                                type="checkbox"
+                                checked={item.completed}
+                                onChange={(event) => void handleToggleChecklistItem(item.id, event.target.checked)}
+                                className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600"
+                              />
+                              <div className="flex-1 min-w-0">
+                                {editingChecklistItemId === item.id ? (
+                                  <div className="flex flex-col sm:flex-row gap-2 mb-1">
+                                    <input
+                                      type="text"
+                                      value={editingChecklistText}
+                                      onChange={(event) => setEditingChecklistText(event.target.value)}
+                                      className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm font-semibold"
+                                    />
+                                    <div className="flex gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => void handleEditChecklistItem(item.id, editingChecklistText)}
+                                        disabled={!sanitizeDisplayValue(editingChecklistText)}
+                                        className="px-2 py-1 rounded-lg bg-blue-600 text-white text-[11px] font-black uppercase disabled:opacity-50"
+                                      >
+                                        Salvar
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setEditingChecklistItemId(null);
+                                          setEditingChecklistText('');
+                                        }}
+                                        className="px-2 py-1 rounded-lg border border-gray-300 text-[11px] font-black uppercase"
+                                      >
+                                        Cancelar
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <p className={`text-sm font-semibold ${item.completed ? 'line-through text-gray-400' : 'text-gray-800'}`}>
+                                    {item.text}
+                                  </p>
+                                )}
+                                <p className="text-[11px] text-gray-500">
+                                  Criado por {item.createdByName || 'Administrador'} em {new Date(item.createdAt).toLocaleString('pt-BR')}
+                                  {item.updatedAt ? ` • Atualizado por ${item.updatedByName || 'Administrador'} em ${new Date(item.updatedAt).toLocaleString('pt-BR')}` : ''}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingChecklistItemId(item.id);
+                                    setEditingChecklistText(item.text);
+                                  }}
+                                  className="p-1.5 rounded-md border border-gray-200 text-gray-600 hover:bg-gray-100"
+                                  title="Editar item"
+                                >
+                                  <Pencil className="w-3 h-3" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleDeleteChecklistItem(item.id)}
+                                  className="p-1.5 rounded-md border border-red-200 text-red-600 hover:bg-red-50"
+                                  title="Excluir item"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {checklistError && (
+                        <p className="mt-2 text-xs font-semibold text-red-600">{checklistError}</p>
+                      )}
                     </div>
 
                     <div className="border-t border-gray-100 pt-6">

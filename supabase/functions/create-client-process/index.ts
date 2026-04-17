@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -54,7 +55,13 @@ Deno.serve(async (request) => {
   const clientName = String(payload.clientName ?? '').trim();
   const clientDocument = payload.clientDocument ? String(payload.clientDocument).trim() : null;
   const clientContact = payload.clientContact ? String(payload.clientContact).trim() : null;
+  const clientEmail = payload.clientEmail ? String(payload.clientEmail).trim().toLowerCase() : null;
+  const clientUserId = payload.clientUserId ? String(payload.clientUserId).trim() : null;
   const organizationName = payload.organizationName ? String(payload.organizationName).trim() : null;
+
+  if (!requesterUserId && clientUserId && UUID_PATTERN.test(clientUserId)) {
+    requesterUserId = clientUserId;
+  }
 
   if (!organizationId || !serviceName) {
     return jsonResponse(400, { success: false, error: 'Dados obrigatórios ausentes para criar o processo.' });
@@ -71,7 +78,7 @@ Deno.serve(async (request) => {
         status: 'triagem',
         cliente_nome: clientName || 'Cliente',
         cliente_documento: clientDocument,
-        cliente_contato: clientContact || null,
+        cliente_contato: clientEmail || clientContact || null,
         responsavel_user_id: assignedAdminId,
         origem_canal: 'portal_cliente',
         unidade_atendimento: serviceArea || null,
@@ -97,6 +104,13 @@ Deno.serve(async (request) => {
         process_id: createdProcess.id,
         tipo: 'atribuicao',
         mensagem: `Atribuído inicialmente para ${assignedProfessionalName || 'profissional a definir'}. Continuidade permitida para admins da organização.`,
+        created_by: requesterUserId,
+      },
+      {
+        org_id: organizationId,
+        process_id: createdProcess.id,
+        tipo: 'registro',
+        mensagem: `Vínculo cliente registrado: ${clientUserId || 'não informado'} (${clientEmail || clientContact || 'contato não informado'}).`,
         created_by: requesterUserId,
       },
     ]);
