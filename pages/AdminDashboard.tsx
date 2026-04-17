@@ -1712,6 +1712,235 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       return (role === 'admin' || role === 'owner') && isDefaultOrganizationName(orgName);
     });
 
+    const { data: memberRows, error: membersError } = await supabase
+      .from('org_members')
+      .select('org_id,user_id,role,organizations(name)')
+      .order('created_at', { ascending: false });
+
+    if (membersError) {
+      setClientsError('Não foi possível carregar os membros da tabela org_members.');
+      setClientsLoading(false);
+      return;
+    }
+
+    const allowedOrgIds = new Set((membershipScopeRows || []).map((row) => row.org_id));
+    const scopedMembers = (memberRows || []).filter((member) => hasGlobalScope || allowedOrgIds.has(member.org_id));
+
+    if (scopedMembers.length === 0) {
+      setClientsData([]);
+      setClientsLoading(false);
+      return;
+    }
+
+    const userIds = Array.from(new Set(scopedMembers.map((member) => member.user_id)));
+    const { data: profileRows, error: profileError } = await supabase
+      .from('profiles')
+      .select('id,nome_completo,nome,email,created_at')
+      .in('id', userIds);
+
+    if (profileError) {
+      console.warn('[clientes] falha ao carregar perfis; exibindo listagem parcial', profileError);
+      setClientsError('Alguns dados de perfil não puderam ser carregados agora. A listagem exibida pode estar parcial.');
+    } else {
+      setClientsError('');
+    }
+
+    const profileMap = new Map(((profileRows || []) as Array<{ id: string; nome_completo?: string | null; nome?: string | null; email?: string | null; created_at?: string | null }>).map((row) => [row.id, row]));
+
+    const normalizedClients: ClientProfileView[] = scopedMembers.map((member) => {
+      const profile = profileMap.get(member.user_id);
+      const email = profile?.email || 'sem-email@nao-informado';
+      const nome =
+        profile?.nome_completo ||
+        profile?.nome ||
+        (email !== 'sem-email@nao-informado' ? String(email).split('@')[0] : `Usuário ${member.user_id.slice(0, 8)}`);
+
+      return {
+        id: `${member.org_id}-${member.user_id}`,
+        user_id: member.user_id,
+        org_id: member.org_id,
+        org_name: extractOrganizationName(member.organizations) || 'Organização Padrão',
+        nome,
+        email,
+        accessLevel: mapOrgRoleToAccessLevel(member.role),
+        source: profile ? 'org_members+profiles' : 'org_members_only',
+        created_at: profile?.created_at || undefined,
+      };
+    });
+
+    setClientsData(normalizedClients);
+    setClientsLoading(false);
+  };
+
+  useEffect(() => {
+    if (currentSection === 'clientes') {
+      fetchClients();
+    }
+  }, [currentSection]);
+
+  const visibleClients = clientsData
+    .filter((client) =>
+      client.nome.toLowerCase().includes(clientsSearch.toLowerCase()) ||
+      client.email.toLowerCase().includes(clientsSearch.toLowerCase()) ||
+      client.org_name.toLowerCase().includes(clientsSearch.toLowerCase())
+    )
+    .sort((a, b) => {
+      if (clientsSort === 'name_asc') {
+        return a.nome.localeCompare(b.nome, 'pt-BR');
+      }
+      if (clientsSort === 'name_desc') {
+        return b.nome.localeCompare(a.nome, 'pt-BR');
+      }
+      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+    })
+    .slice(0, clientsRowsLimit);
+
+  const resetNewClientForm = () => {
+    setNewClientForm({
+      fullName: '',
+      email: '',
+      phone: '',
+      documentId: '',
+      taxId: '',
+      address: '',
+      country: 'Brasil',
+      maritalStatus: 'Solteiro',
+      organizationId: organizations[0]?.id || '',
+      accessLevel: 'Cliente',
+      grantSystemAccess: false,
+    });
+    setClientFormError('');
+    setClientFormSuccess('');
+  };
+
+  const handleCreateClient = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setClientFormError('');
+    setClientFormSuccess('');
+
+    const name = sanitizeDisplayValue(newClientForm.fullName);
+    const email = sanitizeDisplayValue(newClientForm.email);
+    const selectedOrg = organizations.find((org) => org.id === newClientForm.organizationId);
+
+    if (!name) {
+      setClientFormError('Informe o nome do cliente.');
+      return;
+    }
+
+    if (!email) {
+      setClientFormError('Informe o e-mail do cliente.');
+      return;
+    }
+
+    if (!selectedOrg) {
+      setClientFormError('Selecione uma organização válida.');
+      return;
+    }
+
+    setCreatingClient(true);
+
+    try {
+      const normalizedRole = mapAccessLevelToOrgRole(newClientForm.accessLevel);
+
+      if (newClientForm.grantSystemAccess) {
+        const { data: existingProfile, error: lookupError } = await supabase
+          .from('profiles')
+          .select('id,email')
+          .eq('email', email)
+          .maybeSingle();
+
+        if (lookupError) {
+          setClientFormError('Não foi possível validar o perfil no banco de dados.');
+          return;
+        }
+
+        if (!existingProfile?.id) {
+          setClientFormError('Para liberar acesso ao sistema, este e-mail precisa já ter conta criada no Auth.');
+          return;
+        }
+
+        const { error: updateProfileError } = await supabase
+          .from('profiles')
+          .update({
+            nome_completo: name,
+            name,
+            documento_identidade: sanitizeDisplayValue(newClientForm.documentId) || null,
+            nif_cpf: sanitizeDisplayValue(newClientForm.taxId) || null,
+            estado_civil: sanitizeDisplayValue(newClientForm.maritalStatus) || null,
+            phone: sanitizeDisplayValue(newClientForm.phone) || null,
+            endereco: sanitizeDisplayValue(newClientForm.address) || null,
+            pais: sanitizeDisplayValue(newClientForm.country) || null,
+            role: newClientForm.accessLevel,
+            org_id: selectedOrg.id,
+          })
+          .eq('id', existingProfile.id);
+
+        if (updateProfileError) {
+          setClientFormError('Não foi possível atualizar o perfil do cliente.');
+          return;
+        }
+
+        const { error: upsertMemberError } = await supabase
+          .from('org_members')
+          .upsert(
+            {
+              org_id: selectedOrg.id,
+              user_id: existingProfile.id,
+              role: normalizedRole,
+            },
+            { onConflict: 'org_id,user_id' }
+          );
+
+        if (upsertMemberError) {
+          setClientFormError('Perfil atualizado, mas não foi possível vincular cliente à organização.');
+          return;
+        }
+
+        await fetchClients();
+      } else {
+        const tempId = `local-${Date.now()}`;
+        const now = new Date().toLocaleString('pt-BR');
+
+        setUsers((prev) => [
+          {
+            id: tempId,
+            name,
+            email,
+            role: UserRole.CLIENT,
+            documentId: sanitizeDisplayValue(newClientForm.documentId) || '---',
+            taxId: sanitizeDisplayValue(newClientForm.taxId) || '---',
+            address: sanitizeDisplayValue(newClientForm.address) || '---',
+            maritalStatus: sanitizeDisplayValue(newClientForm.maritalStatus) || '---',
+            country: sanitizeDisplayValue(newClientForm.country) || '---',
+            phone: sanitizeDisplayValue(newClientForm.phone) || '---',
+            unit: ServiceUnit.ADMINISTRATIVO,
+            status: ProcessStatus.PENDENTE,
+            protocol: `CLI-${new Date().getFullYear()}-${String(prev.length + 1).padStart(3, '0')}`,
+            registrationDate: now,
+            lastUpdate: now,
+            hierarchy: Hierarchy.NOTES_ONLY,
+            organizationId: selectedOrg.id,
+            organizationName: selectedOrg.name,
+          },
+          ...prev,
+        ]);
+
+        setClientsData((prev) => [
+          {
+            id: `${selectedOrg.id}-${tempId}`,
+            user_id: tempId,
+            org_id: selectedOrg.id,
+            org_name: selectedOrg.name,
+            nome: name,
+            email,
+            accessLevel: newClientForm.accessLevel,
+            source: 'local_manual',
+            created_at: new Date().toISOString(),
+          },
+          ...prev,
+        ]);
+      }
+
       setClientFormSuccess('Cliente cadastrado com sucesso.');
       resetNewClientForm();
       setShowCreateClientModal(false);
@@ -1790,17 +2019,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     event.preventDefault();
     if (!editingClient) return;
 
-      return {
-        id: `${member.org_id}-${member.user_id}`,
-        user_id: member.user_id,
-        org_id: member.org_id,
-        org_name: extractOrganizationName(member.organizations) || 'Organização Padrão',
-        nome,
-        email,
-        accessLevel: mapOrgRoleToAccessLevel(member.role),
-        created_at: profile?.created_at || undefined,
-      };
-    });
+    setClientEditError('');
+    setClientEditSuccess('');
 
     const selectedOrg = organizations.find((org) => org.id === editClientForm.organizationId);
     if (!selectedOrg) {
@@ -1814,18 +2034,67 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       return;
     }
 
-  const visibleClients = clientsData
-    .filter((client) =>
-      client.nome.toLowerCase().includes(clientsSearch.toLowerCase()) ||
-      client.email.toLowerCase().includes(clientsSearch.toLowerCase()) ||
-      client.org_name.toLowerCase().includes(clientsSearch.toLowerCase())
-    )
-    .sort((a, b) => {
-      if (clientsSort === 'name_asc') {
-        return a.nome.localeCompare(b.nome, 'pt-BR');
-      }
-      if (clientsSort === 'name_desc') {
-        return b.nome.localeCompare(a.nome, 'pt-BR');
+    setSavingClientEdit(true);
+
+    try {
+      if (editingClient.user_id.startsWith('local-')) {
+        setUsers((prev) =>
+          prev.map((user) =>
+            user.id === editingClient.user_id
+              ? {
+                  ...user,
+                  name: normalizedName,
+                  email: sanitizeDisplayValue(editClientForm.email) || user.email,
+                  phone: sanitizeDisplayValue(editClientForm.phone) || '---',
+                  documentId: sanitizeDisplayValue(editClientForm.documentId) || '---',
+                  taxId: sanitizeDisplayValue(editClientForm.taxId) || '---',
+                  address: sanitizeDisplayValue(editClientForm.address) || '---',
+                  country: sanitizeDisplayValue(editClientForm.country) || '---',
+                  maritalStatus: sanitizeDisplayValue(editClientForm.maritalStatus) || '---',
+                  organizationId: selectedOrg.id,
+                  organizationName: selectedOrg.name,
+                }
+              : user
+          )
+        );
+      } else {
+        const { error: updateProfileError } = await supabase
+          .from('profiles')
+          .update({
+            nome_completo: normalizedName,
+            name: normalizedName,
+            email: sanitizeDisplayValue(editClientForm.email) || null,
+            phone: sanitizeDisplayValue(editClientForm.phone) || null,
+            documento_identidade: sanitizeDisplayValue(editClientForm.documentId) || null,
+            nif_cpf: sanitizeDisplayValue(editClientForm.taxId) || null,
+            endereco: sanitizeDisplayValue(editClientForm.address) || null,
+            pais: sanitizeDisplayValue(editClientForm.country) || null,
+            estado_civil: sanitizeDisplayValue(editClientForm.maritalStatus) || null,
+            role: editClientForm.accessLevel,
+            org_id: selectedOrg.id,
+          })
+          .eq('id', editingClient.user_id);
+
+        if (updateProfileError) {
+          setClientEditError('Não foi possível atualizar os dados de perfil do cliente.');
+          return;
+        }
+
+        const { error: upsertMemberError } = await supabase
+          .from('org_members')
+          .upsert(
+            {
+              org_id: selectedOrg.id,
+              user_id: editingClient.user_id,
+              role: mapAccessLevelToOrgRole(editClientForm.accessLevel),
+            },
+            { onConflict: 'org_id,user_id' }
+          );
+
+        if (upsertMemberError) {
+          setClientEditError('Perfil atualizado, mas houve erro ao atualizar vínculo da organização.');
+          return;
+        }
       }
 
       setClientsData((prev) =>
@@ -1851,7 +2120,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       setSavingClientEdit(false);
     }
   };
-
   const handleCreateOrganization = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setOrgError('');
