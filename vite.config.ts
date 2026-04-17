@@ -10,7 +10,7 @@ export default defineConfig(({ mode }) => {
       server: {
         port: 3000,
         host: '0.0.0.0',
-        allowedHosts: 'all',
+        allowedHosts: true,
         hmr: isProd ? false : {
           // Use relative protocol to work with any host
           protocol: 'ws',
