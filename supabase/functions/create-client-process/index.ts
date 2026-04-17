@@ -51,7 +51,6 @@ Deno.serve(async (request) => {
   const serviceArea = String(payload.serviceArea ?? '').trim();
   const scheduledSlot = String(payload.scheduledSlot ?? '').trim();
   const assignedProfessionalName = String(payload.assignedProfessionalName ?? '').trim();
-  const assignedAdminId = payload.assignedAdminId ? String(payload.assignedAdminId).trim() : null;
   const clientName = String(payload.clientName ?? '').trim();
   const clientDocument = payload.clientDocument ? String(payload.clientDocument).trim() : null;
   const clientContact = payload.clientContact ? String(payload.clientContact).trim() : null;
@@ -59,8 +58,10 @@ Deno.serve(async (request) => {
   const clientUserId = payload.clientUserId ? String(payload.clientUserId).trim() : null;
   const organizationName = payload.organizationName ? String(payload.organizationName).trim() : null;
 
-  if (!requesterUserId && clientUserId && UUID_PATTERN.test(clientUserId)) {
-    requesterUserId = clientUserId;
+  const normalizedClientUserId = clientUserId && UUID_PATTERN.test(clientUserId) ? clientUserId : null;
+
+  if (!requesterUserId && normalizedClientUserId) {
+    requesterUserId = normalizedClientUserId;
   }
 
   if (!organizationId || !serviceName) {
@@ -70,6 +71,24 @@ Deno.serve(async (request) => {
   const processTitle = `${serviceName} - ${assignedProfessionalName || 'Profissional a definir'} (${scheduledSlot || 'horário a confirmar'})`;
 
   try {
+    if (normalizedClientUserId) {
+      const { data: existingMember } = await adminClient
+        .from('org_members')
+        .select('id')
+        .eq('org_id', organizationId)
+        .eq('user_id', normalizedClientUserId)
+        .limit(1)
+        .maybeSingle();
+
+      if (!existingMember) {
+        await adminClient.from('org_members').insert({
+          org_id: organizationId,
+          user_id: normalizedClientUserId,
+          role: 'client',
+        });
+      }
+    }
+
     const { data: createdProcess, error: processError } = await adminClient
       .from('processes')
       .insert({
@@ -79,7 +98,8 @@ Deno.serve(async (request) => {
         cliente_nome: clientName || 'Cliente',
         cliente_documento: clientDocument,
         cliente_contato: clientEmail || clientContact || null,
-        responsavel_user_id: assignedAdminId,
+        responsavel_user_id: normalizedClientUserId,
+        cliente_user_id: normalizedClientUserId,
         origem_canal: 'portal_cliente',
         unidade_atendimento: serviceArea || null,
         org_nome_solicitado: organizationName,

@@ -69,6 +69,7 @@ type DashboardProcessRow = {
   cliente_nome?: string | null;
   cliente_contato?: string | null;
   responsavel_user_id?: string | null;
+  cliente_user_id?: string | null;
   data_conclusao?: string | null;
 };
 
@@ -142,6 +143,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
   const [dashboardProcessFilter, setDashboardProcessFilter] = React.useState<'todos' | 'andamento' | 'concluidos'>('todos');
   const [dashboardProcessSearch, setDashboardProcessSearch] = React.useState('');
   const [selectedDashboardProcessId, setSelectedDashboardProcessId] = React.useState<string | null>(null);
+  const [dashboardRefreshTrigger, setDashboardRefreshTrigger] = React.useState(0);
   const [dashboardProcessesLoading, setDashboardProcessesLoading] = React.useState(false);
   const [processComments, setProcessComments] = React.useState<Array<{ id: string; text: string; createdAt: string }>>([]);
   const [newComment, setNewComment] = React.useState('');
@@ -261,13 +263,18 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
 
       const remoteQuery = supabase
         .from('processes')
-        .select('id,titulo,protocolo,status,created_at,updated_at,unidade_atendimento,cliente_nome,cliente_contato,responsavel_user_id,data_conclusao')
+        .select('id,titulo,protocolo,status,created_at,updated_at,unidade_atendimento,cliente_nome,cliente_contato,responsavel_user_id,cliente_user_id,data_conclusao')
         .eq('org_id', activeOrganizationId)
         .order('created_at', { ascending: false });
 
       const clientFilters: string[] = [];
       const isClient = currentUser.role !== UserRole.ADMIN;
       if (isClient) {
+        if (currentUser.id) {
+          clientFilters.push(`cliente_user_id.eq.${currentUser.id}`);
+          clientFilters.push(`responsavel_user_id.eq.${currentUser.id}`);
+        }
+
         const email = currentUser.email?.trim().toLowerCase();
         const phone = currentUser.phone?.trim();
         const name = currentUser.name?.trim();
@@ -312,7 +319,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
           if (processIds.length > 0) {
             const { data: ownedRows, error: ownedError } = await supabase
               .from('processes')
-              .select('id,titulo,protocolo,status,created_at,updated_at,unidade_atendimento,cliente_nome,cliente_contato,responsavel_user_id,data_conclusao')
+              .select('id,titulo,protocolo,status,created_at,updated_at,unidade_atendimento,cliente_nome,cliente_contato,responsavel_user_id,cliente_user_id,data_conclusao')
               .eq('org_id', activeOrganizationId)
               .in('id', processIds)
               .order('created_at', { ascending: false });
@@ -345,7 +352,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
     };
 
     void loadDashboardProcesses();
-  }, [activeOrganizationId, currentUser.email, currentUser.id, currentUser.name, currentUser.role, selectedDashboardProcessId]);
+  }, [activeOrganizationId, currentUser.email, currentUser.id, currentUser.name, currentUser.role, dashboardRefreshTrigger]);
 
   React.useEffect(() => {
     if (!currentUser.id) return;
@@ -810,11 +817,13 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
           unidade_atendimento: selectedService.area,
           cliente_nome: currentUser.name,
           cliente_contato: currentUser.email || currentUser.phone || null,
-          responsavel_user_id: UUID_PATTERN.test(selectedSlotData.id) ? selectedSlotData.id : null,
+          responsavel_user_id: currentUser.id || null,
+          cliente_user_id: currentUser.id || null,
           data_conclusao: null,
         },
         ...previous.filter((row) => row.id !== createdProcess.id),
       ]);
+      setDashboardRefreshTrigger((previous) => previous + 1);
 
       await supabase.from('process_events').insert({
         org_id: activeOrganizationId,
