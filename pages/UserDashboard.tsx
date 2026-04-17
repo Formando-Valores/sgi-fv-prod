@@ -101,6 +101,13 @@ const PROCESS_STATUS_LABEL_MAP: Record<string, ServiceProcessView['statusLabel']
   analise: 'em análise',
   concluido: 'finalizado',
 };
+const AREA_TEAM_LABEL_MAP: Record<ServiceArea, string> = {
+  administrativo: 'Setor Administrativo',
+  juridico: 'Setor Jurídico Conveniado à AI',
+  tecnologico: 'Setor Tecnológico',
+  recursos_humanos: 'Setor de Recursos Humanos',
+  advocacia: 'Setor de Advocacia',
+};
 const parsePriceLabel = (priceLabel: string): number | null => {
   const normalized = priceLabel.replace('€', '').replace(',', '.').trim();
   const numericValue = Number(normalized);
@@ -164,6 +171,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
   );
   const isOnboardingFlow = processStatus !== ProcessStatus.CONCLUIDO && (!initialStageFinished || allowNewRequest);
   const displaySectorName = processStatus === ProcessStatus.PENDENTE ? 'Atendimento ao Associado' : 'Setor Jurídico Conveniado à AI';
+  const selectedAreaTeamLabel = selectedArea ? AREA_TEAM_LABEL_MAP[selectedArea] : 'Setor responsável';
   const activeOrganizationId = currentUser.organizationId ?? resolvedOrganizationId;
   const filteredDashboardProcesses = dashboardProcesses.filter((processRow) => {
     const normalizedStatus = (processRow.status || '').toLowerCase();
@@ -1081,7 +1089,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
                         className={`w-full text-left rounded-lg border p-3 disabled:opacity-60 ${selectedSlot === slot.id ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-gray-200'}`}
                       >
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-semibold text-gray-800">Setor Jurídico Conveniado à AI • Equipe {index + 1}</p>
+                          <p className="font-semibold text-gray-800">{selectedAreaTeamLabel} • Equipe {index + 1}</p>
                           {slot.isRecommended && (
                             <span className="rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-black px-2 py-1 uppercase tracking-wider">
                               Recomendado
