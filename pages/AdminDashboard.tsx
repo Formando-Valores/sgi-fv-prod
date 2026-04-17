@@ -2103,7 +2103,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         </section>
       )}
 
-      {(currentSection === 'dashboard' || currentSection === 'configuracoes') && (
+      {currentSection === 'configuracoes' && (
         <>
           {/* Navigation Tabs */}
           <div className="flex border-b border-gray-100 mb-6 gap-8 no-print">
@@ -2531,7 +2531,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
             </table>
           </div>
         </div>
-      ) : activeTab === 'users' ? (
+      ) : currentSection === 'configuracoes' && activeTab === 'users' ? (
         <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
           <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 no-print">
             <div className="relative w-full md:w-96">
@@ -2604,7 +2604,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
             </table>
           </div>
         </div>
-      ) : (
+      ) : currentSection === 'configuracoes' ? (
         /* Management Tab Content */
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
            <div className="lg:col-span-1 bg-white border border-gray-100 rounded-2xl p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
@@ -2778,7 +2778,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               </div>
            </div>
         </div>
-      )}
+      ) : null}
 
       {/* Hierarchy Edit Modal */}
       {editingHierarchyUser && (
