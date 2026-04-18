@@ -427,11 +427,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       const isExternalRequest = source.toLowerCase() === 'wix';
       const generatedValue = unit === ServiceUnit.ADMINISTRATIVO ? 5200 : unit === ServiceUnit.TECNOLOGICO ? 8200 : 1800;
       const processOverrides = processVisualOverrides[process.id] || {};
+      const persistedDeadline = sanitizeDisplayValue(process.data_prazo);
+      const persistedServiceManager = sanitizeDisplayValue(process.gestor_servico);
+      const persistedNotes = sanitizeDisplayValue(process.observacoes);
       const manualDeadline = sanitizeDisplayValue(processOverrides.deadline);
       const manualServiceManager = sanitizeDisplayValue(processOverrides.serviceManager);
       const manualNotes = sanitizeDisplayValue(processOverrides.notes);
+      const resolvedDeadline = persistedDeadline || manualDeadline;
+      const resolvedServiceManager = persistedServiceManager || manualServiceManager;
+      const resolvedNotes = persistedNotes || manualNotes;
       const resolvedDeadlineDisplay =
-        formatDeadlineForDisplay(manualDeadline) || (isExternalRequest ? 'Aguardando análise' : '-');
+        formatDeadlineForDisplay(resolvedDeadline) || (isExternalRequest ? 'Aguardando análise' : '-');
 
       return {
         id: process.id,
@@ -454,10 +460,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         lastUpdate: process.updated_at || process.created_at,
         hierarchy: Hierarchy.STATUS_ONLY,
         notes:
-          manualNotes ||
+          resolvedNotes ||
           (isExternalRequest ? `Origem: Wix${requestedOrganizationName !== 'Não informado' ? ` · Organização solicitada: ${requestedOrganizationName}` : ''}` : undefined),
-        deadline: manualDeadline,
-        serviceManager: manualServiceManager || (isExternalRequest ? 'Aguardando aprovação' : 'Não definido'),
+        deadline: resolvedDeadline,
+        serviceManager: resolvedServiceManager || (isExternalRequest ? 'Aguardando aprovação' : 'Não definido'),
         organizationId: process.org_id,
         organizationName: requestedOrganizationName,
         processType: unit,
@@ -872,7 +878,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
     const { data, error } = await supabase
       .from('processes')
-      .select('id,org_id,titulo,protocolo,status,cliente_nome,cliente_documento,cliente_contato,responsavel_user_id,created_at,updated_at,origem_canal,unidade_atendimento,org_nome_solicitado')
+      .select('id,org_id,titulo,protocolo,status,cliente_nome,cliente_documento,cliente_contato,responsavel_user_id,data_prazo,gestor_servico,observacoes,created_at,updated_at,origem_canal,unidade_atendimento,org_nome_solicitado')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -925,7 +931,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const { data: createdProcess, error: processInsertError } = await supabase
       .from('processes')
       .insert(processPayload)
-      .select('id,org_id,titulo,protocolo,status,cliente_nome,cliente_documento,cliente_contato,responsavel_user_id,created_at,updated_at,origem_canal,unidade_atendimento,org_nome_solicitado')
+      .select('id,org_id,titulo,protocolo,status,cliente_nome,cliente_documento,cliente_contato,responsavel_user_id,data_prazo,gestor_servico,observacoes,created_at,updated_at,origem_canal,unidade_atendimento,org_nome_solicitado')
       .single();
 
     if (processInsertError || !createdProcess) {
@@ -987,22 +993,29 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     }
 
     let processUpdateError = '';
-    if ((currentEditingUser as AdminProcessRow | null)?.processRecordId && dbProcesses.length > 0 && processRecordId) {
+    if (processRecordId) {
+      const processUpdatePayload = {
+        status: statusMap[status],
+        data_prazo: normalizedDeadline || null,
+        gestor_servico: normalizedServiceManager || null,
+        observacoes: normalizedNotes || null,
+      };
+
       const { error } = await supabase
         .from('processes')
-        .update({ status: statusMap[status] })
+        .update(processUpdatePayload)
         .eq('id', processRecordId);
 
       if (error) {
-        processUpdateError = 'Não foi possível atualizar o status do processo no banco.';
+        processUpdateError = 'Não foi possível atualizar status, prazo, gestor e observações do processo no banco.';
       } else {
         setDbProcesses((prev) =>
-          prev.map((process) => (process.id === processRecordId ? { ...process, status: statusMap[status] } : process))
+          prev.map((process) => (process.id === processRecordId ? { ...process, ...processUpdatePayload } : process))
         );
       }
     }
 
-    if (processRecordId) {
+    if (processRecordId && !processUpdateError) {
       setProcessVisualOverrides((prev) => {
         const existing = prev[processRecordId] || {};
         const nextEntry = {

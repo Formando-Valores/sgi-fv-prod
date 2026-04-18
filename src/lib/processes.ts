@@ -26,6 +26,9 @@ export interface Process {
   cliente_documento: string | null;
   cliente_contato: string | null;
   responsavel_user_id: string | null;
+  data_prazo?: string | null;
+  gestor_servico?: string | null;
+  observacoes?: string | null;
   created_at: string;
   updated_at: string;
   origem_canal?: string | null;
@@ -349,7 +352,7 @@ export async function addProcessEvent(
 export async function updateProcess(
   org_id: string,
   process_id: string,
-  updates: Partial<Pick<Process, 'titulo' | 'cliente_nome' | 'cliente_documento' | 'cliente_contato' | 'responsavel_user_id'>>
+  updates: Partial<Pick<Process, 'titulo' | 'cliente_nome' | 'cliente_documento' | 'cliente_contato' | 'responsavel_user_id' | 'data_prazo' | 'gestor_servico' | 'observacoes'>>
 ): Promise<Process> {
   const startTime = performance.now();
   log('updateProcess() starting');

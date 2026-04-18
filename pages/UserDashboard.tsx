@@ -393,6 +393,61 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
   }, [loadDashboardProcesses]);
 
   React.useEffect(() => {
+    const validOrgId = isValidUuid(activeOrganizationId) ? activeOrganizationId : null;
+    if (!validOrgId) return;
+
+    const normalizedUserId = currentUser.id?.trim() || '';
+    const isClient = currentUser.role !== UserRole.ADMIN;
+    const shouldFilterByUser = isClient && isValidUuid(normalizedUserId);
+    const channel = supabase
+      .channel(`dashboard-processes-${validOrgId}-${normalizedUserId || 'anon'}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'processes',
+          filter: `org_id=eq.${validOrgId}`,
+        },
+        (payload) => {
+          const nextRow = (payload.new || null) as Partial<DashboardProcessRow> | null;
+
+          if (shouldFilterByUser && nextRow) {
+            const belongsToCurrentUser =
+              nextRow.cliente_user_id === normalizedUserId ||
+              nextRow.responsavel_user_id === normalizedUserId;
+
+            if (!belongsToCurrentUser) {
+              return;
+            }
+          }
+
+          void loadDashboardProcesses();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [activeOrganizationId, currentUser.id, currentUser.role, loadDashboardProcesses]);
+
+  React.useEffect(() => {
+    const refreshOnFocus = () => {
+      if (document.visibilityState === 'visible') {
+        void loadDashboardProcesses();
+      }
+    };
+
+    window.addEventListener('focus', refreshOnFocus);
+    document.addEventListener('visibilitychange', refreshOnFocus);
+
+    return () => {
+      window.removeEventListener('focus', refreshOnFocus);
+      document.removeEventListener('visibilitychange', refreshOnFocus);
+    };
+  }, [loadDashboardProcesses]);
+  React.useEffect(() => {
     dashboardProcessesRef.current = dashboardProcesses;
     if (!currentUser.id) return;
     localStorage.setItem(`sgi_dashboard_processes_${currentUser.id}`, JSON.stringify(dashboardProcesses));
