@@ -314,6 +314,35 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     return ProcessStatus.PENDENTE;
   };
 
+  const PROCESS_SELECT_BASE_COLUMNS = 'id,org_id,titulo,protocolo,status,cliente_nome,cliente_documento,cliente_contato,responsavel_user_id,created_at,updated_at,origem_canal,unidade_atendimento,org_nome_solicitado';
+  const PROCESS_SELECT_WITH_OPTIONAL_COLUMNS = 'id,org_id,titulo,protocolo,status,cliente_nome,cliente_documento,cliente_contato,responsavel_user_id,data_prazo,gestor_servico,observacoes,created_at,updated_at,origem_canal,unidade_atendimento,org_nome_solicitado';
+
+  const normalizeProcessOptionalFields = (process: Partial<DbProcess>): DbProcess => ({
+    ...(process as DbProcess),
+    data_prazo: process.data_prazo ?? null,
+    gestor_servico: process.gestor_servico ?? null,
+    observacoes: process.observacoes ?? null,
+  });
+
+  const hasMissingOptionalProcessColumns = (error: unknown): boolean => {
+    const supabaseError = (error || {}) as { code?: string | null; message?: string | null; details?: string | null; hint?: string | null };
+    const errorCode = sanitizeDisplayValue(supabaseError.code || '');
+    const combinedMessage = `${supabaseError.message || ''} ${supabaseError.details || ''} ${supabaseError.hint || ''}`.toLowerCase();
+
+    const mentionsOptionalColumns = ['data_prazo', 'gestor_servico', 'observacoes'].some((column) => combinedMessage.includes(column));
+    return mentionsOptionalColumns || errorCode === '42703' || errorCode === 'PGRST204';
+  };
+
+  const logProcessesQueryError = (label: string, error: unknown) => {
+    const supabaseError = (error || {}) as { code?: string | null; message?: string | null; details?: string | null; hint?: string | null };
+    console.warn(`[processos] ${label}`, {
+      code: supabaseError.code || 'sem-codigo',
+      message: supabaseError.message || 'sem-mensagem',
+      details: supabaseError.details || 'sem-detalhes',
+      hint: supabaseError.hint || 'sem-hint',
+    });
+  };
+
   const getEditingProcessRecordId = (user: AdminProcessRow | User | null) =>
     sanitizeDisplayValue((user as AdminProcessRow | null)?.processRecordId || user?.id);
 
@@ -878,18 +907,39 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
     const { data, error } = await supabase
       .from('processes')
-      .select('id,org_id,titulo,protocolo,status,cliente_nome,cliente_documento,cliente_contato,responsavel_user_id,data_prazo,gestor_servico,observacoes,created_at,updated_at,origem_canal,unidade_atendimento,org_nome_solicitado')
+      .select(PROCESS_SELECT_WITH_OPTIONAL_COLUMNS)
       .order('created_at', { ascending: false });
 
-    if (error) {
-      console.warn('[processos] erro ao carregar processos reais', error);
-      setProcessesError('Não foi possível carregar os processos recebidos no banco. Exibindo a base local disponível.');
-      setDbProcesses([]);
+    if (!error) {
+      setDbProcesses(((data as DbProcess[] | null) || []).map((process) => normalizeProcessOptionalFields(process)));
       setProcessesLoading(false);
       return;
     }
 
-    setDbProcesses((data as DbProcess[] | null) || []);
+    logProcessesQueryError('falha na query com colunas opcionais', error);
+
+    if (hasMissingOptionalProcessColumns(error)) {
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from('processes')
+        .select(PROCESS_SELECT_BASE_COLUMNS)
+        .order('created_at', { ascending: false });
+
+      if (!fallbackError) {
+        const normalizedProcesses = ((fallbackData as DbProcess[] | null) || []).map((process) =>
+          normalizeProcessOptionalFields(process)
+        );
+
+        setDbProcesses(normalizedProcesses);
+        setProcessesError('Banco ainda sem colunas opcionais (data_prazo, gestor_servico, observacoes). Processos carregados em modo compatível.');
+        setProcessesLoading(false);
+        return;
+      }
+
+      logProcessesQueryError('falha também na query de fallback sem colunas opcionais', fallbackError);
+    }
+
+    setProcessesError('Não foi possível carregar os processos recebidos no banco. Exibindo a base local disponível.');
+    setDbProcesses([]);
     setProcessesLoading(false);
   };
 
@@ -931,7 +981,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const { data: createdProcess, error: processInsertError } = await supabase
       .from('processes')
       .insert(processPayload)
-      .select('id,org_id,titulo,protocolo,status,cliente_nome,cliente_documento,cliente_contato,responsavel_user_id,data_prazo,gestor_servico,observacoes,created_at,updated_at,origem_canal,unidade_atendimento,org_nome_solicitado')
+      .select(PROCESS_SELECT_BASE_COLUMNS)
       .single();
 
     if (processInsertError || !createdProcess) {
@@ -948,7 +998,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       created_by: currentUser.id,
     });
 
-    setDbProcesses((prev) => [createdProcess as DbProcess, ...prev]);
+    setDbProcesses((prev) => [normalizeProcessOptionalFields(createdProcess as DbProcess), ...prev]);
     setProcessActionFeedback({ type: 'success', message: 'Processo criado com sucesso e adicionado à lista.' });
     setCreatingProcess(false);
     setShowCreateProcessModal(false);
