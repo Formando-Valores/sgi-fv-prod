@@ -143,13 +143,13 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
   const [dashboardProcessFilter, setDashboardProcessFilter] = React.useState<'todos' | 'andamento' | 'concluidos'>('todos');
   const [dashboardProcessSearch, setDashboardProcessSearch] = React.useState('');
   const [selectedDashboardProcessId, setSelectedDashboardProcessId] = React.useState<string | null>(null);
-  const [dashboardRefreshTrigger, setDashboardRefreshTrigger] = React.useState(0);
   const [dashboardProcessesLoading, setDashboardProcessesLoading] = React.useState(false);
   const [processComments, setProcessComments] = React.useState<Array<{ id: string; text: string; createdAt: string }>>([]);
   const [newComment, setNewComment] = React.useState('');
   const [processFiles, setProcessFiles] = React.useState<Array<{ id: string; name: string; sizeLabel: string; uploadedAt: string }>>([]);
   const [financeEntries, setFinanceEntries] = React.useState<Array<{ id: string; serviceName: string; totalLabel: string; paidAt: string }>>([]);
   const [resolvedOrganizationId, setResolvedOrganizationId] = React.useState<string | null>(currentUser.organizationId ?? null);
+  const dashboardProcessesRef = React.useRef<DashboardProcessRow[]>([]);
 
   const steps = [
     { label: ProcessStatus.PENDENTE, color: 'bg-slate-500' },
@@ -175,6 +175,27 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
   const displaySectorName = processStatus === ProcessStatus.PENDENTE ? 'Atendimento ao Associado' : 'Setor Jurídico Conveniado à AI';
   const selectedAreaTeamLabel = selectedArea ? AREA_TEAM_LABEL_MAP[selectedArea] : 'Setor responsável';
   const activeOrganizationId = currentUser.organizationId ?? resolvedOrganizationId;
+  const mergeDashboardRows = React.useCallback((remoteRows: DashboardProcessRow[], fallbackRows: DashboardProcessRow[]) => {
+    const rowsById = new Map<string, DashboardProcessRow>();
+
+    fallbackRows.forEach((row) => {
+      if (row?.id) {
+        rowsById.set(row.id, row);
+      }
+    });
+
+    remoteRows.forEach((row) => {
+      if (row?.id) {
+        rowsById.set(row.id, row);
+      }
+    });
+
+    return Array.from(rowsById.values()).sort((left, right) => {
+      const leftDate = new Date(left.updated_at || left.created_at || 0).getTime();
+      const rightDate = new Date(right.updated_at || right.created_at || 0).getTime();
+      return rightDate - leftDate;
+    });
+  }, []);
   const filteredDashboardProcesses = dashboardProcesses.filter((processRow) => {
     const normalizedStatus = (processRow.status || '').toLowerCase();
     const isConcluded = normalizedStatus === 'concluido';
@@ -240,27 +261,29 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
     void resolveOrganization();
   }, [currentUser.email, currentUser.id, currentUser.organizationId]);
 
-  React.useEffect(() => {
-    const loadDashboardProcesses = async () => {
-      if (!activeOrganizationId) return;
-      setDashboardProcessesLoading(true);
-      const localStorageKey = `sgi_dashboard_processes_${currentUser.id}`;
-      const cachedRows = (() => {
-        try {
-          const fallbackRaw = localStorage.getItem(localStorageKey);
-          return fallbackRaw ? JSON.parse(fallbackRaw) as DashboardProcessRow[] : [];
-        } catch {
-          return [] as DashboardProcessRow[];
-        }
-      })();
+  const loadDashboardProcesses = React.useCallback(async (expectedProcessId?: string) => {
+    if (!activeOrganizationId) return;
+    setDashboardProcessesLoading(true);
 
-      if (cachedRows.length > 0) {
-        setDashboardProcesses(cachedRows);
-        if (!selectedDashboardProcessId) {
-          setSelectedDashboardProcessId(cachedRows[0].id);
-        }
+    const localStorageKey = `sgi_dashboard_processes_${currentUser.id}`;
+    const cachedRows = (() => {
+      try {
+        const fallbackRaw = localStorage.getItem(localStorageKey);
+        return fallbackRaw ? JSON.parse(fallbackRaw) as DashboardProcessRow[] : [];
+      } catch {
+        return [] as DashboardProcessRow[];
       }
+    })();
 
+    const fallbackRows = mergeDashboardRows(dashboardProcessesRef.current, cachedRows);
+    if (fallbackRows.length > 0) {
+      setDashboardProcesses(fallbackRows);
+      setSelectedDashboardProcessId((currentSelectedId) => currentSelectedId || fallbackRows[0]?.id || null);
+    }
+
+    const maxAttempts = expectedProcessId ? 4 : 1;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       const remoteQuery = supabase
         .from('processes')
         .select('id,titulo,protocolo,status,created_at,updated_at,unidade_atendimento,cliente_nome,cliente_contato,responsavel_user_id,cliente_user_id,data_conclusao')
@@ -271,6 +294,10 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
       if (isClient) {
         const normalizedUserId = currentUser.id?.trim() || '';
         if (UUID_PATTERN.test(normalizedUserId)) {
+          console.log('[dashboard] Aplicando filtro por cliente_user_id', {
+            orgId: activeOrganizationId,
+            clienteUserId: normalizedUserId,
+          });
           remoteQuery.eq('cliente_user_id', normalizedUserId);
         } else {
           const fallbackFilters: string[] = [];
@@ -285,7 +312,8 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
             remoteQuery.or(fallbackFilters.join(','));
           } else {
             // Evita expor processos da organização inteira quando o usuário cliente não tem identificadores válidos.
-            setDashboardProcesses(cachedRows);
+            console.warn('[dashboard] Sem identificadores válidos de cliente; mantendo processos em cache.');
+            setDashboardProcesses(fallbackRows);
             setDashboardProcessesLoading(false);
             return;
           }
@@ -295,28 +323,49 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
       const { data, error } = await remoteQuery;
       if (error) {
         console.error('Erro ao carregar processos do dashboard:', error);
-        setDashboardProcesses(cachedRows);
+        setDashboardProcesses(fallbackRows);
         setDashboardProcessesLoading(false);
         return;
       }
 
       const rows = (data || []) as DashboardProcessRow[];
+      const rowsToUse = mergeDashboardRows(rows, fallbackRows);
+      const expectedProcessFound = expectedProcessId
+        ? rowsToUse.some((row) => row.id === expectedProcessId)
+        : true;
 
-      const rowsToUse = rows.length > 0 ? rows : cachedRows;
+      console.log('[dashboard] tentativa de recarga', {
+        attempt,
+        maxAttempts,
+        expectedProcessId,
+        remoteRows: rows.length,
+        mergedRows: rowsToUse.length,
+        expectedProcessFound,
+      });
+
       setDashboardProcesses(rowsToUse);
       if (rows.length > 0) {
         localStorage.setItem(localStorageKey, JSON.stringify(rows));
       }
-      if (!selectedDashboardProcessId && rowsToUse.length > 0) {
-        setSelectedDashboardProcessId(rowsToUse[0].id);
-      }
-      setDashboardProcessesLoading(false);
-    };
+      setSelectedDashboardProcessId((currentSelectedId) => currentSelectedId || rowsToUse[0]?.id || null);
 
-    void loadDashboardProcesses();
-  }, [activeOrganizationId, currentUser.email, currentUser.id, currentUser.name, currentUser.role, dashboardRefreshTrigger]);
+      if (expectedProcessFound || attempt === maxAttempts) {
+        setDashboardProcessesLoading(false);
+        return;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 600));
+    }
+
+    setDashboardProcessesLoading(false);
+  }, [activeOrganizationId, currentUser.email, currentUser.id, currentUser.name, currentUser.phone, currentUser.role, mergeDashboardRows]);
 
   React.useEffect(() => {
+    void loadDashboardProcesses();
+  }, [loadDashboardProcesses]);
+
+  React.useEffect(() => {
+    dashboardProcessesRef.current = dashboardProcesses;
     if (!currentUser.id) return;
     localStorage.setItem(`sgi_dashboard_processes_${currentUser.id}`, JSON.stringify(dashboardProcesses));
   }, [currentUser.id, dashboardProcesses]);
@@ -767,31 +816,36 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
       );
 
       if (!functionError && functionResult?.success && functionResult?.processId) {
+        console.log('[dashboard] Processo criado pela Edge Function', functionResult);
         createdProcess = { id: functionResult.processId as string };
       } else {
+        console.error('[dashboard] Falha da Edge Function na criação do processo', { functionError, functionResult });
         throw functionError || new Error(functionResult?.error || 'Falha ao criar processo');
       }
 
+      const optimisticProcessRow: DashboardProcessRow = {
+        id: createdProcess.id,
+        titulo: selectedService.name,
+        protocolo: createdProcess.id,
+        status: 'triagem',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        unidade_atendimento: selectedService.area,
+        cliente_nome: currentUser.name,
+        cliente_contato: currentUser.email || currentUser.phone || null,
+        responsavel_user_id: currentUser.id || null,
+        cliente_user_id: currentUser.id || null,
+        data_conclusao: null,
+      };
+
       setCreatedProcessId(createdProcess.id);
       setSelectedDashboardProcessId(createdProcess.id);
-      setDashboardProcesses((previous) => [
-        {
-          id: createdProcess.id,
-          titulo: selectedService.name,
-          protocolo: createdProcess.id,
-          status: 'triagem',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          unidade_atendimento: selectedService.area,
-          cliente_nome: currentUser.name,
-          cliente_contato: currentUser.email || currentUser.phone || null,
-          responsavel_user_id: currentUser.id || null,
-          cliente_user_id: currentUser.id || null,
-          data_conclusao: null,
-        },
-        ...previous.filter((row) => row.id !== createdProcess.id),
-      ]);
-      setDashboardRefreshTrigger((previous) => previous + 1);
+      setDashboardProcesses((previous) => {
+        const nextRows = mergeDashboardRows([optimisticProcessRow], previous);
+        dashboardProcessesRef.current = nextRows;
+        return nextRows;
+      });
+      await loadDashboardProcesses(createdProcess.id);
 
       const now = new Date().toLocaleString('pt-BR');
       setServiceProcess({
