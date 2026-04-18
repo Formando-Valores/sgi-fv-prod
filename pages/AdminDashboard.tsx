@@ -1029,12 +1029,30 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       [ProcessStatus.CONCLUIDO]: 'concluido',
     };
 
+    const statusLabelMap: Record<'cadastro' | 'triagem' | 'analise' | 'concluido', string> = {
+      cadastro: 'cadastro',
+      triagem: 'triagem',
+      analise: 'análise',
+      concluido: 'concluído',
+    };
+
+    const previousStatus = statusMap[(currentEditingUser as AdminProcessRow | null)?.status || ProcessStatus.PENDENTE];
+    const previousDeadline = sanitizeDisplayValue((currentEditingUser as AdminProcessRow | null)?.deadline);
+    const previousServiceManager = sanitizeDisplayValue((currentEditingUser as AdminProcessRow | null)?.serviceManager);
+    const previousNotes = sanitizeDisplayValue((currentEditingUser as AdminProcessRow | null)?.notes);
+
     setEditingProfileSaving(true);
     setEditingProfileError('');
 
     const normalizedDeadline = sanitizeDisplayValue(deadline);
     const normalizedNotes = sanitizeDisplayValue(notes);
     const normalizedServiceManager = sanitizeDisplayValue(serviceManager);
+    const nextStatus = statusMap[status];
+
+    const statusChanged = previousStatus !== nextStatus;
+    const deadlineChanged = previousDeadline !== normalizedDeadline;
+    const serviceManagerChanged = previousServiceManager !== normalizedServiceManager;
+    const notesChanged = previousNotes !== normalizedNotes;
 
     if (normalizedDeadline && !/^\d{4}-\d{2}-\d{2}$/.test(normalizedDeadline)) {
       setEditingProfileError('Data de prazo inválida. Use o calendário para selecionar uma data válida.');
@@ -1045,7 +1063,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     let processUpdateError = '';
     if (processRecordId) {
       const processUpdatePayload = {
-        status: statusMap[status],
+        status: nextStatus,
         data_prazo: normalizedDeadline || null,
         gestor_servico: normalizedServiceManager || null,
         observacoes: normalizedNotes || null,
@@ -1084,30 +1102,45 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       });
 
       const processEventsPayload: Array<Record<string, unknown>> = [];
+      const processOrgId = (currentEditingUser as AdminProcessRow | null)?.organizationId || currentUser.organizationId || null;
 
-      if (normalizedServiceManager) {
+      if (statusChanged) {
         processEventsPayload.push({
-          org_id: (currentEditingUser as AdminProcessRow | null)?.organizationId || currentUser.organizationId || null,
+          org_id: processOrgId,
+          process_id: processRecordId,
+          tipo: 'status_change',
+          mensagem: `Status alterado de "${statusLabelMap[previousStatus]}" para "${statusLabelMap[nextStatus]}".`,
+          created_by: currentUser.id,
+        });
+      }
+
+      if (serviceManagerChanged) {
+        const previousManagerLabel = previousServiceManager || 'Não definido';
+        const nextManagerLabel = normalizedServiceManager || 'Não definido';
+        processEventsPayload.push({
+          org_id: processOrgId,
           process_id: processRecordId,
           tipo: 'atribuicao',
-          mensagem: `Gestor do serviço definido para: ${normalizedServiceManager}.`,
+          mensagem: `Responsável do serviço alterado de ${previousManagerLabel} para ${nextManagerLabel}.`,
           created_by: currentUser.id,
         });
       }
 
-      if (normalizedDeadline) {
+      if (deadlineChanged) {
+        const previousDeadlineLabel = previousDeadline ? formatDeadlineForDisplay(previousDeadline) : 'Não definido';
+        const nextDeadlineLabel = normalizedDeadline ? formatDeadlineForDisplay(normalizedDeadline) : 'Não definido';
         processEventsPayload.push({
-          org_id: (currentEditingUser as AdminProcessRow | null)?.organizationId || currentUser.organizationId || null,
+          org_id: processOrgId,
           process_id: processRecordId,
           tipo: 'observacao',
-          mensagem: `Prazo atualizado para: ${formatDeadlineForDisplay(normalizedDeadline)}.`,
+          mensagem: `Prazo atualizado de ${previousDeadlineLabel} para ${nextDeadlineLabel}.`,
           created_by: currentUser.id,
         });
       }
 
-      if (normalizedNotes) {
+      if (notesChanged && normalizedNotes) {
         processEventsPayload.push({
-          org_id: (currentEditingUser as AdminProcessRow | null)?.organizationId || currentUser.organizationId || null,
+          org_id: processOrgId,
           process_id: processRecordId,
           tipo: 'observacao',
           mensagem: `Observação registrada: ${normalizedNotes}.`,

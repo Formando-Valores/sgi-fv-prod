@@ -97,12 +97,57 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3
 const isValidUuid = (value?: string | null): value is string => Boolean(value && UUID_PATTERN.test(value));
 const PROCESS_STEP_NAMES = ['Atendimento iniciado', 'Coleta de informações', 'Análise', 'Execução', 'Finalização'];
 const ASSOCIATIVE_FEE_EUR = 50;
+const normalizeStatusKey = (status?: string | null) =>
+  (status || '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .trim()
+    .toLowerCase();
+
 const PROCESS_STATUS_LABEL_MAP: Record<string, ServiceProcessView['statusLabel']> = {
   pendente: 'aguardando atendimento',
+  cadastro: 'aguardando atendimento',
   triagem: 'em atendimento',
   analise: 'em análise',
   concluido: 'finalizado',
 };
+
+const PROCESS_STATUS_DISPLAY_LABEL_MAP: Record<string, string> = {
+  cadastro: 'Cadastro',
+  triagem: 'Triagem',
+  analise: 'Em análise',
+  concluido: 'Concluído',
+};
+
+const getProcessStatusDisplayLabel = (status?: string | null) => {
+  const normalized = normalizeStatusKey(status);
+  if (!normalized) return '-';
+  return PROCESS_STATUS_DISPLAY_LABEL_MAP[normalized] || status || '-';
+};
+
+const formatProcessTimelineMessage = (event: { tipo?: string | null; mensagem?: string | null }) => {
+  const message = (event.mensagem || '').trim();
+  if (!message) return 'Atualização registrada';
+
+  const tipo = normalizeStatusKey(event.tipo);
+  if (tipo === 'status_change') {
+    if (/status alterado/i.test(message)) return message;
+    return `Status atualizado: ${message}`;
+  }
+
+  if (tipo === 'atribuicao') {
+    if (/gestor do serviço definido/i.test(message)) return message.replace('Gestor do serviço', 'Responsável do serviço');
+    return message;
+  }
+
+  if (tipo === 'observacao') {
+    if (/^Observação registrada:/i.test(message)) return message;
+    return message;
+  }
+
+  return message;
+};
+
 const AREA_TEAM_LABEL_MAP: Record<ServiceArea, string> = {
   administrativo: 'Setor Administrativo',
   juridico: 'Setor Jurídico Conveniado à AI',
@@ -116,9 +161,9 @@ const parsePriceLabel = (priceLabel: string): number | null => {
   return Number.isFinite(numericValue) ? numericValue : null;
 };
 const mapDbStatusToProcessStatus = (status?: string | null): ProcessStatus => {
-  const normalized = (status || '').toLowerCase();
+  const normalized = normalizeStatusKey(status);
   if (normalized === 'triagem') return ProcessStatus.TRIAGEM;
-  if (normalized === 'analise' || normalized === 'análise') return ProcessStatus.ANALISE;
+  if (normalized === 'analise') return ProcessStatus.ANALISE;
   if (normalized === 'concluido') return ProcessStatus.CONCLUIDO;
   return ProcessStatus.PENDENTE;
 };
@@ -141,7 +186,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
   const [isLoadingProfessionals, setIsLoadingProfessionals] = React.useState(false);
   const [professionalsError, setProfessionalsError] = React.useState<string | null>(null);
   const [dashboardProcesses, setDashboardProcesses] = React.useState<DashboardProcessRow[]>([]);
-  const [dashboardProcessFilter, setDashboardProcessFilter] = React.useState<'todos' | 'andamento' | 'concluidos'>('todos');
+  const [dashboardProcessFilter, setDashboardProcessFilter] = React.useState<'todos' | 'andamento' | 'analise' | 'concluidos'>('todos');
   const [dashboardProcessSearch, setDashboardProcessSearch] = React.useState('');
   const [selectedDashboardProcessId, setSelectedDashboardProcessId] = React.useState<string | null>(null);
   const [dashboardProcessesLoading, setDashboardProcessesLoading] = React.useState(false);
@@ -198,10 +243,13 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
     });
   }, []);
   const filteredDashboardProcesses = dashboardProcesses.filter((processRow) => {
-    const normalizedStatus = (processRow.status || '').toLowerCase();
+    const normalizedStatus = normalizeStatusKey(processRow.status);
     const isConcluded = normalizedStatus === 'concluido';
+    const isInAnalysis = normalizedStatus === 'analise';
+
     if (dashboardProcessFilter === 'andamento' && isConcluded) return false;
     if (dashboardProcessFilter === 'concluidos' && !isConcluded) return false;
+    if (dashboardProcessFilter === 'analise' && !isInAnalysis) return false;
 
     if (!dashboardProcessSearch.trim()) return true;
     const target = `${processRow.id} ${processRow.protocolo || ''} ${processRow.titulo || ''} ${processRow.unidade_atendimento || ''} ${processRow.status || ''} ${processRow.cliente_nome || ''}`.toLowerCase();
@@ -462,18 +510,25 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
     const loadSelectedProcessDetails = async () => {
       const { data: processEvents, error: processEventsError } = await supabase
         .from('process_events')
-        .select('mensagem,created_at')
+        .select('tipo,mensagem,created_at,created_by')
         .eq('process_id', selectedRow.id)
-        .order('created_at', { ascending: true });
+        .order('created_at', { ascending: false });
       if (processEventsError) {
         console.error('Erro ao carregar eventos do processo selecionado:', processEventsError);
       }
 
-      const eventList = (processEvents || []) as Array<{ mensagem?: string | null; created_at?: string | null }>;
-      const timeline = eventList.map((event) => ({
-        date: event.created_at ? new Date(event.created_at).toLocaleString('pt-BR') : '-',
-        message: event.mensagem || 'Atualização registrada',
-      }));
+      const eventList = (processEvents || []) as Array<{ tipo?: string | null; mensagem?: string | null; created_at?: string | null; created_by?: string | null }>;
+      const timeline = eventList
+        .slice()
+        .sort((left, right) => {
+          const leftTime = new Date(left.created_at || 0).getTime();
+          const rightTime = new Date(right.created_at || 0).getTime();
+          return rightTime - leftTime;
+        })
+        .map((event) => ({
+          date: event.created_at ? new Date(event.created_at).toLocaleString('pt-BR') : '-',
+          message: formatProcessTimelineMessage(event),
+        }));
 
       const createdAtLabel = selectedRow.created_at ? new Date(selectedRow.created_at).toLocaleString('pt-BR') : new Date().toLocaleString('pt-BR');
       const title = selectedRow.titulo || 'Solicitação de atendimento';
@@ -489,11 +544,11 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
         serviceName,
         scheduledSlot,
         assignedProfessional,
-        statusLabel: PROCESS_STATUS_LABEL_MAP[(selectedRow.status || '').toLowerCase()] || 'aguardando atendimento',
+        statusLabel: PROCESS_STATUS_LABEL_MAP[normalizeStatusKey(selectedRow.status)] || 'aguardando atendimento',
         createdAt: createdAtLabel,
         steps: PROCESS_STEP_NAMES.map((stepName, index) => ({
           name: stepName,
-          status: (selectedRow.status || '').toLowerCase() === 'concluido'
+          status: normalizeStatusKey(selectedRow.status) === 'concluido'
             ? 'concluido'
             : index === 0 ? 'em_andamento' : 'pendente',
           responsible: assignedProfessional,
@@ -1021,13 +1076,14 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
         <div className="mt-3 flex flex-wrap gap-2">
           {[
             { id: 'andamento', label: 'Em andamento' },
+            { id: 'analise', label: 'Em análise' },
             { id: 'concluidos', label: 'Concluídos' },
             { id: 'todos', label: 'Todos' },
           ].map((tab) => (
             <button
               key={tab.id}
               type="button"
-              onClick={() => setDashboardProcessFilter(tab.id as 'todos' | 'andamento' | 'concluidos')}
+              onClick={() => setDashboardProcessFilter(tab.id as 'todos' | 'andamento' | 'analise' | 'concluidos')}
               className={`rounded-lg px-3 py-2 text-xs font-black uppercase ${dashboardProcessFilter === tab.id ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}
             >
               {tab.label}
@@ -1051,8 +1107,16 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
           <div className="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-2">
             {filteredDashboardProcesses.map((processRow) => {
               const isSelected = selectedDashboardProcessId === processRow.id || (!selectedDashboardProcessId && filteredDashboardProcesses.length === 1);
-              const statusNormalized = (processRow.status || '').toLowerCase();
-              const situation = statusNormalized === 'concluido' ? 'Concluído' : 'Em andamento';
+              const statusLabel = getProcessStatusDisplayLabel(processRow.status);
+              const statusKey = normalizeStatusKey(processRow.status);
+              const statusBadgeClass = statusKey === 'concluido'
+                ? 'bg-emerald-100 text-emerald-700'
+                : statusKey === 'analise'
+                  ? 'bg-amber-100 text-amber-700'
+                  : statusKey === 'triagem'
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'bg-slate-100 text-slate-700';
+
               return (
                 <button
                   key={processRow.id}
@@ -1064,9 +1128,9 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
                   <p className="text-sm font-bold text-gray-800">OS: {processRow.protocolo || processRow.id}</p>
                   <p className="text-xs text-gray-600">Área: {processRow.unidade_atendimento || '-'}</p>
                   <p className="text-xs text-gray-600">Serviço: {processRow.titulo || '-'}</p>
-                  <p className="text-xs text-gray-600">Status: {processRow.status || '-'}</p>
+                  <p className="text-xs text-gray-600">Status: <span className={`inline-flex items-center rounded-full px-2 py-0.5 font-bold ${statusBadgeClass}`}>{statusLabel}</span></p>
                   <p className="text-xs text-gray-600">Abertura: {processRow.created_at ? new Date(processRow.created_at).toLocaleString('pt-BR') : '-'}</p>
-                  <p className="text-xs text-gray-700 font-bold">Situação: {situation}</p>
+                  <p className="text-xs text-gray-700 font-bold">Situação: {statusLabel}</p>
                 </button>
               );
             })}
