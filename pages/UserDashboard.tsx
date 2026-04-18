@@ -267,24 +267,29 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
         .eq('org_id', activeOrganizationId)
         .order('created_at', { ascending: false });
 
-      const clientFilters: string[] = [];
       const isClient = currentUser.role !== UserRole.ADMIN;
       if (isClient) {
-        if (currentUser.id) {
-          clientFilters.push(`cliente_user_id.eq.${currentUser.id}`);
-          clientFilters.push(`responsavel_user_id.eq.${currentUser.id}`);
+        const normalizedUserId = currentUser.id?.trim() || '';
+        if (UUID_PATTERN.test(normalizedUserId)) {
+          remoteQuery.eq('cliente_user_id', normalizedUserId);
+        } else {
+          const fallbackFilters: string[] = [];
+          const email = currentUser.email?.trim().toLowerCase();
+          const phone = currentUser.phone?.trim();
+          const name = currentUser.name?.trim();
+          if (email) fallbackFilters.push(`cliente_contato.eq.${email}`);
+          if (phone) fallbackFilters.push(`cliente_contato.eq.${phone}`);
+          if (name) fallbackFilters.push(`cliente_nome.eq.${name}`);
+
+          if (fallbackFilters.length > 0) {
+            remoteQuery.or(fallbackFilters.join(','));
+          } else {
+            // Evita expor processos da organização inteira quando o usuário cliente não tem identificadores válidos.
+            setDashboardProcesses(cachedRows);
+            setDashboardProcessesLoading(false);
+            return;
+          }
         }
-
-        const email = currentUser.email?.trim().toLowerCase();
-        const phone = currentUser.phone?.trim();
-        const name = currentUser.name?.trim();
-        if (email) clientFilters.push(`cliente_contato.eq.${email}`);
-        if (phone) clientFilters.push(`cliente_contato.eq.${phone}`);
-        if (name) clientFilters.push(`cliente_nome.eq.${name}`);
-      }
-
-      if (clientFilters.length > 0) {
-        remoteQuery.or(clientFilters.join(','));
       }
 
       const { data, error } = await remoteQuery;
@@ -295,50 +300,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
         return;
       }
 
-      let rows = (data || []) as DashboardProcessRow[];
-
-      if (isClient && currentUser.id) {
-        const { data: eventRows, error: eventError } = await supabase
-          .from('process_events')
-          .select('process_id')
-          .eq('org_id', activeOrganizationId)
-          .eq('created_by', currentUser.id)
-          .not('process_id', 'is', null);
-
-        if (eventError) {
-          console.error('Erro ao carregar vínculo de processos do cliente:', eventError);
-        } else {
-          const processIds = Array.from(
-            new Set(
-              ((eventRows || []) as Array<{ process_id?: string | null }>)
-                .map((row) => row.process_id)
-                .filter((value): value is string => Boolean(value)),
-            ),
-          );
-
-          if (processIds.length > 0) {
-            const { data: ownedRows, error: ownedError } = await supabase
-              .from('processes')
-              .select('id,titulo,protocolo,status,created_at,updated_at,unidade_atendimento,cliente_nome,cliente_contato,responsavel_user_id,cliente_user_id,data_conclusao')
-              .eq('org_id', activeOrganizationId)
-              .in('id', processIds)
-              .order('created_at', { ascending: false });
-
-            if (ownedError) {
-              console.error('Erro ao carregar processos vinculados por histórico:', ownedError);
-            } else {
-              const mergeMap = new Map<string, DashboardProcessRow>();
-              rows.forEach((row) => mergeMap.set(row.id, row));
-              ((ownedRows || []) as DashboardProcessRow[]).forEach((row) => mergeMap.set(row.id, row));
-              rows = Array.from(mergeMap.values()).sort((a, b) => {
-                const aTime = new Date(a.created_at || 0).getTime();
-                const bTime = new Date(b.created_at || 0).getTime();
-                return bTime - aTime;
-              });
-            }
-          }
-        }
-      }
+      const rows = (data || []) as DashboardProcessRow[];
 
       const rowsToUse = rows.length > 0 ? rows : cachedRows;
       setDashboardProcesses(rowsToUse);
@@ -426,11 +388,18 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
       try {
         let professionalsBase: AvailableProfessional[] = [];
 
-        const { data: contextAdmins, error: contextAdminsError } = await supabase
+        const contextAdminQuery = supabase
           .from('v_user_context')
           .select('user_id,email,nome_completo,org_id,org_role,org_slug,org_name')
-          .eq('org_slug', 'default')
           .in('org_role', ['admin', 'owner']);
+
+        if (activeOrganizationId) {
+          contextAdminQuery.eq('org_id', activeOrganizationId);
+        } else {
+          contextAdminQuery.eq('org_slug', 'default');
+        }
+
+        const { data: contextAdmins, error: contextAdminsError } = await contextAdminQuery;
 
         if (!contextAdminsError && (contextAdmins || []).length > 0) {
           professionalsBase = ((contextAdmins || []) as Array<{
@@ -462,7 +431,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
         }
 
         let memberRows: Array<{ user_id: string; role: string }> = [];
-        const profileMap = new Map<string, { id: string; nome_completo?: string | null; nome?: string | null; name?: string | null; email?: string | null; role?: string | null }>();
+        const profileMap = new Map<string, { id: string; nome_completo?: string | null; nome?: string | null; name?: string | null; email?: string | null }>();
 
         if (activeOrganizationId) {
           const { data: members, error: membersError } = await supabase
@@ -480,28 +449,40 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
           if (userIds.length > 0) {
             const { data: profilesByMembers, error: profilesByMembersError } = await supabase
               .from('profiles')
-              .select('id,nome_completo,nome,name,email,role')
+              .select('id,nome_completo,nome,name,email')
               .in('id', userIds);
 
             if (profilesByMembersError) {
               throw profilesByMembersError;
             }
 
-            ((profilesByMembers || []) as Array<{ id: string; nome_completo?: string | null; nome?: string | null; name?: string | null; email?: string | null; role?: string | null }>)
+            ((profilesByMembers || []) as Array<{ id: string; nome_completo?: string | null; nome?: string | null; name?: string | null; email?: string | null }>)
               .forEach((profile) => profileMap.set(profile.id, profile));
           }
 
-          const { data: fallbackProfiles, error: fallbackProfilesError } = await supabase
-            .from('profiles')
-            .select('id,nome_completo,nome,name,email,role')
+          const { data: contextByOrg, error: contextByOrgError } = await supabase
+            .from('v_user_context')
+            .select('user_id,email,nome_completo,org_role')
             .eq('org_id', activeOrganizationId)
-            .or('role.eq.admin,role.eq.owner,role.eq.ADMIN,role.eq.OWNER,role.eq.Administrador,role.eq.administrador');
+            .in('org_role', ['owner', 'admin']);
 
-          if (!fallbackProfilesError) {
-            ((fallbackProfiles || []) as Array<{ id: string; nome_completo?: string | null; nome?: string | null; name?: string | null; email?: string | null; role?: string | null }>)
-              .forEach((profile) => {
-                if (!profileMap.has(profile.id)) {
-                  profileMap.set(profile.id, profile);
+          if (!contextByOrgError) {
+            ((contextByOrg || []) as Array<{ user_id?: string | null; email?: string | null; nome_completo?: string | null; org_role?: string | null }>)
+              .forEach((row) => {
+                if (!row.user_id) return;
+                if (!profileMap.has(row.user_id)) {
+                  profileMap.set(row.user_id, {
+                    id: row.user_id,
+                    nome_completo: row.nome_completo,
+                    email: row.email,
+                  });
+                }
+
+                if (!memberRows.some((member) => member.user_id === row.user_id)) {
+                  memberRows.push({
+                    user_id: row.user_id,
+                    role: (row.org_role || '').toLowerCase() === 'owner' ? 'owner' : 'admin',
+                  });
                 }
               });
           }
@@ -526,26 +507,8 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
           } as AvailableProfessional;
         });
 
-        const fromProfiles = Array.from(profileMap.values()).map((profile) => {
-          const roleNormalized = (profile.role || '').toLowerCase();
-          return {
-            id: profile.id,
-            professional: profile.nome_completo || profile.nome || profile.name || profile.email || 'Profissional',
-            roleLabel: roleNormalized === 'owner' ? 'Proprietário' : 'Administrador',
-            email: profile.email || null,
-            availableSlots: [],
-            isAvailableNow: false,
-            nextAvailableSlot: null,
-            statusLabel: 'Indisponível',
-            activeServiceCount: 0,
-            scheduledTodayCount: 0,
-            totalOpenDemands: 0,
-            loadScore: 0,
-          } as AvailableProfessional;
-        });
-
         const uniqueById = new Map<string, AvailableProfessional>();
-        [...fromMembers, ...fromProfiles].forEach((professional) => {
+        fromMembers.forEach((professional) => {
           uniqueById.set(professional.id, professional);
         });
 
@@ -602,7 +565,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
         const professionalIds = professionalsBase.map((professional) => professional.id).filter((id) => UUID_PATTERN.test(id));
         let processRows: Array<{ responsavel_user_id: string | null; status: string | null; created_at: string | null }> = [];
 
-        if (professionalIds.length > 0) {
+        if (professionalIds.length > 0 && activeOrganizationId) {
           const { data: processData } = await supabase
             .from('processes')
             .select('responsavel_user_id,status,created_at')
@@ -744,11 +707,16 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
     }
   }, [selectedSlot, selectedSlotData]);
 
-  const logTimelineEvent = async (message: string) => {
+  const logTimelineEvent = async (message: string, processIdOverride?: string | null) => {
+    const processId = processIdOverride ?? createdProcessId;
+    if (!processId || !activeOrganizationId || !currentUser.id) {
+      return;
+    }
+
     try {
       await supabase.from('process_events').insert({
-        process_id: null,
-        org_id: activeOrganizationId ?? null,
+        process_id: processId,
+        org_id: activeOrganizationId,
         created_by: currentUser.id,
         tipo: 'registro',
         mensagem: message,
@@ -825,21 +793,6 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
       ]);
       setDashboardRefreshTrigger((previous) => previous + 1);
 
-      await supabase.from('process_events').insert({
-        org_id: activeOrganizationId,
-        process_id: createdProcess.id,
-        tipo: 'registro',
-        mensagem: `Processo criado a partir do onboarding. Profissional indicado: ${selectedSlotData.professional}. Horário previsto: ${selectedAdminScheduleSlot || 'a confirmar'}. Serviço: ${selectedService.name}.`,
-        created_by: currentUser.id,
-      });
-      await supabase.from('process_events').insert({
-        org_id: activeOrganizationId,
-        process_id: createdProcess.id,
-        tipo: 'atribuicao',
-        mensagem: `Atendimento atribuído para ${selectedSlotData.professional}. Outros administradores da organização podem assumir se necessário.`,
-        created_by: currentUser.id,
-      });
-
       const now = new Date().toLocaleString('pt-BR');
       setServiceProcess({
         id: createdProcess.id,
@@ -875,7 +828,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
       if (processStatus === ProcessStatus.PENDENTE) {
         setProcessStatus(ProcessStatus.TRIAGEM);
       }
-      await logTimelineEvent(`Etapa inicial finalizada após pagamento confirmado. Processo ${createdProcess.id} gerado e encaminhado para o setor responsável.`);
+      await logTimelineEvent(`Etapa inicial finalizada após pagamento confirmado. Processo ${createdProcess.id} gerado e encaminhado para o setor responsável.`, createdProcess.id);
     } catch {
       setProcessCreationError('Falha ao gerar processo para o setor responsável. Tente novamente.');
     } finally {

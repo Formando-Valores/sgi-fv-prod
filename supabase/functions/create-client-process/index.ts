@@ -58,7 +58,12 @@ Deno.serve(async (request) => {
   const clientUserId = payload.clientUserId ? String(payload.clientUserId).trim() : null;
   const organizationName = payload.organizationName ? String(payload.organizationName).trim() : null;
 
-  const normalizedClientUserId = clientUserId && UUID_PATTERN.test(clientUserId) ? clientUserId : null;
+  const normalizedRequesterUserId = requesterUserId && UUID_PATTERN.test(requesterUserId)
+    ? requesterUserId
+    : null;
+  const normalizedClientUserId = clientUserId && UUID_PATTERN.test(clientUserId)
+    ? clientUserId
+    : normalizedRequesterUserId;
 
   if (!requesterUserId && normalizedClientUserId) {
     requesterUserId = normalizedClientUserId;
