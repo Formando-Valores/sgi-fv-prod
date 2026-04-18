@@ -94,6 +94,7 @@ const SERVICE_CATALOG: GuidedService[] = [
 
 const AUTO_ASSIGNMENT_ENABLED = false;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const isValidUuid = (value?: string | null): value is string => Boolean(value && UUID_PATTERN.test(value));
 const PROCESS_STEP_NAMES = ['Atendimento iniciado', 'Coleta de informações', 'Análise', 'Execução', 'Finalização'];
 const ASSOCIATIVE_FEE_EUR = 50;
 const PROCESS_STATUS_LABEL_MAP: Record<string, ServiceProcessView['statusLabel']> = {
@@ -284,21 +285,29 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
     const maxAttempts = expectedProcessId ? 4 : 1;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      const validOrgId = isValidUuid(activeOrganizationId);
+
       const remoteQuery = supabase
         .from('processes')
-        .select('id,titulo,protocolo,status,created_at,updated_at,unidade_atendimento,cliente_nome,cliente_contato,responsavel_user_id,cliente_user_id,data_conclusao')
-        .eq('org_id', activeOrganizationId)
+        .select('id,titulo,protocolo,status,created_at,updated_at,unidade_atendimento,cliente_nome,cliente_contato,responsavel_user_id,cliente_user_id')
         .order('created_at', { ascending: false });
 
+      if (validOrgId) {
+        remoteQuery.eq('org_id', activeOrganizationId);
+      } else {
+        console.warn('[dashboard] organizationId inválido para filtro em processes, consulta seguirá com RLS:', activeOrganizationId);
+      }
+
       const isClient = currentUser.role !== UserRole.ADMIN;
+      const normalizedUserId = currentUser.id?.trim() || '';
+
       if (isClient) {
-        const normalizedUserId = currentUser.id?.trim() || '';
-        if (UUID_PATTERN.test(normalizedUserId)) {
-          console.log('[dashboard] Aplicando filtro por cliente_user_id', {
+        if (isValidUuid(normalizedUserId)) {
+          console.log('[dashboard] Aplicando filtro por cliente_user_id/responsavel_user_id', {
             orgId: activeOrganizationId,
             clienteUserId: normalizedUserId,
           });
-          remoteQuery.eq('cliente_user_id', normalizedUserId);
+          remoteQuery.or(`cliente_user_id.eq.${normalizedUserId},responsavel_user_id.eq.${normalizedUserId}`);
         } else {
           const fallbackFilters: string[] = [];
           const email = currentUser.email?.trim().toLowerCase();
@@ -320,7 +329,26 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
         }
       }
 
-      const { data, error } = await remoteQuery;
+      let { data, error } = await remoteQuery;
+
+      if (error && isClient && isValidUuid(normalizedUserId) && String(error.message || '').includes('cliente_user_id')) {
+        console.warn('[dashboard] coluna cliente_user_id indisponível neste ambiente; aplicando fallback por responsavel_user_id.', error);
+
+        const fallbackQuery = supabase
+          .from('processes')
+          .select('id,titulo,protocolo,status,created_at,updated_at,unidade_atendimento,cliente_nome,cliente_contato,responsavel_user_id')
+          .order('created_at', { ascending: false })
+          .eq('responsavel_user_id', normalizedUserId);
+
+        if (validOrgId) {
+          fallbackQuery.eq('org_id', activeOrganizationId);
+        }
+
+        const fallbackResponse = await fallbackQuery;
+        data = fallbackResponse.data;
+        error = fallbackResponse.error;
+      }
+
       if (error) {
         console.error('Erro ao carregar processos do dashboard:', error);
         setDashboardProcesses(fallbackRows);
@@ -614,7 +642,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
         const professionalIds = professionalsBase.map((professional) => professional.id).filter((id) => UUID_PATTERN.test(id));
         let processRows: Array<{ responsavel_user_id: string | null; status: string | null; created_at: string | null }> = [];
 
-        if (professionalIds.length > 0 && activeOrganizationId) {
+        if (professionalIds.length > 0 && isValidUuid(activeOrganizationId)) {
           const { data: processData } = await supabase
             .from('processes')
             .select('responsavel_user_id,status,created_at')
