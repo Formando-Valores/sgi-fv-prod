@@ -32,6 +32,26 @@ type OrgMemberRow = {
   name?: string | null;
   full_name?: string | null;
   organizations?: { name?: string } | Array<{ name?: string }> | null;
+  profiles?:
+    | {
+        id?: string | null;
+        nome_completo?: string | null;
+        nome?: string | null;
+        name?: string | null;
+        full_name?: string | null;
+        email?: string | null;
+        created_at?: string | null;
+      }
+    | Array<{
+        id?: string | null;
+        nome_completo?: string | null;
+        nome?: string | null;
+        name?: string | null;
+        full_name?: string | null;
+        email?: string | null;
+        created_at?: string | null;
+      }>
+    | null;
 };
 
 type ProfileRow = {
@@ -42,6 +62,8 @@ type ProfileRow = {
   nome_completo?: string | null;
   nome?: string | null;
   name?: string | null;
+  full_name?: string | null;
+  created_at?: string | null;
   organizations?: { name?: string } | Array<{ name?: string }> | null;
 };
 
@@ -1808,12 +1830,31 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       return (role === 'admin' || role === 'owner') && isDefaultOrganizationName(orgName);
     });
 
-    const { data: memberRows, error: membersError } = await supabase
-      .from('org_members')
-      .select('org_id,user_id,role,organizations(name)')
-      .order('created_at', { ascending: false });
+    const orgMemberSelectOptions = [
+      'org_id,user_id,role,nome_completo,nome,name,full_name,organizations(name),profiles(id,nome_completo,nome,name,full_name,email,created_at)',
+      'org_id,user_id,role,nome_completo,nome,name,full_name,organizations(name)',
+      'org_id,user_id,role,organizations(name)',
+    ];
 
-    if (membersError) {
+    let memberRows: OrgMemberRow[] | null = null;
+    let memberError: { message?: string } | null = null;
+
+    for (const selectFields of orgMemberSelectOptions) {
+      const query = await supabase
+        .from('org_members')
+        .select(selectFields)
+        .order('created_at', { ascending: false });
+
+      if (!query.error) {
+        memberRows = query.data as unknown as OrgMemberRow[] | null;
+        memberError = null;
+        break;
+      }
+
+      memberError = query.error;
+    }
+
+    if (memberError) {
       setClientsError('Não foi possível carregar os membros da tabela org_members.');
       setClientsLoading(false);
       return;
@@ -1828,38 +1869,106 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       return;
     }
 
-    const userIds = Array.from(new Set(scopedMembers.map((member) => member.user_id)));
-    const { data: profileRows, error: profileError } = await supabase
-      .from('profiles')
-      .select('id,nome_completo,nome,email,created_at')
-      .in('id', userIds);
+    const joinedProfileMap = new Map<string, ProfileRow>();
 
-    if (profileError) {
-      console.warn('[clientes] falha ao carregar perfis; exibindo listagem parcial', profileError);
-      setClientsError('Alguns dados de perfil não puderam ser carregados agora. A listagem exibida pode estar parcial.');
-    } else {
+    scopedMembers.forEach((member) => {
+      const relatedProfile = Array.isArray(member.profiles) ? member.profiles[0] : member.profiles;
+      const relatedProfileId = sanitizeDisplayValue(relatedProfile?.id || member.user_id);
+      if (!relatedProfile || !relatedProfileId) return;
+
+      joinedProfileMap.set(relatedProfileId, {
+        id: relatedProfileId,
+        nome_completo: relatedProfile.nome_completo,
+        nome: relatedProfile.nome,
+        name: relatedProfile.name,
+        full_name: relatedProfile.full_name,
+        email: relatedProfile.email,
+        created_at: relatedProfile.created_at,
+      });
+    });
+
+    const userIdsWithoutJoinProfile = Array.from(
+      new Set(
+        scopedMembers
+          .map((member) => member.user_id)
+          .filter((userId) => !joinedProfileMap.has(userId))
+      )
+    );
+
+    let profileMap = new Map<string, ProfileRow>(joinedProfileMap);
+    let hasProfileWarning = false;
+
+    if (userIdsWithoutJoinProfile.length > 0) {
+      const profileSelectOptions = [
+        'id,nome_completo,nome,name,full_name,email,created_at',
+        'id,nome_completo,nome,name,email,created_at',
+        'id,nome_completo,nome,email,created_at',
+        'id,email,created_at',
+      ];
+
+      let profileQueryError: { message?: string } | null = null;
+
+      for (const selectFields of profileSelectOptions) {
+        const profileQuery = await supabase
+          .from('profiles')
+          .select(selectFields)
+          .in('id', userIdsWithoutJoinProfile);
+
+        if (!profileQuery.error) {
+          const rows = (profileQuery.data || []) as unknown as ProfileRow[];
+          rows.forEach((row) => {
+            profileMap.set(row.id, row);
+          });
+          profileQueryError = null;
+          break;
+        }
+
+        profileQueryError = profileQuery.error;
+      }
+
+      if (profileQueryError) {
+        hasProfileWarning = true;
+        console.warn('[clientes] falha ao carregar perfis; exibindo listagem parcial', profileQueryError);
+        setClientsError('Alguns dados de perfil não puderam ser carregados agora. A listagem exibida pode estar parcial.');
+      }
+    }
+
+    if (!hasProfileWarning) {
       setClientsError('');
     }
 
-    const profileMap = new Map(((profileRows || []) as Array<{ id: string; nome_completo?: string | null; nome?: string | null; email?: string | null; created_at?: string | null }>).map((row) => [row.id, row]));
-
     const normalizedClients: ClientProfileView[] = scopedMembers.map((member) => {
       const profile = profileMap.get(member.user_id);
-      const email = profile?.email || 'sem-email@nao-informado';
-      const nome =
-        profile?.nome_completo ||
-        profile?.nome ||
-        (email !== 'sem-email@nao-informado' ? String(email).split('@')[0] : `Usuário ${member.user_id.slice(0, 8)}`);
+      const fallbackUser = users.find((user) => user.id === member.user_id);
+
+      const nameFromMemberRow =
+        sanitizeDisplayValue(member.nome_completo) ||
+        sanitizeDisplayValue(member.full_name) ||
+        sanitizeDisplayValue(member.name) ||
+        sanitizeDisplayValue(member.nome);
+
+      const resolvedEmail =
+        sanitizeDisplayValue(profile?.email) || sanitizeDisplayValue(fallbackUser?.email) || 'sem-email@nao-informado';
+
+      const resolvedName =
+        nameFromMemberRow ||
+        sanitizeDisplayValue(profile?.nome_completo) ||
+        sanitizeDisplayValue(profile?.full_name) ||
+        sanitizeDisplayValue(profile?.name) ||
+        sanitizeDisplayValue(profile?.nome) ||
+        sanitizeDisplayValue(fallbackUser?.name) ||
+        (resolvedEmail !== 'sem-email@nao-informado' ? resolvedEmail.split('@')[0] : '') ||
+        `Usuário ${member.user_id.slice(0, 8)}`;
 
       return {
         id: `${member.org_id}-${member.user_id}`,
         user_id: member.user_id,
         org_id: member.org_id,
         org_name: extractOrganizationName(member.organizations) || 'Organização Padrão',
-        nome,
-        email,
+        nome: resolvedName,
+        email: resolvedEmail,
         accessLevel: mapOrgRoleToAccessLevel(member.role),
-        source: profile ? 'org_members+profiles' : 'org_members_only',
+        source: profile || nameFromMemberRow ? 'org_members+profiles' : 'org_members_only',
         created_at: profile?.created_at || undefined,
       };
     });
