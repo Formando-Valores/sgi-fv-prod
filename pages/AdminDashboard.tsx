@@ -314,6 +314,35 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     return ProcessStatus.PENDENTE;
   };
 
+  const PROCESS_SELECT_BASE_COLUMNS = 'id,org_id,titulo,protocolo,status,cliente_nome,cliente_documento,cliente_contato,responsavel_user_id,created_at,updated_at,origem_canal,unidade_atendimento,org_nome_solicitado';
+  const PROCESS_SELECT_WITH_OPTIONAL_COLUMNS = 'id,org_id,titulo,protocolo,status,cliente_nome,cliente_documento,cliente_contato,responsavel_user_id,data_prazo,gestor_servico,observacoes,created_at,updated_at,origem_canal,unidade_atendimento,org_nome_solicitado';
+
+  const normalizeProcessOptionalFields = (process: Partial<DbProcess>): DbProcess => ({
+    ...(process as DbProcess),
+    data_prazo: process.data_prazo ?? null,
+    gestor_servico: process.gestor_servico ?? null,
+    observacoes: process.observacoes ?? null,
+  });
+
+  const hasMissingOptionalProcessColumns = (error: unknown): boolean => {
+    const supabaseError = (error || {}) as { code?: string | null; message?: string | null; details?: string | null; hint?: string | null };
+    const errorCode = sanitizeDisplayValue(supabaseError.code || '');
+    const combinedMessage = `${supabaseError.message || ''} ${supabaseError.details || ''} ${supabaseError.hint || ''}`.toLowerCase();
+
+    const mentionsOptionalColumns = ['data_prazo', 'gestor_servico', 'observacoes'].some((column) => combinedMessage.includes(column));
+    return mentionsOptionalColumns || errorCode === '42703' || errorCode === 'PGRST204';
+  };
+
+  const logProcessesQueryError = (label: string, error: unknown) => {
+    const supabaseError = (error || {}) as { code?: string | null; message?: string | null; details?: string | null; hint?: string | null };
+    console.warn(`[processos] ${label}`, {
+      code: supabaseError.code || 'sem-codigo',
+      message: supabaseError.message || 'sem-mensagem',
+      details: supabaseError.details || 'sem-detalhes',
+      hint: supabaseError.hint || 'sem-hint',
+    });
+  };
+
   const getEditingProcessRecordId = (user: AdminProcessRow | User | null) =>
     sanitizeDisplayValue((user as AdminProcessRow | null)?.processRecordId || user?.id);
 
@@ -427,11 +456,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       const isExternalRequest = source.toLowerCase() === 'wix';
       const generatedValue = unit === ServiceUnit.ADMINISTRATIVO ? 5200 : unit === ServiceUnit.TECNOLOGICO ? 8200 : 1800;
       const processOverrides = processVisualOverrides[process.id] || {};
+      const persistedDeadline = sanitizeDisplayValue(process.data_prazo);
+      const persistedServiceManager = sanitizeDisplayValue(process.gestor_servico);
+      const persistedNotes = sanitizeDisplayValue(process.observacoes);
       const manualDeadline = sanitizeDisplayValue(processOverrides.deadline);
       const manualServiceManager = sanitizeDisplayValue(processOverrides.serviceManager);
       const manualNotes = sanitizeDisplayValue(processOverrides.notes);
+      const resolvedDeadline = persistedDeadline || manualDeadline;
+      const resolvedServiceManager = persistedServiceManager || manualServiceManager;
+      const resolvedNotes = persistedNotes || manualNotes;
       const resolvedDeadlineDisplay =
-        formatDeadlineForDisplay(manualDeadline) || (isExternalRequest ? 'Aguardando análise' : '-');
+        formatDeadlineForDisplay(resolvedDeadline) || (isExternalRequest ? 'Aguardando análise' : '-');
 
       return {
         id: process.id,
@@ -454,10 +489,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         lastUpdate: process.updated_at || process.created_at,
         hierarchy: Hierarchy.STATUS_ONLY,
         notes:
-          manualNotes ||
+          resolvedNotes ||
           (isExternalRequest ? `Origem: Wix${requestedOrganizationName !== 'Não informado' ? ` · Organização solicitada: ${requestedOrganizationName}` : ''}` : undefined),
-        deadline: manualDeadline,
-        serviceManager: manualServiceManager || (isExternalRequest ? 'Aguardando aprovação' : 'Não definido'),
+        deadline: resolvedDeadline,
+        serviceManager: resolvedServiceManager || (isExternalRequest ? 'Aguardando aprovação' : 'Não definido'),
         organizationId: process.org_id,
         organizationName: requestedOrganizationName,
         processType: unit,
@@ -872,18 +907,39 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
     const { data, error } = await supabase
       .from('processes')
-      .select('id,org_id,titulo,protocolo,status,cliente_nome,cliente_documento,cliente_contato,responsavel_user_id,created_at,updated_at,origem_canal,unidade_atendimento,org_nome_solicitado')
+      .select(PROCESS_SELECT_WITH_OPTIONAL_COLUMNS)
       .order('created_at', { ascending: false });
 
-    if (error) {
-      console.warn('[processos] erro ao carregar processos reais', error);
-      setProcessesError('Não foi possível carregar os processos recebidos no banco. Exibindo a base local disponível.');
-      setDbProcesses([]);
+    if (!error) {
+      setDbProcesses(((data as DbProcess[] | null) || []).map((process) => normalizeProcessOptionalFields(process)));
       setProcessesLoading(false);
       return;
     }
 
-    setDbProcesses((data as DbProcess[] | null) || []);
+    logProcessesQueryError('falha na query com colunas opcionais', error);
+
+    if (hasMissingOptionalProcessColumns(error)) {
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from('processes')
+        .select(PROCESS_SELECT_BASE_COLUMNS)
+        .order('created_at', { ascending: false });
+
+      if (!fallbackError) {
+        const normalizedProcesses = ((fallbackData as DbProcess[] | null) || []).map((process) =>
+          normalizeProcessOptionalFields(process)
+        );
+
+        setDbProcesses(normalizedProcesses);
+        setProcessesError('Banco ainda sem colunas opcionais (data_prazo, gestor_servico, observacoes). Processos carregados em modo compatível.');
+        setProcessesLoading(false);
+        return;
+      }
+
+      logProcessesQueryError('falha também na query de fallback sem colunas opcionais', fallbackError);
+    }
+
+    setProcessesError('Não foi possível carregar os processos recebidos no banco. Exibindo a base local disponível.');
+    setDbProcesses([]);
     setProcessesLoading(false);
   };
 
@@ -925,7 +981,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const { data: createdProcess, error: processInsertError } = await supabase
       .from('processes')
       .insert(processPayload)
-      .select('id,org_id,titulo,protocolo,status,cliente_nome,cliente_documento,cliente_contato,responsavel_user_id,created_at,updated_at,origem_canal,unidade_atendimento,org_nome_solicitado')
+      .select(PROCESS_SELECT_BASE_COLUMNS)
       .single();
 
     if (processInsertError || !createdProcess) {
@@ -942,7 +998,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       created_by: currentUser.id,
     });
 
-    setDbProcesses((prev) => [createdProcess as DbProcess, ...prev]);
+    setDbProcesses((prev) => [normalizeProcessOptionalFields(createdProcess as DbProcess), ...prev]);
     setProcessActionFeedback({ type: 'success', message: 'Processo criado com sucesso e adicionado à lista.' });
     setCreatingProcess(false);
     setShowCreateProcessModal(false);
@@ -973,12 +1029,30 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       [ProcessStatus.CONCLUIDO]: 'concluido',
     };
 
+    const statusLabelMap: Record<'cadastro' | 'triagem' | 'analise' | 'concluido', string> = {
+      cadastro: 'cadastro',
+      triagem: 'triagem',
+      analise: 'análise',
+      concluido: 'concluído',
+    };
+
+    const previousStatus = statusMap[(currentEditingUser as AdminProcessRow | null)?.status || ProcessStatus.PENDENTE];
+    const previousDeadline = sanitizeDisplayValue((currentEditingUser as AdminProcessRow | null)?.deadline);
+    const previousServiceManager = sanitizeDisplayValue((currentEditingUser as AdminProcessRow | null)?.serviceManager);
+    const previousNotes = sanitizeDisplayValue((currentEditingUser as AdminProcessRow | null)?.notes);
+
     setEditingProfileSaving(true);
     setEditingProfileError('');
 
     const normalizedDeadline = sanitizeDisplayValue(deadline);
     const normalizedNotes = sanitizeDisplayValue(notes);
     const normalizedServiceManager = sanitizeDisplayValue(serviceManager);
+    const nextStatus = statusMap[status];
+
+    const statusChanged = previousStatus !== nextStatus;
+    const deadlineChanged = previousDeadline !== normalizedDeadline;
+    const serviceManagerChanged = previousServiceManager !== normalizedServiceManager;
+    const notesChanged = previousNotes !== normalizedNotes;
 
     if (normalizedDeadline && !/^\d{4}-\d{2}-\d{2}$/.test(normalizedDeadline)) {
       setEditingProfileError('Data de prazo inválida. Use o calendário para selecionar uma data válida.');
@@ -987,22 +1061,29 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     }
 
     let processUpdateError = '';
-    if ((currentEditingUser as AdminProcessRow | null)?.processRecordId && dbProcesses.length > 0 && processRecordId) {
+    if (processRecordId) {
+      const processUpdatePayload = {
+        status: nextStatus,
+        data_prazo: normalizedDeadline || null,
+        gestor_servico: normalizedServiceManager || null,
+        observacoes: normalizedNotes || null,
+      };
+
       const { error } = await supabase
         .from('processes')
-        .update({ status: statusMap[status] })
+        .update(processUpdatePayload)
         .eq('id', processRecordId);
 
       if (error) {
-        processUpdateError = 'Não foi possível atualizar o status do processo no banco.';
+        processUpdateError = 'Não foi possível atualizar status, prazo, gestor e observações do processo no banco.';
       } else {
         setDbProcesses((prev) =>
-          prev.map((process) => (process.id === processRecordId ? { ...process, status: statusMap[status] } : process))
+          prev.map((process) => (process.id === processRecordId ? { ...process, ...processUpdatePayload } : process))
         );
       }
     }
 
-    if (processRecordId) {
+    if (processRecordId && !processUpdateError) {
       setProcessVisualOverrides((prev) => {
         const existing = prev[processRecordId] || {};
         const nextEntry = {
@@ -1021,30 +1102,45 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       });
 
       const processEventsPayload: Array<Record<string, unknown>> = [];
+      const processOrgId = (currentEditingUser as AdminProcessRow | null)?.organizationId || currentUser.organizationId || null;
 
-      if (normalizedServiceManager) {
+      if (statusChanged) {
         processEventsPayload.push({
-          org_id: (currentEditingUser as AdminProcessRow | null)?.organizationId || currentUser.organizationId || null,
+          org_id: processOrgId,
+          process_id: processRecordId,
+          tipo: 'status_change',
+          mensagem: `Status alterado de "${statusLabelMap[previousStatus]}" para "${statusLabelMap[nextStatus]}".`,
+          created_by: currentUser.id,
+        });
+      }
+
+      if (serviceManagerChanged) {
+        const previousManagerLabel = previousServiceManager || 'Não definido';
+        const nextManagerLabel = normalizedServiceManager || 'Não definido';
+        processEventsPayload.push({
+          org_id: processOrgId,
           process_id: processRecordId,
           tipo: 'atribuicao',
-          mensagem: `Gestor do serviço definido para: ${normalizedServiceManager}.`,
+          mensagem: `Responsável do serviço alterado de ${previousManagerLabel} para ${nextManagerLabel}.`,
           created_by: currentUser.id,
         });
       }
 
-      if (normalizedDeadline) {
+      if (deadlineChanged) {
+        const previousDeadlineLabel = previousDeadline ? formatDeadlineForDisplay(previousDeadline) : 'Não definido';
+        const nextDeadlineLabel = normalizedDeadline ? formatDeadlineForDisplay(normalizedDeadline) : 'Não definido';
         processEventsPayload.push({
-          org_id: (currentEditingUser as AdminProcessRow | null)?.organizationId || currentUser.organizationId || null,
+          org_id: processOrgId,
           process_id: processRecordId,
           tipo: 'observacao',
-          mensagem: `Prazo atualizado para: ${formatDeadlineForDisplay(normalizedDeadline)}.`,
+          mensagem: `Prazo atualizado de ${previousDeadlineLabel} para ${nextDeadlineLabel}.`,
           created_by: currentUser.id,
         });
       }
 
-      if (normalizedNotes) {
+      if (notesChanged && normalizedNotes) {
         processEventsPayload.push({
-          org_id: (currentEditingUser as AdminProcessRow | null)?.organizationId || currentUser.organizationId || null,
+          org_id: processOrgId,
           process_id: processRecordId,
           tipo: 'observacao',
           mensagem: `Observação registrada: ${normalizedNotes}.`,
@@ -1712,6 +1808,235 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       return (role === 'admin' || role === 'owner') && isDefaultOrganizationName(orgName);
     });
 
+    const { data: memberRows, error: membersError } = await supabase
+      .from('org_members')
+      .select('org_id,user_id,role,organizations(name)')
+      .order('created_at', { ascending: false });
+
+    if (membersError) {
+      setClientsError('Não foi possível carregar os membros da tabela org_members.');
+      setClientsLoading(false);
+      return;
+    }
+
+    const allowedOrgIds = new Set((membershipScopeRows || []).map((row) => row.org_id));
+    const scopedMembers = (memberRows || []).filter((member) => hasGlobalScope || allowedOrgIds.has(member.org_id));
+
+    if (scopedMembers.length === 0) {
+      setClientsData([]);
+      setClientsLoading(false);
+      return;
+    }
+
+    const userIds = Array.from(new Set(scopedMembers.map((member) => member.user_id)));
+    const { data: profileRows, error: profileError } = await supabase
+      .from('profiles')
+      .select('id,nome_completo,nome,email,created_at')
+      .in('id', userIds);
+
+    if (profileError) {
+      console.warn('[clientes] falha ao carregar perfis; exibindo listagem parcial', profileError);
+      setClientsError('Alguns dados de perfil não puderam ser carregados agora. A listagem exibida pode estar parcial.');
+    } else {
+      setClientsError('');
+    }
+
+    const profileMap = new Map(((profileRows || []) as Array<{ id: string; nome_completo?: string | null; nome?: string | null; email?: string | null; created_at?: string | null }>).map((row) => [row.id, row]));
+
+    const normalizedClients: ClientProfileView[] = scopedMembers.map((member) => {
+      const profile = profileMap.get(member.user_id);
+      const email = profile?.email || 'sem-email@nao-informado';
+      const nome =
+        profile?.nome_completo ||
+        profile?.nome ||
+        (email !== 'sem-email@nao-informado' ? String(email).split('@')[0] : `Usuário ${member.user_id.slice(0, 8)}`);
+
+      return {
+        id: `${member.org_id}-${member.user_id}`,
+        user_id: member.user_id,
+        org_id: member.org_id,
+        org_name: extractOrganizationName(member.organizations) || 'Organização Padrão',
+        nome,
+        email,
+        accessLevel: mapOrgRoleToAccessLevel(member.role),
+        source: profile ? 'org_members+profiles' : 'org_members_only',
+        created_at: profile?.created_at || undefined,
+      };
+    });
+
+    setClientsData(normalizedClients);
+    setClientsLoading(false);
+  };
+
+  useEffect(() => {
+    if (currentSection === 'clientes') {
+      fetchClients();
+    }
+  }, [currentSection]);
+
+  const visibleClients = clientsData
+    .filter((client) =>
+      client.nome.toLowerCase().includes(clientsSearch.toLowerCase()) ||
+      client.email.toLowerCase().includes(clientsSearch.toLowerCase()) ||
+      client.org_name.toLowerCase().includes(clientsSearch.toLowerCase())
+    )
+    .sort((a, b) => {
+      if (clientsSort === 'name_asc') {
+        return a.nome.localeCompare(b.nome, 'pt-BR');
+      }
+      if (clientsSort === 'name_desc') {
+        return b.nome.localeCompare(a.nome, 'pt-BR');
+      }
+      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+    })
+    .slice(0, clientsRowsLimit);
+
+  const resetNewClientForm = () => {
+    setNewClientForm({
+      fullName: '',
+      email: '',
+      phone: '',
+      documentId: '',
+      taxId: '',
+      address: '',
+      country: 'Brasil',
+      maritalStatus: 'Solteiro',
+      organizationId: organizations[0]?.id || '',
+      accessLevel: 'Cliente',
+      grantSystemAccess: false,
+    });
+    setClientFormError('');
+    setClientFormSuccess('');
+  };
+
+  const handleCreateClient = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setClientFormError('');
+    setClientFormSuccess('');
+
+    const name = sanitizeDisplayValue(newClientForm.fullName);
+    const email = sanitizeDisplayValue(newClientForm.email);
+    const selectedOrg = organizations.find((org) => org.id === newClientForm.organizationId);
+
+    if (!name) {
+      setClientFormError('Informe o nome do cliente.');
+      return;
+    }
+
+    if (!email) {
+      setClientFormError('Informe o e-mail do cliente.');
+      return;
+    }
+
+    if (!selectedOrg) {
+      setClientFormError('Selecione uma organização válida.');
+      return;
+    }
+
+    setCreatingClient(true);
+
+    try {
+      const normalizedRole = mapAccessLevelToOrgRole(newClientForm.accessLevel);
+
+      if (newClientForm.grantSystemAccess) {
+        const { data: existingProfile, error: lookupError } = await supabase
+          .from('profiles')
+          .select('id,email')
+          .eq('email', email)
+          .maybeSingle();
+
+        if (lookupError) {
+          setClientFormError('Não foi possível validar o perfil no banco de dados.');
+          return;
+        }
+
+        if (!existingProfile?.id) {
+          setClientFormError('Para liberar acesso ao sistema, este e-mail precisa já ter conta criada no Auth.');
+          return;
+        }
+
+        const { error: updateProfileError } = await supabase
+          .from('profiles')
+          .update({
+            nome_completo: name,
+            name,
+            documento_identidade: sanitizeDisplayValue(newClientForm.documentId) || null,
+            nif_cpf: sanitizeDisplayValue(newClientForm.taxId) || null,
+            estado_civil: sanitizeDisplayValue(newClientForm.maritalStatus) || null,
+            phone: sanitizeDisplayValue(newClientForm.phone) || null,
+            endereco: sanitizeDisplayValue(newClientForm.address) || null,
+            pais: sanitizeDisplayValue(newClientForm.country) || null,
+            role: newClientForm.accessLevel,
+            org_id: selectedOrg.id,
+          })
+          .eq('id', existingProfile.id);
+
+        if (updateProfileError) {
+          setClientFormError('Não foi possível atualizar o perfil do cliente.');
+          return;
+        }
+
+        const { error: upsertMemberError } = await supabase
+          .from('org_members')
+          .upsert(
+            {
+              org_id: selectedOrg.id,
+              user_id: existingProfile.id,
+              role: normalizedRole,
+            },
+            { onConflict: 'org_id,user_id' }
+          );
+
+        if (upsertMemberError) {
+          setClientFormError('Perfil atualizado, mas não foi possível vincular cliente à organização.');
+          return;
+        }
+
+        await fetchClients();
+      } else {
+        const tempId = `local-${Date.now()}`;
+        const now = new Date().toLocaleString('pt-BR');
+
+        setUsers((prev) => [
+          {
+            id: tempId,
+            name,
+            email,
+            role: UserRole.CLIENT,
+            documentId: sanitizeDisplayValue(newClientForm.documentId) || '---',
+            taxId: sanitizeDisplayValue(newClientForm.taxId) || '---',
+            address: sanitizeDisplayValue(newClientForm.address) || '---',
+            maritalStatus: sanitizeDisplayValue(newClientForm.maritalStatus) || '---',
+            country: sanitizeDisplayValue(newClientForm.country) || '---',
+            phone: sanitizeDisplayValue(newClientForm.phone) || '---',
+            unit: ServiceUnit.ADMINISTRATIVO,
+            status: ProcessStatus.PENDENTE,
+            protocol: `CLI-${new Date().getFullYear()}-${String(prev.length + 1).padStart(3, '0')}`,
+            registrationDate: now,
+            lastUpdate: now,
+            hierarchy: Hierarchy.NOTES_ONLY,
+            organizationId: selectedOrg.id,
+            organizationName: selectedOrg.name,
+          },
+          ...prev,
+        ]);
+
+        setClientsData((prev) => [
+          {
+            id: `${selectedOrg.id}-${tempId}`,
+            user_id: tempId,
+            org_id: selectedOrg.id,
+            org_name: selectedOrg.name,
+            nome: name,
+            email,
+            accessLevel: newClientForm.accessLevel,
+            source: 'local_manual',
+            created_at: new Date().toISOString(),
+          },
+          ...prev,
+        ]);
+      }
+
       setClientFormSuccess('Cliente cadastrado com sucesso.');
       resetNewClientForm();
       setShowCreateClientModal(false);
@@ -1790,17 +2115,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     event.preventDefault();
     if (!editingClient) return;
 
-      return {
-        id: `${member.org_id}-${member.user_id}`,
-        user_id: member.user_id,
-        org_id: member.org_id,
-        org_name: extractOrganizationName(member.organizations) || 'Organização Padrão',
-        nome,
-        email,
-        accessLevel: mapOrgRoleToAccessLevel(member.role),
-        created_at: profile?.created_at || undefined,
-      };
-    });
+    setClientEditError('');
+    setClientEditSuccess('');
 
     const selectedOrg = organizations.find((org) => org.id === editClientForm.organizationId);
     if (!selectedOrg) {
@@ -1814,18 +2130,67 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       return;
     }
 
-  const visibleClients = clientsData
-    .filter((client) =>
-      client.nome.toLowerCase().includes(clientsSearch.toLowerCase()) ||
-      client.email.toLowerCase().includes(clientsSearch.toLowerCase()) ||
-      client.org_name.toLowerCase().includes(clientsSearch.toLowerCase())
-    )
-    .sort((a, b) => {
-      if (clientsSort === 'name_asc') {
-        return a.nome.localeCompare(b.nome, 'pt-BR');
-      }
-      if (clientsSort === 'name_desc') {
-        return b.nome.localeCompare(a.nome, 'pt-BR');
+    setSavingClientEdit(true);
+
+    try {
+      if (editingClient.user_id.startsWith('local-')) {
+        setUsers((prev) =>
+          prev.map((user) =>
+            user.id === editingClient.user_id
+              ? {
+                  ...user,
+                  name: normalizedName,
+                  email: sanitizeDisplayValue(editClientForm.email) || user.email,
+                  phone: sanitizeDisplayValue(editClientForm.phone) || '---',
+                  documentId: sanitizeDisplayValue(editClientForm.documentId) || '---',
+                  taxId: sanitizeDisplayValue(editClientForm.taxId) || '---',
+                  address: sanitizeDisplayValue(editClientForm.address) || '---',
+                  country: sanitizeDisplayValue(editClientForm.country) || '---',
+                  maritalStatus: sanitizeDisplayValue(editClientForm.maritalStatus) || '---',
+                  organizationId: selectedOrg.id,
+                  organizationName: selectedOrg.name,
+                }
+              : user
+          )
+        );
+      } else {
+        const { error: updateProfileError } = await supabase
+          .from('profiles')
+          .update({
+            nome_completo: normalizedName,
+            name: normalizedName,
+            email: sanitizeDisplayValue(editClientForm.email) || null,
+            phone: sanitizeDisplayValue(editClientForm.phone) || null,
+            documento_identidade: sanitizeDisplayValue(editClientForm.documentId) || null,
+            nif_cpf: sanitizeDisplayValue(editClientForm.taxId) || null,
+            endereco: sanitizeDisplayValue(editClientForm.address) || null,
+            pais: sanitizeDisplayValue(editClientForm.country) || null,
+            estado_civil: sanitizeDisplayValue(editClientForm.maritalStatus) || null,
+            role: editClientForm.accessLevel,
+            org_id: selectedOrg.id,
+          })
+          .eq('id', editingClient.user_id);
+
+        if (updateProfileError) {
+          setClientEditError('Não foi possível atualizar os dados de perfil do cliente.');
+          return;
+        }
+
+        const { error: upsertMemberError } = await supabase
+          .from('org_members')
+          .upsert(
+            {
+              org_id: selectedOrg.id,
+              user_id: editingClient.user_id,
+              role: mapAccessLevelToOrgRole(editClientForm.accessLevel),
+            },
+            { onConflict: 'org_id,user_id' }
+          );
+
+        if (upsertMemberError) {
+          setClientEditError('Perfil atualizado, mas houve erro ao atualizar vínculo da organização.');
+          return;
+        }
       }
 
       setClientsData((prev) =>
@@ -1851,7 +2216,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       setSavingClientEdit(false);
     }
   };
-
   const handleCreateOrganization = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setOrgError('');
