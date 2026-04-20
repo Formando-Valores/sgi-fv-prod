@@ -534,7 +534,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
     const selectedRow = selectedDashboardProcessId
       ? dashboardProcesses.find((row) => row.id === selectedDashboardProcessId)
       : dashboardProcesses[0];
-    if (!selectedRow?.id || allowNewRequest) return;
+    if (!selectedRow?.id) return;
 
     const loadSelectedProcessDetails = async () => {
       const { data: processEvents, error: processEventsError } = await supabase
@@ -589,7 +589,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
     };
 
     void loadSelectedProcessDetails();
-  }, [allowNewRequest, dashboardProcesses, selectedDashboardProcessId]);
+  }, [dashboardProcesses, selectedDashboardProcessId]);
 
   React.useEffect(() => {
     const loadProfessionals = async () => {
@@ -948,7 +948,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
       return;
     }
 
-    if (createdProcessId && stripeCheckoutSessionId) {
+    if (!allowNewRequest && createdProcessId && stripeCheckoutSessionId) {
       setInitialStageFinished(true);
       return;
     }
@@ -1565,10 +1565,6 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
             onClick={() => {
               setAllowNewRequest(true);
               setInitialStageFinished(false);
-              setProcessStatus(ProcessStatus.PENDENTE);
-              setCreatedProcessId(null);
-              setServiceProcess(null);
-              setSelectedDashboardProcessId(null);
               setSelectedArea(null);
               setSelectedServiceId('');
               setSelectedSlot('');
@@ -1580,6 +1576,9 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
               setBackendPaymentStatus('pending');
               setBackendProcessStatus('pending_payment');
               setStripeCheckoutSessionId(null);
+              setProcessStatus(mapDbStatusToProcessStatus(
+                dashboardProcesses.find((row) => row.id === selectedDashboardProcessId)?.status || dashboardProcesses[0]?.status,
+              ));
             }}
             className="mt-3 rounded-xl bg-white border border-emerald-200 text-emerald-700 font-bold px-4 py-2"
           >
