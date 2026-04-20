@@ -230,7 +230,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
       selectedAdminScheduleSlot &&
       availableProfessionals.some((professional) => professional.id === selectedSlot && professional.availableSlots.length > 0),
   );
-  const isOnboardingFlow = processStatus !== ProcessStatus.CONCLUIDO && (!initialStageFinished || allowNewRequest);
+  const isOnboardingFlow = allowNewRequest || !initialStageFinished;
   const displaySectorName = processStatus === ProcessStatus.PENDENTE ? 'Atendimento ao Associado' : 'Setor Jurídico Conveniado à AI';
   const selectedAreaTeamLabel = selectedArea ? AREA_TEAM_LABEL_MAP[selectedArea] : 'Setor responsável';
   const activeOrganizationId = currentUser.organizationId ?? resolvedOrganizationId;
@@ -1565,14 +1565,21 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
             onClick={() => {
               setAllowNewRequest(true);
               setInitialStageFinished(false);
+              setProcessStatus(ProcessStatus.PENDENTE);
               setCreatedProcessId(null);
               setServiceProcess(null);
+              setSelectedDashboardProcessId(null);
               setSelectedArea(null);
               setSelectedServiceId('');
               setSelectedSlot('');
               setSelectedAdminScheduleSlot('');
               setPaymentMethod('');
               setPaymentStatus('idle');
+              setProcessCreationError(null);
+              setCheckoutReturnStatus(null);
+              setBackendPaymentStatus('pending');
+              setBackendProcessStatus('pending_payment');
+              setStripeCheckoutSessionId(null);
             }}
             className="mt-3 rounded-xl bg-white border border-emerald-200 text-emerald-700 font-bold px-4 py-2"
           >
