@@ -217,6 +217,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
   const [dashboardProcessSearch, setDashboardProcessSearch] = React.useState('');
   const [selectedDashboardProcessId, setSelectedDashboardProcessId] = React.useState<string | null>(null);
   const [dashboardProcessesLoading, setDashboardProcessesLoading] = React.useState(false);
+  const [activeMainMenu, setActiveMainMenu] = React.useState<'painel' | 'processos' | 'financeiro'>('painel');
   const [activeInternalSection, setActiveInternalSection] = React.useState<'processo' | 'financeiro'>('processo');
   const [processComments, setProcessComments] = React.useState<Array<{ id: string; text: string; createdAt: string }>>([]);
   const [newComment, setNewComment] = React.useState('');
@@ -1184,6 +1185,42 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
         </div>
       </header>
 
+      <section className="mb-6 bg-white border border-gray-100 rounded-2xl p-4 sm:p-4 shadow-[0_16px_34px_rgba(15,23,42,0.08)] no-print">
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setActiveMainMenu('painel');
+              setActiveInternalSection('processo');
+            }}
+            className={`rounded-xl px-4 py-2 text-sm font-black uppercase border ${activeMainMenu === 'painel' ? 'bg-blue-600 text-white border-blue-700' : 'bg-gray-100 text-gray-700 border-gray-200'}`}
+          >
+            Painel
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setActiveMainMenu('processos');
+              setActiveInternalSection('processo');
+            }}
+            className={`rounded-xl px-4 py-2 text-sm font-black uppercase border ${activeMainMenu === 'processos' ? 'bg-blue-600 text-white border-blue-700' : 'bg-gray-100 text-gray-700 border-gray-200'}`}
+          >
+            Processos
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setActiveMainMenu('financeiro');
+              setActiveInternalSection('financeiro');
+            }}
+            className={`rounded-xl px-4 py-2 text-sm font-black uppercase border ${activeMainMenu === 'financeiro' ? 'bg-blue-600 text-white border-blue-700' : 'bg-gray-100 text-gray-700 border-gray-200'}`}
+          >
+            Financeiro
+          </button>
+        </div>
+      </section>
+
+      {activeMainMenu === 'painel' && (
       <section className="mb-6 bg-white border border-gray-100 rounded-2xl p-4 sm:p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
         <h2 className="text-lg font-black text-gray-800">Guia rápido do sistema</h2>
         <ol className="mt-2 list-decimal pl-5 text-sm text-gray-600 space-y-1">
@@ -1193,7 +1230,9 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
           <li>Acompanhe o histórico, baixe relatório técnico e comprovantes financeiros.</li>
         </ol>
       </section>
+      )}
 
+      {activeMainMenu !== 'financeiro' && (
       <section className="mb-6 bg-white border border-gray-100 rounded-2xl p-4 sm:p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
         <h2 className="text-lg font-black text-gray-800">Acompanhamento dos Meus Processos</h2>
         <div className="mt-3 flex flex-wrap gap-2">
@@ -1260,6 +1299,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
           </div>
         )}
       </section>
+      )}
 
       {isOnboardingFlow && (
         <section className="mb-6 bg-white border border-gray-100 rounded-2xl p-4 sm:p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
