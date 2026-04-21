@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LogOut, Printer, FileDown, User as UserIcon, Calendar, Clock, Landmark, Activity, UserCheck, MessageSquare } from 'lucide-react';
+import { LogOut, Printer, FileDown, User as UserIcon, Calendar, Clock, Landmark, Activity, UserCheck, MessageSquare, Wallet } from 'lucide-react';
 import { User, ProcessStatus, UserRole } from '../types';
 import { supabase } from '../supabase';
 import { SERVICE_MANAGERS } from '../constants';
@@ -58,6 +58,8 @@ type ServiceProcessView = {
   steps: ProcessStep[];
   timeline: Array<{ date: string; message: string }>;
 };
+
+type ClientInternalSection = 'painel' | 'processos' | 'financeiro';
 
 type DashboardProcessRow = {
   id: string;
@@ -183,6 +185,10 @@ const parsePriceLabel = (priceLabel: string): number | null => {
   const numericValue = Number(normalized);
   return Number.isFinite(numericValue) ? numericValue : null;
 };
+const formatEuroValue = (amount: number | null) => {
+  if (amount === null || Number.isNaN(amount)) return '—';
+  return `${amount.toFixed(2).replace('.', ',')}€`;
+};
 const mapDbStatusToProcessStatus = (status?: string | null): ProcessStatus => {
   const normalized = normalizeStatusKey(status);
   if (normalized === 'triagem') return ProcessStatus.TRIAGEM;
@@ -291,6 +297,36 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
     const target = `${processRow.id} ${processRow.protocolo || ''} ${processRow.titulo || ''} ${processRow.unidade_atendimento || ''} ${processRow.status || ''} ${processRow.cliente_nome || ''}`.toLowerCase();
     return target.includes(dashboardProcessSearch.toLowerCase());
   });
+  const estimateProcessAmount = React.useCallback((processRow: DashboardProcessRow) => {
+    const matchedService = SERVICE_CATALOG.find((service) =>
+      normalizeStatusKey(service.name) === normalizeStatusKey(processRow.titulo),
+    );
+    const servicePrice = matchedService ? parsePriceLabel(matchedService.priceLabel) : null;
+    if (servicePrice === null) return null;
+    return servicePrice + ASSOCIATIVE_FEE_EUR;
+  }, []);
+  const financialSummary = React.useMemo(() => {
+    const paidByStatus = dashboardProcesses.filter((processRow) => ['paid', 'pago', 'succeeded'].includes(normalizeStatusKey(processRow.payment_status)));
+    const paidRows = paidByStatus.length > 0
+      ? paidByStatus
+      : dashboardProcesses.filter((processRow) => financeEntries.some((entry) => entry.id === processRow.id));
+    const pendingRows = dashboardProcesses.filter((processRow) => !['paid', 'pago', 'succeeded'].includes(normalizeStatusKey(processRow.payment_status)));
+
+    const totalPaid = paidRows.reduce((total, row) => total + (estimateProcessAmount(row) || 0), 0);
+    const totalPending = pendingRows.reduce((total, row) => total + (estimateProcessAmount(row) || 0), 0);
+
+    const upcomingDeadlines = pendingRows
+      .map((row) => {
+        const dateValue = row.data_conclusao || row.updated_at || row.created_at;
+        const date = dateValue ? new Date(dateValue) : null;
+        return { row, date };
+      })
+      .filter((item) => item.date && !Number.isNaN(item.date.getTime()))
+      .sort((a, b) => (a.date?.getTime() || 0) - (b.date?.getTime() || 0))
+      .slice(0, 3);
+
+    return { paidRows, pendingRows, totalPaid, totalPending, upcomingDeadlines };
+  }, [dashboardProcesses, estimateProcessAmount, financeEntries]);
 
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -1172,84 +1208,184 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
         </div>
       </header>
 
-      <section className="mb-6 bg-white border border-gray-100 rounded-2xl p-4 sm:p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
-        <h2 className="text-lg font-black text-gray-800">Guia rápido do sistema</h2>
-        <ol className="mt-2 list-decimal pl-5 text-sm text-gray-600 space-y-1">
-          <li>Crie uma <strong>Nova Ordem de Serviço</strong> escolhendo área e serviço.</li>
-          <li>Confira o total (serviço + quota associativa) e conclua o pagamento.</li>
-          <li>Após aprovação, envie anexos e comentários dentro da OS.</li>
-          <li>Acompanhe o histórico, baixe relatório técnico e comprovantes financeiros.</li>
-        </ol>
-      </section>
-
-      <section className="mb-6 bg-white border border-gray-100 rounded-2xl p-4 sm:p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
-        <h2 className="text-lg font-black text-gray-800">Acompanhamento dos Meus Processos</h2>
-        <div className="mt-3 flex flex-wrap gap-2">
+      <section className="mb-6 bg-white border border-gray-100 rounded-2xl p-3 sm:p-4 shadow-[0_16px_34px_rgba(15,23,42,0.08)] no-print">
+        <div className="flex flex-wrap gap-2">
           {[
-            { id: 'andamento', label: 'Em andamento' },
-            { id: 'analise', label: 'Em análise' },
-            { id: 'concluidos', label: 'Concluídos' },
-            { id: 'todos', label: 'Todos' },
+            { id: 'painel', label: 'Painel' },
+            { id: 'processos', label: 'Processos' },
+            { id: 'financeiro', label: 'Financeiro' },
           ].map((tab) => (
             <button
               key={tab.id}
               type="button"
-              onClick={() => setDashboardProcessFilter(tab.id as 'todos' | 'andamento' | 'analise' | 'concluidos')}
-              className={`rounded-lg px-3 py-2 text-xs font-black uppercase ${dashboardProcessFilter === tab.id ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}
+              onClick={() => setActiveInternalSection(tab.id as ClientInternalSection)}
+              className={`rounded-lg px-3 py-2 text-xs sm:text-sm font-black uppercase ${
+                activeInternalSection === tab.id ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'
+              }`}
             >
               {tab.label}
             </button>
           ))}
         </div>
-        <input
-          value={dashboardProcessSearch}
-          onChange={(event) => setDashboardProcessSearch(event.target.value)}
-          placeholder="Buscar por nº processo, OS, serviço, status..."
-          className="mt-3 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-        />
-
-        {dashboardProcessesLoading ? (
-          <p className="mt-3 text-sm text-gray-500 font-semibold">Carregando processos...</p>
-        ) : filteredDashboardProcesses.length === 0 ? (
-          <p className="mt-3 text-sm text-gray-600 font-semibold">
-            Você ainda não possui processos cadastrados. Clique em Nova Ordem de Serviço para iniciar um atendimento.
-          </p>
-        ) : (
-          <div className="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-2">
-            {filteredDashboardProcesses.map((processRow) => {
-              const isSelected = selectedDashboardProcessId === processRow.id || (!selectedDashboardProcessId && filteredDashboardProcesses.length === 1);
-              const statusLabel = getProcessStatusDisplayLabel(processRow.status);
-              const statusKey = normalizeStatusKey(processRow.status);
-              const statusBadgeClass = statusKey === 'concluido'
-                ? 'bg-emerald-100 text-emerald-700'
-                : statusKey === 'analise'
-                  ? 'bg-amber-100 text-amber-700'
-                  : statusKey === 'triagem'
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'bg-slate-100 text-slate-700';
-
-              return (
-                <button
-                  key={processRow.id}
-                  type="button"
-                  onClick={() => setSelectedDashboardProcessId(processRow.id)}
-                  className={`text-left rounded-xl border p-3 ${isSelected ? 'border-blue-300 bg-blue-50' : 'border-gray-200 bg-white'}`}
-                >
-                  <p className="text-xs text-gray-500 font-black uppercase">Processo {processRow.id}</p>
-                  <p className="text-sm font-bold text-gray-800">OS: {processRow.protocolo || processRow.id}</p>
-                  <p className="text-xs text-gray-600">Área: {processRow.unidade_atendimento || '-'}</p>
-                  <p className="text-xs text-gray-600">Serviço: {processRow.titulo || '-'}</p>
-                  <p className="text-xs text-gray-600">Status: <span className={`inline-flex items-center rounded-full px-2 py-0.5 font-bold ${statusBadgeClass}`}>{statusLabel}</span></p>
-                  <p className="text-xs text-gray-600">Abertura: {processRow.created_at ? new Date(processRow.created_at).toLocaleString('pt-BR') : '-'}</p>
-                  <p className="text-xs text-gray-700 font-bold">Situação: {statusLabel}</p>
-                </button>
-              );
-            })}
-          </div>
-        )}
       </section>
 
-      {isOnboardingFlow && (
+      {activeInternalSection === 'processos' && (
+        <>
+          <section className="mb-6 bg-white border border-gray-100 rounded-2xl p-4 sm:p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
+            <h2 className="text-lg font-black text-gray-800">Guia rápido do sistema</h2>
+            <ol className="mt-2 list-decimal pl-5 text-sm text-gray-600 space-y-1">
+              <li>Crie uma <strong>Nova Ordem de Serviço</strong> escolhendo área e serviço.</li>
+              <li>Confira o total (serviço + quota associativa) e conclua o pagamento.</li>
+              <li>Após aprovação, envie anexos e comentários dentro da OS.</li>
+              <li>Acompanhe o histórico, baixe relatório técnico e comprovantes financeiros.</li>
+            </ol>
+          </section>
+
+          <section className="mb-6 bg-white border border-gray-100 rounded-2xl p-4 sm:p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
+            <h2 className="text-lg font-black text-gray-800">Acompanhamento dos Meus Processos</h2>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {[
+                { id: 'andamento', label: 'Em andamento' },
+                { id: 'analise', label: 'Em análise' },
+                { id: 'concluidos', label: 'Concluídos' },
+                { id: 'todos', label: 'Todos' },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setDashboardProcessFilter(tab.id as 'todos' | 'andamento' | 'analise' | 'concluidos')}
+                  className={`rounded-lg px-3 py-2 text-xs font-black uppercase ${dashboardProcessFilter === tab.id ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+            <input
+              value={dashboardProcessSearch}
+              onChange={(event) => setDashboardProcessSearch(event.target.value)}
+              placeholder="Buscar por nº processo, OS, serviço, status..."
+              className="mt-3 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            />
+
+            {dashboardProcessesLoading ? (
+              <p className="mt-3 text-sm text-gray-500 font-semibold">Carregando processos...</p>
+            ) : filteredDashboardProcesses.length === 0 ? (
+              <p className="mt-3 text-sm text-gray-600 font-semibold">
+                Você ainda não possui processos cadastrados. Clique em Nova Ordem de Serviço para iniciar um atendimento.
+              </p>
+            ) : (
+              <div className="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-2">
+                {filteredDashboardProcesses.map((processRow) => {
+                  const isSelected = selectedDashboardProcessId === processRow.id || (!selectedDashboardProcessId && filteredDashboardProcesses.length === 1);
+                  const statusLabel = getProcessStatusDisplayLabel(processRow.status);
+                  const statusKey = normalizeStatusKey(processRow.status);
+                  const statusBadgeClass = statusKey === 'concluido'
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : statusKey === 'analise'
+                      ? 'bg-amber-100 text-amber-700'
+                      : statusKey === 'triagem'
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'bg-slate-100 text-slate-700';
+
+                  return (
+                    <button
+                      key={processRow.id}
+                      type="button"
+                      onClick={() => setSelectedDashboardProcessId(processRow.id)}
+                      className={`text-left rounded-xl border p-3 ${isSelected ? 'border-blue-300 bg-blue-50' : 'border-gray-200 bg-white'}`}
+                    >
+                      <p className="text-xs text-gray-500 font-black uppercase">Processo {processRow.id}</p>
+                      <p className="text-sm font-bold text-gray-800">OS: {processRow.protocolo || processRow.id}</p>
+                      <p className="text-xs text-gray-600">Área: {processRow.unidade_atendimento || '-'}</p>
+                      <p className="text-xs text-gray-600">Serviço: {processRow.titulo || '-'}</p>
+                      <p className="text-xs text-gray-600">Status: <span className={`inline-flex items-center rounded-full px-2 py-0.5 font-bold ${statusBadgeClass}`}>{statusLabel}</span></p>
+                      <p className="text-xs text-gray-600">Abertura: {processRow.created_at ? new Date(processRow.created_at).toLocaleString('pt-BR') : '-'}</p>
+                      <p className="text-xs text-gray-700 font-bold">Situação: {statusLabel}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        </>
+      )}
+
+      {activeInternalSection === 'financeiro' && (
+        <section className="mb-6 bg-white border border-gray-100 rounded-2xl p-4 sm:p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
+          <h2 className="text-lg font-black text-gray-800 flex items-center gap-2">
+            <Wallet className="w-5 h-5 text-emerald-600" /> Financeiro
+          </h2>
+          <p className="text-sm text-gray-500 mt-1">Visão consolidada dos pagamentos e prazos dos seus processos.</p>
+
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+              <p className="text-xs font-black uppercase text-emerald-700">Total pago</p>
+              <p className="text-2xl font-black text-emerald-800">{formatEuroValue(financialSummary.totalPaid)}</p>
+              <p className="text-xs text-emerald-700 mt-1">{financialSummary.paidRows.length} processo(s) pago(s)</p>
+            </div>
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+              <p className="text-xs font-black uppercase text-amber-700">Total pendente</p>
+              <p className="text-2xl font-black text-amber-800">{formatEuroValue(financialSummary.totalPending)}</p>
+              <p className="text-xs text-amber-700 mt-1">{financialSummary.pendingRows.length} processo(s) pendente(s)</p>
+            </div>
+            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+              <p className="text-xs font-black uppercase text-blue-700">Próximos vencimentos/prazos</p>
+              <div className="mt-2 space-y-1">
+                {financialSummary.upcomingDeadlines.length === 0 ? (
+                  <p className="text-xs text-blue-700 font-semibold">Sem prazos previstos.</p>
+                ) : (
+                  financialSummary.upcomingDeadlines.map(({ row, date }) => (
+                    <p key={row.id} className="text-xs text-blue-800">
+                      <span className="font-bold">{row.protocolo || row.id}</span> • {date?.toLocaleDateString('pt-BR')}
+                    </p>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-5 rounded-xl border border-gray-200 overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="text-left px-3 py-2 font-black text-gray-600 uppercase text-[11px]">Processo</th>
+                  <th className="text-left px-3 py-2 font-black text-gray-600 uppercase text-[11px]">Serviço</th>
+                  <th className="text-left px-3 py-2 font-black text-gray-600 uppercase text-[11px]">Valor</th>
+                  <th className="text-left px-3 py-2 font-black text-gray-600 uppercase text-[11px]">Status</th>
+                  <th className="text-left px-3 py-2 font-black text-gray-600 uppercase text-[11px]">Pago em</th>
+                </tr>
+              </thead>
+              <tbody>
+                {financialSummary.paidRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-3 py-4 text-center text-gray-500 font-semibold">
+                      Nenhum processo pago até o momento.
+                    </td>
+                  </tr>
+                ) : (
+                  financialSummary.paidRows.map((row) => (
+                    <tr key={row.id} className="border-t border-gray-100">
+                      <td className="px-3 py-2 font-semibold text-gray-700">{row.protocolo || row.id}</td>
+                      <td className="px-3 py-2 text-gray-700">{row.titulo || '-'}</td>
+                      <td className="px-3 py-2 text-gray-700">{formatEuroValue(estimateProcessAmount(row))}</td>
+                      <td className="px-3 py-2">
+                        <span className="inline-flex rounded-full bg-emerald-100 text-emerald-700 px-2 py-0.5 text-xs font-bold">
+                          Pago
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-gray-700">
+                        {row.updated_at ? new Date(row.updated_at).toLocaleDateString('pt-BR') : '-'}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {activeInternalSection === 'processos' && isOnboardingFlow && (
         <section className="mb-6 bg-white border border-gray-100 rounded-2xl p-4 sm:p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
           <h2 className="text-lg font-black text-gray-800">Primeiro acesso guiado</h2>
           <p className="text-sm text-gray-500 mb-4">Selecione o seu serviço pela área selecionada.</p>
@@ -1476,7 +1612,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
         </section>
       )}
 
-      {initialStageFinished && (
+      {activeInternalSection === 'processos' && initialStageFinished && (
         <section className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 sm:p-6">
           <h2 className="text-lg font-black text-emerald-800">Etapa inicial concluída</h2>
           <p className="text-sm font-semibold text-emerald-700 mt-1">
@@ -1496,7 +1632,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
       )}
 
 
-      {checkoutReturnStatus && (
+      {activeInternalSection === 'processos' && checkoutReturnStatus && (
         <section className={`mb-6 rounded-2xl border p-4 sm:p-6 ${checkoutReturnStatus === 'success' ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}>
           <h2 className={`text-lg font-black ${checkoutReturnStatus === 'success' ? 'text-emerald-800' : 'text-amber-800'}`}>
             {checkoutReturnStatus === 'success' ? 'Retorno do checkout recebido' : 'Pagamento cancelado no checkout'}
@@ -1509,7 +1645,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
         </section>
       )}
 
-      {serviceProcess && (
+      {activeInternalSection === 'processos' && serviceProcess && (
         <section className="mb-6 rounded-2xl border border-blue-200 bg-blue-50 p-4 sm:p-6">
           <h2 className="text-lg font-black text-blue-800">PROCESSO EM ANDAMENTO</h2>
           <p className="text-sm font-semibold text-blue-700 mt-1">Solicitação criada. O atendimento será iniciado após confirmação do pagamento.</p>
@@ -1637,6 +1773,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
         </section>
       )}
 
+      {activeInternalSection === 'painel' && (
       <main className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Status Section */}
         <section className="lg:col-span-2 space-y-6">
@@ -1763,6 +1900,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
           </div>
         </section>
       </main>
+      )}
     </div>
   );
 };
