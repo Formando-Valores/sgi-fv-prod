@@ -9,7 +9,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { FolderKanban, Clock, CheckCircle2, AlertCircle, ArrowRight, Loader2, FileEdit, RefreshCw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { getProcessStats, listProcesses, type Process } from '../lib/processes';
+import { getProcessStats, listProcesses, listAdminOperationalProcesses, type Process } from '../lib/processes';
 import { checkMigrations, getMigrationStatusMessage, type MigrationStatus } from '../lib/checkMigrations';
 
 // Debug mode flag
@@ -19,6 +19,18 @@ const log = (...args: any[]) => {
 };
 const logError = (...args: any[]) => {
   console.error('[Dashboard ERROR]', new Date().toISOString(), ...args);
+};
+
+const statusLabels: Record<string, string> = {
+  queued: 'Na Fila',
+  in_progress: 'Em Execução',
+  awaiting_documents: 'Aguardando Docs',
+  under_review: 'Em Revisão',
+  completed: 'Finalizado'
+};
+
+const paymentLabels: Record<string, string> = {
+  paid: 'Pago'
 };
 
 const Dashboard: React.FC = () => {
@@ -119,10 +131,10 @@ const Dashboard: React.FC = () => {
           log(`getProcessStats() completed in ${elapsed.toFixed(2)}ms:`, data);
           return data;
         }),
-        listProcesses(userContext.org_id).then(data => {
+        (isAdmin ? listAdminOperationalProcesses(userContext.org_id) : listProcesses(userContext.org_id)).then(data => {
           const elapsed = performance.now() - processesStartTime;
-          log(`listProcesses() completed in ${elapsed.toFixed(2)}ms, count:`, data.length);
-          return data;
+          log(`process listing completed in ${elapsed.toFixed(2)}ms, count:`, data.length);
+          return data.filter((process) => process.process_status !== 'pending_payment');
         })
       ]);
       
@@ -326,6 +338,16 @@ const Dashboard: React.FC = () => {
                   </div>
                 </div>
                 <div className="text-right">
+                  {process.payment_status && (
+                    <p className="text-emerald-400 text-[10px] font-black uppercase tracking-wide">
+                      {paymentLabels[process.payment_status] || process.payment_status}
+                    </p>
+                  )}
+                  {process.process_status && (
+                    <p className="text-indigo-300 text-[10px] font-black uppercase tracking-wide">
+                      {statusLabels[process.process_status] || process.process_status}
+                    </p>
+                  )}
                   <p className="text-slate-400 text-xs">{formatDate(process.created_at)}</p>
                 </div>
               </Link>
