@@ -71,6 +71,9 @@ type DashboardProcessRow = {
   responsavel_user_id?: string | null;
   cliente_user_id?: string | null;
   data_conclusao?: string | null;
+  payment_status?: string | null;
+  process_status?: string | null;
+  stripe_checkout_session_id?: string | null;
 };
 
 const SERVICE_CATALOG: GuidedService[] = [
@@ -125,6 +128,12 @@ const getProcessStatusDisplayLabel = (status?: string | null) => {
   return PROCESS_STATUS_DISPLAY_LABEL_MAP[normalized] || status || '-';
 };
 
+const summarizeStripeSessionId = (sessionId?: string | null) => {
+  if (!sessionId) return '-';
+  if (sessionId.length <= 14) return sessionId;
+  return `${sessionId.slice(0, 8)}...${sessionId.slice(-6)}`;
+};
+
 const formatProcessTimelineMessage = (event: { tipo?: string | null; mensagem?: string | null }) => {
   const message = (event.mensagem || '').trim();
   if (!message) return 'Atualização registrada';
@@ -172,7 +181,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
   const [selectedArea, setSelectedArea] = React.useState<ServiceArea | null>(null);
   const [selectedServiceId, setSelectedServiceId] = React.useState<string>('');
   const [paymentMethod, setPaymentMethod] = React.useState<'cartao' | 'boleto' | ''>('');
-  const [paymentStatus, setPaymentStatus] = React.useState<'idle' | 'initiated' | 'awaiting_confirmation' | 'confirmed'>('idle');
+  const [paymentStatus, setPaymentStatus] = React.useState<'idle' | 'creating_request' | 'awaiting_redirect' | 'pending' | 'paid' | 'cancelled'>('idle');
   const [selectedSlot, setSelectedSlot] = React.useState<string>('');
   const [selectedAdminScheduleSlot, setSelectedAdminScheduleSlot] = React.useState<string>('');
   const [initialStageFinished, setInitialStageFinished] = React.useState(false);
@@ -181,6 +190,10 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
   const [createdProcessId, setCreatedProcessId] = React.useState<string | null>(null);
   const [serviceProcess, setServiceProcess] = React.useState<ServiceProcessView | null>(null);
   const [processCreationError, setProcessCreationError] = React.useState<string | null>(null);
+  const [backendPaymentStatus, setBackendPaymentStatus] = React.useState<string>('pending');
+  const [backendProcessStatus, setBackendProcessStatus] = React.useState<string>('pending_payment');
+  const [stripeCheckoutSessionId, setStripeCheckoutSessionId] = React.useState<string | null>(null);
+  const [checkoutReturnStatus, setCheckoutReturnStatus] = React.useState<'success' | 'cancel' | null>(null);
   const [allowNewRequest, setAllowNewRequest] = React.useState(false);
   const [availableProfessionals, setAvailableProfessionals] = React.useState<AvailableProfessional[]>([]);
   const [isLoadingProfessionals, setIsLoadingProfessionals] = React.useState(false);
@@ -217,7 +230,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
       selectedAdminScheduleSlot &&
       availableProfessionals.some((professional) => professional.id === selectedSlot && professional.availableSlots.length > 0),
   );
-  const isOnboardingFlow = processStatus !== ProcessStatus.CONCLUIDO && (!initialStageFinished || allowNewRequest);
+  const isOnboardingFlow = allowNewRequest || !initialStageFinished;
   const displaySectorName = processStatus === ProcessStatus.PENDENTE ? 'Atendimento ao Associado' : 'Setor Jurídico Conveniado à AI';
   const selectedAreaTeamLabel = selectedArea ? AREA_TEAM_LABEL_MAP[selectedArea] : 'Setor responsável';
   const activeOrganizationId = currentUser.organizationId ?? resolvedOrganizationId;
@@ -255,6 +268,22 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
     const target = `${processRow.id} ${processRow.protocolo || ''} ${processRow.titulo || ''} ${processRow.unidade_atendimento || ''} ${processRow.status || ''} ${processRow.cliente_nome || ''}`.toLowerCase();
     return target.includes(dashboardProcessSearch.toLowerCase());
   });
+
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const checkoutResult = params.get('checkout');
+
+    if (checkoutResult === 'success') {
+      setCheckoutReturnStatus('success');
+      setPaymentStatus('pending');
+      void logTimelineEvent('Retorno do checkout Stripe com sucesso. Pagamento em validação.');
+    } else if (checkoutResult === 'cancel') {
+      setCheckoutReturnStatus('cancel');
+      setPaymentStatus('cancelled');
+      void logTimelineEvent('Checkout Stripe cancelado pelo cliente. Solicitação permanece com pagamento pendente.');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   React.useEffect(() => {
     setResolvedOrganizationId(currentUser.organizationId ?? null);
@@ -505,7 +534,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
     const selectedRow = selectedDashboardProcessId
       ? dashboardProcesses.find((row) => row.id === selectedDashboardProcessId)
       : dashboardProcesses[0];
-    if (!selectedRow?.id || allowNewRequest) return;
+    if (!selectedRow?.id) return;
 
     const loadSelectedProcessDetails = async () => {
       const { data: processEvents, error: processEventsError } = await supabase
@@ -560,7 +589,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
     };
 
     void loadSelectedProcessDetails();
-  }, [allowNewRequest, dashboardProcesses, selectedDashboardProcessId]);
+  }, [dashboardProcesses, selectedDashboardProcessId]);
 
   React.useEffect(() => {
     const loadProfessionals = async () => {
@@ -919,16 +948,17 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
       return;
     }
 
-    if (createdProcessId && serviceProcess) {
+    if (!allowNewRequest && createdProcessId && stripeCheckoutSessionId) {
       setInitialStageFinished(true);
       return;
     }
 
     setIsCreatingProcess(true);
+    setPaymentStatus('creating_request');
     setProcessCreationError(null);
 
     try {
-      let createdProcess: { id: string } | null = null;
+      let createdProcess: { id: string; paymentStatus?: string | null; processStatus?: string | null } | null = null;
       const { data: sessionData } = await supabase.auth.getSession();
       const accessToken = sessionData.session?.access_token;
 
@@ -949,23 +979,32 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
             clientEmail: currentUser.email || null,
             clientUserId: currentUser.id || null,
             organizationName: currentUser.organizationName || null,
+            processStatus: 'pending_payment',
+            paymentStatus: 'pending',
           },
         },
       );
 
       if (!functionError && functionResult?.success && functionResult?.processId) {
         console.log('[dashboard] Processo criado pela Edge Function', functionResult);
-        createdProcess = { id: functionResult.processId as string };
+        createdProcess = {
+          id: functionResult.processId as string,
+          paymentStatus: functionResult.paymentStatus ?? 'pending',
+          processStatus: functionResult.processStatus ?? 'pending_payment',
+        };
       } else {
         console.error('[dashboard] Falha da Edge Function na criação do processo', { functionError, functionResult });
         throw functionError || new Error(functionResult?.error || 'Falha ao criar processo');
       }
 
+      setBackendPaymentStatus(createdProcess.paymentStatus || 'pending');
+      setBackendProcessStatus(createdProcess.processStatus || 'pending_payment');
+
       const optimisticProcessRow: DashboardProcessRow = {
         id: createdProcess.id,
         titulo: selectedService.name,
         protocolo: createdProcess.id,
-        status: 'triagem',
+        status: 'cadastro',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         unidade_atendimento: selectedService.area,
@@ -974,6 +1013,8 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
         responsavel_user_id: currentUser.id || null,
         cliente_user_id: currentUser.id || null,
         data_conclusao: null,
+        payment_status: createdProcess.paymentStatus || 'pending',
+        process_status: createdProcess.processStatus || 'pending_payment',
       };
 
       setCreatedProcessId(createdProcess.id);
@@ -998,35 +1039,58 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
           status: index === 0 ? 'em_andamento' : 'pendente',
           responsible: selectedSlotData.professional,
           updatedAt: now,
-          notes: index === 0 ? 'Pagamento confirmado e atendimento iniciado.' : '',
+          notes: index === 0 ? 'Solicitação criada com pagamento pendente.' : '',
         })),
         timeline: [
           { date: now, message: 'Ordem de Serviço criada' },
           { date: now, message: `Setor responsável atualizado (${selectedSlotData.professional})` },
         ],
       });
-      setFinanceEntries((previous) => [
-        {
-          id: createdProcess.id,
-          serviceName: selectedService.name,
-          totalLabel: totalPriceLabel,
-          paidAt: now,
-        },
-        ...previous,
-      ]);
 
+      setPaymentStatus('awaiting_redirect');
+      await logTimelineEvent(`Solicitação ${createdProcess.id} criada com pagamento pendente. Redirecionando para checkout Stripe.`, createdProcess.id);
+
+      const { data: checkoutResult, error: checkoutError } = await supabase.functions.invoke(
+        SUPABASE_EDGE_FUNCTIONS.CREATE_CHECKOUT_SESSION,
+        {
+          headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+          body: {
+            processId: createdProcess.id,
+            organizationId: activeOrganizationId,
+            serviceName: selectedService.name,
+            serviceArea: selectedService.area,
+            amountLabel: totalPriceLabel,
+            customerName: currentUser.name,
+            customerEmail: currentUser.email || null,
+            customerId: currentUser.id || null,
+            returnUrlSuccess: `${window.location.origin}${window.location.pathname}?checkout=success`,
+            returnUrlCancel: `${window.location.origin}${window.location.pathname}?checkout=cancel`,
+          },
+        },
+      );
+
+      if (checkoutError || !checkoutResult?.checkoutSession?.url) {
+        throw checkoutError || new Error(checkoutResult?.error || 'Falha ao criar checkout session');
+      }
+
+      const sessionId = checkoutResult.checkoutSession.id || checkoutResult.stripeCheckoutSessionId || null;
+      setStripeCheckoutSessionId(sessionId);
+      setBackendPaymentStatus(checkoutResult.paymentStatus || createdProcess.paymentStatus || 'pending');
+      setBackendProcessStatus(checkoutResult.processStatus || createdProcess.processStatus || 'pending_payment');
+      setPaymentStatus('pending');
       setInitialStageFinished(true);
       setAllowNewRequest(false);
-      if (processStatus === ProcessStatus.PENDENTE) {
-        setProcessStatus(ProcessStatus.TRIAGEM);
-      }
-      await logTimelineEvent(`Etapa inicial finalizada após pagamento confirmado. Processo ${createdProcess.id} gerado e encaminhado para o setor responsável.`, createdProcess.id);
+      await logTimelineEvent(`Checkout Stripe iniciado (sessão ${sessionId || 'sem id retornado'}).`, createdProcess.id);
+
+      window.location.assign(checkoutResult.checkoutSession.url as string);
     } catch {
-      setProcessCreationError('Falha ao gerar processo para o setor responsável. Tente novamente.');
+      setProcessCreationError('Falha ao criar solicitação de pagamento. Tente novamente.');
+      setPaymentStatus('idle');
     } finally {
       setIsCreatingProcess(false);
     }
   };
+
 
   return (
   <div className="min-h-screen bg-gray-50 p-4 md:p-8 text-gray-800">
@@ -1304,9 +1368,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
                   disabled={!canContinueToPayment}
                   onClick={() => {
                     setPaymentMethod('cartao');
-                    setPaymentStatus('confirmed');
                     void logTimelineEvent(`Pagamento iniciado no Stripe por cartão para ${selectedService.name}, após seleção do setor responsável.`);
-                    void logTimelineEvent(`Pagamento confirmado automaticamente (cartão) para ${selectedService.name}.`);
                     void handleFinalizeInitialStage();
                   }}
                   className="rounded-xl bg-blue-600 text-white font-bold px-4 py-2 disabled:opacity-50"
@@ -1318,8 +1380,8 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
                   disabled={!canContinueToPayment}
                   onClick={() => {
                     setPaymentMethod('boleto');
-                    setPaymentStatus('awaiting_confirmation');
-                    void logTimelineEvent(`Pagamento iniciado no Stripe por boleto para ${selectedService.name}, após seleção do setor responsável. Aguardando confirmação.`);
+                    void logTimelineEvent(`Pagamento iniciado no Stripe por boleto para ${selectedService.name}, após seleção do setor responsável.`);
+                    void handleFinalizeInitialStage();
                   }}
                   className="rounded-xl border border-blue-200 bg-white text-blue-700 font-bold px-4 py-2 disabled:opacity-50"
                 >
@@ -1327,44 +1389,40 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
                 </button>
               </div>
 
-              {paymentStatus === 'awaiting_confirmation' && (
-                <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
-                  <p className="text-sm font-semibold text-amber-700">
-                    Aguardando confirmação de pagamento do boleto. Após confirmação, o fluxo continuará automaticamente.
+              {paymentStatus === 'creating_request' && (
+                <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3">
+                  <p className="text-sm font-semibold text-blue-700">
+                    Criando solicitação inicial com status pending_payment e paymentStatus pending...
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPaymentStatus('confirmed');
-                      void logTimelineEvent(`Pagamento confirmado após compensação de boleto para ${selectedService.name}.`);
-                      void handleFinalizeInitialStage();
-                    }}
-                    className="mt-2 rounded-lg bg-amber-600 text-white px-3 py-2 text-sm font-bold"
-                  >
-                    Confirmar pagamento do boleto
-                  </button>
                 </div>
               )}
 
-              {paymentStatus === 'confirmed' && (
-                <div className="mt-3 space-y-3">
-                  <p className="text-sm font-semibold text-emerald-700">
-                    Pagamento confirmado via {paymentMethod === 'cartao' ? 'cartão de crédito' : 'boleto'}.
+              {paymentStatus === 'awaiting_redirect' && (
+                <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3">
+                  <p className="text-sm font-semibold text-blue-700">
+                    Checkout criado. Aguardando redirecionamento para o Stripe...
                   </p>
-                  <button
-                    type="button"
-                    disabled={isCreatingProcess}
-                    onClick={() => {
-                      void handleFinalizeInitialStage();
-                    }}
-                    className="rounded-xl bg-emerald-600 text-white font-bold px-4 py-2 disabled:opacity-60"
-                  >
-                    {isCreatingProcess ? 'Gerando processo...' : 'Finalizar pagamento e liberar área da OS'}
-                  </button>
-                  {processCreationError && (
-                    <p className="text-sm font-semibold text-red-600">{processCreationError}</p>
-                  )}
                 </div>
+              )}
+
+              {paymentStatus === 'pending' && (
+                <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                  <p className="text-sm font-semibold text-amber-700">
+                    Pagamento pendente. Assim que houver confirmação no backend, o processo será atualizado.
+                  </p>
+                </div>
+              )}
+
+              {paymentStatus === 'cancelled' && (
+                <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 p-3">
+                  <p className="text-sm font-semibold text-rose-700">
+                    Checkout cancelado. Você pode iniciar uma nova tentativa de pagamento.
+                  </p>
+                </div>
+              )}
+
+              {processCreationError && (
+                <p className="mt-3 text-sm font-semibold text-red-600">{processCreationError}</p>
               )}
             </div>
           )}
@@ -1375,22 +1433,39 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
         <section className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 sm:p-6">
           <h2 className="text-lg font-black text-emerald-800">Etapa inicial concluída</h2>
           <p className="text-sm font-semibold text-emerald-700 mt-1">
-            Pagamento aprovado e área da Ordem de Serviço liberada para envio de comentários e documentos.
+            Solicitação enviada ao backend e checkout criado. Aguarde a confirmação do pagamento para continuidade.
           </p>
           {createdProcessId && (
             <div className="text-xs font-bold text-emerald-800 mt-2 space-y-1">
               <p>Número da OS: {createdProcessId}</p>
               <p>Serviço contratado: {selectedService?.name || serviceProcess?.serviceName || '-'}</p>
-              <p>Valor pago: {totalPriceLabel}</p>
+              <p>Valor da cobrança: {totalPriceLabel}</p>
+              <p>paymentStatus: {backendPaymentStatus}</p>
+              <p>processStatus: {backendProcessStatus}</p>
+              <p>stripeCheckoutSessionId: {summarizeStripeSessionId(stripeCheckoutSessionId)}</p>
             </div>
           )}
+        </section>
+      )}
+
+
+      {checkoutReturnStatus && (
+        <section className={`mb-6 rounded-2xl border p-4 sm:p-6 ${checkoutReturnStatus === 'success' ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}>
+          <h2 className={`text-lg font-black ${checkoutReturnStatus === 'success' ? 'text-emerald-800' : 'text-amber-800'}`}>
+            {checkoutReturnStatus === 'success' ? 'Retorno do checkout recebido' : 'Pagamento cancelado no checkout'}
+          </h2>
+          <p className={`text-sm font-semibold mt-1 ${checkoutReturnStatus === 'success' ? 'text-emerald-700' : 'text-amber-700'}`}>
+            {checkoutReturnStatus === 'success'
+              ? 'Recebemos o retorno de sucesso do Stripe. A confirmação final depende da validação backend/webhook.'
+              : 'Você retornou do Stripe sem concluir o pagamento. O processo permanece pendente.'}
+          </p>
         </section>
       )}
 
       {serviceProcess && (
         <section className="mb-6 rounded-2xl border border-blue-200 bg-blue-50 p-4 sm:p-6">
           <h2 className="text-lg font-black text-blue-800">PROCESSO EM ANDAMENTO</h2>
-          <p className="text-sm font-semibold text-emerald-700 mt-1">Pagamento confirmado! Seu atendimento foi iniciado.</p>
+          <p className="text-sm font-semibold text-blue-700 mt-1">Solicitação criada. O atendimento será iniciado após confirmação do pagamento.</p>
           <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
             <p><span className="font-black text-gray-600 uppercase text-xs">Setor responsável</span><br />{displaySectorName}</p>
             <p><span className="font-black text-gray-600 uppercase text-xs">Status</span><br />{serviceProcess.statusLabel}</p>
@@ -1490,14 +1565,20 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
             onClick={() => {
               setAllowNewRequest(true);
               setInitialStageFinished(false);
-              setCreatedProcessId(null);
-              setServiceProcess(null);
               setSelectedArea(null);
               setSelectedServiceId('');
               setSelectedSlot('');
               setSelectedAdminScheduleSlot('');
               setPaymentMethod('');
               setPaymentStatus('idle');
+              setProcessCreationError(null);
+              setCheckoutReturnStatus(null);
+              setBackendPaymentStatus('pending');
+              setBackendProcessStatus('pending_payment');
+              setStripeCheckoutSessionId(null);
+              setProcessStatus(mapDbStatusToProcessStatus(
+                dashboardProcesses.find((row) => row.id === selectedDashboardProcessId)?.status || dashboardProcesses[0]?.status,
+              ));
             }}
             className="mt-3 rounded-xl bg-white border border-emerald-200 text-emerald-700 font-bold px-4 py-2"
           >
