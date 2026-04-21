@@ -7,13 +7,34 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Plus, Search, Eye, FolderKanban, X, AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { listProcesses, createProcess, type Process, type CreateProcessPayload } from '../../lib/processes';
+import {
+  listProcesses,
+  listAdminOperationalProcesses,
+  createProcess,
+  type Process,
+  type CreateProcessPayload
+} from '../../lib/processes';
 
 const statusLabels: Record<string, { label: string; color: string }> = {
   cadastro: { label: 'Cadastro', color: 'bg-slate-600' },
   triagem: { label: 'Triagem', color: 'bg-yellow-600' },
   analise: { label: 'Análise', color: 'bg-orange-600' },
-  concluido: { label: 'Concluído', color: 'bg-emerald-600' }
+  concluido: { label: 'Concluído', color: 'bg-emerald-600' },
+  queued: { label: 'Na Fila', color: 'bg-indigo-600' },
+  in_progress: { label: 'Em Execução', color: 'bg-blue-600' },
+  awaiting_documents: { label: 'Aguardando Docs', color: 'bg-amber-600' },
+  under_review: { label: 'Em Revisão', color: 'bg-purple-600' },
+  completed: { label: 'Finalizado', color: 'bg-emerald-600' },
+  pending_payment: { label: 'Pagamento Pendente', color: 'bg-red-700' }
+};
+
+const paymentLabels: Record<string, { label: string; color: string }> = {
+  pending: { label: 'Pendente', color: 'bg-yellow-700' },
+  paid: { label: 'Pago', color: 'bg-emerald-700' },
+  failed: { label: 'Falhou', color: 'bg-red-700' },
+  refunded: { label: 'Estornado', color: 'bg-orange-700' },
+  canceled: { label: 'Cancelado', color: 'bg-slate-700' },
+  released: { label: 'Liberado', color: 'bg-cyan-700' }
 };
 
 const ProcessList: React.FC = () => {
@@ -37,7 +58,7 @@ const ProcessList: React.FC = () => {
 
   useEffect(() => {
     loadProcesses();
-  }, [userContext?.org_id]);
+  }, [userContext?.org_id, isAdmin]);
 
   const loadProcesses = async () => {
     if (!userContext?.org_id) {
@@ -50,8 +71,11 @@ const ProcessList: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      const data = await listProcesses(userContext.org_id);
-      setProcesses(data);
+      const data = isAdmin
+        ? await listAdminOperationalProcesses(userContext.org_id)
+        : await listProcesses(userContext.org_id);
+      const safeData = data.filter((process) => process.process_status !== 'pending_payment');
+      setProcesses(safeData);
     } catch (err) {
       console.error('Error loading processes:', err);
       setError('Erro ao carregar processos. Verifique se as migrações foram executadas.');
@@ -95,6 +119,7 @@ const ProcessList: React.FC = () => {
     return new Date(dateStr).toLocaleDateString('pt-BR');
   };
 
+  const getOperationalStatus = (process: Process) => process.process_status || process.status;
 
   const formatSource = (source?: string | null) => {
     if (!source) return 'Painel interno';
@@ -189,10 +214,17 @@ const ProcessList: React.FC = () => {
                     <td className="px-6 py-4 font-bold text-slate-200">{process.titulo}</td>
                     <td className="px-6 py-4 text-slate-300">{process.cliente_nome || '-'}</td>
                     <td className="px-6 py-4">
+                      {process.payment_status && (
+                        <span
+                          className={`mr-2 px-3 py-1 rounded-full text-[10px] font-black text-white ${paymentLabels[process.payment_status]?.color || 'bg-slate-600'}`}
+                        >
+                          Pgto: {paymentLabels[process.payment_status]?.label || process.payment_status}
+                        </span>
+                      )}
                       <span
-                        className={`px-3 py-1 rounded-full text-[10px] font-black text-white ${statusLabels[process.status]?.color || 'bg-slate-600'}`}
+                        className={`px-3 py-1 rounded-full text-[10px] font-black text-white ${statusLabels[getOperationalStatus(process)]?.color || 'bg-slate-600'}`}
                       >
-                        {statusLabels[process.status]?.label || process.status}
+                        {statusLabels[getOperationalStatus(process)]?.label || getOperationalStatus(process)}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-slate-300 font-semibold">{formatSource(process.origem_canal)}</td>

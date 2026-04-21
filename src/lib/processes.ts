@@ -34,6 +34,21 @@ export interface Process {
   origem_canal?: string | null;
   unidade_atendimento?: string | null;
   org_nome_solicitado?: string | null;
+  payment_status?: 'pending' | 'paid' | 'failed' | 'refunded' | 'canceled' | 'released' | null;
+  process_status?:
+    | 'draft'
+    | 'created'
+    | 'pending_payment'
+    | 'queued'
+    | 'in_progress'
+    | 'awaiting_documents'
+    | 'under_review'
+    | 'completed'
+    | 'cadastro'
+    | 'triagem'
+    | 'analise'
+    | 'concluido'
+    | null;
 }
 
 export interface ProcessEvent {
@@ -105,6 +120,51 @@ export async function listProcesses(org_id: string): Promise<Process[]> {
   } catch (err) {
     const elapsed = performance.now() - startTime;
     logError(`Unexpected error in listProcesses after ${elapsed.toFixed(2)}ms:`, err);
+    logError('Error stack:', (err as Error)?.stack);
+    return [];
+  }
+}
+
+const ADMIN_OPERATIONAL_STATUSES: NonNullable<Process['process_status']>[] = [
+  'queued',
+  'in_progress',
+  'awaiting_documents',
+  'under_review',
+  'completed'
+];
+
+/**
+ * List operational processes for admin panel
+ * - payment_status = paid
+ * - process_status IN operational statuses
+ */
+export async function listAdminOperationalProcesses(org_id: string): Promise<Process[]> {
+  const startTime = performance.now();
+  log('listAdminOperationalProcesses() starting for org_id:', org_id);
+
+  try {
+    const { data, error } = await supabase
+      .from('processes')
+      .select('*')
+      .eq('org_id', org_id)
+      .eq('payment_status', 'paid')
+      .in('process_status', ADMIN_OPERATIONAL_STATUSES)
+      .order('created_at', { ascending: false });
+
+    const elapsed = performance.now() - startTime;
+    log(`Admin operational query completed in ${elapsed.toFixed(2)}ms`);
+
+    if (error) {
+      logError('Error listing admin operational processes:', error);
+      logError('Error details:', JSON.stringify(error, null, 2));
+      return [];
+    }
+
+    log('Admin operational query successful, returned', data?.length || 0, 'processes');
+    return data || [];
+  } catch (err) {
+    const elapsed = performance.now() - startTime;
+    logError(`Unexpected error in listAdminOperationalProcesses after ${elapsed.toFixed(2)}ms:`, err);
     logError('Error stack:', (err as Error)?.stack);
     return [];
   }
