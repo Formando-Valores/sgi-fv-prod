@@ -61,6 +61,18 @@ export interface ProcessEvent {
   created_at: string;
 }
 
+export interface PaidClientProcessFinance {
+  processId: string;
+  serviceName: string;
+  amount: number | null;
+  currency: string | null;
+  paymentStatus: NonNullable<Process['payment_status']>;
+  paidAt: string;
+  useUntil: string | null;
+  processStatus: NonNullable<Process['process_status']> | null;
+  isExpiringSoon: boolean;
+}
+
 export interface CreateProcessPayload {
   titulo: string;
   cliente_nome?: string;
@@ -165,6 +177,66 @@ export async function listAdminOperationalProcesses(org_id: string): Promise<Pro
   } catch (err) {
     const elapsed = performance.now() - startTime;
     logError(`Unexpected error in listAdminOperationalProcesses after ${elapsed.toFixed(2)}ms:`, err);
+    logError('Error stack:', (err as Error)?.stack);
+    return [];
+  }
+}
+
+/**
+ * List paid processes with financial data for an authenticated client in a specific organization.
+ */
+export async function listClientPaidProcessesFinance(
+  org_id: string,
+  client_user_id: string,
+): Promise<PaidClientProcessFinance[]> {
+  const startTime = performance.now();
+  log('listClientPaidProcessesFinance() starting for org_id:', org_id, 'client_user_id:', client_user_id);
+
+  try {
+    const { data, error } = await supabase
+      .from('processes')
+      .select('id,titulo,amount,currency,payment_status,paid_at,data_prazo,process_status')
+      .eq('org_id', org_id)
+      .eq('responsavel_user_id', client_user_id)
+      .eq('payment_status', 'paid')
+      .not('paid_at', 'is', null)
+      .order('paid_at', { ascending: false });
+
+    const elapsed = performance.now() - startTime;
+    log(`Client paid financial query completed in ${elapsed.toFixed(2)}ms`);
+
+    if (error) {
+      logError('Error listing client paid financial processes:', error);
+      logError('Error details:', JSON.stringify(error, null, 2));
+      return [];
+    }
+
+    const now = new Date();
+    const sevenDaysFromNow = new Date(now);
+    sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
+
+    const rows = (data || []).map((row) => {
+      const deadline = row.data_prazo ? new Date(`${row.data_prazo}T23:59:59`) : null;
+      const isExpiringSoon = Boolean(deadline && deadline >= now && deadline <= sevenDaysFromNow);
+
+      return {
+        processId: row.id,
+        serviceName: row.titulo || 'Serviço não informado',
+        amount: typeof row.amount === 'number' ? row.amount : row.amount ? Number(row.amount) : null,
+        currency: row.currency || null,
+        paymentStatus: (row.payment_status || 'pending') as NonNullable<Process['payment_status']>,
+        paidAt: row.paid_at as string,
+        useUntil: row.data_prazo || null,
+        processStatus: (row.process_status || null) as NonNullable<Process['process_status']> | null,
+        isExpiringSoon,
+      } satisfies PaidClientProcessFinance;
+    });
+
+    log('Client paid financial query successful, returned', rows.length, 'processes');
+    return rows;
+  } catch (err) {
+    const elapsed = performance.now() - startTime;
+    logError(`Unexpected error in listClientPaidProcessesFinance after ${elapsed.toFixed(2)}ms:`, err);
     logError('Error stack:', (err as Error)?.stack);
     return [];
   }
