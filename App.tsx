@@ -18,6 +18,8 @@ import Register from './pages/Register';
 import PasswordRecovery from './pages/PasswordRecovery';
 import UserDashboard from './pages/UserDashboard';
 import AdminDashboard from './pages/AdminDashboard';
+import PaymentSuccess from './src/pages/Payments/PaymentSuccess';
+import PaymentCancel from './src/pages/Payments/PaymentCancel';
 import { ProcessStatus, ServiceUnit, User, UserRole } from './types';
 import { INITIAL_MOCK_USERS } from './constants';
 import { supabase } from './supabase';
@@ -220,6 +222,8 @@ const RootApp: React.FC = () => {
           <Route path="/dashboard/clientes" element={renderDashboardRoute('clientes')} />
           <Route path="/dashboard/configuracoes" element={renderDashboardRoute('configuracoes')} />
           <Route path="/dashboard/organizacoes" element={renderDashboardRoute('organizacoes')} />
+          <Route path="/payments/success" element={<PaymentSuccess />} />
+          <Route path="/payments/cancel" element={<PaymentCancel />} />
           <Route path="*" element={authBootstrapping ? authLoadingScreen : <Navigate to="/login" />} />
         </Routes>
       </div>
