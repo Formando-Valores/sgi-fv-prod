@@ -49,8 +49,11 @@ Deno.serve(async (request) => {
   const organizationId = String(payload.organizationId ?? '').trim();
   const serviceName = String(payload.serviceName ?? '').trim();
   const serviceArea = String(payload.serviceArea ?? '').trim();
+  const serviceId = payload.serviceId ? String(payload.serviceId).trim() : null;
   const scheduledSlot = String(payload.scheduledSlot ?? '').trim();
   const assignedProfessionalName = String(payload.assignedProfessionalName ?? '').trim();
+  const amount = Number(payload.amount ?? 0);
+  const normalizedAmount = Number.isFinite(amount) && amount > 0 ? Math.round(amount) : null;
   const clientName = String(payload.clientName ?? '').trim();
   const clientDocument = payload.clientDocument ? String(payload.clientDocument).trim() : null;
   const clientContact = payload.clientContact ? String(payload.clientContact).trim() : null;
@@ -76,6 +79,17 @@ Deno.serve(async (request) => {
   const processTitle = `${serviceName} - ${assignedProfessionalName || 'Profissional a definir'} (${scheduledSlot || 'horário a confirmar'})`;
 
   try {
+    const { data: processColumnsData } = await adminClient
+      .from('information_schema.columns')
+      .select('column_name')
+      .eq('table_schema', 'public')
+      .eq('table_name', 'processes');
+
+    const processColumns = new Set((processColumnsData ?? []).map((column) => String(column.column_name)));
+
+    const processStatusValue = 'pending_payment';
+    const paymentStatusValue = 'pending';
+
     if (normalizedClientUserId) {
       const { data: existingMember } = await adminClient
         .from('org_members')
@@ -94,22 +108,47 @@ Deno.serve(async (request) => {
       }
     }
 
+    const processInsert: Record<string, unknown> = {
+      org_id: organizationId,
+      titulo: processTitle,
+      cliente_nome: clientName || 'Cliente',
+      cliente_documento: clientDocument,
+      cliente_contato: clientEmail || clientContact || null,
+      responsavel_user_id: normalizedClientUserId,
+      cliente_user_id: normalizedClientUserId,
+      origem_canal: 'portal_cliente',
+      unidade_atendimento: serviceArea || null,
+      org_nome_solicitado: organizationName,
+    };
+
+    if (processColumns.has('process_status')) {
+      processInsert.process_status = processStatusValue;
+    } else if (processColumns.has('status')) {
+      processInsert.status = 'cadastro';
+    }
+
+    if (processColumns.has('payment_status')) {
+      processInsert.payment_status = paymentStatusValue;
+    }
+
+    if (normalizedAmount !== null) {
+      if (processColumns.has('amount')) processInsert.amount = normalizedAmount;
+      if (processColumns.has('valor')) processInsert.valor = normalizedAmount;
+      if (processColumns.has('valor_centavos')) processInsert.valor_centavos = normalizedAmount;
+      if (processColumns.has('checkout_amount')) processInsert.checkout_amount = normalizedAmount;
+    }
+
+    if (serviceId) {
+      if (processColumns.has('service_id')) processInsert.service_id = serviceId;
+      if (processColumns.has('selected_service_id')) processInsert.selected_service_id = serviceId;
+      if (processColumns.has('servico_id')) processInsert.servico_id = serviceId;
+      if (processColumns.has('service_reference')) processInsert.service_reference = serviceId;
+    }
+
     const { data: createdProcess, error: processError } = await adminClient
       .from('processes')
-      .insert({
-        org_id: organizationId,
-        titulo: processTitle,
-        status: 'triagem',
-        cliente_nome: clientName || 'Cliente',
-        cliente_documento: clientDocument,
-        cliente_contato: clientEmail || clientContact || null,
-        responsavel_user_id: normalizedClientUserId,
-        cliente_user_id: normalizedClientUserId,
-        origem_canal: 'portal_cliente',
-        unidade_atendimento: serviceArea || null,
-        org_nome_solicitado: organizationName,
-      })
-      .select('id,created_at')
+      .insert(processInsert)
+      .select('id,created_at,status,process_status,payment_status')
       .single();
 
     if (processError || !createdProcess) {
@@ -121,7 +160,7 @@ Deno.serve(async (request) => {
         org_id: organizationId,
         process_id: createdProcess.id,
         tipo: 'registro',
-        mensagem: `Atendimento criado após pagamento confirmado. Serviço: ${serviceName}.`,
+        mensagem: `Solicitação criada; aguardando confirmação de pagamento. Serviço: ${serviceName}. Referência: ${serviceId || 'não informada'}. Valor: ${normalizedAmount ?? 'não informado'}.`,
         created_by: requesterUserId,
       },
       {
@@ -143,6 +182,8 @@ Deno.serve(async (request) => {
     return jsonResponse(200, {
       success: true,
       processId: createdProcess.id,
+      status: createdProcess.process_status ?? createdProcess.status ?? processStatusValue,
+      paymentStatus: createdProcess.payment_status ?? paymentStatusValue,
       createdAt: createdProcess.created_at,
     });
   } catch {
