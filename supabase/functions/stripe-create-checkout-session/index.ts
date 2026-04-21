@@ -1,5 +1,5 @@
-import Stripe from 'https://esm.sh/stripe@18.3.0?target=deno';
 import { Client } from 'https://deno.land/x/postgres@v0.19.3/mod.ts';
+import { StripePaymentProvider } from '../_shared/payments/stripeProvider.ts';
 
 type CheckoutPayload = {
   amount?: number;
@@ -78,9 +78,7 @@ Deno.serve(async (request) => {
     return jsonResponse(400, { success: false, error: 'successUrl e cancelUrl são obrigatórios.' });
   }
 
-  const stripe = new Stripe(stripeSecretKey, {
-    apiVersion: '2025-03-31.basil',
-  });
+  const provider = new StripePaymentProvider(stripeSecretKey);
 
   const processId = String(payload.processId ?? '').trim();
   const clientId = String(payload.clientId ?? '').trim();
@@ -97,30 +95,17 @@ Deno.serve(async (request) => {
     await client.connect();
     await client.queryArray('BEGIN');
 
-    const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      line_items: [
-        {
-          quantity: 1,
-          price_data: {
-            currency,
-            unit_amount: Math.round(amount),
-            product_data: {
-              name: 'Serviço SGI FV',
-            },
-          },
-        },
-      ],
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-      metadata: {
-        processId,
-        clientId,
-        serviceId,
-        organizationId,
-        areaId: String(payload.areaId ?? ''),
-        sectorId: String(payload.sectorId ?? ''),
-      },
+    const checkout = await provider.createCheckout({
+      amountInCents: amount,
+      currency,
+      successUrl,
+      cancelUrl,
+      processId,
+      clientId,
+      serviceId,
+      organizationId,
+      areaId: String(payload.areaId ?? ''),
+      sectorId: String(payload.sectorId ?? ''),
     });
 
     await client.queryObject(
@@ -130,22 +115,24 @@ Deno.serve(async (request) => {
          amount,
          currency,
          status,
+         payment_provider,
          payment_method,
          stripe_checkout_session_id,
-         last_event_type,
-         last_event_at,
-         updated_at
-       ) VALUES ($1, $2, $3, $4, 'pending', 'stripe_checkout', $5, 'checkout.session.created', now(), now())
+       last_event_type,
+        last_event_at,
+        updated_at
+       ) VALUES ($1, $2, $3, $4, 'pending', 'stripe', 'stripe_checkout', $5, 'checkout.session.created', now(), now())
        ON CONFLICT (process_id) DO UPDATE
        SET amount = EXCLUDED.amount,
            currency = EXCLUDED.currency,
            status = 'pending',
+           payment_provider = 'stripe',
            payment_method = 'stripe_checkout',
            stripe_checkout_session_id = EXCLUDED.stripe_checkout_session_id,
            last_event_type = 'checkout.session.created',
            last_event_at = now(),
            updated_at = now()`,
-      [processId, clientId, amount / 100, currency.toUpperCase(), session.id],
+      [processId, clientId, amount / 100, currency.toUpperCase(), checkout.sessionId],
     );
 
     await client.queryObject(
@@ -164,19 +151,19 @@ Deno.serve(async (request) => {
       [
         organizationId,
         processId,
-        `Checkout session criada. checkoutSessionId=${session.id}.`,
-        session.id,
-        `Cliente redirecionado para checkout Stripe. checkoutSessionId=${session.id}.`,
+        `Checkout session criada. checkoutSessionId=${checkout.sessionId}.`,
+        checkout.sessionId,
+        `Cliente redirecionado para checkout Stripe. checkoutSessionId=${checkout.sessionId}.`,
       ],
     );
 
     await client.queryArray('COMMIT');
-    logAudit('checkout_created_and_redirect_logged', { processId, checkoutSessionId: session.id, clientId });
+    logAudit('checkout_created_and_redirect_logged', { processId, checkoutSessionId: checkout.sessionId, clientId });
 
     return jsonResponse(200, {
       success: true,
-      sessionId: session.id,
-      url: session.url,
+      sessionId: checkout.sessionId,
+      url: checkout.url,
     });
   } catch (error) {
     await client.queryArray('ROLLBACK').catch(() => undefined);

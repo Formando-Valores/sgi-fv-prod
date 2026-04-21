@@ -14,28 +14,11 @@ import {
   type Process,
   type CreateProcessPayload
 } from '../../lib/processes';
-
-const statusLabels: Record<string, { label: string; color: string }> = {
-  cadastro: { label: 'Cadastro', color: 'bg-slate-600' },
-  triagem: { label: 'Triagem', color: 'bg-yellow-600' },
-  analise: { label: 'Análise', color: 'bg-orange-600' },
-  concluido: { label: 'Concluído', color: 'bg-emerald-600' },
-  queued: { label: 'Na Fila', color: 'bg-indigo-600' },
-  in_progress: { label: 'Em Execução', color: 'bg-blue-600' },
-  awaiting_documents: { label: 'Aguardando Docs', color: 'bg-amber-600' },
-  under_review: { label: 'Em Revisão', color: 'bg-purple-600' },
-  completed: { label: 'Finalizado', color: 'bg-emerald-600' },
-  pending_payment: { label: 'Pagamento Pendente', color: 'bg-red-700' }
-};
-
-const paymentLabels: Record<string, { label: string; color: string }> = {
-  pending: { label: 'Pendente', color: 'bg-yellow-700' },
-  paid: { label: 'Pago', color: 'bg-emerald-700' },
-  failed: { label: 'Falhou', color: 'bg-red-700' },
-  refunded: { label: 'Estornado', color: 'bg-orange-700' },
-  canceled: { label: 'Cancelado', color: 'bg-slate-700' },
-  released: { label: 'Liberado', color: 'bg-cyan-700' }
-};
+import {
+  PAYMENT_STATUS_BADGES,
+  PROCESS_STATUS_BADGES,
+  getOperationalStatus,
+} from '../../lib/paymentStatus';
 
 const ProcessList: React.FC = () => {
   const { userContext, isAdmin } = useAuth();
@@ -118,8 +101,6 @@ const ProcessList: React.FC = () => {
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('pt-BR');
   };
-
-  const getOperationalStatus = (process: Process) => process.process_status || process.status;
 
   const formatSource = (source?: string | null) => {
     if (!source) return 'Painel interno';
@@ -216,15 +197,15 @@ const ProcessList: React.FC = () => {
                     <td className="px-6 py-4">
                       {process.payment_status && (
                         <span
-                          className={`mr-2 px-3 py-1 rounded-full text-[10px] font-black text-white ${paymentLabels[process.payment_status]?.color || 'bg-slate-600'}`}
+                          className={`mr-2 px-3 py-1 rounded-full text-[10px] font-black text-white ${PAYMENT_STATUS_BADGES[process.payment_status]?.color || 'bg-slate-600'}`}
                         >
-                          Pgto: {paymentLabels[process.payment_status]?.label || process.payment_status}
+                          Pgto: {PAYMENT_STATUS_BADGES[process.payment_status]?.label || process.payment_status}
                         </span>
                       )}
                       <span
-                        className={`px-3 py-1 rounded-full text-[10px] font-black text-white ${statusLabels[getOperationalStatus(process)]?.color || 'bg-slate-600'}`}
+                        className={`px-3 py-1 rounded-full text-[10px] font-black text-white ${PROCESS_STATUS_BADGES[getOperationalStatus(process)]?.color || 'bg-slate-600'}`}
                       >
-                        {statusLabels[getOperationalStatus(process)]?.label || getOperationalStatus(process)}
+                        {PROCESS_STATUS_BADGES[getOperationalStatus(process)]?.label || getOperationalStatus(process)}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-slate-300 font-semibold">{formatSource(process.origem_canal)}</td>
