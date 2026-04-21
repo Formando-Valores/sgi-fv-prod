@@ -130,16 +130,18 @@ Deno.serve(async (request) => {
          amount,
          currency,
          status,
+         payment_provider,
          payment_method,
          stripe_checkout_session_id,
          last_event_type,
          last_event_at,
          updated_at
-       ) VALUES ($1, $2, $3, $4, 'pending', 'stripe_checkout', $5, 'checkout.session.created', now(), now())
+       ) VALUES ($1, $2, $3, $4, 'pending', 'stripe', 'stripe_checkout', $5, 'checkout.session.created', now(), now())
        ON CONFLICT (process_id) DO UPDATE
        SET amount = EXCLUDED.amount,
            currency = EXCLUDED.currency,
            status = 'pending',
+           payment_provider = 'stripe',
            payment_method = 'stripe_checkout',
            stripe_checkout_session_id = EXCLUDED.stripe_checkout_session_id,
            last_event_type = 'checkout.session.created',
