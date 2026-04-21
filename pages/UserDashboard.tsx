@@ -5,6 +5,7 @@ import { User, ProcessStatus, UserRole } from '../types';
 import { supabase } from '../supabase';
 import { SERVICE_MANAGERS } from '../constants';
 import { SUPABASE_EDGE_FUNCTIONS } from '../src/lib/supabaseFunctions';
+import { listClientPaidProcessesFinance } from '../src/lib/processes';
 
 interface UserDashboardProps {
   currentUser: User;
@@ -134,6 +135,19 @@ const summarizeStripeSessionId = (sessionId?: string | null) => {
   return `${sessionId.slice(0, 8)}...${sessionId.slice(-6)}`;
 };
 
+const formatFinanceAmount = (amount?: number | null, currency?: string | null) => {
+  if (amount === null || amount === undefined) return 'Valor não informado';
+  const normalizedCurrency = (currency || 'EUR').toUpperCase();
+  return new Intl.NumberFormat('pt-PT', { style: 'currency', currency: normalizedCurrency }).format(amount);
+};
+
+const formatFinanceDate = (value?: string | null) => {
+  if (!value) return '-';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '-';
+  return parsed.toLocaleDateString('pt-PT');
+};
+
 const formatProcessTimelineMessage = (event: { tipo?: string | null; mensagem?: string | null }) => {
   const message = (event.mensagem || '').trim();
   if (!message) return 'Atualização registrada';
@@ -203,10 +217,20 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
   const [dashboardProcessSearch, setDashboardProcessSearch] = React.useState('');
   const [selectedDashboardProcessId, setSelectedDashboardProcessId] = React.useState<string | null>(null);
   const [dashboardProcessesLoading, setDashboardProcessesLoading] = React.useState(false);
+  const [activeInternalSection] = React.useState<'overview' | 'finance'>('overview');
   const [processComments, setProcessComments] = React.useState<Array<{ id: string; text: string; createdAt: string }>>([]);
   const [newComment, setNewComment] = React.useState('');
   const [processFiles, setProcessFiles] = React.useState<Array<{ id: string; name: string; sizeLabel: string; uploadedAt: string }>>([]);
-  const [financeEntries, setFinanceEntries] = React.useState<Array<{ id: string; serviceName: string; totalLabel: string; paidAt: string }>>([]);
+  const [financeEntries, setFinanceEntries] = React.useState<Array<{
+    id: string;
+    serviceName: string;
+    totalLabel: string;
+    paidAt: string;
+    useUntil: string;
+    paymentStatus: string;
+    processStatus: string;
+    isExpiringSoon: boolean;
+  }>>([]);
   const [resolvedOrganizationId, setResolvedOrganizationId] = React.useState<string | null>(currentUser.organizationId ?? null);
   const dashboardProcessesRef = React.useRef<DashboardProcessRow[]>([]);
 
@@ -468,6 +492,30 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
   React.useEffect(() => {
     void loadDashboardProcesses();
   }, [loadDashboardProcesses]);
+
+  React.useEffect(() => {
+    if (!activeOrganizationId || !currentUser.id) {
+      setFinanceEntries([]);
+      return;
+    }
+
+    const loadPaidFinanceEntries = async () => {
+      const paidProcesses = await listClientPaidProcessesFinance(activeOrganizationId, currentUser.id);
+      const entries = paidProcesses.map((financeProcess) => ({
+        id: financeProcess.processId,
+        serviceName: financeProcess.serviceName,
+        totalLabel: formatFinanceAmount(financeProcess.amount, financeProcess.currency),
+        paidAt: formatFinanceDate(financeProcess.paidAt),
+        useUntil: formatFinanceDate(financeProcess.useUntil),
+        paymentStatus: financeProcess.paymentStatus || '-',
+        processStatus: getProcessStatusDisplayLabel(financeProcess.processStatus),
+        isExpiringSoon: financeProcess.isExpiringSoon,
+      }));
+      setFinanceEntries(entries);
+    };
+
+    void loadPaidFinanceEntries();
+  }, [activeOrganizationId, currentUser.id]);
 
   React.useEffect(() => {
     const validOrgId = isValidUuid(activeOrganizationId) ? activeOrganizationId : null;
@@ -885,8 +933,8 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
     event.target.value = '';
   };
 
-  const handleDownloadReceipt = (entry: { id: string; serviceName: string; totalLabel: string; paidAt: string }) => {
-    const receiptText = `Comprovante SGI-FV\nOS: ${entry.id}\nCliente: ${currentUser.name}\nServiço: ${entry.serviceName}\nValor: ${entry.totalLabel}\nData pagamento: ${entry.paidAt}\n`;
+  const handleDownloadReceipt = (entry: { id: string; serviceName: string; totalLabel: string; paidAt: string; useUntil: string; processStatus: string }) => {
+    const receiptText = `Comprovante SGI-FV\nOS: ${entry.id}\nCliente: ${currentUser.name}\nServiço: ${entry.serviceName}\nValor: ${entry.totalLabel}\nData pagamento: ${entry.paidAt}\nVálido até: ${entry.useUntil}\nStatus do processo: ${entry.processStatus}\n`;
     const blob = new Blob([receiptText], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -1551,7 +1599,10 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
               <div className="space-y-2">
                 {financeEntries.map((entry) => (
                   <div key={entry.id} className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                    <span>{entry.serviceName} • {entry.totalLabel} • {entry.paidAt}</span>
+                    <span>
+                      {entry.serviceName} • {entry.totalLabel} • Pago em {entry.paidAt} • Uso até {entry.useUntil} • {entry.processStatus}
+                      {entry.isExpiringSoon ? ' • ⚠️ Próximo do vencimento' : ''}
+                    </span>
                     <button type="button" onClick={() => handleDownloadReceipt(entry)} className="rounded-lg border border-gray-300 px-2 py-1 font-bold">
                       Baixar comprovante
                     </button>
@@ -1559,6 +1610,9 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
                 ))}
               </div>
             </div>
+          )}
+          {activeInternalSection === 'finance' && (
+            <div className="hidden" aria-hidden="true" />
           )}
           <button
             type="button"
