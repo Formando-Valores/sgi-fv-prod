@@ -1,41 +1,69 @@
-/**
- * SGI FV - Stripe Integration (STUB)
- * 
- * TODO: Implementar integração com Stripe para:
- * - Checkout de planos/assinaturas
- * - Webhooks para atualização de status
- * - Portal do cliente
- * 
- * Referências:
- * - https://stripe.com/docs/payments/checkout
- * - https://stripe.com/docs/billing/subscriptions/webhooks
- */
+import { SUPABASE_EDGE_FUNCTIONS } from './supabaseFunctions';
 
-// TODO: Configurar chaves Stripe
-// VITE_STRIPE_PUBLISHABLE_KEY=pk_...
-// STRIPE_SECRET_KEY=sk_... (apenas backend)
-// STRIPE_WEBHOOK_SECRET=whsec_...
+type CreateCheckoutSessionParams = {
+  amount: number;
+  currency: string;
+  successUrl: string;
+  cancelUrl: string;
+  processId: string;
+  clientId: string;
+  serviceId: string;
+  organizationId: string;
+  areaId: string;
+  sectorId: string;
+};
+
+type CreateCheckoutSessionResponse = {
+  sessionId: string;
+  url: string;
+};
+
+const buildFunctionUrl = (functionName: string) => {
+  const supabaseUrl = String(import.meta.env.VITE_SUPABASE_URL ?? '').trim();
+
+  if (!supabaseUrl) {
+    throw new Error('VITE_SUPABASE_URL não configurada no frontend.');
+  }
+
+  return `${supabaseUrl}/functions/v1/${functionName}`;
+};
 
 /**
- * Criar sessão de checkout
- * TODO: Implementar chamada para Stripe Checkout
+ * Camada segura de consumo do frontend para iniciar checkout no backend.
+ * Nenhuma chave secreta do Stripe é usada aqui.
  */
 export async function createCheckoutSession(
-  _priceId: string,
-  _customerId: string
-): Promise<{ url: string } | null> {
-  console.warn('Stripe checkout não implementado');
-  return null;
+  params: CreateCheckoutSessionParams
+): Promise<CreateCheckoutSessionResponse> {
+  const anonKey = String(import.meta.env.VITE_SUPABASE_ANON_KEY ?? '').trim();
+
+  if (!anonKey) {
+    throw new Error('VITE_SUPABASE_ANON_KEY não configurada no frontend.');
+  }
+
+  const response = await fetch(buildFunctionUrl(SUPABASE_EDGE_FUNCTIONS.STRIPE_CREATE_CHECKOUT_SESSION), {
+    method: 'POST',
+    headers: {
+      apikey: anonKey,
+      Authorization: `Bearer ${anonKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(params),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const message = String(payload?.error ?? 'Não foi possível criar a sessão de checkout.');
+    throw new Error(message);
+  }
+
+  return {
+    sessionId: String(payload?.sessionId ?? ''),
+    url: String(payload?.url ?? ''),
+  };
 }
 
-/**
- * Processar webhook do Stripe
- * TODO: Implementar handler para eventos:
- * - checkout.session.completed
- * - customer.subscription.updated
- * - customer.subscription.deleted
- * - invoice.payment_failed
- */
 export async function handleStripeWebhook(
   _payload: string,
   _signature: string
@@ -44,10 +72,6 @@ export async function handleStripeWebhook(
   return false;
 }
 
-/**
- * Criar portal do cliente
- * TODO: Implementar redirecionamento para Stripe Customer Portal
- */
 export async function createCustomerPortalSession(
   _customerId: string
 ): Promise<{ url: string } | null> {
