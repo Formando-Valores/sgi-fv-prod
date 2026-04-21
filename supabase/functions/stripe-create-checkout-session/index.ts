@@ -1,4 +1,5 @@
 import Stripe from 'https://esm.sh/stripe@18.3.0?target=deno';
+import { Client } from 'https://deno.land/x/postgres@v0.19.3/mod.ts';
 
 type CheckoutPayload = {
   amount?: number;
@@ -28,6 +29,16 @@ const jsonResponse = (status: number, body: Record<string, unknown>) =>
     },
   });
 
+const getDbConnectionString = () =>
+  Deno.env.get('SUPABASE_DB_URL')
+    ?? Deno.env.get('POSTGRES_URL')
+    ?? Deno.env.get('DATABASE_URL')
+    ?? '';
+
+const logAudit = (message: string, context: Record<string, unknown>) => {
+  console.log(`[stripe-checkout] ${message}`, JSON.stringify(context));
+};
+
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -38,9 +49,14 @@ Deno.serve(async (request) => {
   }
 
   const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY') ?? '';
+  const dbConnectionString = getDbConnectionString();
 
   if (!stripeSecretKey) {
     return jsonResponse(500, { success: false, error: 'STRIPE_SECRET_KEY não configurada.' });
+  }
+
+  if (!dbConnectionString) {
+    return jsonResponse(500, { success: false, error: 'String de conexão do banco não configurada.' });
   }
 
   const payload = (await request.json().catch(() => ({}))) as CheckoutPayload;
@@ -66,7 +82,21 @@ Deno.serve(async (request) => {
     apiVersion: '2025-03-31.basil',
   });
 
+  const processId = String(payload.processId ?? '').trim();
+  const clientId = String(payload.clientId ?? '').trim();
+  const organizationId = String(payload.organizationId ?? '').trim();
+  const serviceId = String(payload.serviceId ?? '').trim();
+
+  if (!processId || !clientId || !organizationId) {
+    return jsonResponse(400, { success: false, error: 'processId, clientId e organizationId são obrigatórios.' });
+  }
+
+  const client = new Client(dbConnectionString);
+
   try {
+    await client.connect();
+    await client.queryArray('BEGIN');
+
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       line_items: [
@@ -84,14 +114,64 @@ Deno.serve(async (request) => {
       success_url: successUrl,
       cancel_url: cancelUrl,
       metadata: {
-        processId: String(payload.processId ?? ''),
-        clientId: String(payload.clientId ?? ''),
-        serviceId: String(payload.serviceId ?? ''),
-        organizationId: String(payload.organizationId ?? ''),
+        processId,
+        clientId,
+        serviceId,
+        organizationId,
         areaId: String(payload.areaId ?? ''),
         sectorId: String(payload.sectorId ?? ''),
       },
     });
+
+    await client.queryObject(
+      `INSERT INTO public.payments (
+         process_id,
+         client_id,
+         amount,
+         currency,
+         status,
+         payment_method,
+         stripe_checkout_session_id,
+         last_event_type,
+         last_event_at,
+         updated_at
+       ) VALUES ($1, $2, $3, $4, 'pending', 'stripe_checkout', $5, 'checkout.session.created', now(), now())
+       ON CONFLICT (process_id) DO UPDATE
+       SET amount = EXCLUDED.amount,
+           currency = EXCLUDED.currency,
+           status = 'pending',
+           payment_method = 'stripe_checkout',
+           stripe_checkout_session_id = EXCLUDED.stripe_checkout_session_id,
+           last_event_type = 'checkout.session.created',
+           last_event_at = now(),
+           updated_at = now()`,
+      [processId, clientId, amount / 100, currency.toUpperCase(), session.id],
+    );
+
+    await client.queryObject(
+      `INSERT INTO public.process_events (
+         org_id,
+         process_id,
+         tipo,
+         mensagem,
+         correlation_process_id,
+         correlation_checkout_session_id,
+         correlation_stripe_event_id,
+         event_code
+       ) VALUES
+         ($1, $2, 'status_change', $3, $2, $4, NULL, 'checkout_session_created'),
+         ($1, $2, 'status_change', $5, $2, $4, NULL, 'client_redirected')`,
+      [
+        organizationId,
+        processId,
+        `Checkout session criada. checkoutSessionId=${session.id}.`,
+        session.id,
+        `Cliente redirecionado para checkout Stripe. checkoutSessionId=${session.id}.`,
+      ],
+    );
+
+    await client.queryArray('COMMIT');
+    logAudit('checkout_created_and_redirect_logged', { processId, checkoutSessionId: session.id, clientId });
 
     return jsonResponse(200, {
       success: true,
@@ -99,7 +179,11 @@ Deno.serve(async (request) => {
       url: session.url,
     });
   } catch (error) {
+    await client.queryArray('ROLLBACK').catch(() => undefined);
     const message = error instanceof Error ? error.message : 'Erro ao criar sessão de checkout.';
+    logAudit('checkout_creation_failed', { processId, clientId, error: message });
     return jsonResponse(500, { success: false, error: message });
+  } finally {
+    await client.end().catch(() => undefined);
   }
 });

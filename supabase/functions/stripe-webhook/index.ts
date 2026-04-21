@@ -72,12 +72,24 @@ const validateProcessConsistency = (
   }
 };
 
-const mapEventToPaymentStatus = (eventType: string): 'paid' | 'failed' | 'cancelled' | 'refunded' | null => {
+const mapEventToPaymentStatus = (eventType: string): 'paid' | 'failed' | 'canceled' | 'refunded' | null => {
   if (eventType === 'checkout.session.completed' || eventType === 'payment_intent.succeeded') return 'paid';
   if (eventType === 'payment_intent.payment_failed') return 'failed';
-  if (eventType === 'checkout.session.expired' || eventType === 'checkout.session.async_payment_failed') return 'cancelled';
+  if (eventType === 'checkout.session.expired' || eventType === 'checkout.session.async_payment_failed') return 'canceled';
   if (eventType === 'charge.refunded' || eventType === 'charge.refund.updated') return 'refunded';
   return null;
+};
+
+const mapEventToAuditCode = (eventType: string) => {
+  if (eventType === 'checkout.session.completed' || eventType === 'payment_intent.succeeded') return 'payment_confirmed';
+  if (eventType === 'payment_intent.payment_failed') return 'payment_failed';
+  if (eventType === 'checkout.session.expired' || eventType === 'checkout.session.async_payment_failed') return 'payment_canceled';
+  if (eventType === 'charge.refunded' || eventType === 'charge.refund.updated') return 'payment_refunded';
+  return 'payment_updated';
+};
+
+const logAudit = (message: string, context: Record<string, unknown>) => {
+  console.log(`[stripe-webhook] ${message}`, JSON.stringify(context));
 };
 
 Deno.serve(async (request) => {
@@ -119,6 +131,7 @@ Deno.serve(async (request) => {
 
   const actionableStatus = mapEventToPaymentStatus(event.type);
   if (!actionableStatus) {
+    logAudit('webhook_received_ignored', { stripeEventId: event.id, eventType: event.type });
     return jsonResponse(200, { success: true, ignored: true, eventType: event.type });
   }
 
@@ -200,10 +213,12 @@ Deno.serve(async (request) => {
               stripe_checkout_session_id = COALESCE($3, stripe_checkout_session_id),
               stripe_payment_intent_id = COALESCE($4, stripe_payment_intent_id),
               raw_webhook_event_id = $5,
+              last_event_type = $6,
+              last_event_at = now(),
               updated_at = now()
         WHERE process_id = $1
         RETURNING id`,
-      [processId, actionableStatus, checkoutSessionId, paymentIntentId, event.id],
+      [processId, actionableStatus, checkoutSessionId, paymentIntentId, event.id, event.type],
     );
 
     if (paymentUpdate.rows.length === 0) {
@@ -214,10 +229,7 @@ Deno.serve(async (request) => {
       await client.queryObject(
         `UPDATE public.processes
             SET payment_status = 'paid',
-                process_status = CASE
-                  WHEN process_status IN ('pending_payment', 'draft', 'created') THEN 'queued'
-                  ELSE COALESCE(process_status, 'queued')
-                END,
+                process_status = 'liberado',
                 updated_at = now()
           WHERE id = $1`,
         [processId],
@@ -236,12 +248,50 @@ Deno.serve(async (request) => {
     const detailMessage = `event_id=${event.id}; checkout_session_id=${checkoutSessionId ?? '-'}; payment_intent_id=${paymentIntentId ?? '-'}.`;
 
     await client.queryObject(
-      `INSERT INTO public.process_events (org_id, process_id, tipo, mensagem)
-       VALUES ($1, $2, 'status_change', $3)`,
-      [process.org_id, processId, `${baseMessage} ${detailMessage}`],
+      `INSERT INTO public.process_events (
+         org_id, process_id, tipo, mensagem,
+         correlation_process_id, correlation_checkout_session_id, correlation_stripe_event_id, event_code
+       )
+       VALUES
+         ($1, $2, 'status_change', $3, $2, $4, $5, 'webhook_received'),
+         ($1, $2, 'status_change', $6, $2, $4, $5, 'webhook_validated'),
+         ($1, $2, 'status_change', $7, $2, $4, $5, $8)`,
+      [
+        process.org_id,
+        processId,
+        `Webhook recebido (${event.type}). stripeEventId=${event.id}.`,
+        checkoutSessionId,
+        event.id,
+        `Webhook validado (${event.type}). stripeEventId=${event.id}.`,
+        `${baseMessage} ${detailMessage}`,
+        mapEventToAuditCode(event.type),
+      ],
     );
 
+    if (actionableStatus === 'paid') {
+      await client.queryObject(
+        `INSERT INTO public.process_events (
+           org_id, process_id, tipo, mensagem,
+           correlation_process_id, correlation_checkout_session_id, correlation_stripe_event_id, event_code
+         ) VALUES ($1, $2, 'status_change', $3, $2, $4, $5, 'process_released')`,
+        [
+          process.org_id,
+          processId,
+          `Processo liberado após confirmação de pagamento. stripeEventId=${event.id}.`,
+          checkoutSessionId,
+          event.id,
+        ],
+      );
+    }
+
     await client.queryArray('COMMIT');
+    logAudit('webhook_processed', {
+      processId,
+      stripeEventId: event.id,
+      checkoutSessionId,
+      paymentIntentId,
+      paymentStatus: actionableStatus,
+    });
 
     return jsonResponse(200, {
       success: true,
@@ -252,6 +302,7 @@ Deno.serve(async (request) => {
   } catch (error) {
     await client.queryArray('ROLLBACK').catch(() => undefined);
     const message = error instanceof Error ? error.message : 'Falha ao processar webhook Stripe.';
+    logAudit('webhook_processing_failed', { stripeEventId: event?.id ?? null, error: message });
     return jsonResponse(500, { success: false, error: message });
   } finally {
     await client.end().catch(() => undefined);
