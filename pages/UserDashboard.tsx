@@ -119,16 +119,38 @@ const PROCESS_STATUS_LABEL_MAP: Record<string, ServiceProcessView['statusLabel']
 };
 
 const PROCESS_STATUS_DISPLAY_LABEL_MAP: Record<string, string> = {
+  pending_payment: 'Aguardando pagamento',
+  queued: 'Na fila',
+  in_progress: 'Em andamento',
+  awaiting_documents: 'Aguardando documentos',
+  under_review: 'Em análise',
+  completed: 'Concluído',
+  cancelled: 'Cancelado',
   cadastro: 'Cadastro',
   triagem: 'Triagem',
   analise: 'Em análise',
   concluido: 'Concluído',
 };
 
+const PAYMENT_STATUS_DISPLAY_LABEL_MAP: Record<string, string> = {
+  pending: 'Pendente',
+  paid: 'Pago',
+  failed: 'Falhou',
+  cancelled: 'Cancelado',
+  canceled: 'Cancelado',
+  refunded: 'Reembolsado',
+};
+
 const getProcessStatusDisplayLabel = (status?: string | null) => {
   const normalized = normalizeStatusKey(status);
   if (!normalized) return '-';
   return PROCESS_STATUS_DISPLAY_LABEL_MAP[normalized] || status || '-';
+};
+
+const getPaymentStatusDisplayLabel = (status?: string | null) => {
+  const normalized = normalizeStatusKey(status);
+  if (!normalized) return '-';
+  return PAYMENT_STATUS_DISPLAY_LABEL_MAP[normalized] || status || '-';
 };
 
 const summarizeStripeSessionId = (sessionId?: string | null) => {
@@ -148,6 +170,18 @@ const formatFinanceDate = (value?: string | null) => {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return '-';
   return parsed.toLocaleDateString('pt-PT');
+};
+
+const getUsageDeadlineStatus = (useUntil?: string | null): 'normal' | 'expiring' | 'expired' => {
+  if (!useUntil) return 'normal';
+  const now = new Date();
+  const deadline = new Date(`${useUntil}T23:59:59`);
+  if (Number.isNaN(deadline.getTime())) return 'normal';
+  if (deadline < now) return 'expired';
+  const sevenDaysFromNow = new Date(now);
+  sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
+  if (deadline <= sevenDaysFromNow) return 'expiring';
+  return 'normal';
 };
 
 const formatProcessTimelineMessage = (event: { tipo?: string | null; mensagem?: string | null }) => {
@@ -232,12 +266,23 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
     id: string;
     serviceName: string;
     totalLabel: string;
+    amount: number | null;
+    currency: string;
     paidAt: string;
+    paidAtRaw: string | null;
     useUntil: string;
+    useUntilRaw: string | null;
     paymentStatus: string;
+    paymentStatusKey: string;
     processStatus: string;
-    isExpiringSoon: boolean;
+    processStatusKey: string;
+    usageDeadlineStatus: 'normal' | 'expiring' | 'expired';
   }>>([]);
+  const [financeSearch, setFinanceSearch] = React.useState('');
+  const [financePaymentStatusFilter, setFinancePaymentStatusFilter] = React.useState<'all' | 'pending' | 'paid' | 'failed' | 'cancelled' | 'refunded'>('all');
+  const [financeProcessStatusFilter, setFinanceProcessStatusFilter] = React.useState<'all' | 'pending_payment' | 'queued' | 'in_progress' | 'awaiting_documents' | 'under_review' | 'completed' | 'cancelled'>('all');
+  const [financeDateStart, setFinanceDateStart] = React.useState('');
+  const [financeDateEnd, setFinanceDateEnd] = React.useState('');
   const [resolvedOrganizationId, setResolvedOrganizationId] = React.useState<string | null>(currentUser.organizationId ?? null);
   const dashboardProcessesRef = React.useRef<DashboardProcessRow[]>([]);
 
@@ -329,6 +374,30 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
 
     return { paidRows, pendingRows, totalPaid, totalPending, upcomingDeadlines };
   }, [dashboardProcesses, estimateProcessAmount, financeEntries]);
+  const filteredFinanceEntries = React.useMemo(() => financeEntries.filter((entry) => {
+    if (financePaymentStatusFilter !== 'all' && entry.paymentStatusKey !== financePaymentStatusFilter) return false;
+    if (financeProcessStatusFilter !== 'all' && entry.processStatusKey !== financeProcessStatusFilter) return false;
+
+    if (financeDateStart || financeDateEnd) {
+      if (!entry.paidAtRaw) return false;
+      const paidAtDate = new Date(entry.paidAtRaw);
+      if (Number.isNaN(paidAtDate.getTime())) return false;
+
+      if (financeDateStart) {
+        const startDate = new Date(`${financeDateStart}T00:00:00`);
+        if (paidAtDate < startDate) return false;
+      }
+
+      if (financeDateEnd) {
+        const endDate = new Date(`${financeDateEnd}T23:59:59`);
+        if (paidAtDate > endDate) return false;
+      }
+    }
+
+    if (!financeSearch.trim()) return true;
+    const target = `${entry.id} ${entry.serviceName} ${entry.paymentStatus} ${entry.processStatus}`.toLowerCase();
+    return target.includes(financeSearch.toLowerCase().trim());
+  }), [financeDateEnd, financeDateStart, financeEntries, financePaymentStatusFilter, financeProcessStatusFilter, financeSearch]);
 
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -538,16 +607,30 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
 
     const loadPaidFinanceEntries = async () => {
       const paidProcesses = await listClientPaidProcessesFinance(activeOrganizationId, currentUser.id);
-      const entries = paidProcesses.map((financeProcess) => ({
+      const entries = paidProcesses.map((financeProcess) => {
+        const paymentStatusKey = normalizeStatusKey(financeProcess.paymentStatus) === 'canceled'
+          ? 'cancelled'
+          : normalizeStatusKey(financeProcess.paymentStatus);
+        const processStatusKey = normalizeStatusKey(financeProcess.processStatus);
+        const usageDeadlineStatus = getUsageDeadlineStatus(financeProcess.useUntil);
+
+        return {
         id: financeProcess.processId,
         serviceName: financeProcess.serviceName,
+        amount: financeProcess.amount,
+        currency: financeProcess.currency,
         totalLabel: formatFinanceAmount(financeProcess.amount, financeProcess.currency),
         paidAt: formatFinanceDate(financeProcess.paidAt),
+        paidAtRaw: financeProcess.paidAt,
         useUntil: formatFinanceDate(financeProcess.useUntil),
-        paymentStatus: financeProcess.paymentStatus || '-',
+        useUntilRaw: financeProcess.useUntil,
+        paymentStatus: getPaymentStatusDisplayLabel(financeProcess.paymentStatus),
+        paymentStatusKey,
         processStatus: getProcessStatusDisplayLabel(financeProcess.processStatus),
-        isExpiringSoon: financeProcess.isExpiringSoon,
-      }));
+        processStatusKey,
+        usageDeadlineStatus,
+      };
+      });
       setFinanceEntries(entries);
     };
 
@@ -1290,6 +1373,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
           ))}
         </div>
       </section>
+      )}
 
       {activeInternalSection === 'processos' && (
         <>
@@ -1405,9 +1489,6 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
               </div>
             </div>
           </div>
-        )}
-      </section>
-      )}
 
           <div className="mt-5 rounded-xl border border-gray-200 overflow-x-auto">
             <table className="min-w-full text-sm">
@@ -1824,16 +1905,103 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
           {activeInternalSection === 'financeiro' && (
             <div className="mt-4 rounded-xl border border-emerald-100 bg-white p-3">
               <p className="text-xs font-black uppercase text-gray-500 mb-2">Financeiro do Cliente</p>
+              <div className="mb-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2">
+                <input
+                  type="search"
+                  value={financeSearch}
+                  onChange={(event) => setFinanceSearch(event.target.value)}
+                  placeholder="Buscar por OS, serviço ou status..."
+                  className="rounded-lg border border-emerald-200 px-3 py-2 text-xs"
+                />
+                <select
+                  value={financePaymentStatusFilter}
+                  onChange={(event) => setFinancePaymentStatusFilter(event.target.value as typeof financePaymentStatusFilter)}
+                  className="rounded-lg border border-emerald-200 px-3 py-2 text-xs"
+                >
+                  <option value="all">Pagamento: todos</option>
+                  <option value="pending">Pendente</option>
+                  <option value="paid">Pago</option>
+                  <option value="failed">Falhou</option>
+                  <option value="cancelled">Cancelado</option>
+                  <option value="refunded">Reembolsado</option>
+                </select>
+                <select
+                  value={financeProcessStatusFilter}
+                  onChange={(event) => setFinanceProcessStatusFilter(event.target.value as typeof financeProcessStatusFilter)}
+                  className="rounded-lg border border-emerald-200 px-3 py-2 text-xs"
+                >
+                  <option value="all">Processo: todos</option>
+                  <option value="pending_payment">Aguardando pagamento</option>
+                  <option value="queued">Na fila</option>
+                  <option value="in_progress">Em andamento</option>
+                  <option value="awaiting_documents">Aguardando documentos</option>
+                  <option value="under_review">Em análise</option>
+                  <option value="completed">Concluído</option>
+                  <option value="cancelled">Cancelado</option>
+                </select>
+                <input
+                  type="date"
+                  value={financeDateStart}
+                  onChange={(event) => setFinanceDateStart(event.target.value)}
+                  className="rounded-lg border border-emerald-200 px-3 py-2 text-xs"
+                />
+                <input
+                  type="date"
+                  value={financeDateEnd}
+                  onChange={(event) => setFinanceDateEnd(event.target.value)}
+                  className="rounded-lg border border-emerald-200 px-3 py-2 text-xs"
+                />
+              </div>
               {financeEntries.length === 0 ? (
-                <p className="text-sm text-gray-600">Ainda não há processos pagos para este cliente.</p>
+                <p className="text-sm text-gray-600">Ainda não há itens financeiros para este cliente.</p>
+              ) : filteredFinanceEntries.length === 0 ? (
+                <p className="text-sm text-gray-600">Nenhum item encontrado para os filtros selecionados.</p>
               ) : (
                 <div className="space-y-2">
-                  {financeEntries.map((entry) => (
-                    <div key={entry.id} className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                      <span>
-                        {entry.serviceName} • {entry.totalLabel} • Pago em {entry.paidAt} • Uso até {entry.useUntil} • {entry.processStatus}
-                        {entry.isExpiringSoon ? ' • ⚠️ Próximo do vencimento' : ''}
-                      </span>
+                  {filteredFinanceEntries.map((entry) => (
+                    <div key={entry.id} className="rounded-lg border border-emerald-100 p-3 text-xs">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-bold text-gray-800">{entry.serviceName} • OS {entry.id.slice(0, 8)}</span>
+                        <div className="flex items-center gap-1">
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${
+                            entry.paymentStatusKey === 'paid'
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : entry.paymentStatusKey === 'failed' || entry.paymentStatusKey === 'cancelled'
+                                ? 'bg-red-100 text-red-700'
+                                : entry.paymentStatusKey === 'refunded'
+                                  ? 'bg-violet-100 text-violet-700'
+                                  : 'bg-amber-100 text-amber-700'
+                          }`}>
+                            Pagamento: {entry.paymentStatus}
+                          </span>
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${
+                            entry.processStatusKey === 'completed'
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : entry.processStatusKey === 'cancelled'
+                                ? 'bg-red-100 text-red-700'
+                                : 'bg-blue-100 text-blue-700'
+                          }`}>
+                            Processo: {entry.processStatus}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="mt-2 text-gray-600">
+                        Valor: <span className="font-bold text-gray-800">{entry.totalLabel}</span> • Data de pagamento: <span className="font-bold text-gray-800">{entry.paidAt}</span>
+                      </p>
+                      <p className="mt-1 text-gray-600">
+                        Prazo de uso:{' '}
+                        <span className={`font-bold ${
+                          entry.usageDeadlineStatus === 'expired'
+                            ? 'text-red-700'
+                            : entry.usageDeadlineStatus === 'expiring'
+                              ? 'text-amber-700'
+                              : 'text-emerald-700'
+                        }`}>
+                          {entry.useUntil}
+                          {entry.usageDeadlineStatus === 'expiring' ? ' • Próximo do vencimento' : ''}
+                          {entry.usageDeadlineStatus === 'expired' ? ' • Vencido' : ''}
+                        </span>
+                      </p>
                       <button type="button" onClick={() => handleDownloadReceipt(entry)} className="rounded-lg border border-gray-300 px-2 py-1 font-bold">
                         Baixar comprovante
                       </button>
