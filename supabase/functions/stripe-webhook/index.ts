@@ -1,6 +1,5 @@
+import Stripe from 'https://esm.sh/stripe@18.3.0?target=deno';
 import { Client } from 'https://deno.land/x/postgres@v0.19.3/mod.ts';
-import { StripePaymentProvider } from '../_shared/payments/stripeProvider.ts';
-import { mapEventToAuditCode, resolveProcessUpdate } from '../_shared/payments/status.ts';
 
 type ProcessRecord = {
   id: string;
@@ -43,6 +42,43 @@ const pickProcessServiceId = (process: ProcessRecord) =>
   ?? process.service_reference
   ?? null;
 
+const normalizeStripeId = (value: string | Stripe.PaymentIntent | null) => {
+  if (!value) return null;
+  return typeof value === 'string' ? value : value.id;
+};
+
+const mapEventToPaymentStatus = (eventType: string): 'paid' | 'failed' | 'canceled' | 'refunded' | null => {
+  if (eventType === 'checkout.session.completed' || eventType === 'payment_intent.succeeded') return 'paid';
+  if (eventType === 'payment_intent.payment_failed') return 'failed';
+  if (eventType === 'checkout.session.expired' || eventType === 'checkout.session.async_payment_failed') return 'canceled';
+  if (eventType === 'charge.refunded' || eventType === 'charge.refund.updated') return 'refunded';
+  return null;
+};
+
+const mapEventToAuditCode = (eventType: string) => {
+  if (eventType === 'checkout.session.completed' || eventType === 'payment_intent.succeeded') return 'payment_confirmed';
+  if (eventType === 'payment_intent.payment_failed') return 'payment_failed';
+  if (eventType === 'checkout.session.expired' || eventType === 'checkout.session.async_payment_failed') return 'payment_canceled';
+  if (eventType === 'charge.refunded' || eventType === 'charge.refund.updated') return 'payment_refunded';
+  return 'payment_updated';
+};
+
+const resolveProcessUpdate = (paymentStatus: 'paid' | 'failed' | 'canceled' | 'refunded') => {
+  if (paymentStatus === 'paid') {
+    return {
+      paymentStatus,
+      processStatus: 'liberado',
+      shouldReleaseProcess: true,
+    };
+  }
+
+  return {
+    paymentStatus,
+    processStatus: null,
+    shouldReleaseProcess: false,
+  };
+};
+
 const validateProcessConsistency = (
   process: ProcessRecord,
   metadata: { processId?: string; clientId?: string; serviceId?: string; orgId?: string; organizationId?: string },
@@ -82,10 +118,11 @@ Deno.serve(async (request) => {
   }
 
   const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY') ?? '';
+  const stripeWebhookSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET') ?? '';
   const dbConnectionString = getDbConnectionString();
 
-  if (!stripeSecretKey) {
-    return jsonResponse(500, { success: false, error: 'STRIPE_SECRET_KEY ausente.' });
+  if (!stripeSecretKey || !stripeWebhookSecret) {
+    return jsonResponse(500, { success: false, error: 'Credenciais Stripe ausentes.' });
   }
 
   if (!dbConnectionString) {
@@ -98,19 +135,20 @@ Deno.serve(async (request) => {
   }
 
   const rawBody = await request.text();
-  const provider = new StripePaymentProvider(stripeSecretKey);
+  const stripe = new Stripe(stripeSecretKey, { apiVersion: '2025-03-31.basil' });
 
-  let webhookEvent;
+  let event: Stripe.Event;
   try {
-    webhookEvent = await provider.interpretWebhook(rawBody, signature);
+    event = await stripe.webhooks.constructEventAsync(rawBody, signature, stripeWebhookSecret);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Assinatura do webhook inválida.';
     return jsonResponse(400, { success: false, error: message });
   }
 
-  if (!webhookEvent) {
-    logAudit('webhook_received_ignored', { eventType: 'not-actionable' });
-    return jsonResponse(200, { success: true, ignored: true });
+  const actionableStatus = mapEventToPaymentStatus(event.type);
+  if (!actionableStatus) {
+    logAudit('webhook_received_ignored', { stripeEventId: event.id, eventType: event.type });
+    return jsonResponse(200, { success: true, ignored: true, eventType: event.type });
   }
 
   const client = new Client(dbConnectionString);
@@ -121,15 +159,42 @@ Deno.serve(async (request) => {
 
     const idemCheck = await client.queryObject<{ id: string }>(
       'SELECT id FROM public.payments WHERE raw_webhook_event_id = $1 LIMIT 1',
-      [webhookEvent.eventId],
+      [event.id],
     );
 
     if (idemCheck.rows.length > 0) {
       await client.queryArray('COMMIT');
-      return jsonResponse(200, { success: true, duplicated: true, eventId: webhookEvent.eventId });
+      return jsonResponse(200, { success: true, duplicated: true, eventId: event.id });
     }
 
-    const { processId, paymentIntentId, checkoutSessionId, metadata } = webhookEvent;
+    let processId = '';
+    let paymentIntentId: string | null = null;
+    let checkoutSessionId: string | null = null;
+    const metadata: Record<string, string> = {};
+
+    if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.expired' || event.type === 'checkout.session.async_payment_failed') {
+      const session = event.data.object as Stripe.Checkout.Session;
+      processId = String(session.metadata?.processId ?? '').trim();
+      paymentIntentId = normalizeStripeId(session.payment_intent as string | Stripe.PaymentIntent | null);
+      checkoutSessionId = session.id;
+      Object.assign(metadata, session.metadata ?? {});
+    }
+
+    if (event.type === 'payment_intent.succeeded' || event.type === 'payment_intent.payment_failed') {
+      const paymentIntent = event.data.object as Stripe.PaymentIntent;
+      processId = String(paymentIntent.metadata?.processId ?? '').trim();
+      paymentIntentId = paymentIntent.id;
+      checkoutSessionId = String(paymentIntent.metadata?.checkoutSessionId ?? '').trim() || null;
+      Object.assign(metadata, paymentIntent.metadata ?? {});
+    }
+
+    if (event.type === 'charge.refunded' || event.type === 'charge.refund.updated') {
+      const charge = event.data.object as Stripe.Charge;
+      processId = String(charge.metadata?.processId ?? '').trim();
+      paymentIntentId = normalizeStripeId(charge.payment_intent as string | Stripe.PaymentIntent | null);
+      checkoutSessionId = String(charge.metadata?.checkoutSessionId ?? '').trim() || null;
+      Object.assign(metadata, charge.metadata ?? {});
+    }
 
     if (!processId) {
       throw new Error('processId ausente no metadata do evento Stripe.');
@@ -170,14 +235,14 @@ Deno.serve(async (request) => {
               updated_at = now()
         WHERE process_id = $1
         RETURNING id`,
-      [processId, webhookEvent.paymentStatus, checkoutSessionId, paymentIntentId, webhookEvent.eventId, webhookEvent.eventType],
+      [processId, actionableStatus, checkoutSessionId, paymentIntentId, event.id, event.type],
     );
 
     if (paymentUpdate.rows.length === 0) {
       throw new Error('Pagamento não encontrado para o processId informado.');
     }
 
-    const processUpdate = resolveProcessUpdate(webhookEvent.paymentStatus);
+    const processUpdate = resolveProcessUpdate(actionableStatus);
 
     if (processUpdate.shouldReleaseProcess) {
       await client.queryObject(
@@ -198,8 +263,8 @@ Deno.serve(async (request) => {
       );
     }
 
-    const baseMessage = `Webhook Stripe processado (${webhookEvent.eventType}). payment_status=${webhookEvent.paymentStatus}.`;
-    const detailMessage = `event_id=${webhookEvent.eventId}; checkout_session_id=${checkoutSessionId ?? '-'}; payment_intent_id=${paymentIntentId ?? '-'}.`;
+    const baseMessage = `Webhook Stripe processado (${event.type}). payment_status=${actionableStatus}.`;
+    const detailMessage = `event_id=${event.id}; checkout_session_id=${checkoutSessionId ?? '-'}; payment_intent_id=${paymentIntentId ?? '-'}.`;
 
     await client.queryObject(
       `INSERT INTO public.process_events (
@@ -213,12 +278,12 @@ Deno.serve(async (request) => {
       [
         process.org_id,
         processId,
-        `Webhook recebido (${webhookEvent.eventType}). stripeEventId=${webhookEvent.eventId}.`,
+        `Webhook recebido (${event.type}). stripeEventId=${event.id}.`,
         checkoutSessionId,
-        webhookEvent.eventId,
-        `Webhook validado (${webhookEvent.eventType}). stripeEventId=${webhookEvent.eventId}.`,
+        event.id,
+        `Webhook validado (${event.type}). stripeEventId=${event.id}.`,
         `${baseMessage} ${detailMessage}`,
-        mapEventToAuditCode(webhookEvent.eventType),
+        mapEventToAuditCode(event.type),
       ],
     );
 
@@ -231,9 +296,9 @@ Deno.serve(async (request) => {
         [
           process.org_id,
           processId,
-          `Processo liberado após confirmação de pagamento. stripeEventId=${webhookEvent.eventId}.`,
+          `Processo liberado após confirmação de pagamento. stripeEventId=${event.id}.`,
           checkoutSessionId,
-          webhookEvent.eventId,
+          event.id,
         ],
       );
     }
@@ -241,22 +306,22 @@ Deno.serve(async (request) => {
     await client.queryArray('COMMIT');
     logAudit('webhook_processed', {
       processId,
-      stripeEventId: webhookEvent.eventId,
+      stripeEventId: event.id,
       checkoutSessionId,
       paymentIntentId,
-      paymentStatus: webhookEvent.paymentStatus,
+      paymentStatus: actionableStatus,
     });
 
     return jsonResponse(200, {
       success: true,
-      eventId: webhookEvent.eventId,
+      eventId: event.id,
       processId,
-      paymentStatus: webhookEvent.paymentStatus,
+      paymentStatus: actionableStatus,
     });
   } catch (error) {
     await client.queryArray('ROLLBACK').catch(() => undefined);
     const message = error instanceof Error ? error.message : 'Falha ao processar webhook Stripe.';
-    logAudit('webhook_processing_failed', { stripeEventId: webhookEvent?.eventId ?? null, error: message });
+    logAudit('webhook_processing_failed', { error: message });
     return jsonResponse(500, { success: false, error: message });
   } finally {
     await client.end().catch(() => undefined);
