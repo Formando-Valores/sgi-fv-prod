@@ -223,6 +223,8 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
   const [dashboardProcessSearch, setDashboardProcessSearch] = React.useState('');
   const [selectedDashboardProcessId, setSelectedDashboardProcessId] = React.useState<string | null>(null);
   const [dashboardProcessesLoading, setDashboardProcessesLoading] = React.useState(false);
+  const [activeMainMenu, setActiveMainMenu] = React.useState<'painel' | 'processos' | 'financeiro'>('painel');
+  const [activeInternalSection, setActiveInternalSection] = React.useState<'processo' | 'financeiro'>('processo');
   const [processComments, setProcessComments] = React.useState<Array<{ id: string; text: string; createdAt: string }>>([]);
   const [newComment, setNewComment] = React.useState('');
   const [processFiles, setProcessFiles] = React.useState<Array<{ id: string; name: string; sizeLabel: string; uploadedAt: string }>>([]);
@@ -536,21 +538,32 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
 
     const loadPaidFinanceEntries = async () => {
       const paidProcesses = await listClientPaidProcessesFinance(activeOrganizationId, currentUser.id);
-      const entries = paidProcesses.map((process) => ({
-        id: process.processId,
-        serviceName: process.serviceName,
-        totalLabel: formatFinanceAmount(process.amount, process.currency),
-        paidAt: formatFinanceDate(process.paidAt),
-        useUntil: formatFinanceDate(process.useUntil),
-        paymentStatus: process.paymentStatus || '-',
-        processStatus: getProcessStatusDisplayLabel(process.processStatus),
-        isExpiringSoon: process.isExpiringSoon,
+      const entries = paidProcesses.map((financeProcess) => ({
+        id: financeProcess.processId,
+        serviceName: financeProcess.serviceName,
+        totalLabel: formatFinanceAmount(financeProcess.amount, financeProcess.currency),
+        paidAt: formatFinanceDate(financeProcess.paidAt),
+        useUntil: formatFinanceDate(financeProcess.useUntil),
+        paymentStatus: financeProcess.paymentStatus || '-',
+        processStatus: getProcessStatusDisplayLabel(financeProcess.processStatus),
+        isExpiringSoon: financeProcess.isExpiringSoon,
       }));
       setFinanceEntries(entries);
     };
 
     void loadPaidFinanceEntries();
   }, [activeOrganizationId, currentUser.id]);
+
+  React.useEffect(() => {
+    if (!serviceProcess && financeEntries.length > 0 && activeInternalSection !== 'financeiro') {
+      setActiveInternalSection('financeiro');
+      return;
+    }
+
+    if (serviceProcess && activeInternalSection !== 'processo' && financeEntries.length === 0) {
+      setActiveInternalSection('processo');
+    }
+  }, [activeInternalSection, financeEntries.length, serviceProcess]);
 
   React.useEffect(() => {
     const validOrgId = isValidUuid(activeOrganizationId) ? activeOrganizationId : null;
@@ -1208,8 +1221,57 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
         </div>
       </header>
 
-      <section className="mb-6 bg-white border border-gray-100 rounded-2xl p-3 sm:p-4 shadow-[0_16px_34px_rgba(15,23,42,0.08)] no-print">
+      <section className="mb-6 bg-white border border-gray-100 rounded-2xl p-4 sm:p-4 shadow-[0_16px_34px_rgba(15,23,42,0.08)] no-print">
         <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setActiveMainMenu('painel');
+              setActiveInternalSection('processo');
+            }}
+            className={`rounded-xl px-4 py-2 text-sm font-black uppercase border ${activeMainMenu === 'painel' ? 'bg-blue-600 text-white border-blue-700' : 'bg-gray-100 text-gray-700 border-gray-200'}`}
+          >
+            Painel
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setActiveMainMenu('processos');
+              setActiveInternalSection('processo');
+            }}
+            className={`rounded-xl px-4 py-2 text-sm font-black uppercase border ${activeMainMenu === 'processos' ? 'bg-blue-600 text-white border-blue-700' : 'bg-gray-100 text-gray-700 border-gray-200'}`}
+          >
+            Processos
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setActiveMainMenu('financeiro');
+              setActiveInternalSection('financeiro');
+            }}
+            className={`rounded-xl px-4 py-2 text-sm font-black uppercase border ${activeMainMenu === 'financeiro' ? 'bg-blue-600 text-white border-blue-700' : 'bg-gray-100 text-gray-700 border-gray-200'}`}
+          >
+            Financeiro
+          </button>
+        </div>
+      </section>
+
+      {activeMainMenu === 'painel' && (
+      <section className="mb-6 bg-white border border-gray-100 rounded-2xl p-4 sm:p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
+        <h2 className="text-lg font-black text-gray-800">Guia rápido do sistema</h2>
+        <ol className="mt-2 list-decimal pl-5 text-sm text-gray-600 space-y-1">
+          <li>Crie uma <strong>Nova Ordem de Serviço</strong> escolhendo área e serviço.</li>
+          <li>Confira o total (serviço + quota associativa) e conclua o pagamento.</li>
+          <li>Após aprovação, envie anexos e comentários dentro da OS.</li>
+          <li>Acompanhe o histórico, baixe relatório técnico e comprovantes financeiros.</li>
+        </ol>
+      </section>
+      )}
+
+      {activeMainMenu !== 'financeiro' && (
+      <section className="mb-6 bg-white border border-gray-100 rounded-2xl p-4 sm:p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
+        <h2 className="text-lg font-black text-gray-800">Acompanhamento dos Meus Processos</h2>
+        <div className="mt-3 flex flex-wrap gap-2">
           {[
             { id: 'painel', label: 'Painel' },
             { id: 'processos', label: 'Processos' },
@@ -1343,6 +1405,9 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
               </div>
             </div>
           </div>
+        )}
+      </section>
+      )}
 
           <div className="mt-5 rounded-xl border border-gray-200 overflow-x-auto">
             <table className="min-w-full text-sm">
@@ -1645,105 +1710,137 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
         </section>
       )}
 
-      {activeInternalSection === 'processos' && serviceProcess && (
+      {(serviceProcess || financeEntries.length > 0) && (
         <section className="mb-6 rounded-2xl border border-blue-200 bg-blue-50 p-4 sm:p-6">
-          <h2 className="text-lg font-black text-blue-800">PROCESSO EM ANDAMENTO</h2>
-          <p className="text-sm font-semibold text-blue-700 mt-1">Solicitação criada. O atendimento será iniciado após confirmação do pagamento.</p>
-          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-            <p><span className="font-black text-gray-600 uppercase text-xs">Setor responsável</span><br />{displaySectorName}</p>
-            <p><span className="font-black text-gray-600 uppercase text-xs">Status</span><br />{serviceProcess.statusLabel}</p>
-            <p><span className="font-black text-gray-600 uppercase text-xs">Serviço</span><br />{serviceProcess.serviceName}</p>
-            <p><span className="font-black text-gray-600 uppercase text-xs">Data/Hora</span><br />{serviceProcess.createdAt} • {serviceProcess.scheduledSlot}</p>
+          <h2 className="text-lg font-black text-blue-800">PAINEL DO CLIENTE</h2>
+          <p className="text-sm font-semibold text-blue-700 mt-1">Acompanhe o processo e consulte uma aba dedicada ao Financeiro do Cliente.</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setActiveInternalSection('processo')}
+              className={`rounded-xl px-4 py-2 text-xs font-black uppercase tracking-wide border ${activeInternalSection === 'processo' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-blue-700 border-blue-200'}`}
+            >
+              Processo em andamento
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveInternalSection('financeiro')}
+              className={`rounded-xl px-4 py-2 text-xs font-black uppercase tracking-wide border ${activeInternalSection === 'financeiro' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-emerald-700 border-emerald-200'}`}
+            >
+              Financeiro do Cliente
+            </button>
           </div>
-          <div className="mt-4 space-y-2">
-            {serviceProcess.steps.map((step) => (
-              <div key={step.name} className="rounded-lg border border-blue-100 bg-white p-3">
-                <p className="text-sm font-bold text-gray-800">{step.name}</p>
-                <p className="text-xs text-gray-500">Status: {step.status} • Setor Responsável: {displaySectorName} • Atualizado: {step.updatedAt}</p>
-                {step.notes && <p className="text-xs text-gray-600 mt-1">{step.notes}</p>}
+
+          {activeInternalSection === 'processo' && serviceProcess && (
+            <>
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                <p><span className="font-black text-gray-600 uppercase text-xs">Setor responsável</span><br />{displaySectorName}</p>
+                <p><span className="font-black text-gray-600 uppercase text-xs">Status</span><br />{serviceProcess.statusLabel}</p>
+                <p><span className="font-black text-gray-600 uppercase text-xs">Serviço</span><br />{serviceProcess.serviceName}</p>
+                <p><span className="font-black text-gray-600 uppercase text-xs">Data/Hora</span><br />{serviceProcess.createdAt} • {serviceProcess.scheduledSlot}</p>
               </div>
-            ))}
-          </div>
-          <button type="button" className="mt-4 rounded-xl border border-blue-200 bg-white text-blue-700 font-bold px-4 py-2">
-            Acompanhar atendimento da OS
-          </button>
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="rounded-xl border border-blue-100 bg-white p-3">
-              <p className="text-xs font-black uppercase text-gray-500 mb-2">Comentários</p>
-              <textarea
-                value={newComment}
-                onChange={(event) => setNewComment(event.target.value)}
-                rows={3}
-                className="w-full border border-gray-200 rounded-lg p-2 text-sm"
-                placeholder="Escreva um comentário sobre a OS..."
-              />
-              <button type="button" onClick={handleAddComment} className="mt-2 rounded-lg bg-blue-600 text-white text-xs font-bold px-3 py-2">
-                Registrar comentário
-              </button>
-              <div className="mt-2 space-y-1 max-h-28 overflow-auto">
-                {processComments.map((comment) => (
-                  <p key={comment.id} className="text-xs text-gray-600">{comment.createdAt} • {comment.text}</p>
-                ))}
-              </div>
-            </div>
-            <div className="rounded-xl border border-blue-100 bg-white p-3">
-              <p className="text-xs font-black uppercase text-gray-500 mb-2">Anexos</p>
-              <input type="file" multiple onChange={handleAttachmentUpload} className="text-xs" />
-              <div className="mt-2 space-y-1 max-h-28 overflow-auto">
-                {processFiles.map((file) => (
-                  <p key={file.id} className="text-xs text-gray-600">{file.uploadedAt} • {file.name} ({file.sizeLabel})</p>
-                ))}
-              </div>
-            </div>
-          </div>
-          {serviceProcess.timeline.length > 0 && (
-            <div className="mt-4 rounded-xl border border-blue-100 bg-white p-3">
-              <p className="text-xs font-black uppercase text-gray-500 mb-2">Histórico do processo</p>
-              <div className="space-y-1">
-                {serviceProcess.timeline.map((event, index) => (
-                  <p key={`${event.date}-${index}`} className="text-xs text-gray-600">
-                    {event.date} • {event.message}
-                  </p>
-                ))}
-              </div>
-            </div>
-          )}
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="rounded-xl border border-blue-100 bg-white p-3">
-              <p className="text-xs font-black uppercase text-gray-500 mb-2">Relatório técnico</p>
-              <p className="text-xs text-gray-600 mb-2">Visualize os dados consolidados da OS e baixe em PDF.</p>
-              <button type="button" onClick={handleDownloadTechnicalReport} className="rounded-lg bg-slate-700 text-white text-xs font-bold px-3 py-2">
-                Baixar relatório técnico (PDF)
-              </button>
-            </div>
-            <div className="rounded-xl border border-blue-100 bg-white p-3">
-              <p className="text-xs font-black uppercase text-gray-500 mb-2">Suporte</p>
-              <a
-                href={`https://wa.me/351935362089?text=${encodeURIComponent(`Olá, preciso de suporte técnico para a OS ${serviceProcess.id}. Cliente: ${currentUser.name}.`)}`}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-block rounded-lg bg-green-600 text-white text-xs font-bold px-3 py-2"
-              >
-                Fale com a Área Técnica
-              </a>
-            </div>
-          </div>
-          {financeEntries.length > 0 && (
-            <div className="mt-4 rounded-xl border border-blue-100 bg-white p-3">
-              <p className="text-xs font-black uppercase text-gray-500 mb-2">Módulo financeiro</p>
-              <div className="space-y-2">
-                {financeEntries.map((entry) => (
-                  <div key={entry.id} className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                    <span>
-                      {entry.serviceName} • {entry.totalLabel} • Pago em {entry.paidAt} • Uso até {entry.useUntil} • {entry.processStatus}
-                      {entry.isExpiringSoon ? ' • ⚠️ Próximo do vencimento' : ''}
-                    </span>
-                    <button type="button" onClick={() => handleDownloadReceipt(entry)} className="rounded-lg border border-gray-300 px-2 py-1 font-bold">
-                      Baixar comprovante
-                    </button>
+              <div className="mt-4 space-y-2">
+                {serviceProcess.steps.map((step) => (
+                  <div key={step.name} className="rounded-lg border border-blue-100 bg-white p-3">
+                    <p className="text-sm font-bold text-gray-800">{step.name}</p>
+                    <p className="text-xs text-gray-500">Status: {step.status} • Setor Responsável: {displaySectorName} • Atualizado: {step.updatedAt}</p>
+                    {step.notes && <p className="text-xs text-gray-600 mt-1">{step.notes}</p>}
                   </div>
                 ))}
               </div>
+              <button type="button" className="mt-4 rounded-xl border border-blue-200 bg-white text-blue-700 font-bold px-4 py-2">
+                Acompanhar atendimento da OS
+              </button>
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="rounded-xl border border-blue-100 bg-white p-3">
+                  <p className="text-xs font-black uppercase text-gray-500 mb-2">Comentários</p>
+                  <textarea
+                    value={newComment}
+                    onChange={(event) => setNewComment(event.target.value)}
+                    rows={3}
+                    className="w-full border border-gray-200 rounded-lg p-2 text-sm"
+                    placeholder="Escreva um comentário sobre a OS..."
+                  />
+                  <button type="button" onClick={handleAddComment} className="mt-2 rounded-lg bg-blue-600 text-white text-xs font-bold px-3 py-2">
+                    Registrar comentário
+                  </button>
+                  <div className="mt-2 space-y-1 max-h-28 overflow-auto">
+                    {processComments.map((comment) => (
+                      <p key={comment.id} className="text-xs text-gray-600">{comment.createdAt} • {comment.text}</p>
+                    ))}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-blue-100 bg-white p-3">
+                  <p className="text-xs font-black uppercase text-gray-500 mb-2">Anexos</p>
+                  <input type="file" multiple onChange={handleAttachmentUpload} className="text-xs" />
+                  <div className="mt-2 space-y-1 max-h-28 overflow-auto">
+                    {processFiles.map((file) => (
+                      <p key={file.id} className="text-xs text-gray-600">{file.uploadedAt} • {file.name} ({file.sizeLabel})</p>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              {serviceProcess.timeline.length > 0 && (
+                <div className="mt-4 rounded-xl border border-blue-100 bg-white p-3">
+                  <p className="text-xs font-black uppercase text-gray-500 mb-2">Histórico do processo</p>
+                  <div className="space-y-1">
+                    {serviceProcess.timeline.map((event, index) => (
+                      <p key={`${event.date}-${index}`} className="text-xs text-gray-600">
+                        {event.date} • {event.message}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="rounded-xl border border-blue-100 bg-white p-3">
+                  <p className="text-xs font-black uppercase text-gray-500 mb-2">Relatório técnico</p>
+                  <p className="text-xs text-gray-600 mb-2">Visualize os dados consolidados da OS e baixe em PDF.</p>
+                  <button type="button" onClick={handleDownloadTechnicalReport} className="rounded-lg bg-slate-700 text-white text-xs font-bold px-3 py-2">
+                    Baixar relatório técnico (PDF)
+                  </button>
+                </div>
+                <div className="rounded-xl border border-blue-100 bg-white p-3">
+                  <p className="text-xs font-black uppercase text-gray-500 mb-2">Suporte</p>
+                  <a
+                    href={`https://wa.me/351935362089?text=${encodeURIComponent(`Olá, preciso de suporte técnico para a OS ${serviceProcess.id}. Cliente: ${currentUser.name}.`)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-block rounded-lg bg-green-600 text-white text-xs font-bold px-3 py-2"
+                  >
+                    Fale com a Área Técnica
+                  </a>
+                </div>
+              </div>
+            </>
+          )}
+
+          {activeInternalSection === 'processo' && !serviceProcess && (
+            <div className="mt-4 rounded-xl border border-blue-100 bg-white p-4 text-sm text-gray-600">
+              Nenhum processo em andamento encontrado no momento.
+            </div>
+          )}
+
+          {activeInternalSection === 'financeiro' && (
+            <div className="mt-4 rounded-xl border border-emerald-100 bg-white p-3">
+              <p className="text-xs font-black uppercase text-gray-500 mb-2">Financeiro do Cliente</p>
+              {financeEntries.length === 0 ? (
+                <p className="text-sm text-gray-600">Ainda não há processos pagos para este cliente.</p>
+              ) : (
+                <div className="space-y-2">
+                  {financeEntries.map((entry) => (
+                    <div key={entry.id} className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                      <span>
+                        {entry.serviceName} • {entry.totalLabel} • Pago em {entry.paidAt} • Uso até {entry.useUntil} • {entry.processStatus}
+                        {entry.isExpiringSoon ? ' • ⚠️ Próximo do vencimento' : ''}
+                      </span>
+                      <button type="button" onClick={() => handleDownloadReceipt(entry)} className="rounded-lg border border-gray-300 px-2 py-1 font-bold">
+                        Baixar comprovante
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
           <button
