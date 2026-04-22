@@ -303,8 +303,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [clientJourneyLoading, setClientJourneyLoading] = useState(false);
 
   const location = useLocation();
-  const locationSection = location.pathname.split('/')[2] as 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes' | undefined;
-  const currentSection = locationSection || section || 'dashboard';
+  const validSections = ['dashboard', 'processos', 'clientes', 'configuracoes', 'organizacoes'] as const;
+  type DashboardSection = typeof validSections[number];
+  const parseSectionCandidate = (value?: string | null): DashboardSection | null => {
+    if (!value) return null;
+    if ((validSections as readonly string[]).includes(value)) return value as DashboardSection;
+    return null;
+  };
+  const pathnameSection = parseSectionCandidate(location.pathname.split('/')[2]);
+  const hashSource = typeof window !== 'undefined' ? window.location.hash : '';
+  const hashSection = parseSectionCandidate(hashSource.split('/')[2]);
+  const currentSection = pathnameSection || hashSection || section || 'dashboard';
 
   const permissions = resolvePermissions(currentUser.org_role ?? (currentUser.role === UserRole.ADMIN ? 'admin' : 'client'));
   const permissionSubject = { org_role: currentUser.org_role ?? null, hierarchy: permissions.hierarchy };

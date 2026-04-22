@@ -187,6 +187,7 @@ const RootApp: React.FC = () => {
 
     return (
       <UnifiedDashboard
+        key={`dashboard-${section}`}
         currentUser={currentUser}
         users={users}
         setUsers={setUsers}
