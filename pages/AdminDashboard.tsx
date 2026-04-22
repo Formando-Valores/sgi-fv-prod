@@ -301,6 +301,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [checklistError, setChecklistError] = useState('');
   const [clientJourneyHistory, setClientJourneyHistory] = useState<ClientProcessProgressHistoryItem[]>([]);
   const [clientJourneyLoading, setClientJourneyLoading] = useState(false);
+  const [browserHash, setBrowserHash] = useState(() => (typeof window !== 'undefined' ? window.location.hash : ''));
 
   const location = useLocation();
   const validSections = ['dashboard', 'processos', 'clientes', 'configuracoes', 'organizacoes'] as const;
@@ -311,7 +312,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     return null;
   };
   const pathnameSection = parseSectionCandidate(location.pathname.split('/')[2]);
-  const hashSource = typeof window !== 'undefined' ? window.location.hash : '';
+  const hashSource = browserHash || (typeof window !== 'undefined' ? window.location.hash : '');
   const hashSection = parseSectionCandidate(hashSource.split('/')[2]);
   const currentSection = pathnameSection || hashSection || section || 'dashboard';
 
@@ -333,6 +334,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   useEffect(() => {
     setSidebarOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleHashChange = () => {
+      setBrowserHash(window.location.hash);
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+    };
+  }, []);
 
   useEffect(() => {
     if (currentSection === 'configuracoes') {
