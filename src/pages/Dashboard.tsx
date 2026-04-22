@@ -12,6 +12,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { getProcessStats, listProcesses, listAdminOperationalProcesses, type Process } from '../lib/processes';
 import { getPaymentStatusLabel, getProcessStatusLabel } from '../lib/paymentStatus';
 import { checkMigrations, getMigrationStatusMessage, type MigrationStatus } from '../lib/checkMigrations';
+import { can } from '../lib/permissions';
 
 // Debug mode flag
 const DEBUG = true;
@@ -25,7 +26,9 @@ const logError = (...args: any[]) => {
 const Dashboard: React.FC = () => {
   log('Dashboard component rendering');
   
-  const { userContext, isAdmin } = useAuth();
+  const { userContext } = useAuth();
+  const canViewAllProcesses = can('view_all', 'processos', userContext);
+  const canCreateProcess = can('create', 'processos', userContext);
   const [stats, setStats] = useState({ total: 0, cadastro: 0, triagem: 0, analise: 0, concluido: 0 });
   const [recentProcesses, setRecentProcesses] = useState<Process[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,7 +38,7 @@ const Dashboard: React.FC = () => {
   log('Current state:', {
     hasUserContext: !!userContext,
     org_id: userContext?.org_id,
-    isAdmin,
+    canViewAllProcesses,
     loading,
     error: !!error,
     migrationStatus: migrationStatus?.allReady
@@ -120,7 +123,7 @@ const Dashboard: React.FC = () => {
           log(`getProcessStats() completed in ${elapsed.toFixed(2)}ms:`, data);
           return data;
         }),
-        (isAdmin ? listAdminOperationalProcesses(userContext.org_id) : listProcesses(userContext.org_id)).then(data => {
+        (canViewAllProcesses ? listAdminOperationalProcesses(userContext.org_id) : listProcesses(userContext.org_id)).then(data => {
           const elapsed = performance.now() - processesStartTime;
           log(`process listing completed in ${elapsed.toFixed(2)}ms, count:`, data.length);
           return data.filter((process) => process.process_status !== 'pending_payment');
@@ -288,7 +291,7 @@ const Dashboard: React.FC = () => {
             </div>
             <ArrowRight className="w-5 h-5 text-blue-400 group-hover:translate-x-1 transition-transform" />
           </Link>
-          {isAdmin && (
+          {canCreateProcess && (
             <Link
               to="/processos/novo"
               className="flex items-center justify-between p-4 bg-emerald-900/20 border border-emerald-800 rounded-xl hover:bg-emerald-900/30 transition-colors group"
