@@ -315,7 +315,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const pathnameSection = parseSectionCandidate(location.pathname.split('/')[2]);
   const hashSource = (typeof window !== 'undefined' ? window.location.hash : '') || browserHash;
   const hashSection = parseSectionCandidate(hashSource.split('/')[2]);
-  const currentSection = manualSection || pathnameSection || hashSection || section || 'dashboard';
+  const currentSection = pathnameSection || hashSection || manualSection || section || 'dashboard';
 
   const permissions = resolvePermissions(currentUser.org_role ?? (currentUser.role === UserRole.ADMIN ? 'admin' : 'client'));
   const permissionSubject = { org_role: currentUser.org_role ?? null, hierarchy: permissions.hierarchy };
@@ -355,10 +355,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   }, [location.pathname, location.search]);
 
   useEffect(() => {
-    if (pathnameSection || hashSection) {
+    if (!manualSection) return;
+
+    if (pathnameSection === manualSection || hashSection === manualSection) {
       setManualSection(null);
     }
-  }, [pathnameSection, hashSection]);
+  }, [hashSection, manualSection, pathnameSection]);
 
   useEffect(() => {
     if (currentSection === 'configuracoes') {
