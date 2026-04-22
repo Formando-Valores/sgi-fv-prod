@@ -184,7 +184,7 @@ const RootApp: React.FC = () => {
     </div>
   );
 
-  const renderDashboardRoute = (section: 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes' = 'dashboard') => {
+  const renderDashboardRoute = () => {
     if (authBootstrapping) {
       return authLoadingScreen;
     }
@@ -195,12 +195,10 @@ const RootApp: React.FC = () => {
 
     return (
       <UnifiedDashboard
-        key={`dashboard-${section}`}
         currentUser={currentUser}
         users={users}
         setUsers={setUsers}
         onLogout={handleLogout}
-        section={section}
       />
     );
   };
@@ -218,11 +216,7 @@ const RootApp: React.FC = () => {
             element={authBootstrapping ? authLoadingScreen : (currentUser ? <Navigate to="/dashboard" /> : <Register setUsers={setUsers} setCurrentUser={setCurrentUser} />)}
           />
           <Route path="/recovery" element={<PasswordRecovery />} />
-          <Route path="/dashboard" element={renderDashboardRoute('dashboard')} />
-          <Route path="/dashboard/processos" element={renderDashboardRoute('processos')} />
-          <Route path="/dashboard/clientes" element={renderDashboardRoute('clientes')} />
-          <Route path="/dashboard/configuracoes" element={renderDashboardRoute('configuracoes')} />
-          <Route path="/dashboard/organizacoes" element={renderDashboardRoute('organizacoes')} />
+          <Route path="/dashboard/*" element={renderDashboardRoute()} />
           <Route path="/payments/success" element={<PaymentSuccess />} />
           <Route path="/payments/cancel" element={<PaymentCancel />} />
           <Route path="*" element={authBootstrapping ? authLoadingScreen : <Navigate to="/login" />} />
