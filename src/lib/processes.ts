@@ -16,6 +16,35 @@ const logError = (...args: any[]) => {
   console.error('[Processes API ERROR]', new Date().toISOString(), ...args);
 };
 
+async function getAuthenticatedUserId(): Promise<string | null> {
+  const { data, error } = await supabase.auth.getUser();
+  if (error) {
+    logError('Unable to resolve authenticated user from Supabase auth context:', error);
+    return null;
+  }
+  return data.user?.id ?? null;
+}
+
+async function logFinancialAuditEvent(
+  eventCode: string,
+  details: Record<string, unknown>,
+): Promise<void> {
+  const actorUserId = await getAuthenticatedUserId();
+  if (!actorUserId) return;
+
+  const { error } = await supabase
+    .from('financial_audit_events')
+    .insert({
+      actor_user_id: actorUserId,
+      event_code: eventCode,
+      details,
+    });
+
+  if (error) {
+    logError('Failed to persist financial audit event:', eventCode, error);
+  }
+}
+
 export interface Process {
   id: string;
   org_id: string;
@@ -140,30 +169,24 @@ export async function listProcesses(org_id: string): Promise<Process[]> {
   }
 }
 
-const ADMIN_OPERATIONAL_STATUSES: NonNullable<Process['process_status']>[] = [
-  'queued',
-  'in_progress',
-  'awaiting_documents',
-  'under_review',
-  'completed'
-];
-
 /**
  * List operational processes for admin panel
  * - payment_status = paid
- * - process_status IN operational statuses
+ * - process_status = liberado
  */
 export async function listAdminOperationalProcesses(org_id: string): Promise<Process[]> {
   const startTime = performance.now();
   log('listAdminOperationalProcesses() starting for org_id:', org_id);
 
   try {
+    const actorUserId = await getAuthenticatedUserId();
+
     const { data, error } = await supabase
       .from('processes')
       .select('*')
       .eq('org_id', org_id)
       .eq('payment_status', 'paid')
-      .in('process_status', ADMIN_OPERATIONAL_STATUSES)
+      .eq('process_status', 'liberado')
       .order('created_at', { ascending: false });
 
     const elapsed = performance.now() - startTime;
@@ -174,6 +197,16 @@ export async function listAdminOperationalProcesses(org_id: string): Promise<Pro
       logError('Error details:', JSON.stringify(error, null, 2));
       return [];
     }
+
+    await logFinancialAuditEvent('admin_financial_processes_viewed', {
+      orgId: org_id,
+      actorUserId,
+      resultCount: data?.length || 0,
+      constraints: {
+        payment_status: 'paid',
+        process_status: 'liberado',
+      },
+    });
 
     log('Admin operational query successful, returned', data?.length || 0, 'processes');
     return data || [];
@@ -196,11 +229,26 @@ export async function listClientPaidProcessesFinance(
   log('listClientPaidProcessesFinance() starting for org_id:', org_id, 'client_user_id:', client_user_id);
 
   try {
+    const authenticatedUserId = await getAuthenticatedUserId();
+    if (!authenticatedUserId) {
+      logError('listClientPaidProcessesFinance() blocked: no authenticated user found.');
+      return [];
+    }
+    if (authenticatedUserId !== client_user_id) {
+      logError(
+        'listClientPaidProcessesFinance() blocked: client_user_id differs from authenticated user.',
+        { authenticatedUserId, client_user_id, org_id },
+      );
+      return [];
+    }
+
+    const now = new Date();
     const { data, error } = await supabase
       .from('processes')
       .select('id,titulo,amount,currency,payment_status,paid_at,data_prazo,usage_deadline_at,process_status')
       .eq('org_id', org_id)
       .eq('responsavel_user_id', client_user_id)
+      .in('payment_status', ['paid', 'released'])
       .order('created_at', { ascending: false });
 
     const elapsed = performance.now() - startTime;
@@ -220,7 +268,6 @@ export async function listClientPaidProcessesFinance(
           : null;
       const daysRemaining = deadline ? Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
       const isExpired = Boolean(deadline && deadline < now);
-      const isExpiringSoon = Boolean(deadline && deadline >= now && deadline <= sevenDaysFromNow);
 
       return {
         processId: row.id,
@@ -235,6 +282,17 @@ export async function listClientPaidProcessesFinance(
         isExpired,
         processStatus: (row.process_status || null) as NonNullable<Process['process_status']> | null,
       } satisfies ClientProcessFinance;
+    });
+
+    await logFinancialAuditEvent('client_financial_processes_viewed', {
+      orgId: org_id,
+      actorUserId: authenticatedUserId,
+      clientUserId: client_user_id,
+      resultCount: rows.length,
+      constraints: {
+        responsavel_user_id: client_user_id,
+        payment_status_in: ['paid', 'released'],
+      },
     });
 
     log('Client paid financial query successful, returned', rows.length, 'processes');
