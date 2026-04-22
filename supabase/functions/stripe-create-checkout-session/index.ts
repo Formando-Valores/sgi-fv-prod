@@ -14,6 +14,12 @@ type CheckoutPayload = {
   sectorId?: string;
 };
 
+type ProcessOwnershipRow = {
+  id: string;
+  org_id: string;
+  responsavel_user_id?: string | null;
+};
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -96,6 +102,25 @@ Deno.serve(async (request) => {
   try {
     await client.connect();
     await client.queryArray('BEGIN');
+
+    const processOwnership = await client.queryObject<ProcessOwnershipRow>(
+      `SELECT id, org_id, responsavel_user_id
+         FROM public.processes
+        WHERE id = $1
+          AND org_id = $2
+        LIMIT 1`,
+      [processId, organizationId],
+    );
+
+    const process = processOwnership.rows[0];
+    if (!process) {
+      throw new Error('Processo não encontrado para o organizationId informado.');
+    }
+
+    const expectedClientId = process.responsavel_user_id ?? null;
+    if (expectedClientId && expectedClientId !== clientId) {
+      throw new Error('clientId divergente do cliente vinculado ao processo.');
+    }
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',

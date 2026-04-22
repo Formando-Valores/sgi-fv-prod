@@ -4,7 +4,6 @@ import { Client } from 'https://deno.land/x/postgres@v0.19.3/mod.ts';
 type ProcessRecord = {
   id: string;
   org_id: string;
-  client_user_id?: string | null;
   responsavel_user_id?: string | null;
   service_id?: string | null;
   selected_service_id?: string | null;
@@ -46,6 +45,9 @@ const normalizeStripeId = (value: string | Stripe.PaymentIntent | null) => {
   if (!value) return null;
   return typeof value === 'string' ? value : value.id;
 };
+
+const isUuid = (value: string | null | undefined) =>
+  Boolean(value && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value));
 
 const mapEventToPaymentStatus = (eventType: string): 'paid' | 'failed' | 'canceled' | 'refunded' | null => {
   if (eventType === 'checkout.session.completed' || eventType === 'payment_intent.succeeded') return 'paid';
@@ -90,7 +92,7 @@ const validateProcessConsistency = (
   }
 
   if (hasTruthyMetadata(metadata.clientId)) {
-    const processClientId = process.client_user_id ?? process.responsavel_user_id ?? null;
+    const processClientId = process.responsavel_user_id ?? null;
     if (processClientId && processClientId !== metadata.clientId) {
       throw new Error('Inconsistência entre clientId do metadata e do processo.');
     }
@@ -201,7 +203,7 @@ Deno.serve(async (request) => {
     }
 
     const processResult = await client.queryObject<ProcessRecord>(
-      `SELECT id, org_id, client_user_id, responsavel_user_id, service_id, selected_service_id, servico_id, service_reference
+      `SELECT id, org_id, responsavel_user_id, service_id, selected_service_id, servico_id, service_reference
          FROM public.processes
         WHERE id = $1
         LIMIT 1
@@ -222,6 +224,14 @@ Deno.serve(async (request) => {
       organizationId: metadata.organizationId,
     });
 
+    const expectedClientId = process.responsavel_user_id ?? null;
+    const metadataClientId = String(metadata.clientId ?? '').trim();
+    const validatedClientId = isUuid(metadataClientId)
+      ? metadataClientId
+      : isUuid(expectedClientId)
+        ? expectedClientId
+        : null;
+
     const paymentUpdate = await client.queryObject<{ id: string }>(
       `UPDATE public.payments
           SET status = $2,
@@ -234,8 +244,9 @@ Deno.serve(async (request) => {
               last_event_at = now(),
               updated_at = now()
         WHERE process_id = $1
+          AND ($7::uuid IS NULL OR client_id = $7::uuid)
         RETURNING id`,
-      [processId, actionableStatus, checkoutSessionId, paymentIntentId, event.id, event.type],
+      [processId, actionableStatus, checkoutSessionId, paymentIntentId, event.id, event.type, validatedClientId],
     );
 
     if (paymentUpdate.rows.length === 0) {
