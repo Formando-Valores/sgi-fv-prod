@@ -1,8 +1,8 @@
 
 import React, { useEffect, useState } from 'react';
-import { LogOut, Printer, FileDown, Eye, Pencil, Search, Users, ShieldCheck, X, Plus, Trash2, Calendar, MessageSquare, Check, User as UserIcon, UserCheck, LayoutDashboard, FolderKanban, Users2, Settings, Menu, Building2, Flag } from 'lucide-react';
+import { LogOut, Printer, FileDown, Eye, Pencil, Search, Users, ShieldCheck, X, Plus, Trash2, Calendar, MessageSquare, Check, User as UserIcon, UserCheck, LayoutDashboard, FolderKanban, Users2, Settings, Building2, Flag } from 'lucide-react';
 import { User, ProcessStatus, UserRole, Hierarchy, ServiceUnit, Organization } from '../types';
-import { NavLink, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { SERVICE_MANAGERS } from '../constants';
 import { buildOrganizationErrorMessage, createOrganization, deleteOrganization, loadOrganizations, updateOrganization, updateOrganizationStatus } from '../organizationRepository';
 import { supabase } from '../supabase';
@@ -10,7 +10,16 @@ import type { Process as DbProcess } from '../src/lib/processes';
 import Card from '../src/components/ui/Card';
 import Badge from '../src/components/ui/Badge';
 import Button from '../src/components/ui/Button';
+import DashboardShell from '../src/components/dashboard/DashboardShell';
+import DashboardSidebar from '../src/components/dashboard/DashboardSidebar';
+import DashboardTopbar from '../src/components/dashboard/DashboardTopbar';
+import DashboardCardContainer from '../src/components/dashboard/DashboardCardContainer';
 import { can, getAllowedModules, resolvePermissions } from '../src/lib/permissions';
+import OverviewBlock from '../src/components/dashboard/blocks/OverviewBlock';
+import ProcessesBlock from '../src/components/dashboard/blocks/ProcessesBlock';
+import ClientsBlock from '../src/components/dashboard/blocks/ClientsBlock';
+import OrganizationsBlock from '../src/components/dashboard/blocks/OrganizationsBlock';
+import ClientJourneyBlock from '../src/components/dashboard/blocks/ClientJourneyBlock';
 
 type AccessLevel = 'Administrador' | 'Usuário Sênior' | 'Usuário Pleno' | 'Operador' | 'Cliente';
 
@@ -164,9 +173,16 @@ interface AdminDashboardProps {
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
   onLogout: () => void;
   section?: 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes';
+  blocks?: {
+    OverviewBlock?: React.ComponentType<{ children: React.ReactNode }>;
+    ProcessesBlock?: React.ComponentType<{ children: React.ReactNode }>;
+    ClientsBlock?: React.ComponentType<{ children: React.ReactNode }>;
+    OrganizationsBlock?: React.ComponentType<{ children: React.ReactNode }>;
+    ClientJourneyBlock?: React.ComponentType<{ children: React.ReactNode }>;
+  };
 }
 
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, setUsers, onLogout, section = 'dashboard' }) => {
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, setUsers, onLogout, section = 'dashboard', blocks }) => {
   const [activeTab, setActiveTab] = useState<'users' | 'management'>('users');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState<AdminProcessRow | User | null>(null);
@@ -265,6 +281,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     country: 'Brasil',
     maritalStatus: 'Solteiro',
   });
+  const OverviewContainer = blocks?.OverviewBlock ?? OverviewBlock;
+  const ProcessesContainer = blocks?.ProcessesBlock ?? ProcessesBlock;
+  const ClientsContainer = blocks?.ClientsBlock ?? ClientsBlock;
+  const OrganizationsContainer = blocks?.OrganizationsBlock ?? OrganizationsBlock;
+  const ClientJourneyContainer = blocks?.ClientJourneyBlock ?? ClientJourneyBlock;
   const [editingProfileLoading, setEditingProfileLoading] = useState(false);
   const [editingProfileError, setEditingProfileError] = useState('');
   const [editingProfileSaving, setEditingProfileSaving] = useState(false);
@@ -2315,85 +2336,51 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   };
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-gray-50 p-4 md:p-8 text-gray-800">
-      <div className="mx-auto flex min-w-0 max-w-[1600px] flex-col gap-6 lg:flex-row">
-        <div className="lg:hidden mb-3">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="p-3 rounded-xl bg-white border border-gray-200 text-gray-700 shadow-sm"
-            aria-label="Abrir menu"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
-        </div>
-
-        {sidebarOpen && (
-          <button
-            className="lg:hidden fixed inset-0 bg-black/30 z-40"
-            onClick={() => setSidebarOpen(false)}
-            aria-label="Fechar menu"
-          />
-        )}
-
-        <aside
-          className={`fixed lg:static inset-y-0 left-0 z-50 lg:z-auto w-72 shrink-0 bg-white border border-gray-100 rounded-r-2xl lg:rounded-2xl p-5 h-full lg:h-fit transition-transform duration-300 shadow-sm ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
-        >
-          <h2 className="text-xl font-black mb-1 text-gray-800">SGI FV</h2>
-          <p className="text-gray-500 text-xs font-bold uppercase mb-6">Formando Valores</p>
-
-          <div className="mb-6 p-3 rounded-xl bg-gray-50 border border-gray-200">
-            <p className="font-bold text-gray-800">{currentUser.name}</p>
-            <p className="text-[10px] uppercase tracking-widest text-gray-500">{permissions.hierarchy.toUpperCase()}</p>
-          </div>
-
-          <nav className="space-y-2">
-            {sidebarLinks.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                onClick={() => setSidebarOpen(false)}
-                className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${isActive ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-white text-gray-600 border-gray-100 hover:bg-gray-50'}`}
+    <DashboardShell
+      sidebarOpen={sidebarOpen}
+      onOpenSidebar={() => setSidebarOpen(true)}
+      onCloseSidebar={() => setSidebarOpen(false)}
+      sidebar={(
+        <DashboardSidebar
+          sidebarOpen={sidebarOpen}
+          onNavigate={() => setSidebarOpen(false)}
+          userName={currentUser.name}
+          hierarchyLabel={permissions.hierarchy}
+          links={sidebarLinks}
+        />
+      )}
+      topbar={(
+        <DashboardTopbar
+          title={<><ShieldCheck className="text-blue-500" /> SGI FV - PAINEL ADMINISTRATIVO</>}
+          subtitle={`Bem-vindo, ${currentUser.name}`}
+          actions={(
+            <div className="flex gap-2">
+              <Button
+                onClick={handlePrint}
+                title="Clique para Imprimir Documento"
+                variant="secondary"
+                className="flex items-center gap-2 text-xs font-bold uppercase"
               >
-                <item.icon className="w-4 h-4" />
-                <span className="font-bold">{item.label}</span>
-              </NavLink>
-            ))}
-          </nav>
-
-        </aside>
-
-        <div className="min-w-0 flex-1 lg:pl-0">
-      {/* Admin Header */}
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 no-print">
-        <div>
-          <h1 className="text-2xl font-black text-gray-800 tracking-tighter flex items-center gap-2">
-            <ShieldCheck className="text-blue-500" /> SGI FV - PAINEL ADMINISTRATIVO
-          </h1>
-          <p className="text-gray-500 text-xs font-bold uppercase mt-1">Bem-vindo, {currentUser.name}</p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            onClick={handlePrint} 
-            title="Clique para Imprimir Documento"
-            variant="secondary"
-            className="flex items-center gap-2 text-xs font-bold uppercase"
-          >
-            <Printer className="w-4 h-4" /> Imprimir
-          </Button>
-          <Button
-            onClick={handlePrint} 
-            title="Clique para Salvar como PDF"
-            className="flex items-center gap-2 text-xs font-bold uppercase"
-          >
-            <FileDown className="w-4 h-4" /> Gerar PDF
-          </Button>
-          <Button onClick={onLogout} variant="danger" className="flex items-center gap-2 text-xs font-bold uppercase">
-            <LogOut className="w-4 h-4" /> Sair
-          </Button>
-        </div>
-      </header>
+                <Printer className="w-4 h-4" /> Imprimir
+              </Button>
+              <Button
+                onClick={handlePrint}
+                title="Clique para Salvar como PDF"
+                className="flex items-center gap-2 text-xs font-bold uppercase"
+              >
+                <FileDown className="w-4 h-4" /> Gerar PDF
+              </Button>
+              <Button onClick={onLogout} variant="danger" className="flex items-center gap-2 text-xs font-bold uppercase">
+                <LogOut className="w-4 h-4" /> Sair
+              </Button>
+            </div>
+          )}
+        />
+      )}
+    >
 
       {currentSection === 'dashboard' && (
+        <OverviewContainer>
         <section className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5 no-print">
           {dashboardHighlights.map((item) => (
             <article key={item.key} className={`rounded-2xl border p-4 shadow-sm ${item.styles} min-h-[112px]`}>
@@ -2406,9 +2393,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
             </article>
           ))}
         </section>
+        </OverviewContainer>
       )}
 
       {currentSection === 'dashboard' && (
+        <OverviewContainer>
         <section className="mb-6 space-y-4 no-print">
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
             <article className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
@@ -2567,6 +2556,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
             </div>
           </article>
         </section>
+        </OverviewContainer>
       )}
 
       {currentSection === 'configuracoes' && (
@@ -2593,7 +2583,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
 
       {currentSection === 'organizacoes' ? (
-        canManageOrganizations ? (
+        <OrganizationsContainer>
+        {canManageOrganizations ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
             <h3 className="text-lg font-black mb-4">CADASTRAR ORGANIZAÇÃO</h3>
@@ -2703,8 +2694,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           <Card className="bg-white border-gray-100 p-6">
             <p className="text-sm font-semibold text-gray-500">Você não possui permissão para gerenciar organizações.</p>
           </Card>
-        )
+        )}
+        </OrganizationsContainer>
       ) : currentSection === 'processos' ? (
+        <ProcessesContainer>
         <div className="min-w-0 space-y-6">
           <Card className="min-w-0 bg-white border-gray-100 p-4 sm:p-5">
             <div className="mb-2 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -2929,8 +2922,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
             </div>
           </Card>
         </div>
+        </ProcessesContainer>
       ) : currentSection === 'clientes' ? (
-        <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
+        <ClientsContainer>
+        <DashboardCardContainer className="p-6">
           <h3 className="text-lg font-black mb-4">CLIENTES</h3>
 
           <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -3006,7 +3001,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               </tbody>
             </table>
           </div>
-        </div>
+        </DashboardCardContainer>
+        </ClientsContainer>
       ) : currentSection === 'configuracoes' && activeTab === 'users' ? (
         <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
           <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 no-print">
@@ -3633,6 +3629,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
       {/* Details View Modal */}
       {selectedUser && (
+        <ClientJourneyContainer>
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-white w-full max-w-2xl rounded-3xl border border-gray-100 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
              <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
@@ -3693,6 +3690,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
              </div>
           </div>
         </div>
+        </ClientJourneyContainer>
       )}
 
       {canCreateProcess && showCreateProcessModal && (
@@ -3816,8 +3814,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           </div>
         </div>
       )}
-        </div>
-      </div>
 
       {/* Edit Status Modal */}
       {editingUser && (
@@ -4087,7 +4083,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           </div>
         </div>
       )}
-    </div>
+    </DashboardShell>
   );
 };
 
