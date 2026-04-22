@@ -312,7 +312,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     return null;
   };
   const pathnameSection = parseSectionCandidate(location.pathname.split('/')[2]);
-  const hashSource = browserHash || (typeof window !== 'undefined' ? window.location.hash : '');
+  const hashSource = (typeof window !== 'undefined' ? window.location.hash : '') || browserHash;
   const hashSection = parseSectionCandidate(hashSource.split('/')[2]);
   const currentSection = pathnameSection || hashSection || section || 'dashboard';
 
@@ -347,6 +347,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       window.removeEventListener('hashchange', handleHashChange);
     };
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    setBrowserHash(window.location.hash);
+  }, [location.pathname, location.search]);
 
   useEffect(() => {
     if (currentSection === 'configuracoes') {
