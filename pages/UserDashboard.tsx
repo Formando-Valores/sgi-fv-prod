@@ -59,8 +59,6 @@ type ServiceProcessView = {
   timeline: Array<{ date: string; message: string }>;
 };
 
-type ClientInternalSection = 'painel' | 'processos' | 'financeiro';
-
 type DashboardProcessRow = {
   id: string;
   titulo?: string | null;
@@ -1293,31 +1291,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
         </section>
       )}
 
-      {activeMainMenu !== 'financeiro' && (
-      <>
-      <section className="mb-6 bg-white border border-gray-100 rounded-2xl p-4 sm:p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
-        <h2 className="text-lg font-black text-gray-800">Acompanhamento dos Meus Processos</h2>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {[
-            { id: 'painel', label: 'Painel' },
-            { id: 'processos', label: 'Processos' },
-            { id: 'financeiro', label: 'Financeiro' },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveInternalSection(tab.id as ClientInternalSection)}
-              className={`rounded-lg px-3 py-2 text-xs sm:text-sm font-black uppercase ${
-                activeInternalSection === tab.id ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </section>
-
-      {activeInternalSection === 'processos' && (
+      {activeMainMenu === 'processos' && (
         <>
           <section className="mb-6 bg-white border border-gray-100 rounded-2xl p-4 sm:p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
             <h2 className="text-lg font-black text-gray-800">Guia rápido do sistema</h2>
@@ -1398,7 +1372,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
         </>
       )}
 
-      {activeInternalSection === 'financeiro' && (
+      {activeMainMenu === 'financeiro' && (
         <section className="mb-6 bg-white border border-gray-100 rounded-2xl p-4 sm:p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
           <h2 className="text-lg font-black text-gray-800 flex items-center gap-2">
             <Wallet className="w-5 h-5 text-emerald-600" /> Financeiro
@@ -1477,10 +1451,9 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
           </div>
         </section>
       )}
-      </>
-      )}
+      
 
-      {activeInternalSection === 'processos' && isOnboardingFlow && (
+      {activeMainMenu === 'processos' && isOnboardingFlow && (
         <section className="mb-6 bg-white border border-gray-100 rounded-2xl p-4 sm:p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
           <h2 className="text-lg font-black text-gray-800">Primeiro acesso guiado</h2>
           <p className="text-sm text-gray-500 mb-4">Selecione o seu serviço pela área selecionada.</p>
@@ -1707,7 +1680,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
         </section>
       )}
 
-      {activeInternalSection === 'processos' && initialStageFinished && (
+      {activeMainMenu === 'processos' && initialStageFinished && (
         <section className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 sm:p-6">
           <h2 className="text-lg font-black text-emerald-800">Etapa inicial concluída</h2>
           <p className="text-sm font-semibold text-emerald-700 mt-1">
@@ -1727,7 +1700,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
       )}
 
 
-      {activeInternalSection === 'processos' && checkoutReturnStatus && (
+      {activeMainMenu === 'processos' && checkoutReturnStatus && (
         <section className={`mb-6 rounded-2xl border p-4 sm:p-6 ${checkoutReturnStatus === 'success' ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}>
           <h2 className={`text-lg font-black ${checkoutReturnStatus === 'success' ? 'text-emerald-800' : 'text-amber-800'}`}>
             {checkoutReturnStatus === 'success' ? 'Retorno do checkout recebido' : 'Pagamento cancelado no checkout'}
@@ -1906,7 +1879,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
         </section>
       )}
 
-      {activeInternalSection === 'painel' && (
+      {activeMainMenu === 'painel' && (
       <main className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Status Section */}
         <section className="lg:col-span-2 space-y-6">
