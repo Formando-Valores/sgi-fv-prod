@@ -222,7 +222,6 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
   const [selectedDashboardProcessId, setSelectedDashboardProcessId] = React.useState<string | null>(null);
   const [dashboardProcessesLoading, setDashboardProcessesLoading] = React.useState(false);
   const [activeMainMenu, setActiveMainMenu] = React.useState<'painel' | 'processos' | 'financeiro'>('painel');
-  const [activeInternalSection, setActiveInternalSection] = React.useState<'processo' | 'financeiro'>('processo');
   const [processComments, setProcessComments] = React.useState<Array<{ id: string; text: string; createdAt: string }>>([]);
   const [newComment, setNewComment] = React.useState('');
   const [processFiles, setProcessFiles] = React.useState<Array<{ id: string; name: string; sizeLabel: string; uploadedAt: string }>>([]);
@@ -560,17 +559,6 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
 
     void loadPaidFinanceEntries();
   }, [activeOrganizationId, currentUser.id]);
-
-  React.useEffect(() => {
-    if (!serviceProcess && financeEntries.length > 0 && activeInternalSection !== 'financeiro') {
-      setActiveInternalSection('financeiro');
-      return;
-    }
-
-    if (serviceProcess && activeInternalSection !== 'processo' && financeEntries.length === 0) {
-      setActiveInternalSection('processo');
-    }
-  }, [activeInternalSection, financeEntries.length, serviceProcess]);
 
   React.useEffect(() => {
     const validOrgId = isValidUuid(activeOrganizationId) ? activeOrganizationId : null;
@@ -988,17 +976,6 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
     event.target.value = '';
   };
 
-  const handleDownloadReceipt = (entry: { id: string; serviceName: string; totalLabel: string; paidAt: string; useUntil: string; processStatus: string }) => {
-    const receiptText = `Comprovante SGI-FV\nOS: ${entry.id}\nCliente: ${currentUser.name}\nServiço: ${entry.serviceName}\nValor: ${entry.totalLabel}\nData pagamento: ${entry.paidAt}\nVálido até: ${entry.useUntil}\nStatus do processo: ${entry.processStatus}\n`;
-    const blob = new Blob([receiptText], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `comprovante-${entry.id}.txt`;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
-
   const handleDownloadTechnicalReport = () => {
     if (!serviceProcess) return;
     const historyLines = serviceProcess.timeline.map((event) => `- ${event.date}: ${event.message}`).join('\n');
@@ -1234,7 +1211,6 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
             type="button"
             onClick={() => {
               setActiveMainMenu('painel');
-              setActiveInternalSection('processo');
             }}
             className={`rounded-xl px-4 py-2 text-sm font-black uppercase border ${activeMainMenu === 'painel' ? 'bg-blue-600 text-white border-blue-700' : 'bg-gray-100 text-gray-700 border-gray-200'}`}
           >
@@ -1244,7 +1220,6 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
             type="button"
             onClick={() => {
               setActiveMainMenu('processos');
-              setActiveInternalSection('processo');
             }}
             className={`rounded-xl px-4 py-2 text-sm font-black uppercase border ${activeMainMenu === 'processos' ? 'bg-blue-600 text-white border-blue-700' : 'bg-gray-100 text-gray-700 border-gray-200'}`}
           >
@@ -1254,7 +1229,6 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
             type="button"
             onClick={() => {
               setActiveMainMenu('financeiro');
-              setActiveInternalSection('financeiro');
             }}
             className={`rounded-xl px-4 py-2 text-sm font-black uppercase border ${activeMainMenu === 'financeiro' ? 'bg-blue-600 text-white border-blue-700' : 'bg-gray-100 text-gray-700 border-gray-200'}`}
           >
@@ -1713,28 +1687,11 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
         </section>
       )}
 
-      {(serviceProcess || financeEntries.length > 0) && (
+      {serviceProcess && (
         <section className="mb-6 rounded-2xl border border-blue-200 bg-blue-50 p-4 sm:p-6">
           <h2 className="text-lg font-black text-blue-800">PAINEL DO CLIENTE</h2>
-          <p className="text-sm font-semibold text-blue-700 mt-1">Acompanhe o processo e consulte uma aba dedicada ao Financeiro do Cliente.</p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => setActiveInternalSection('processo')}
-              className={`rounded-xl px-4 py-2 text-xs font-black uppercase tracking-wide border ${activeInternalSection === 'processo' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-blue-700 border-blue-200'}`}
-            >
-              Processo em andamento
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveInternalSection('financeiro')}
-              className={`rounded-xl px-4 py-2 text-xs font-black uppercase tracking-wide border ${activeInternalSection === 'financeiro' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-emerald-700 border-emerald-200'}`}
-            >
-              Financeiro do Cliente
-            </button>
-          </div>
-
-          {activeInternalSection === 'processo' && serviceProcess && (
+          <p className="text-sm font-semibold text-blue-700 mt-1">Acompanhe o processo em andamento.</p>
+          {serviceProcess && (
             <>
               <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                 <p><span className="font-black text-gray-600 uppercase text-xs">Setor responsável</span><br />{displaySectorName}</p>
@@ -1816,41 +1773,6 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
                 </div>
               </div>
             </>
-          )}
-
-          {activeInternalSection === 'processo' && !serviceProcess && (
-            <div className="mt-4 rounded-xl border border-blue-100 bg-white p-4 text-sm text-gray-600">
-              Nenhum processo em andamento encontrado no momento.
-            </div>
-          )}
-
-          {activeInternalSection === 'financeiro' && (
-            <div className="mt-4 rounded-xl border border-emerald-100 bg-white p-3">
-              <p className="text-xs font-black uppercase text-gray-500 mb-2">Financeiro do Cliente</p>
-              {financeEntries.length === 0 ? (
-                <p className="text-sm text-gray-600">Ainda não há processos pagos para este cliente.</p>
-              ) : (
-                <div className="space-y-2">
-                  {financeEntries.map((entry) => (
-                    <div key={entry.id} className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                      <span>
-                        {entry.serviceName} • {entry.totalLabel} • Pago em {entry.paidAt} • Uso até {entry.useUntil} • {entry.processStatus}
-                        {entry.isExpired
-                          ? ' • 🔴 vencido'
-                          : typeof entry.daysRemaining === 'number'
-                            ? ` • 🟠 vence em ${entry.daysRemaining} dia(s)`
-                            : entry.isExpiringSoon
-                              ? ' • ⚠️ Próximo do vencimento'
-                              : ''}
-                      </span>
-                      <button type="button" onClick={() => handleDownloadReceipt(entry)} className="rounded-lg border border-gray-300 px-2 py-1 font-bold">
-                        Baixar comprovante
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
           )}
           <button
             type="button"
