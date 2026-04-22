@@ -59,8 +59,6 @@ type ServiceProcessView = {
   timeline: Array<{ date: string; message: string }>;
 };
 
-type ClientInternalSection = 'painel' | 'processos' | 'financeiro';
-
 type DashboardProcessRow = {
   id: string;
   titulo?: string | null;
@@ -258,7 +256,6 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
   const [selectedDashboardProcessId, setSelectedDashboardProcessId] = React.useState<string | null>(null);
   const [dashboardProcessesLoading, setDashboardProcessesLoading] = React.useState(false);
   const [activeMainMenu, setActiveMainMenu] = React.useState<'painel' | 'processos' | 'financeiro'>('painel');
-  const [activeInternalSection, setActiveInternalSection] = React.useState<'processo' | 'financeiro'>('processo');
   const [processComments, setProcessComments] = React.useState<Array<{ id: string; text: string; createdAt: string }>>([]);
   const [newComment, setNewComment] = React.useState('');
   const [processFiles, setProcessFiles] = React.useState<Array<{ id: string; name: string; sizeLabel: string; uploadedAt: string }>>([]);
@@ -271,7 +268,8 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
     paidAt: string;
     paidAtRaw: string | null;
     useUntil: string;
-    useUntilRaw: string | null;
+    daysRemaining: number | null;
+    isExpired: boolean;
     paymentStatus: string;
     paymentStatusKey: string;
     processStatus: string;
@@ -374,30 +372,11 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
 
     return { paidRows, pendingRows, totalPaid, totalPending, upcomingDeadlines };
   }, [dashboardProcesses, estimateProcessAmount, financeEntries]);
-  const filteredFinanceEntries = React.useMemo(() => financeEntries.filter((entry) => {
-    if (financePaymentStatusFilter !== 'all' && entry.paymentStatusKey !== financePaymentStatusFilter) return false;
-    if (financeProcessStatusFilter !== 'all' && entry.processStatusKey !== financeProcessStatusFilter) return false;
-
-    if (financeDateStart || financeDateEnd) {
-      if (!entry.paidAtRaw) return false;
-      const paidAtDate = new Date(entry.paidAtRaw);
-      if (Number.isNaN(paidAtDate.getTime())) return false;
-
-      if (financeDateStart) {
-        const startDate = new Date(`${financeDateStart}T00:00:00`);
-        if (paidAtDate < startDate) return false;
-      }
-
-      if (financeDateEnd) {
-        const endDate = new Date(`${financeDateEnd}T23:59:59`);
-        if (paidAtDate > endDate) return false;
-      }
-    }
-
-    if (!financeSearch.trim()) return true;
-    const target = `${entry.id} ${entry.serviceName} ${entry.paymentStatus} ${entry.processStatus}`.toLowerCase();
-    return target.includes(financeSearch.toLowerCase().trim());
-  }), [financeDateEnd, financeDateStart, financeEntries, financePaymentStatusFilter, financeProcessStatusFilter, financeSearch]);
+  const dashboardDeadlineAlerts = React.useMemo(() => {
+    const expired = financeEntries.filter((entry) => entry.isExpired);
+    const expiringSoon = financeEntries.filter((entry) => !entry.isExpired && typeof entry.daysRemaining === 'number' && entry.daysRemaining <= 7);
+    return { expired, expiringSoon };
+  }, [financeEntries]);
 
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -623,9 +602,9 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
         paidAt: formatFinanceDate(financeProcess.paidAt),
         paidAtRaw: financeProcess.paidAt,
         useUntil: formatFinanceDate(financeProcess.useUntil),
-        useUntilRaw: financeProcess.useUntil,
-        paymentStatus: getPaymentStatusDisplayLabel(financeProcess.paymentStatus),
-        paymentStatusKey,
+        daysRemaining: financeProcess.daysRemaining,
+        isExpired: financeProcess.isExpired,
+        paymentStatus: financeProcess.paymentStatus || '-',
         processStatus: getProcessStatusDisplayLabel(financeProcess.processStatus),
         processStatusKey,
         usageDeadlineStatus,
@@ -636,17 +615,6 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
 
     void loadPaidFinanceEntries();
   }, [activeOrganizationId, currentUser.id]);
-
-  React.useEffect(() => {
-    if (!serviceProcess && financeEntries.length > 0 && activeInternalSection !== 'financeiro') {
-      setActiveInternalSection('financeiro');
-      return;
-    }
-
-    if (serviceProcess && activeInternalSection !== 'processo' && financeEntries.length === 0) {
-      setActiveInternalSection('processo');
-    }
-  }, [activeInternalSection, financeEntries.length, serviceProcess]);
 
   React.useEffect(() => {
     const validOrgId = isValidUuid(activeOrganizationId) ? activeOrganizationId : null;
@@ -1064,17 +1032,6 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
     event.target.value = '';
   };
 
-  const handleDownloadReceipt = (entry: { id: string; serviceName: string; totalLabel: string; paidAt: string; useUntil: string; processStatus: string }) => {
-    const receiptText = `Comprovante SGI-FV\nOS: ${entry.id}\nCliente: ${currentUser.name}\nServiço: ${entry.serviceName}\nValor: ${entry.totalLabel}\nData pagamento: ${entry.paidAt}\nVálido até: ${entry.useUntil}\nStatus do processo: ${entry.processStatus}\n`;
-    const blob = new Blob([receiptText], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `comprovante-${entry.id}.txt`;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
-
   const handleDownloadTechnicalReport = () => {
     if (!serviceProcess) return;
     const historyLines = serviceProcess.timeline.map((event) => `- ${event.date}: ${event.message}`).join('\n');
@@ -1310,7 +1267,6 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
             type="button"
             onClick={() => {
               setActiveMainMenu('painel');
-              setActiveInternalSection('processo');
             }}
             className={`rounded-xl px-4 py-2 text-sm font-black uppercase border ${activeMainMenu === 'painel' ? 'bg-blue-600 text-white border-blue-700' : 'bg-gray-100 text-gray-700 border-gray-200'}`}
           >
@@ -1320,7 +1276,6 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
             type="button"
             onClick={() => {
               setActiveMainMenu('processos');
-              setActiveInternalSection('processo');
             }}
             className={`rounded-xl px-4 py-2 text-sm font-black uppercase border ${activeMainMenu === 'processos' ? 'bg-blue-600 text-white border-blue-700' : 'bg-gray-100 text-gray-700 border-gray-200'}`}
           >
@@ -1330,7 +1285,6 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
             type="button"
             onClick={() => {
               setActiveMainMenu('financeiro');
-              setActiveInternalSection('financeiro');
             }}
             className={`rounded-xl px-4 py-2 text-sm font-black uppercase border ${activeMainMenu === 'financeiro' ? 'bg-blue-600 text-white border-blue-700' : 'bg-gray-100 text-gray-700 border-gray-200'}`}
           >
@@ -1351,31 +1305,23 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
       </section>
       )}
 
-      {activeMainMenu !== 'financeiro' && (
-      <section className="mb-6 bg-white border border-gray-100 rounded-2xl p-4 sm:p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
-        <h2 className="text-lg font-black text-gray-800">Acompanhamento dos Meus Processos</h2>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {[
-            { id: 'painel', label: 'Painel' },
-            { id: 'processos', label: 'Processos' },
-            { id: 'financeiro', label: 'Financeiro' },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveInternalSection(tab.id as ClientInternalSection)}
-              className={`rounded-lg px-3 py-2 text-xs sm:text-sm font-black uppercase ${
-                activeInternalSection === tab.id ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </section>
+      {(dashboardDeadlineAlerts.expired.length > 0 || dashboardDeadlineAlerts.expiringSoon.length > 0) && activeMainMenu !== 'financeiro' && (
+        <section className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <p className="text-sm font-black text-amber-800">Avisos de prazo</p>
+          {dashboardDeadlineAlerts.expired.length > 0 && (
+            <p className="text-xs text-rose-700 font-semibold mt-1">
+              {dashboardDeadlineAlerts.expired.length} processo(s) vencido(s).
+            </p>
+          )}
+          {dashboardDeadlineAlerts.expiringSoon.length > 0 && (
+            <p className="text-xs text-amber-800 font-semibold mt-1">
+              {dashboardDeadlineAlerts.expiringSoon.length} processo(s) vence(m) em até 7 dias.
+            </p>
+          )}
+        </section>
       )}
 
-      {activeInternalSection === 'processos' && (
+      {activeMainMenu === 'processos' && (
         <>
           <section className="mb-6 bg-white border border-gray-100 rounded-2xl p-4 sm:p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
             <h2 className="text-lg font-black text-gray-800">Guia rápido do sistema</h2>
@@ -1456,10 +1402,15 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
         </>
       )}
 
-      {activeInternalSection === 'financeiro' && (
+      {activeMainMenu === 'financeiro' && (
         <section className="mb-6 bg-white border border-gray-100 rounded-2xl p-4 sm:p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
           <h2 className="text-lg font-black text-gray-800 flex items-center gap-2">
             <Wallet className="w-5 h-5 text-emerald-600" /> Financeiro
+            {(dashboardDeadlineAlerts.expired.length > 0 || dashboardDeadlineAlerts.expiringSoon.length > 0) && (
+              <span className="inline-flex items-center rounded-full bg-rose-100 text-rose-700 text-[11px] px-2 py-0.5 font-black">
+                {dashboardDeadlineAlerts.expired.length > 0 ? `${dashboardDeadlineAlerts.expired.length} vencido(s)` : `${dashboardDeadlineAlerts.expiringSoon.length} alerta(s)`}
+              </span>
+            )}
           </h2>
           <p className="text-sm text-gray-500 mt-1">Visão consolidada dos pagamentos e prazos dos seus processos.</p>
 
@@ -1530,8 +1481,9 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
           </div>
         </section>
       )}
+      
 
-      {activeInternalSection === 'processos' && isOnboardingFlow && (
+      {activeMainMenu === 'processos' && isOnboardingFlow && (
         <section className="mb-6 bg-white border border-gray-100 rounded-2xl p-4 sm:p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
           <h2 className="text-lg font-black text-gray-800">Primeiro acesso guiado</h2>
           <p className="text-sm text-gray-500 mb-4">Selecione o seu serviço pela área selecionada.</p>
@@ -1758,7 +1710,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
         </section>
       )}
 
-      {activeInternalSection === 'processos' && initialStageFinished && (
+      {activeMainMenu === 'processos' && initialStageFinished && (
         <section className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 sm:p-6">
           <h2 className="text-lg font-black text-emerald-800">Etapa inicial concluída</h2>
           <p className="text-sm font-semibold text-emerald-700 mt-1">
@@ -1778,7 +1730,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
       )}
 
 
-      {activeInternalSection === 'processos' && checkoutReturnStatus && (
+      {activeMainMenu === 'processos' && checkoutReturnStatus && (
         <section className={`mb-6 rounded-2xl border p-4 sm:p-6 ${checkoutReturnStatus === 'success' ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}>
           <h2 className={`text-lg font-black ${checkoutReturnStatus === 'success' ? 'text-emerald-800' : 'text-amber-800'}`}>
             {checkoutReturnStatus === 'success' ? 'Retorno do checkout recebido' : 'Pagamento cancelado no checkout'}
@@ -1791,28 +1743,11 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
         </section>
       )}
 
-      {(serviceProcess || financeEntries.length > 0) && (
+      {serviceProcess && (
         <section className="mb-6 rounded-2xl border border-blue-200 bg-blue-50 p-4 sm:p-6">
           <h2 className="text-lg font-black text-blue-800">PAINEL DO CLIENTE</h2>
-          <p className="text-sm font-semibold text-blue-700 mt-1">Acompanhe o processo e consulte uma aba dedicada ao Financeiro do Cliente.</p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => setActiveInternalSection('processo')}
-              className={`rounded-xl px-4 py-2 text-xs font-black uppercase tracking-wide border ${activeInternalSection === 'processo' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-blue-700 border-blue-200'}`}
-            >
-              Processo em andamento
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveInternalSection('financeiro')}
-              className={`rounded-xl px-4 py-2 text-xs font-black uppercase tracking-wide border ${activeInternalSection === 'financeiro' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-emerald-700 border-emerald-200'}`}
-            >
-              Financeiro do Cliente
-            </button>
-          </div>
-
-          {activeInternalSection === 'processo' && serviceProcess && (
+          <p className="text-sm font-semibold text-blue-700 mt-1">Acompanhe o processo em andamento.</p>
+          {serviceProcess && (
             <>
               <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                 <p><span className="font-black text-gray-600 uppercase text-xs">Setor responsável</span><br />{displaySectorName}</p>
@@ -1895,122 +1830,6 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
               </div>
             </>
           )}
-
-          {activeInternalSection === 'processo' && !serviceProcess && (
-            <div className="mt-4 rounded-xl border border-blue-100 bg-white p-4 text-sm text-gray-600">
-              Nenhum processo em andamento encontrado no momento.
-            </div>
-          )}
-
-          {activeInternalSection === 'financeiro' && (
-            <div className="mt-4 rounded-xl border border-emerald-100 bg-white p-3">
-              <p className="text-xs font-black uppercase text-gray-500 mb-2">Financeiro do Cliente</p>
-              <div className="mb-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2">
-                <input
-                  type="search"
-                  value={financeSearch}
-                  onChange={(event) => setFinanceSearch(event.target.value)}
-                  placeholder="Buscar por OS, serviço ou status..."
-                  className="rounded-lg border border-emerald-200 px-3 py-2 text-xs"
-                />
-                <select
-                  value={financePaymentStatusFilter}
-                  onChange={(event) => setFinancePaymentStatusFilter(event.target.value as typeof financePaymentStatusFilter)}
-                  className="rounded-lg border border-emerald-200 px-3 py-2 text-xs"
-                >
-                  <option value="all">Pagamento: todos</option>
-                  <option value="pending">Pendente</option>
-                  <option value="paid">Pago</option>
-                  <option value="failed">Falhou</option>
-                  <option value="cancelled">Cancelado</option>
-                  <option value="refunded">Reembolsado</option>
-                </select>
-                <select
-                  value={financeProcessStatusFilter}
-                  onChange={(event) => setFinanceProcessStatusFilter(event.target.value as typeof financeProcessStatusFilter)}
-                  className="rounded-lg border border-emerald-200 px-3 py-2 text-xs"
-                >
-                  <option value="all">Processo: todos</option>
-                  <option value="pending_payment">Aguardando pagamento</option>
-                  <option value="queued">Na fila</option>
-                  <option value="in_progress">Em andamento</option>
-                  <option value="awaiting_documents">Aguardando documentos</option>
-                  <option value="under_review">Em análise</option>
-                  <option value="completed">Concluído</option>
-                  <option value="cancelled">Cancelado</option>
-                </select>
-                <input
-                  type="date"
-                  value={financeDateStart}
-                  onChange={(event) => setFinanceDateStart(event.target.value)}
-                  className="rounded-lg border border-emerald-200 px-3 py-2 text-xs"
-                />
-                <input
-                  type="date"
-                  value={financeDateEnd}
-                  onChange={(event) => setFinanceDateEnd(event.target.value)}
-                  className="rounded-lg border border-emerald-200 px-3 py-2 text-xs"
-                />
-              </div>
-              {financeEntries.length === 0 ? (
-                <p className="text-sm text-gray-600">Ainda não há itens financeiros para este cliente.</p>
-              ) : filteredFinanceEntries.length === 0 ? (
-                <p className="text-sm text-gray-600">Nenhum item encontrado para os filtros selecionados.</p>
-              ) : (
-                <div className="space-y-2">
-                  {filteredFinanceEntries.map((entry) => (
-                    <div key={entry.id} className="rounded-lg border border-emerald-100 p-3 text-xs">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="font-bold text-gray-800">{entry.serviceName} • OS {entry.id.slice(0, 8)}</span>
-                        <div className="flex items-center gap-1">
-                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${
-                            entry.paymentStatusKey === 'paid'
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : entry.paymentStatusKey === 'failed' || entry.paymentStatusKey === 'cancelled'
-                                ? 'bg-red-100 text-red-700'
-                                : entry.paymentStatusKey === 'refunded'
-                                  ? 'bg-violet-100 text-violet-700'
-                                  : 'bg-amber-100 text-amber-700'
-                          }`}>
-                            Pagamento: {entry.paymentStatus}
-                          </span>
-                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${
-                            entry.processStatusKey === 'completed'
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : entry.processStatusKey === 'cancelled'
-                                ? 'bg-red-100 text-red-700'
-                                : 'bg-blue-100 text-blue-700'
-                          }`}>
-                            Processo: {entry.processStatus}
-                          </span>
-                        </div>
-                      </div>
-                      <p className="mt-2 text-gray-600">
-                        Valor: <span className="font-bold text-gray-800">{entry.totalLabel}</span> • Data de pagamento: <span className="font-bold text-gray-800">{entry.paidAt}</span>
-                      </p>
-                      <p className="mt-1 text-gray-600">
-                        Prazo de uso:{' '}
-                        <span className={`font-bold ${
-                          entry.usageDeadlineStatus === 'expired'
-                            ? 'text-red-700'
-                            : entry.usageDeadlineStatus === 'expiring'
-                              ? 'text-amber-700'
-                              : 'text-emerald-700'
-                        }`}>
-                          {entry.useUntil}
-                          {entry.usageDeadlineStatus === 'expiring' ? ' • Próximo do vencimento' : ''}
-                          {entry.usageDeadlineStatus === 'expired' ? ' • Vencido' : ''}
-                        </span>
-                      </p>
-                      <button type="button" onClick={() => handleDownloadReceipt(entry)} className="rounded-lg border border-gray-300 px-2 py-1 font-bold">
-                        Baixar comprovante
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
           <button
             type="button"
             onClick={() => {
@@ -2038,7 +1857,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
         </section>
       )}
 
-      {activeInternalSection === 'painel' && (
+      {activeMainMenu === 'painel' && (
       <main className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Status Section */}
         <section className="lg:col-span-2 space-y-6">
