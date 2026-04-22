@@ -117,16 +117,38 @@ const PROCESS_STATUS_LABEL_MAP: Record<string, ServiceProcessView['statusLabel']
 };
 
 const PROCESS_STATUS_DISPLAY_LABEL_MAP: Record<string, string> = {
+  pending_payment: 'Aguardando pagamento',
+  queued: 'Na fila',
+  in_progress: 'Em andamento',
+  awaiting_documents: 'Aguardando documentos',
+  under_review: 'Em análise',
+  completed: 'Concluído',
+  cancelled: 'Cancelado',
   cadastro: 'Cadastro',
   triagem: 'Triagem',
   analise: 'Em análise',
   concluido: 'Concluído',
 };
 
+const PAYMENT_STATUS_DISPLAY_LABEL_MAP: Record<string, string> = {
+  pending: 'Pendente',
+  paid: 'Pago',
+  failed: 'Falhou',
+  cancelled: 'Cancelado',
+  canceled: 'Cancelado',
+  refunded: 'Reembolsado',
+};
+
 const getProcessStatusDisplayLabel = (status?: string | null) => {
   const normalized = normalizeStatusKey(status);
   if (!normalized) return '-';
   return PROCESS_STATUS_DISPLAY_LABEL_MAP[normalized] || status || '-';
+};
+
+const getPaymentStatusDisplayLabel = (status?: string | null) => {
+  const normalized = normalizeStatusKey(status);
+  if (!normalized) return '-';
+  return PAYMENT_STATUS_DISPLAY_LABEL_MAP[normalized] || status || '-';
 };
 
 const summarizeStripeSessionId = (sessionId?: string | null) => {
@@ -146,6 +168,18 @@ const formatFinanceDate = (value?: string | null) => {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return '-';
   return parsed.toLocaleDateString('pt-PT');
+};
+
+const getUsageDeadlineStatus = (useUntil?: string | null): 'normal' | 'expiring' | 'expired' => {
+  if (!useUntil) return 'normal';
+  const now = new Date();
+  const deadline = new Date(`${useUntil}T23:59:59`);
+  if (Number.isNaN(deadline.getTime())) return 'normal';
+  if (deadline < now) return 'expired';
+  const sevenDaysFromNow = new Date(now);
+  sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
+  if (deadline <= sevenDaysFromNow) return 'expiring';
+  return 'normal';
 };
 
 const formatProcessTimelineMessage = (event: { tipo?: string | null; mensagem?: string | null }) => {
@@ -229,14 +263,24 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
     id: string;
     serviceName: string;
     totalLabel: string;
+    amount: number | null;
+    currency: string;
     paidAt: string;
+    paidAtRaw: string | null;
     useUntil: string;
     daysRemaining: number | null;
     isExpired: boolean;
     paymentStatus: string;
+    paymentStatusKey: string;
     processStatus: string;
-    isExpiringSoon: boolean;
+    processStatusKey: string;
+    usageDeadlineStatus: 'normal' | 'expiring' | 'expired';
   }>>([]);
+  const [financeSearch, setFinanceSearch] = React.useState('');
+  const [financePaymentStatusFilter, setFinancePaymentStatusFilter] = React.useState<'all' | 'pending' | 'paid' | 'failed' | 'cancelled' | 'refunded'>('all');
+  const [financeProcessStatusFilter, setFinanceProcessStatusFilter] = React.useState<'all' | 'pending_payment' | 'queued' | 'in_progress' | 'awaiting_documents' | 'under_review' | 'completed' | 'cancelled'>('all');
+  const [financeDateStart, setFinanceDateStart] = React.useState('');
+  const [financeDateEnd, setFinanceDateEnd] = React.useState('');
   const [resolvedOrganizationId, setResolvedOrganizationId] = React.useState<string | null>(currentUser.organizationId ?? null);
   const dashboardProcessesRef = React.useRef<DashboardProcessRow[]>([]);
 
@@ -542,18 +586,30 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
 
     const loadPaidFinanceEntries = async () => {
       const paidProcesses = await listClientPaidProcessesFinance(activeOrganizationId, currentUser.id);
-      const entries = paidProcesses.map((financeProcess) => ({
+      const entries = paidProcesses.map((financeProcess) => {
+        const paymentStatusKey = normalizeStatusKey(financeProcess.paymentStatus) === 'canceled'
+          ? 'cancelled'
+          : normalizeStatusKey(financeProcess.paymentStatus);
+        const processStatusKey = normalizeStatusKey(financeProcess.processStatus);
+        const usageDeadlineStatus = getUsageDeadlineStatus(financeProcess.useUntil);
+
+        return {
         id: financeProcess.processId,
         serviceName: financeProcess.serviceName,
+        amount: financeProcess.amount,
+        currency: financeProcess.currency,
         totalLabel: formatFinanceAmount(financeProcess.amount, financeProcess.currency),
         paidAt: formatFinanceDate(financeProcess.paidAt),
+        paidAtRaw: financeProcess.paidAt,
         useUntil: formatFinanceDate(financeProcess.useUntil),
         daysRemaining: financeProcess.daysRemaining,
         isExpired: financeProcess.isExpired,
         paymentStatus: financeProcess.paymentStatus || '-',
         processStatus: getProcessStatusDisplayLabel(financeProcess.processStatus),
-        isExpiringSoon: financeProcess.isExpiringSoon,
-      }));
+        processStatusKey,
+        usageDeadlineStatus,
+      };
+      });
       setFinanceEntries(entries);
     };
 

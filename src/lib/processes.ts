@@ -62,19 +62,18 @@ export interface ProcessEvent {
   created_at: string;
 }
 
-export interface PaidClientProcessFinance {
+export interface ClientProcessFinance {
   processId: string;
   serviceName: string;
   amount: number | null;
-  currency: string | null;
+  currency: string;
   paymentStatus: NonNullable<Process['payment_status']>;
-  paidAt: string;
+  paidAt: string | null;
   useUntil: string | null;
   usageDeadlineAt: string | null;
   daysRemaining: number | null;
   isExpired: boolean;
   processStatus: NonNullable<Process['process_status']> | null;
-  isExpiringSoon: boolean;
 }
 
 export interface CreateProcessPayload {
@@ -192,7 +191,7 @@ export async function listAdminOperationalProcesses(org_id: string): Promise<Pro
 export async function listClientPaidProcessesFinance(
   org_id: string,
   client_user_id: string,
-): Promise<PaidClientProcessFinance[]> {
+): Promise<ClientProcessFinance[]> {
   const startTime = performance.now();
   log('listClientPaidProcessesFinance() starting for org_id:', org_id, 'client_user_id:', client_user_id);
 
@@ -202,9 +201,7 @@ export async function listClientPaidProcessesFinance(
       .select('id,titulo,amount,currency,payment_status,paid_at,data_prazo,usage_deadline_at,process_status')
       .eq('org_id', org_id)
       .eq('responsavel_user_id', client_user_id)
-      .eq('payment_status', 'paid')
-      .not('paid_at', 'is', null)
-      .order('paid_at', { ascending: false });
+      .order('created_at', { ascending: false });
 
     const elapsed = performance.now() - startTime;
     log(`Client paid financial query completed in ${elapsed.toFixed(2)}ms`);
@@ -214,10 +211,6 @@ export async function listClientPaidProcessesFinance(
       logError('Error details:', JSON.stringify(error, null, 2));
       return [];
     }
-
-    const now = new Date();
-    const sevenDaysFromNow = new Date(now);
-    sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
 
     const rows = (data || []).map((row) => {
       const deadline = row.usage_deadline_at
@@ -233,7 +226,7 @@ export async function listClientPaidProcessesFinance(
         processId: row.id,
         serviceName: row.titulo || 'Serviço não informado',
         amount: typeof row.amount === 'number' ? row.amount : row.amount ? Number(row.amount) : null,
-        currency: row.currency || null,
+        currency: (row.currency || 'EUR').toUpperCase(),
         paymentStatus: (row.payment_status || 'pending') as NonNullable<Process['payment_status']>,
         paidAt: row.paid_at as string,
         useUntil: row.data_prazo || (deadline ? deadline.toISOString() : null),
@@ -241,8 +234,7 @@ export async function listClientPaidProcessesFinance(
         daysRemaining,
         isExpired,
         processStatus: (row.process_status || null) as NonNullable<Process['process_status']> | null,
-        isExpiringSoon,
-      } satisfies PaidClientProcessFinance;
+      } satisfies ClientProcessFinance;
     });
 
     log('Client paid financial query successful, returned', rows.length, 'processes');
