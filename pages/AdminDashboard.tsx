@@ -10,6 +10,7 @@ import type { Process as DbProcess } from '../src/lib/processes';
 import Card from '../src/components/ui/Card';
 import Badge from '../src/components/ui/Badge';
 import Button from '../src/components/ui/Button';
+import { resolvePermissions } from '../src/lib/permissions';
 
 type AccessLevel = 'Administrador' | 'Usuário Sênior' | 'Usuário Pleno' | 'Operador' | 'Cliente';
 
@@ -277,13 +278,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const location = useLocation();
   const currentSection = section ?? (location.pathname.split('/')[2] as 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes') ?? 'dashboard';
 
+  const permissions = resolvePermissions(currentUser.org_role ?? (currentUser.role === UserRole.ADMIN ? 'admin' : 'client'));
+
   const sidebarLinks = [
-    { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { to: '/dashboard/processos', label: 'Processos', icon: FolderKanban },
-    { to: '/dashboard/clientes', label: 'Clientes', icon: Users2 },
-    { to: '/dashboard/configuracoes', label: 'Configurações', icon: Settings },
-    { to: '/dashboard/organizacoes', label: 'Organizações', icon: Building2 },
-  ];
+    { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, visible: true },
+    { to: '/dashboard/processos', label: 'Processos', icon: FolderKanban, visible: permissions.capabilities.canOperateProcesses },
+    { to: '/dashboard/clientes', label: 'Clientes', icon: Users2, visible: permissions.capabilities.canManageClients },
+    { to: '/dashboard/configuracoes', label: 'Configurações', icon: Settings, visible: permissions.capabilities.canAccessSettings },
+    { to: '/dashboard/organizacoes', label: 'Organizações', icon: Building2, visible: permissions.capabilities.canViewOrganizations },
+  ].filter((item) => item.visible);
 
   useEffect(() => {
     setSidebarOpen(false);

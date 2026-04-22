@@ -22,6 +22,7 @@ import PaymentCancel from './src/pages/Payments/PaymentCancel';
 import { ProcessStatus, ServiceUnit, User } from './types';
 import { INITIAL_MOCK_USERS } from './constants';
 import { supabase } from './supabase';
+import { resolvePermissions } from './src/lib/permissions';
 
 const parseStorageItem = <T,>(key: string, fallback: T): T => {
   const rawValue = localStorage.getItem(key);
@@ -37,12 +38,6 @@ const parseStorageItem = <T,>(key: string, fallback: T): T => {
     localStorage.removeItem(key);
     return fallback;
   }
-};
-
-const isAdminOrgRole = (value: unknown): boolean => {
-  if (typeof value !== 'string') return false;
-  const normalized = value.toLowerCase();
-  return normalized === 'admin' || normalized === 'owner' || normalized === 'administrador';
 };
 
 const RootApp: React.FC = () => {
@@ -116,7 +111,8 @@ const RootApp: React.FC = () => {
         }
 
         const orgRole = contextData?.org_role ?? contextByEmailData?.org_role ?? profile?.role ?? null;
-        const normalizedRole = isAdminOrgRole(orgRole) ? UserRole.ADMIN : UserRole.CLIENT;
+        const permissions = resolvePermissions(orgRole, { profileRole: profile?.role });
+        const normalizedRole = permissions.hierarchy === 'cliente' ? UserRole.CLIENT : UserRole.ADMIN;
 
         const normalizedUser: User = {
           id: sessionUser.id,

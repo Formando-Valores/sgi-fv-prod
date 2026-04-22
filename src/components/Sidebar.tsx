@@ -8,15 +8,23 @@ import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, FolderKanban, Users, Settings, Building2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
-const navItems = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/processos', label: 'Processos', icon: FolderKanban },
-  { to: '/clientes', label: 'Clientes', icon: Users },
-  { to: '/configuracoes', label: 'Configurações', icon: Settings },
-];
+const hierarchyLabel: Record<string, string> = {
+  admin: 'Administrador',
+  senior: 'Usuário Sênior',
+  pleno: 'Usuário Pleno',
+  operador: 'Operador',
+  cliente: 'Cliente',
+};
 
 const Sidebar: React.FC = () => {
-  const { userContext } = useAuth();
+  const { userContext, capabilities, hierarchy } = useAuth();
+
+  const navItems = [
+    { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, visible: true },
+    { to: '/processos', label: 'Processos', icon: FolderKanban, visible: capabilities.canOperateProcesses },
+    { to: '/clientes', label: 'Clientes', icon: Users, visible: capabilities.canManageClients },
+    { to: '/configuracoes', label: 'Configurações', icon: Settings, visible: capabilities.canAccessSettings },
+  ].filter((item) => item.visible);
 
   return (
     <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col">
@@ -38,9 +46,7 @@ const Sidebar: React.FC = () => {
                 {userContext.org_name || 'Sem organização'}
               </p>
               <p className="text-[10px] text-slate-500 uppercase font-bold">
-                {userContext.role === 'owner' ? 'Proprietário' :
-                 userContext.role === 'admin' ? 'Administrador' :
-                 userContext.role === 'staff' ? 'Colaborador' : 'Cliente'}
+                {hierarchyLabel[hierarchy] || 'Cliente'}
               </p>
             </div>
           </div>
