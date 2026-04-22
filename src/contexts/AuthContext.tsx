@@ -18,6 +18,7 @@ import { supabase } from '../../supabase';
 console.log('[AuthContext] ✅ Supabase client imported');
 
 import type { UserContext, OrgRole } from '../../types';
+import { resolvePermissions, type PermissionCapabilities, type SystemHierarchy } from '../lib/permissions';
 console.log('[AuthContext] ✅ Types imported');
 console.log('[AuthContext] All imports completed successfully!');
 
@@ -36,6 +37,8 @@ interface AuthContextValue {
   loading: boolean;
   error: string | null;
   isAdmin: boolean;
+  hierarchy: SystemHierarchy;
+  capabilities: PermissionCapabilities;
   refreshContext: () => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -310,9 +313,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [loadContext]);
 
-  const isAdmin = userContext?.role === 'admin' || userContext?.role === 'owner';
-  
-  log('Render decision:', { loading, error: !!error, hasSession: !!session, isAdmin });
+  const { hierarchy, capabilities, isAdminHierarchy } = resolvePermissions(userContext?.role);
+  const isAdmin = isAdminHierarchy;
+
+  log('Render decision:', { loading, error: !!error, hasSession: !!session, isAdmin, hierarchy });
 
   // Show loading state
   if (loading) {
@@ -368,6 +372,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       error,
       isAdmin,
+      hierarchy,
+      capabilities,
       refreshContext,
       signOut
     }}>
