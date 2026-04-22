@@ -19,7 +19,7 @@ import PasswordRecovery from './pages/PasswordRecovery';
 import UnifiedDashboard from './src/pages/UnifiedDashboard';
 import PaymentSuccess from './src/pages/Payments/PaymentSuccess';
 import PaymentCancel from './src/pages/Payments/PaymentCancel';
-import { ProcessStatus, ServiceUnit, User } from './types';
+import { ProcessStatus, ServiceUnit, User, UserRole } from './types';
 import { INITIAL_MOCK_USERS } from './constants';
 import { supabase } from './supabase';
 import { resolvePermissions } from './src/lib/permissions';
@@ -139,6 +139,11 @@ const RootApp: React.FC = () => {
 
         if (mounted) {
           setCurrentUser(normalizedUser);
+        }
+      } catch (bootstrapError) {
+        console.error('[auth] erro inesperado no bootstrapUserFromSession', bootstrapError);
+        if (mounted) {
+          setCurrentUser(null);
         }
       } finally {
         if (mounted) {
