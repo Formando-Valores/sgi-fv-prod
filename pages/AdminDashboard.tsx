@@ -10,7 +10,7 @@ import type { Process as DbProcess } from '../src/lib/processes';
 import Card from '../src/components/ui/Card';
 import Badge from '../src/components/ui/Badge';
 import Button from '../src/components/ui/Button';
-import { resolvePermissions } from '../src/lib/permissions';
+import { can, getAllowedModules, resolvePermissions } from '../src/lib/permissions';
 
 type AccessLevel = 'Administrador' | 'Usuário Sênior' | 'Usuário Pleno' | 'Operador' | 'Cliente';
 
@@ -279,13 +279,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const currentSection = section ?? (location.pathname.split('/')[2] as 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes') ?? 'dashboard';
 
   const permissions = resolvePermissions(currentUser.org_role ?? (currentUser.role === UserRole.ADMIN ? 'admin' : 'client'));
+  const permissionSubject = { org_role: currentUser.org_role ?? null, hierarchy: permissions.hierarchy };
+  const allowedModules = getAllowedModules(permissionSubject);
+  const canCreateProcess = can('create', 'processos', permissionSubject);
+  const canManageOrganizations = can('manage', 'organizacoes', permissionSubject);
 
   const sidebarLinks = [
-    { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, visible: true },
-    { to: '/dashboard/processos', label: 'Processos', icon: FolderKanban, visible: permissions.capabilities.canOperateProcesses },
-    { to: '/dashboard/clientes', label: 'Clientes', icon: Users2, visible: permissions.capabilities.canManageClients },
-    { to: '/dashboard/configuracoes', label: 'Configurações', icon: Settings, visible: permissions.capabilities.canAccessSettings },
-    { to: '/dashboard/organizacoes', label: 'Organizações', icon: Building2, visible: permissions.capabilities.canViewOrganizations },
+    { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, visible: allowedModules.includes('dashboard') },
+    { to: '/dashboard/processos', label: 'Processos', icon: FolderKanban, visible: allowedModules.includes('processos') },
+    { to: '/dashboard/clientes', label: 'Clientes', icon: Users2, visible: allowedModules.includes('clientes') },
+    { to: '/dashboard/configuracoes', label: 'Configurações', icon: Settings, visible: allowedModules.includes('configuracoes') },
+    { to: '/dashboard/organizacoes', label: 'Organizações', icon: Building2, visible: allowedModules.includes('organizacoes') },
   ].filter((item) => item.visible);
 
   useEffect(() => {
@@ -2339,7 +2343,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
           <div className="mb-6 p-3 rounded-xl bg-gray-50 border border-gray-200">
             <p className="font-bold text-gray-800">{currentUser.name}</p>
-            <p className="text-[10px] uppercase tracking-widest text-gray-500">{currentUser.role === UserRole.ADMIN ? 'ADMIN' : 'CLIENTE'}</p>
+            <p className="text-[10px] uppercase tracking-widest text-gray-500">{permissions.hierarchy.toUpperCase()}</p>
           </div>
 
           <nav className="space-y-2">
@@ -2589,6 +2593,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
 
       {currentSection === 'organizacoes' ? (
+        canManageOrganizations ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
             <h3 className="text-lg font-black mb-4">CADASTRAR ORGANIZAÇÃO</h3>
@@ -2694,6 +2699,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
             </div>
           </div>
         </div>
+        ) : (
+          <Card className="bg-white border-gray-100 p-6">
+            <p className="text-sm font-semibold text-gray-500">Você não possui permissão para gerenciar organizações.</p>
+          </Card>
+        )
       ) : currentSection === 'processos' ? (
         <div className="min-w-0 space-y-6">
           <Card className="min-w-0 bg-white border-gray-100 p-4 sm:p-5">
@@ -2701,17 +2711,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               <div className="min-w-0">
                 <h3 className="text-3xl sm:text-4xl font-black tracking-tight leading-none">Processos</h3>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  resetNewProcessForm();
-                  setProcessActionFeedback(null);
-                  setShowCreateProcessModal(true);
-                }}
-                className="inline-flex items-center gap-2 shrink-0 px-4 py-2 rounded-lg border border-blue-100 bg-blue-50 text-blue-600 font-semibold hover:bg-blue-100 transition-colors"
-              >
-                <Plus className="w-4 h-4" /> Novo processo
-              </button>
+              {canCreateProcess && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    resetNewProcessForm();
+                    setProcessActionFeedback(null);
+                    setShowCreateProcessModal(true);
+                  }}
+                  className="inline-flex items-center gap-2 shrink-0 px-4 py-2 rounded-lg border border-blue-100 bg-blue-50 text-blue-600 font-semibold hover:bg-blue-100 transition-colors"
+                >
+                  <Plus className="w-4 h-4" /> Novo processo
+                </button>
+              )}
             </div>
             <p className="text-gray-500 text-sm mb-4">Visão geral em formato de planilha para filtrar, acompanhar status e agir rápido.</p>
 
@@ -3683,7 +3695,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         </div>
       )}
 
-      {showCreateProcessModal && (
+      {canCreateProcess && showCreateProcessModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-white w-full max-w-3xl rounded-3xl border border-gray-100 shadow-2xl overflow-hidden">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">

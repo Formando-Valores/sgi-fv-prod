@@ -7,6 +7,7 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, FolderKanban, Users, Settings, Building2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { getAllowedModules } from '../lib/permissions';
 
 const hierarchyLabel: Record<string, string> = {
   admin: 'Administrador',
@@ -17,13 +18,14 @@ const hierarchyLabel: Record<string, string> = {
 };
 
 const Sidebar: React.FC = () => {
-  const { userContext, capabilities, hierarchy } = useAuth();
+  const { userContext, hierarchy } = useAuth();
+  const allowedModules = getAllowedModules(userContext);
 
   const navItems = [
-    { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, visible: true },
-    { to: '/processos', label: 'Processos', icon: FolderKanban, visible: capabilities.canOperateProcesses },
-    { to: '/clientes', label: 'Clientes', icon: Users, visible: capabilities.canManageClients },
-    { to: '/configuracoes', label: 'Configurações', icon: Settings, visible: capabilities.canAccessSettings },
+    { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, visible: allowedModules.includes('dashboard') },
+    { to: '/processos', label: 'Processos', icon: FolderKanban, visible: allowedModules.includes('processos') },
+    { to: '/clientes', label: 'Clientes', icon: Users, visible: allowedModules.includes('clientes') },
+    { to: '/configuracoes', label: 'Configurações', icon: Settings, visible: allowedModules.includes('configuracoes') },
   ].filter((item) => item.visible);
 
   return (

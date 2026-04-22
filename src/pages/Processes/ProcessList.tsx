@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Plus, Search, Eye, FolderKanban, X, AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { can } from '../../lib/permissions';
 import {
   listProcesses,
   listAdminOperationalProcesses,
@@ -21,7 +22,9 @@ import {
 } from '../../lib/paymentStatus';
 
 const ProcessList: React.FC = () => {
-  const { userContext, isAdmin } = useAuth();
+  const { userContext } = useAuth();
+  const canViewAllProcesses = can('view_all', 'processos', userContext);
+  const canCreateProcess = can('create', 'processos', userContext);
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [processes, setProcesses] = useState<Process[]>([]);
@@ -41,7 +44,7 @@ const ProcessList: React.FC = () => {
 
   useEffect(() => {
     loadProcesses();
-  }, [userContext?.org_id, isAdmin]);
+  }, [userContext?.org_id, canViewAllProcesses]);
 
   const loadProcesses = async () => {
     if (!userContext?.org_id) {
@@ -54,7 +57,7 @@ const ProcessList: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      const data = isAdmin
+      const data = canViewAllProcesses
         ? await listAdminOperationalProcesses(userContext.org_id)
         : await listProcesses(userContext.org_id);
       const safeData = data.filter((process) => process.process_status !== 'pending_payment');
@@ -119,7 +122,7 @@ const ProcessList: React.FC = () => {
           </h1>
           <p className="text-slate-400 text-sm font-bold mt-1">Gerenciamento de processos</p>
         </div>
-        {isAdmin && (
+        {canCreateProcess && (
           <button
             onClick={() => setShowModal(true)}
             className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl flex items-center gap-2 transition-colors shadow-lg"
@@ -164,7 +167,7 @@ const ProcessList: React.FC = () => {
             {searchTerm ? 'Nenhum processo encontrado' : 'Nenhum processo cadastrado'}
           </h3>
           <p className="text-slate-500 text-sm">
-            {searchTerm ? 'Tente uma busca diferente' : isAdmin ? 'Clique em "Novo Processo" para começar' : 'Aguarde a criação de processos'}
+            {searchTerm ? 'Tente uma busca diferente' : canCreateProcess ? 'Clique em "Novo Processo" para começar' : 'Aguarde a criação de processos'}
           </p>
         </div>
       ) : (
