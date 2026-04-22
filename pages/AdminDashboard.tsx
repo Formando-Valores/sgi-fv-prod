@@ -306,6 +306,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const location = useLocation();
   const validSections = ['dashboard', 'processos', 'clientes', 'configuracoes', 'organizacoes'] as const;
   type DashboardSection = typeof validSections[number];
+  const [manualSection, setManualSection] = useState<DashboardSection | null>(null);
   const parseSectionCandidate = (value?: string | null): DashboardSection | null => {
     if (!value) return null;
     if ((validSections as readonly string[]).includes(value)) return value as DashboardSection;
@@ -314,7 +315,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const pathnameSection = parseSectionCandidate(location.pathname.split('/')[2]);
   const hashSource = (typeof window !== 'undefined' ? window.location.hash : '') || browserHash;
   const hashSection = parseSectionCandidate(hashSource.split('/')[2]);
-  const currentSection = pathnameSection || hashSection || section || 'dashboard';
+  const currentSection = manualSection || pathnameSection || hashSection || section || 'dashboard';
 
   const permissions = resolvePermissions(currentUser.org_role ?? (currentUser.role === UserRole.ADMIN ? 'admin' : 'client'));
   const permissionSubject = { org_role: currentUser.org_role ?? null, hierarchy: permissions.hierarchy };
@@ -352,6 +353,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     if (typeof window === 'undefined') return;
     setBrowserHash(window.location.hash);
   }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    if (pathnameSection || hashSection) {
+      setManualSection(null);
+    }
+  }, [pathnameSection, hashSection]);
 
   useEffect(() => {
     if (currentSection === 'configuracoes') {
@@ -2473,6 +2480,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         <DashboardSidebar
           sidebarOpen={sidebarOpen}
           onNavigate={() => setSidebarOpen(false)}
+          onSelectSection={(nextSection) => setManualSection(parseSectionCandidate(nextSection))}
           userName={currentUser.name}
           hierarchyLabel={permissions.hierarchy}
           links={sidebarLinks}
