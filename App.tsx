@@ -16,11 +16,10 @@ import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import PasswordRecovery from './pages/PasswordRecovery';
-import UserDashboard from './pages/UserDashboard';
-import AdminDashboard from './pages/AdminDashboard';
+import UnifiedDashboard from './src/pages/UnifiedDashboard';
 import PaymentSuccess from './src/pages/Payments/PaymentSuccess';
 import PaymentCancel from './src/pages/Payments/PaymentCancel';
-import { ProcessStatus, ServiceUnit, User, UserRole } from './types';
+import { ProcessStatus, ServiceUnit, User } from './types';
 import { INITIAL_MOCK_USERS } from './constants';
 import { supabase } from './supabase';
 
@@ -185,23 +184,15 @@ const RootApp: React.FC = () => {
       return <Navigate to="/login" />;
     }
 
-    if (currentUser.role === UserRole.ADMIN) {
-      return (
-        <AdminDashboard
-          currentUser={currentUser}
-          users={users}
-          setUsers={setUsers}
-          onLogout={handleLogout}
-          section={section}
-        />
-      );
-    }
-
-    if (section !== 'dashboard') {
-      return <Navigate to="/dashboard" />;
-    }
-
-    return <UserDashboard currentUser={currentUser} onLogout={handleLogout} />;
+    return (
+      <UnifiedDashboard
+        currentUser={currentUser}
+        users={users}
+        setUsers={setUsers}
+        onLogout={handleLogout}
+        section={section}
+      />
+    );
   };
 
   return (
