@@ -249,6 +249,14 @@ Deno.serve(async (request) => {
         `UPDATE public.processes
             SET payment_status = $2,
                 process_status = $3,
+                usage_deadline_at = COALESCE(
+                  CASE
+                    WHEN data_prazo IS NOT NULL THEN (data_prazo::timestamp + interval '23 hours 59 minutes 59 seconds')
+                    ELSE NULL
+                  END,
+                  usage_deadline_at,
+                  now() + interval '30 days'
+                ),
                 updated_at = now()
           WHERE id = $1`,
         [processId, processUpdate.paymentStatus, processUpdate.processStatus],
@@ -257,6 +265,17 @@ Deno.serve(async (request) => {
       await client.queryObject(
         `UPDATE public.processes
             SET payment_status = $2,
+                usage_deadline_at = CASE
+                  WHEN $2 = 'paid' THEN COALESCE(
+                    CASE
+                      WHEN data_prazo IS NOT NULL THEN (data_prazo::timestamp + interval '23 hours 59 minutes 59 seconds')
+                      ELSE NULL
+                    END,
+                    usage_deadline_at,
+                    now() + interval '30 days'
+                  )
+                  ELSE usage_deadline_at
+                END,
                 updated_at = now()
           WHERE id = $1`,
         [processId, processUpdate.paymentStatus],

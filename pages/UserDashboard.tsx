@@ -234,6 +234,8 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
     totalLabel: string;
     paidAt: string;
     useUntil: string;
+    daysRemaining: number | null;
+    isExpired: boolean;
     paymentStatus: string;
     processStatus: string;
     isExpiringSoon: boolean;
@@ -329,6 +331,11 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
 
     return { paidRows, pendingRows, totalPaid, totalPending, upcomingDeadlines };
   }, [dashboardProcesses, estimateProcessAmount, financeEntries]);
+  const dashboardDeadlineAlerts = React.useMemo(() => {
+    const expired = financeEntries.filter((entry) => entry.isExpired);
+    const expiringSoon = financeEntries.filter((entry) => !entry.isExpired && typeof entry.daysRemaining === 'number' && entry.daysRemaining <= 7);
+    return { expired, expiringSoon };
+  }, [financeEntries]);
 
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -544,6 +551,8 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
         totalLabel: formatFinanceAmount(financeProcess.amount, financeProcess.currency),
         paidAt: formatFinanceDate(financeProcess.paidAt),
         useUntil: formatFinanceDate(financeProcess.useUntil),
+        daysRemaining: financeProcess.daysRemaining,
+        isExpired: financeProcess.isExpired,
         paymentStatus: financeProcess.paymentStatus || '-',
         processStatus: getProcessStatusDisplayLabel(financeProcess.processStatus),
         isExpiringSoon: financeProcess.isExpiringSoon,
@@ -1268,7 +1277,24 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
       </section>
       )}
 
+      {(dashboardDeadlineAlerts.expired.length > 0 || dashboardDeadlineAlerts.expiringSoon.length > 0) && activeMainMenu !== 'financeiro' && (
+        <section className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <p className="text-sm font-black text-amber-800">Avisos de prazo</p>
+          {dashboardDeadlineAlerts.expired.length > 0 && (
+            <p className="text-xs text-rose-700 font-semibold mt-1">
+              {dashboardDeadlineAlerts.expired.length} processo(s) vencido(s).
+            </p>
+          )}
+          {dashboardDeadlineAlerts.expiringSoon.length > 0 && (
+            <p className="text-xs text-amber-800 font-semibold mt-1">
+              {dashboardDeadlineAlerts.expiringSoon.length} processo(s) vence(m) em até 7 dias.
+            </p>
+          )}
+        </section>
+      )}
+
       {activeMainMenu !== 'financeiro' && (
+      <>
       <section className="mb-6 bg-white border border-gray-100 rounded-2xl p-4 sm:p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
         <h2 className="text-lg font-black text-gray-800">Acompanhamento dos Meus Processos</h2>
         <div className="mt-3 flex flex-wrap gap-2">
@@ -1376,6 +1402,11 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
         <section className="mb-6 bg-white border border-gray-100 rounded-2xl p-4 sm:p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
           <h2 className="text-lg font-black text-gray-800 flex items-center gap-2">
             <Wallet className="w-5 h-5 text-emerald-600" /> Financeiro
+            {(dashboardDeadlineAlerts.expired.length > 0 || dashboardDeadlineAlerts.expiringSoon.length > 0) && (
+              <span className="inline-flex items-center rounded-full bg-rose-100 text-rose-700 text-[11px] px-2 py-0.5 font-black">
+                {dashboardDeadlineAlerts.expired.length > 0 ? `${dashboardDeadlineAlerts.expired.length} vencido(s)` : `${dashboardDeadlineAlerts.expiringSoon.length} alerta(s)`}
+              </span>
+            )}
           </h2>
           <p className="text-sm text-gray-500 mt-1">Visão consolidada dos pagamentos e prazos dos seus processos.</p>
 
@@ -1405,9 +1436,6 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
               </div>
             </div>
           </div>
-        )}
-      </section>
-      )}
 
           <div className="mt-5 rounded-xl border border-gray-200 overflow-x-auto">
             <table className="min-w-full text-sm">
@@ -1448,6 +1476,8 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
             </table>
           </div>
         </section>
+      )}
+      </>
       )}
 
       {activeInternalSection === 'processos' && isOnboardingFlow && (
@@ -1832,7 +1862,13 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onLogout }) 
                     <div key={entry.id} className="flex flex-wrap items-center justify-between gap-2 text-xs">
                       <span>
                         {entry.serviceName} • {entry.totalLabel} • Pago em {entry.paidAt} • Uso até {entry.useUntil} • {entry.processStatus}
-                        {entry.isExpiringSoon ? ' • ⚠️ Próximo do vencimento' : ''}
+                        {entry.isExpired
+                          ? ' • 🔴 vencido'
+                          : typeof entry.daysRemaining === 'number'
+                            ? ` • 🟠 vence em ${entry.daysRemaining} dia(s)`
+                            : entry.isExpiringSoon
+                              ? ' • ⚠️ Próximo do vencimento'
+                              : ''}
                       </span>
                       <button type="button" onClick={() => handleDownloadReceipt(entry)} className="rounded-lg border border-gray-300 px-2 py-1 font-bold">
                         Baixar comprovante

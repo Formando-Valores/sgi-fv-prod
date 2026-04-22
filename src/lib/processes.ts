@@ -27,6 +27,7 @@ export interface Process {
   cliente_contato: string | null;
   responsavel_user_id: string | null;
   data_prazo?: string | null;
+  usage_deadline_at?: string | null;
   gestor_servico?: string | null;
   observacoes?: string | null;
   created_at: string;
@@ -69,6 +70,9 @@ export interface PaidClientProcessFinance {
   paymentStatus: NonNullable<Process['payment_status']>;
   paidAt: string;
   useUntil: string | null;
+  usageDeadlineAt: string | null;
+  daysRemaining: number | null;
+  isExpired: boolean;
   processStatus: NonNullable<Process['process_status']> | null;
   isExpiringSoon: boolean;
 }
@@ -195,7 +199,7 @@ export async function listClientPaidProcessesFinance(
   try {
     const { data, error } = await supabase
       .from('processes')
-      .select('id,titulo,amount,currency,payment_status,paid_at,data_prazo,process_status')
+      .select('id,titulo,amount,currency,payment_status,paid_at,data_prazo,usage_deadline_at,process_status')
       .eq('org_id', org_id)
       .eq('responsavel_user_id', client_user_id)
       .eq('payment_status', 'paid')
@@ -216,7 +220,13 @@ export async function listClientPaidProcessesFinance(
     sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
 
     const rows = (data || []).map((row) => {
-      const deadline = row.data_prazo ? new Date(`${row.data_prazo}T23:59:59`) : null;
+      const deadline = row.usage_deadline_at
+        ? new Date(row.usage_deadline_at)
+        : row.data_prazo
+          ? new Date(`${row.data_prazo}T23:59:59`)
+          : null;
+      const daysRemaining = deadline ? Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
+      const isExpired = Boolean(deadline && deadline < now);
       const isExpiringSoon = Boolean(deadline && deadline >= now && deadline <= sevenDaysFromNow);
 
       return {
@@ -226,7 +236,10 @@ export async function listClientPaidProcessesFinance(
         currency: row.currency || null,
         paymentStatus: (row.payment_status || 'pending') as NonNullable<Process['payment_status']>,
         paidAt: row.paid_at as string,
-        useUntil: row.data_prazo || null,
+        useUntil: row.data_prazo || (deadline ? deadline.toISOString() : null),
+        usageDeadlineAt: deadline ? deadline.toISOString() : null,
+        daysRemaining,
+        isExpired,
         processStatus: (row.process_status || null) as NonNullable<Process['process_status']> | null,
         isExpiringSoon,
       } satisfies PaidClientProcessFinance;
