@@ -55,8 +55,8 @@ const RootApp: React.FC = () => {
   useEffect(() => {
     let mounted = true;
 
-    const bootstrapUserFromSession = async () => {
-      if (mounted) {
+    const bootstrapUserFromSession = async (showLoader = false) => {
+      if (mounted && showLoader) {
         setAuthBootstrapping(true);
       }
 
@@ -152,10 +152,18 @@ const RootApp: React.FC = () => {
       }
     };
 
-    void bootstrapUserFromSession();
+    void bootstrapUserFromSession(true);
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event) => {
-      void bootstrapUserFromSession();
+    const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
+      if (!mounted) return;
+
+      if (event === 'SIGNED_OUT') {
+        setCurrentUser(null);
+        setAuthBootstrapping(false);
+        return;
+      }
+
+      void bootstrapUserFromSession(false);
     });
     return () => {
       mounted = false;
