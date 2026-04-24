@@ -301,21 +301,26 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [checklistError, setChecklistError] = useState('');
   const [clientJourneyHistory, setClientJourneyHistory] = useState<ClientProcessProgressHistoryItem[]>([]);
   const [clientJourneyLoading, setClientJourneyLoading] = useState(false);
-  const [browserHash, setBrowserHash] = useState(() => (typeof window !== 'undefined' ? window.location.hash : ''));
 
   const location = useLocation();
   const validSections = ['dashboard', 'processos', 'clientes', 'configuracoes', 'organizacoes'] as const;
   type DashboardSection = typeof validSections[number];
-  const [manualSection, setManualSection] = useState<DashboardSection | null>(null);
   const parseSectionCandidate = (value?: string | null): DashboardSection | null => {
     if (!value) return null;
     if ((validSections as readonly string[]).includes(value)) return value as DashboardSection;
     return null;
   };
-  const pathnameSection = parseSectionCandidate(location.pathname.split('/')[2]);
-  const hashSource = (typeof window !== 'undefined' ? window.location.hash : '') || browserHash;
-  const hashSection = parseSectionCandidate(hashSource.split('/')[2]);
-  const currentSection = pathnameSection || hashSection || manualSection || section || 'dashboard';
+  const resolveSectionFromLocation = (): DashboardSection => {
+    const pathnameSection = parseSectionCandidate(location.pathname.split('/')[2]);
+    if (pathnameSection) return pathnameSection;
+
+    const hashValue = location.hash || (typeof window !== 'undefined' ? window.location.hash : '');
+    const hashSection = parseSectionCandidate(hashValue.split('/')[2]);
+    if (hashSection) return hashSection;
+
+    return section || 'dashboard';
+  };
+  const [currentSection, setCurrentSection] = useState<DashboardSection>(resolveSectionFromLocation);
 
   const permissions = resolvePermissions(currentUser.org_role ?? (currentUser.role === UserRole.ADMIN ? 'admin' : 'client'));
   const permissionSubject = { org_role: currentUser.org_role ?? null, hierarchy: permissions.hierarchy };
@@ -337,30 +342,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   }, [location.pathname]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const handleHashChange = () => {
-      setBrowserHash(window.location.hash);
-    };
-
-    window.addEventListener('hashchange', handleHashChange);
-    return () => {
-      window.removeEventListener('hashchange', handleHashChange);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    setBrowserHash(window.location.hash);
-  }, [location.pathname, location.search]);
-
-  useEffect(() => {
-    if (!manualSection) return;
-
-    if (pathnameSection === manualSection || hashSection === manualSection) {
-      setManualSection(null);
-    }
-  }, [hashSection, manualSection, pathnameSection]);
+    setCurrentSection(resolveSectionFromLocation());
+  }, [location.hash, location.pathname, location.search]);
 
   useEffect(() => {
     if (currentSection === 'configuracoes') {
@@ -2482,7 +2465,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         <DashboardSidebar
           sidebarOpen={sidebarOpen}
           onNavigate={() => setSidebarOpen(false)}
-          onSelectSection={(nextSection) => setManualSection(parseSectionCandidate(nextSection))}
+          onSelectSection={(nextSection) => setCurrentSection(parseSectionCandidate(nextSection) || 'dashboard')}
           userName={currentUser.name}
           hierarchyLabel={permissions.hierarchy}
           links={sidebarLinks}
