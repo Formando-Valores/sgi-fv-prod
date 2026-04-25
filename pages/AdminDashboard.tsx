@@ -373,6 +373,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [checklistError, setChecklistError] = useState('');
   const [clientJourneyHistory, setClientJourneyHistory] = useState<ClientProcessProgressHistoryItem[]>([]);
   const [clientJourneyLoading, setClientJourneyLoading] = useState(false);
+  const clientJourneyLastProcessIdRef = React.useRef<string | null>(null);
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -1257,17 +1258,26 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
   useEffect(() => {
     if (!isClientScope) {
+      clientJourneyLastProcessIdRef.current = null;
       setClientJourneyHistory([]);
       setClientJourneyLoading(false);
       return;
     }
 
-    const processId = processRows[0]?.id;
+    const processId = clientPrimaryProcess?.id ?? null;
     if (!processId) {
+      clientJourneyLastProcessIdRef.current = null;
       setClientJourneyHistory([]);
       setClientJourneyLoading(false);
       return;
     }
+
+    if (clientJourneyLastProcessIdRef.current === processId) {
+      return;
+    }
+
+    clientJourneyLastProcessIdRef.current = processId;
+    let cancelled = false;
 
     const loadClientJourneyHistory = async () => {
       setClientJourneyLoading(true);
@@ -1277,6 +1287,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         .eq('process_id', processId)
         .order('created_at', { ascending: false })
         .limit(5);
+
+      if (cancelled) {
+        return;
+      }
 
       if (error) {
         setClientJourneyHistory([]);
@@ -1295,7 +1309,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     };
 
     void loadClientJourneyHistory();
-  }, [isClientScope, processRows]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [clientPrimaryProcess?.id, isClientScope]);
 
   const handleCreateProcess = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
