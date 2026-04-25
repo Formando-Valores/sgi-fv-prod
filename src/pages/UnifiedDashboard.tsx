@@ -1,7 +1,7 @@
 import React from 'react';
 import AdminDashboard from '../../pages/AdminDashboard';
-import { User } from '../../types';
-import { getAllowedModules, resolvePermissions } from '../lib/permissions';
+import { User, UserRole } from '../../types';
+import { resolvePermissions } from '../lib/permissions';
 import OverviewBlock from '../components/dashboard/blocks/OverviewBlock';
 import ProcessesBlock from '../components/dashboard/blocks/ProcessesBlock';
 import ClientsBlock from '../components/dashboard/blocks/ClientsBlock';
@@ -23,8 +23,10 @@ const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({
   onLogout,
   section = 'dashboard',
 }) => {
-  const permissions = resolvePermissions(currentUser);
-  const allowedModules = getAllowedModules(permissions);
+  const permissions = resolvePermissions(
+    currentUser.org_role ?? (currentUser.role === UserRole.ADMIN ? 'admin' : 'client'),
+  );
+  const allowedModules = permissions.modules;
   const EmptyBlock: React.FC<{ children: React.ReactNode }> = () => null;
 
   return (

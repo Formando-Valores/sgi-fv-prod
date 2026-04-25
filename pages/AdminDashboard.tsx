@@ -20,6 +20,9 @@ import ProcessesBlock from '../src/components/dashboard/blocks/ProcessesBlock';
 import ClientsBlock from '../src/components/dashboard/blocks/ClientsBlock';
 import OrganizationsBlock from '../src/components/dashboard/blocks/OrganizationsBlock';
 import ClientJourneyBlock from '../src/components/dashboard/blocks/ClientJourneyBlock';
+import ClientProcessProgressPanel, {
+  ClientProcessProgressHistoryItem,
+} from '../src/components/dashboard/ClientProcessProgressPanel';
 
 type AccessLevel = 'Administrador' | 'Usuário Sênior' | 'Usuário Pleno' | 'Operador' | 'Cliente';
 
@@ -68,6 +71,7 @@ interface AdminProcessRow extends User {
   valor: number;
   sourceLabel: string;
   requestedOrganizationName: string;
+  contractedServiceName: string;
 }
 
 interface ClientProfileView {
@@ -295,15 +299,35 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [editingChecklistText, setEditingChecklistText] = useState('');
   const [checklistLoading, setChecklistLoading] = useState(false);
   const [checklistError, setChecklistError] = useState('');
+  const [clientJourneyHistory, setClientJourneyHistory] = useState<ClientProcessProgressHistoryItem[]>([]);
+  const [clientJourneyLoading, setClientJourneyLoading] = useState(false);
 
   const location = useLocation();
-  const currentSection = section ?? (location.pathname.split('/')[2] as 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes') ?? 'dashboard';
+  const validSections = ['dashboard', 'processos', 'clientes', 'configuracoes', 'organizacoes'] as const;
+  type DashboardSection = typeof validSections[number];
+  const parseSectionCandidate = (value?: string | null): DashboardSection | null => {
+    if (!value) return null;
+    if ((validSections as readonly string[]).includes(value)) return value as DashboardSection;
+    return null;
+  };
+  const resolveSectionFromLocation = (): DashboardSection => {
+    const pathnameSection = parseSectionCandidate(location.pathname.split('/')[2]);
+    if (pathnameSection) return pathnameSection;
+
+    const hashValue = location.hash || (typeof window !== 'undefined' ? window.location.hash : '');
+    const hashSection = parseSectionCandidate(hashValue.split('/')[2]);
+    if (hashSection) return hashSection;
+
+    return section || 'dashboard';
+  };
+  const [currentSection, setCurrentSection] = useState<DashboardSection>(resolveSectionFromLocation);
 
   const permissions = resolvePermissions(currentUser.org_role ?? (currentUser.role === UserRole.ADMIN ? 'admin' : 'client'));
   const permissionSubject = { org_role: currentUser.org_role ?? null, hierarchy: permissions.hierarchy };
   const allowedModules = getAllowedModules(permissionSubject);
   const canCreateProcess = can('create', 'processos', permissionSubject);
   const canManageOrganizations = can('manage', 'organizacoes', permissionSubject);
+  const isClientScope = permissions.hierarchy === 'cliente';
 
   const sidebarLinks = [
     { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, visible: allowedModules.includes('dashboard') },
@@ -316,6 +340,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   useEffect(() => {
     setSidebarOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    setCurrentSection(resolveSectionFromLocation());
+  }, [location.hash, location.pathname, location.search]);
 
   useEffect(() => {
     if (currentSection === 'configuracoes') {
@@ -474,6 +502,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     return 'Cadastro';
   };
 
+  const fallbackUsersForRows = isClientScope
+    ? users.filter((user) => user.id === currentUser.id)
+    : users;
+
   const baseProcessRows: AdminProcessRow[] = (dbProcesses.length > 0 ? dbProcesses.map((process) => {
       const unit = inferServiceUnit(process);
       const legacyStatus = mapDatabaseStatusToLegacy(process.status);
@@ -532,8 +564,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         valor: generatedValue,
         sourceLabel: source ? source.toUpperCase() : 'PAINEL',
         requestedOrganizationName,
+        contractedServiceName: sanitizeDisplayValue(process.titulo) || 'Serviço não informado',
       };
-    }) : users.map((user) => {
+    }) : fallbackUsersForRows.map((user) => {
       const generatedValue = user.unit === ServiceUnit.ADMINISTRATIVO ? 5200 : 1800;
       return {
         ...user,
@@ -548,6 +581,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         valor: generatedValue,
         sourceLabel: 'PAINEL',
         requestedOrganizationName: user.organizationName || 'Não informado',
+        contractedServiceName: user.unit === ServiceUnit.ADMINISTRATIVO ? 'Serviço administrativo' : 'Serviço jurídico',
       };
     })) as AdminProcessRow[];
 
@@ -674,6 +708,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   };
 
   const dashboardRecentRows = processRows.slice(0, 5);
+  const clientPrimaryProcess = isClientScope ? processRows[0] : null;
+  const clientStatusLabelMap: Record<ProcessStatus, string> = {
+    [ProcessStatus.PENDENTE]: 'Em atendimento inicial',
+    [ProcessStatus.TRIAGEM]: 'Coleta em andamento',
+    [ProcessStatus.ANALISE]: 'Análise em andamento',
+    [ProcessStatus.CONCLUIDO]: 'Concluído',
+  };
+  const clientStepByStatus: Record<ProcessStatus, number> = {
+    [ProcessStatus.PENDENTE]: 0,
+    [ProcessStatus.TRIAGEM]: 1,
+    [ProcessStatus.ANALISE]: 2,
+    [ProcessStatus.CONCLUIDO]: 4,
+  };
 
   const resetNewProcessForm = () => {
     setNewProcessForm({
@@ -933,10 +980,36 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     setProcessesLoading(true);
     setProcessesError('');
 
-    const { data, error } = await supabase
+    const normalizedUserId = sanitizeDisplayValue(currentUser.id);
+    const canFilterByUserId = Boolean(normalizedUserId);
+
+    const queryWithOptionalColumns = supabase
       .from('processes')
       .select(PROCESS_SELECT_WITH_OPTIONAL_COLUMNS)
       .order('created_at', { ascending: false });
+
+    if (isClientScope) {
+      if (!canFilterByUserId) {
+        setProcessesError('Usuário cliente sem identificação válida para filtrar processos.');
+        setDbProcesses([]);
+        setProcessesLoading(false);
+        return;
+      }
+      queryWithOptionalColumns.or(`cliente_user_id.eq.${normalizedUserId},responsavel_user_id.eq.${normalizedUserId}`);
+    }
+
+    let { data, error } = await queryWithOptionalColumns;
+
+    if (error && isClientScope && canFilterByUserId && String(error.message || '').includes('cliente_user_id')) {
+      const clientFallbackQuery = supabase
+        .from('processes')
+        .select(PROCESS_SELECT_WITH_OPTIONAL_COLUMNS)
+        .order('created_at', { ascending: false })
+        .eq('responsavel_user_id', normalizedUserId);
+      const fallbackResponse = await clientFallbackQuery;
+      data = fallbackResponse.data;
+      error = fallbackResponse.error;
+    }
 
     if (!error) {
       setDbProcesses(((data as DbProcess[] | null) || []).map((process) => normalizeProcessOptionalFields(process)));
@@ -947,10 +1020,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     logProcessesQueryError('falha na query com colunas opcionais', error);
 
     if (hasMissingOptionalProcessColumns(error)) {
-      const { data: fallbackData, error: fallbackError } = await supabase
+      const fallbackQuery = supabase
         .from('processes')
         .select(PROCESS_SELECT_BASE_COLUMNS)
         .order('created_at', { ascending: false });
+
+      if (isClientScope && canFilterByUserId) {
+        fallbackQuery.or(`cliente_user_id.eq.${normalizedUserId},responsavel_user_id.eq.${normalizedUserId}`);
+      }
+
+      const { data: fallbackData, error: fallbackError } = await fallbackQuery;
 
       if (!fallbackError) {
         const normalizedProcesses = ((fallbackData as DbProcess[] | null) || []).map((process) =>
@@ -970,6 +1049,48 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     setDbProcesses([]);
     setProcessesLoading(false);
   };
+
+  useEffect(() => {
+    if (!isClientScope) {
+      setClientJourneyHistory([]);
+      setClientJourneyLoading(false);
+      return;
+    }
+
+    const processId = processRows[0]?.id;
+    if (!processId) {
+      setClientJourneyHistory([]);
+      setClientJourneyLoading(false);
+      return;
+    }
+
+    const loadClientJourneyHistory = async () => {
+      setClientJourneyLoading(true);
+      const { data, error } = await supabase
+        .from('process_events')
+        .select('id,mensagem,created_at')
+        .eq('process_id', processId)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (error) {
+        setClientJourneyHistory([]);
+        setClientJourneyLoading(false);
+        return;
+      }
+
+      const compactHistory = ((data || []) as Array<{ id: string; mensagem?: string | null; created_at?: string | null }>).map((event) => ({
+        id: event.id,
+        dateLabel: event.created_at ? new Date(event.created_at).toLocaleString('pt-BR') : 'Sem data',
+        message: sanitizeDisplayValue(event.mensagem) || 'Atualização registrada.',
+      }));
+
+      setClientJourneyHistory(compactHistory);
+      setClientJourneyLoading(false);
+    };
+
+    void loadClientJourneyHistory();
+  }, [isClientScope, processRows]);
 
   const handleCreateProcess = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -2344,6 +2465,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         <DashboardSidebar
           sidebarOpen={sidebarOpen}
           onNavigate={() => setSidebarOpen(false)}
+          onSelectSection={(nextSection) => setCurrentSection(parseSectionCandidate(nextSection) || 'dashboard')}
           userName={currentUser.name}
           hierarchyLabel={permissions.hierarchy}
           links={sidebarLinks}
@@ -2398,6 +2520,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
       {currentSection === 'dashboard' && (
         <OverviewContainer>
+        {isClientScope && (
+          <section className="mb-6 no-print">
+            <ClientProcessProgressPanel
+              serviceName={clientPrimaryProcess?.contractedServiceName || 'Nenhum serviço contratado ainda'}
+              responsibleSector={clientPrimaryProcess?.processType || 'Setor não definido'}
+              currentStatus={clientPrimaryProcess ? clientStatusLabelMap[clientPrimaryProcess.status] : 'Sem processo ativo'}
+              currentStepIndex={clientPrimaryProcess ? clientStepByStatus[clientPrimaryProcess.status] : 0}
+              history={clientJourneyLoading ? [{ id: 'loading', dateLabel: 'Carregando', message: 'Buscando histórico do processo...' }] : clientJourneyHistory}
+            />
+          </section>
+        )}
         <section className="mb-6 space-y-4 no-print">
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
             <article className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
