@@ -111,6 +111,11 @@ async function fetchUserContext(userId: string): Promise<{ context: UserContext 
 
     log('User context data received:', JSON.stringify(data, null, 2));
 
+    const resolved = resolvePermissions((data.org_role || 'client') as OrgRole, {
+      profileRole: data.profile_role || data.role || null,
+      hierarchy: data.hierarchy || null,
+    });
+
     const context: UserContext = {
       id: data.user_id,
       email: data.email || '',
@@ -119,6 +124,9 @@ async function fetchUserContext(userId: string): Promise<{ context: UserContext 
       org_slug: data.org_slug || 'default',
       org_name: data.org_name || 'Sem organização',
       role: (data.org_role || 'client') as OrgRole,
+      profile_role: data.profile_role || data.role || null,
+      hierarchy: resolved.hierarchy,
+      capabilities: resolved.capabilities,
       profile: null
     };
 
@@ -313,7 +321,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [loadContext]);
 
-  const { hierarchy, capabilities, isAdminHierarchy } = resolvePermissions(userContext?.role);
+  const { hierarchy, capabilities, isAdminHierarchy } = resolvePermissions(userContext?.role, {
+    profileRole: userContext?.profile_role || null,
+    hierarchy: userContext?.hierarchy || null,
+  });
   const isAdmin = isAdminHierarchy;
 
   log('Render decision:', { loading, error: !!error, hasSession: !!session, isAdmin, hierarchy });

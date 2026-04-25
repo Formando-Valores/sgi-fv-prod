@@ -1,4 +1,4 @@
-import type { OrgRole, User, UserContext } from '../../types';
+import type { CapabilityMap, OrgRole, User, UserContext } from '../../types';
 
 export type SystemHierarchy = 'admin' | 'senior' | 'pleno' | 'operador' | 'cliente';
 
@@ -6,15 +6,7 @@ export type PermissionModule = 'dashboard' | 'processos' | 'clientes' | 'configu
 export type PermissionAction = 'view' | 'view_own' | 'view_all' | 'create' | 'update' | 'delete' | 'manage';
 export type PermissionScope = PermissionModule;
 
-export type PermissionCapabilities = {
-  canViewOrganizations: boolean;
-  canManageOrganizations: boolean;
-  canManageMembers: boolean;
-  canManageClients: boolean;
-  canOperateProcesses: boolean;
-  canAccessSettings: boolean;
-  canViewFinancial: boolean;
-};
+export type PermissionCapabilities = CapabilityMap;
 
 export type HierarchyMappingFlags = {
   profileRole?: string | null;
@@ -32,25 +24,37 @@ type PermissionMatrix = {
 };
 
 type PermissionSubject =
-  | Pick<UserContext, 'role'>
-  | Pick<User, 'role' | 'org_role'>
+  | Pick<UserContext, 'role' | 'profile_role' | 'hierarchy' | 'org_id' | 'id'>
+  | Pick<User, 'role' | 'org_role' | 'organizationId' | 'id'>
   | {
+      id?: string | null;
       role?: OrgRole | string | null;
       org_role?: OrgRole | string | null;
       hierarchy?: SystemHierarchy | string | null;
       profileRole?: string | null;
+      profile_role?: string | null;
+      org_id?: string | null;
+      organizationId?: string | null;
     };
 
-const normalizeHierarchyValue = (value?: string | null): SystemHierarchy | null => {
-  if (!value) return null;
+export type DataScope = {
+  orgId: string | null;
+  userId: string | null;
+  restrictToOwnUser: boolean;
+};
 
-  const normalized = value
+const normalizeText = (value?: string | null): string =>
+  (value || '')
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
     .trim()
     .toLowerCase();
 
-  if (['admin', 'administrador', 'owner'].includes(normalized)) return 'admin';
+const normalizeHierarchyValue = (value?: string | null): SystemHierarchy | null => {
+  const normalized = normalizeText(value);
+  if (!normalized) return null;
+
+  if (['admin', 'administrador', 'administrator', 'owner'].includes(normalized)) return 'admin';
   if (['senior', 'usuario senior', 'usuário sênior'].includes(normalized)) return 'senior';
   if (['pleno', 'usuario pleno', 'usuário pleno', 'staff'].includes(normalized)) return 'pleno';
   if (['operador', 'operator'].includes(normalized)) return 'operador';
@@ -69,7 +73,7 @@ export function mapToSystemHierarchy(orgRole?: OrgRole | string | null, flags: H
   const explicitHierarchy = normalizeHierarchyValue(flags.hierarchy) || normalizeHierarchyValue(flags.profileRole);
   if (explicitHierarchy) return explicitHierarchy;
 
-  const normalizedOrgRole = (orgRole || '').toString().trim().toLowerCase();
+  const normalizedOrgRole = normalizeText(orgRole?.toString());
 
   if (normalizedOrgRole === 'owner' || normalizedOrgRole === 'admin') return 'admin';
   if (normalizedOrgRole === 'staff') return 'pleno';
@@ -126,7 +130,6 @@ const CAPABILITIES_BY_HIERARCHY: Record<SystemHierarchy, PermissionCapabilities>
 };
 
 const PERMISSION_MATRIX_BY_HIERARCHY: Record<SystemHierarchy, PermissionMatrix> = {
-  // Administrador: acesso global
   admin: {
     modules: ['dashboard', 'processos', 'clientes', 'configuracoes', 'organizacoes', 'financeiro'],
     actionsByScope: {
@@ -138,7 +141,6 @@ const PERMISSION_MATRIX_BY_HIERARCHY: Record<SystemHierarchy, PermissionMatrix> 
       financeiro: ['view', 'view_all', 'manage'],
     },
   },
-  // Sênior: acesso total da própria organização
   senior: {
     modules: ['dashboard', 'processos', 'clientes', 'configuracoes', 'financeiro'],
     actionsByScope: {
@@ -149,7 +151,6 @@ const PERMISSION_MATRIX_BY_HIERARCHY: Record<SystemHierarchy, PermissionMatrix> 
       financeiro: ['view', 'view_all'],
     },
   },
-  // Pleno: acesso parcial da organização
   pleno: {
     modules: ['dashboard', 'processos', 'clientes', 'financeiro'],
     actionsByScope: {
@@ -159,7 +160,6 @@ const PERMISSION_MATRIX_BY_HIERARCHY: Record<SystemHierarchy, PermissionMatrix> 
       financeiro: ['view'],
     },
   },
-  // Operador: acesso básico operacional
   operador: {
     modules: ['dashboard', 'processos'],
     actionsByScope: {
@@ -167,7 +167,6 @@ const PERMISSION_MATRIX_BY_HIERARCHY: Record<SystemHierarchy, PermissionMatrix> 
       processos: ['view', 'update'],
     },
   },
-  // Cliente: apenas próprios dados/processos
   cliente: {
     modules: ['dashboard', 'processos', 'financeiro'],
     actionsByScope: {
@@ -189,7 +188,9 @@ function resolveHierarchyFromSubject(subject?: PermissionSubject | null): System
     ('role' in subject ? subject.role : null);
 
   return mapToSystemHierarchy(orgRole as OrgRole | string | null, {
-    profileRole: 'profileRole' in subject ? subject.profileRole : null,
+    profileRole:
+      ('profileRole' in subject ? subject.profileRole : null) ||
+      ('profile_role' in subject ? subject.profile_role : null),
   });
 }
 
@@ -206,21 +207,10 @@ export function can(action: PermissionAction, scope: PermissionScope, subject?: 
   const hierarchy = resolveHierarchyFromSubject(subject);
   const allowedActions = PERMISSION_MATRIX_BY_HIERARCHY[hierarchy].actionsByScope[scope] || [];
 
-  if (allowedActions.includes(action)) {
-    return true;
-  }
-
-  if (allowedActions.includes('manage')) {
-    return ['view', 'view_all', 'create', 'update', 'delete', 'manage'].includes(action);
-  }
-
-  if (allowedActions.includes('view_all') && (action === 'view' || action === 'view_own')) {
-    return true;
-  }
-
-  if (allowedActions.includes('view') && action === 'view_own') {
-    return true;
-  }
+  if (allowedActions.includes(action)) return true;
+  if (allowedActions.includes('manage')) return ['view', 'view_all', 'create', 'update', 'delete', 'manage'].includes(action);
+  if (allowedActions.includes('view_all') && (action === 'view' || action === 'view_own')) return true;
+  if (allowedActions.includes('view') && action === 'view_own') return true;
 
   return false;
 }
@@ -241,4 +231,20 @@ export function hierarchyToOrgRole(hierarchy: SystemHierarchy): OrgRole {
   if (hierarchy === 'admin' || hierarchy === 'senior') return 'admin';
   if (hierarchy === 'pleno' || hierarchy === 'operador') return 'staff';
   return 'client';
+}
+
+export function getNavigationModules(subject?: PermissionSubject | null): PermissionModule[] {
+  return getAllowedModules(subject).filter((module) => module !== 'financeiro');
+}
+
+export function getProcessScope(subject?: PermissionSubject | null): DataScope {
+  const hierarchy = resolveHierarchyFromSubject(subject);
+  const orgId = ('org_id' in (subject || {}) ? subject?.org_id : null) || ('organizationId' in (subject || {}) ? subject?.organizationId : null) || null;
+  const userId = ('id' in (subject || {}) ? subject?.id : null) || null;
+
+  return {
+    orgId,
+    userId,
+    restrictToOwnUser: hierarchy === 'cliente',
+  };
 }

@@ -171,6 +171,78 @@ const statusBadgeVariant = (status: ProcessStatus): 'success' | 'warning' | 'dan
   return 'neutral';
 };
 
+
+
+type AdminDashboardLayoutProps = {
+  sidebarOpen: boolean;
+  setSidebarOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  currentUserName: string;
+  hierarchyLabel: string;
+  sidebarLinks: Array<{ to: string; label: string; icon: React.ComponentType<{ className?: string }> }>;
+  onLogout: () => void;
+  onPrint: () => void;
+  onSelectSection: (nextSection: string) => void;
+  children: React.ReactNode;
+};
+
+const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({
+  sidebarOpen,
+  setSidebarOpen,
+  currentUserName,
+  hierarchyLabel,
+  sidebarLinks,
+  onLogout,
+  onPrint,
+  onSelectSection,
+  children,
+}) => (
+  <DashboardShell
+    sidebarOpen={sidebarOpen}
+    onOpenSidebar={() => setSidebarOpen(true)}
+    onCloseSidebar={() => setSidebarOpen(false)}
+    sidebar={(
+      <DashboardSidebar
+        sidebarOpen={sidebarOpen}
+        onNavigate={() => setSidebarOpen(false)}
+        onSelectSection={onSelectSection}
+        userName={currentUserName}
+        hierarchyLabel={hierarchyLabel}
+        links={sidebarLinks}
+      />
+    )}
+    topbar={(
+      <DashboardTopbar
+        title={<><ShieldCheck className="text-blue-500" /> SGI FV - PAINEL ADMINISTRATIVO</>}
+        subtitle={`Bem-vindo, ${currentUserName}`}
+        actions={(
+          <div className="flex gap-2">
+            <Button
+              onClick={onPrint}
+              title="Clique para Imprimir Documento"
+              variant="secondary"
+              className="flex items-center gap-2 text-xs font-bold uppercase"
+            >
+              <Printer className="w-4 h-4" /> Imprimir
+            </Button>
+            <Button
+              onClick={onPrint}
+              title="Clique para Salvar como PDF"
+              className="flex items-center gap-2 text-xs font-bold uppercase"
+            >
+              <FileDown className="w-4 h-4" /> Gerar PDF
+            </Button>
+            <Button onClick={onLogout} variant="danger" className="flex items-center gap-2 text-xs font-bold uppercase">
+              <LogOut className="w-4 h-4" /> Sair
+            </Button>
+          </div>
+        )}
+      />
+    )}
+  >
+    {children}
+  </DashboardShell>
+);
+
 interface AdminDashboardProps {
   currentUser: User;
   users: User[];
@@ -2615,48 +2687,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   };
 
   return (
-    <DashboardShell
+    <AdminDashboardLayout
       sidebarOpen={sidebarOpen}
-      onOpenSidebar={() => setSidebarOpen(true)}
-      onCloseSidebar={() => setSidebarOpen(false)}
-      sidebar={(
-        <DashboardSidebar
-          sidebarOpen={sidebarOpen}
-          onNavigate={() => setSidebarOpen(false)}
-          onSelectSection={(nextSection) => setCurrentSection(parseSectionCandidate(nextSection) || 'dashboard')}
-          userName={currentUser.name}
-          hierarchyLabel={permissions.hierarchy}
-          links={sidebarLinks}
-        />
-      )}
-      topbar={(
-        <DashboardTopbar
-          title={<><ShieldCheck className="text-blue-500" /> SGI FV - PAINEL ADMINISTRATIVO</>}
-          subtitle={`Bem-vindo, ${currentUser.name}`}
-          actions={(
-            <div className="flex gap-2">
-              <Button
-                onClick={handlePrint}
-                title="Clique para Imprimir Documento"
-                variant="secondary"
-                className="flex items-center gap-2 text-xs font-bold uppercase"
-              >
-                <Printer className="w-4 h-4" /> Imprimir
-              </Button>
-              <Button
-                onClick={handlePrint}
-                title="Clique para Salvar como PDF"
-                className="flex items-center gap-2 text-xs font-bold uppercase"
-              >
-                <FileDown className="w-4 h-4" /> Gerar PDF
-              </Button>
-              <Button onClick={onLogout} variant="danger" className="flex items-center gap-2 text-xs font-bold uppercase">
-                <LogOut className="w-4 h-4" /> Sair
-              </Button>
-            </div>
-          )}
-        />
-      )}
+      setSidebarOpen={setSidebarOpen}
+      currentUserName={currentUser.name}
+      hierarchyLabel={permissions.hierarchy}
+      sidebarLinks={sidebarLinks}
+      onLogout={onLogout}
+      onPrint={handlePrint}
+      onSelectSection={(nextSection) => setCurrentSection(parseSectionCandidate(nextSection) || 'dashboard')}
     >
 
       {currentSection === 'dashboard' && (
@@ -4374,7 +4413,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           </div>
         </div>
       )}
-    </DashboardShell>
+    </AdminDashboardLayout>
   );
 };
 
