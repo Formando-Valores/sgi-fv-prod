@@ -7,7 +7,7 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, FolderKanban, Users, Settings, Building2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { getAllowedModules, type PermissionModule } from '../lib/permissions';
+import { getNavigationModules, type PermissionModule } from '../lib/permissions';
 
 const hierarchyLabel: Record<string, string> = {
   admin: 'Administrador',
@@ -19,7 +19,7 @@ const hierarchyLabel: Record<string, string> = {
 
 const Sidebar: React.FC = () => {
   const { userContext, hierarchy } = useAuth();
-  const allowedModules = getAllowedModules(userContext);
+  const allowedModules = getNavigationModules(userContext);
 
   const moduleNavMap: Partial<Record<PermissionModule, { to: string; label: string; icon: React.ComponentType<{ className?: string }> }>> = {
     dashboard: { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },

@@ -6,6 +6,7 @@
  */
 
 import { supabase } from '../../supabase';
+import { getProcessScope } from './permissions';
 
 // Debug mode flag
 const DEBUG = true;
@@ -32,6 +33,31 @@ type ProcessQueryScope = {
   isGlobalAdmin: boolean;
   resolvedOrgId: string | null;
 };
+
+
+
+type ProcessScopedFilter = {
+  orgId?: string | null;
+  userId?: string | null;
+  hierarchy?: string | null;
+};
+
+function applyScopedProcessFilters<T extends { eq: (...args: any[]) => T }>(query: T, scope: ProcessScopedFilter): T {
+  const scopeResolver = getProcessScope({
+    org_id: scope.orgId || null,
+    id: scope.userId || null,
+    hierarchy: scope.hierarchy || null,
+  });
+
+  let scopedQuery = query;
+  if (scopeResolver.orgId) {
+    scopedQuery = scopedQuery.eq('org_id', scopeResolver.orgId);
+  }
+  if (scopeResolver.restrictToOwnUser && scopeResolver.userId) {
+    scopedQuery = scopedQuery.eq('responsavel_user_id', scopeResolver.userId);
+  }
+  return scopedQuery;
+}
 
 const GLOBAL_ADMIN_ROLE_VALUES = new Set([
   'admin',
@@ -339,13 +365,19 @@ export async function listClientPaidProcessesFinance(
     }
 
     const now = new Date();
-    const { data, error } = await supabase
+    let query = supabase
       .from('processes')
       .select('id,titulo,amount,currency,payment_status,paid_at,data_prazo,usage_deadline_at,process_status')
-      .eq('org_id', org_id)
-      .eq('responsavel_user_id', client_user_id)
       .in('payment_status', ['paid', 'released'])
       .order('created_at', { ascending: false });
+
+    query = applyScopedProcessFilters(query, {
+      orgId: org_id,
+      userId: client_user_id,
+      hierarchy: 'cliente',
+    });
+
+    const { data, error } = await query;
 
     const elapsed = performance.now() - startTime;
     log(`Client paid financial query completed in ${elapsed.toFixed(2)}ms`);
@@ -397,6 +429,50 @@ export async function listClientPaidProcessesFinance(
     const elapsed = performance.now() - startTime;
     logError(`Unexpected error in listClientPaidProcessesFinance after ${elapsed.toFixed(2)}ms:`, err);
     logError('Error stack:', (err as Error)?.stack);
+    return [];
+  }
+}
+
+
+
+export async function listClientDashboardProcesses(org_id: string, client_user_id: string): Promise<Process[]> {
+  const startTime = performance.now();
+  log('listClientDashboardProcesses() starting for org_id:', org_id, 'client_user_id:', client_user_id);
+
+  try {
+    const authenticatedUserId = await getAuthenticatedUserId();
+    if (!authenticatedUserId || authenticatedUserId !== client_user_id) {
+      logError('listClientDashboardProcesses() blocked: invalid authenticated client context.', {
+        authenticatedUserId,
+        client_user_id,
+      });
+      return [];
+    }
+
+    let query = supabase
+      .from('processes')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    query = applyScopedProcessFilters(query, {
+      orgId: org_id,
+      userId: client_user_id,
+      hierarchy: 'cliente',
+    });
+
+    const { data, error } = await query;
+    const elapsed = performance.now() - startTime;
+    log(`Client dashboard query completed in ${elapsed.toFixed(2)}ms`);
+
+    if (error) {
+      logError('Error listing client dashboard processes:', error);
+      return [];
+    }
+
+    return data || [];
+  } catch (err) {
+    const elapsed = performance.now() - startTime;
+    logError(`Unexpected error in listClientDashboardProcesses after ${elapsed.toFixed(2)}ms:`, err);
     return [];
   }
 }

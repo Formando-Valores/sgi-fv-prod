@@ -39,6 +39,20 @@ export enum Hierarchy {
 /** Roles disponíveis no sistema multi-tenant */
 export type OrgRole = 'owner' | 'admin' | 'staff' | 'client';
 
+
+export type NormalizedHierarchy = 'admin' | 'senior' | 'pleno' | 'operador' | 'cliente';
+
+export type CapabilityKey =
+  | 'canViewOrganizations'
+  | 'canManageOrganizations'
+  | 'canManageMembers'
+  | 'canManageClients'
+  | 'canOperateProcesses'
+  | 'canAccessSettings'
+  | 'canViewFinancial';
+
+export type CapabilityMap = Record<CapabilityKey, boolean>;
+
 /** Organização/Empresa */
 export interface Organization {
   id: string;
@@ -84,6 +98,9 @@ export interface UserContext {
   org_slug: string;
   org_name: string;
   role: OrgRole;
+  profile_role?: string | null;
+  hierarchy?: NormalizedHierarchy | null;
+  capabilities?: Partial<CapabilityMap> | null;
   profile: Profile | null;
 }
 

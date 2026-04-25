@@ -184,6 +184,27 @@ const RootApp: React.FC = () => {
     </div>
   );
 
+
+  const renderUnifiedSectionRoute = (section: 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes') => {
+    if (authBootstrapping) {
+      return authLoadingScreen;
+    }
+
+    if (!currentUser) {
+      return <Navigate to="/login" />;
+    }
+
+    return (
+      <UnifiedDashboard
+        currentUser={currentUser}
+        users={users}
+        setUsers={setUsers}
+        onLogout={handleLogout}
+        section={section}
+      />
+    );
+  };
+
   const renderDashboardRoute = () => {
     if (authBootstrapping) {
       return authLoadingScreen;
@@ -217,6 +238,10 @@ const RootApp: React.FC = () => {
           />
           <Route path="/recovery" element={<PasswordRecovery />} />
           <Route path="/dashboard/*" element={renderDashboardRoute()} />
+          <Route path="/processos" element={renderUnifiedSectionRoute('processos')} />
+          <Route path="/clientes" element={renderUnifiedSectionRoute('clientes')} />
+          <Route path="/configuracoes" element={renderUnifiedSectionRoute('configuracoes')} />
+          <Route path="/organizacoes" element={renderUnifiedSectionRoute('organizacoes')} />
           <Route path="/payments/success" element={<PaymentSuccess />} />
           <Route path="/payments/cancel" element={<PaymentCancel />} />
           <Route path="*" element={authBootstrapping ? authLoadingScreen : <Navigate to="/login" />} />
