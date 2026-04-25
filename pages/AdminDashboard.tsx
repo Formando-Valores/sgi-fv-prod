@@ -282,6 +282,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [orgSuccess, setOrgSuccess] = useState('');
   const [processSearch, setProcessSearch] = useState('');
   const [processStatusFilter, setProcessStatusFilter] = useState<'all' | ProcessStatus>('all');
+  const [processStatusPreset, setProcessStatusPreset] = useState<'all' | 'andamento' | 'atencao'>('all');
   const [processResponsibleFilter, setProcessResponsibleFilter] = useState('all');
   const [processTypeFilter, setProcessTypeFilter] = useState<'all' | ServiceUnit>('all');
   const [processPeriodFilter, setProcessPeriodFilter] = useState<'all' | 'today' | '7d' | '30d'>('all');
@@ -416,8 +417,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
   const parseProcessQuickPresetFromSearch = (search: string): ProcessQuickPreset | null => {
     const preset = new URLSearchParams(search).get('preset');
-    if (preset === 'andamento' || preset === 'atencao' || preset === 'novos7d') return preset;
-    return null;
+
+    if (!preset) return null;
+
+    const presetAliases: Record<string, ProcessQuickPreset> = {
+      andamento: 'andamento',
+      'processos-em-andamento': 'andamento',
+      atencao: 'atencao',
+      'processos-prioridade': 'atencao',
+      novos7d: 'novos7d',
+      'processos-novos-7d': 'novos7d',
+    };
+
+    return presetAliases[preset] ?? null;
   };
 
   const applyProcessQuickPreset = (preset: ProcessQuickPreset) => {
@@ -427,12 +439,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
     if (preset === 'andamento') {
       setProcessStatusFilter('all');
+      setProcessStatusPreset('andamento');
       setProcessPeriodFilter('all');
     } else if (preset === 'atencao') {
       setProcessStatusFilter('all');
+      setProcessStatusPreset('atencao');
       setProcessPeriodFilter('all');
     } else if (preset === 'novos7d') {
       setProcessStatusFilter('all');
+      setProcessStatusPreset('all');
       setProcessPeriodFilter('7d');
     }
   };
@@ -506,12 +521,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   useEffect(() => {
     if (currentSection !== 'processos') {
       setActiveProcessQuickPreset(null);
+      setProcessStatusPreset('all');
       return;
     }
 
     const detectedPreset = parseProcessQuickPresetFromSearch(location.search);
     if (!detectedPreset) {
       setActiveProcessQuickPreset(null);
+      setProcessStatusPreset('all');
       return;
     }
 
@@ -808,12 +825,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   };
 
   const processRows = baseProcessRows.filter((process) => {
-    const quickPresetStatuses =
-      activeProcessQuickPreset === 'andamento'
-        ? [ProcessStatus.PENDENTE, ProcessStatus.TRIAGEM, ProcessStatus.ANALISE]
-        : activeProcessQuickPreset === 'atencao'
-          ? [ProcessStatus.TRIAGEM, ProcessStatus.ANALISE]
-          : null;
+    const andamentoStatuses = [ProcessStatus.PENDENTE, ProcessStatus.TRIAGEM, ProcessStatus.ANALISE];
+    const atencaoStatuses = [ProcessStatus.TRIAGEM, ProcessStatus.ANALISE];
 
     const matchesSearch =
       process.name.toLowerCase().includes(processSearch.toLowerCase()) ||
@@ -823,13 +836,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       process.sourceLabel.toLowerCase().includes(processSearch.toLowerCase()) ||
       process.requestedOrganizationName.toLowerCase().includes(processSearch.toLowerCase());
 
-    const matchesStatus = processStatusFilter === 'all' || process.status === processStatusFilter;
+    const matchesStatus =
+      processStatusPreset === 'atencao'
+        ? atencaoStatuses.includes(process.status)
+        : processStatusPreset === 'andamento'
+          ? andamentoStatuses.includes(process.status)
+          : processStatusFilter === 'all' || process.status === processStatusFilter;
     const matchesResponsible = processResponsibleFilter === 'all' || (process.serviceManager || 'Não definido') === processResponsibleFilter;
     const matchesType = processTypeFilter === 'all' || process.processType === processTypeFilter;
     const matchesPeriod = isWithinPeriod(process.registrationDate, processPeriodFilter);
-    const matchesQuickPreset = !quickPresetStatuses || quickPresetStatuses.includes(process.status);
 
-    return matchesSearch && matchesStatus && matchesResponsible && matchesType && matchesPeriod && matchesQuickPreset;
+    return matchesSearch && matchesStatus && matchesResponsible && matchesType && matchesPeriod;
   });
 
   const quickPresetVisual = activeProcessQuickPreset
@@ -3225,7 +3242,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               </div>
               <select
                 value={processStatusFilter}
-                onChange={(event) => setProcessStatusFilter(event.target.value as 'all' | ProcessStatus)}
+                onChange={(event) => {
+                  setProcessStatusFilter(event.target.value as 'all' | ProcessStatus);
+                  setProcessStatusPreset('all');
+                }}
                 className="w-full py-3 px-4 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
               >
                 <option value="all">Todos os status</option>
