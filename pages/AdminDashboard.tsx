@@ -417,8 +417,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
   const parseProcessQuickPresetFromSearch = (search: string): ProcessQuickPreset | null => {
     const preset = new URLSearchParams(search).get('preset');
-    if (preset === 'andamento' || preset === 'atencao' || preset === 'novos7d') return preset;
-    return null;
+
+    if (!preset) return null;
+
+    const presetAliases: Record<string, ProcessQuickPreset> = {
+      andamento: 'andamento',
+      'processos-em-andamento': 'andamento',
+      atencao: 'atencao',
+      'processos-prioridade': 'atencao',
+      novos7d: 'novos7d',
+      'processos-novos-7d': 'novos7d',
+    };
+
+    return presetAliases[preset] ?? null;
   };
 
   const applyProcessQuickPreset = (preset: ProcessQuickPreset) => {
