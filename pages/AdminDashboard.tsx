@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { LogOut, Printer, FileDown, Eye, Pencil, Search, Users, ShieldCheck, X, Plus, Trash2, Calendar, MessageSquare, Check, User as UserIcon, UserCheck, LayoutDashboard, FolderKanban, Users2, Settings, Building2, Flag } from 'lucide-react';
 import { User, ProcessStatus, UserRole, Hierarchy, ServiceUnit, Organization } from '../types';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { SERVICE_MANAGERS } from '../constants';
 import { buildOrganizationErrorMessage, createOrganization, deleteOrganization, loadOrganizations, updateOrganization, updateOrganizationStatus } from '../organizationRepository';
 import { supabase } from '../supabase';
@@ -303,6 +303,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [clientJourneyLoading, setClientJourneyLoading] = useState(false);
 
   const location = useLocation();
+  const navigate = useNavigate();
   const validSections = ['dashboard', 'processos', 'clientes', 'configuracoes', 'organizacoes'] as const;
   type DashboardSection = typeof validSections[number];
   const parseSectionCandidate = (value?: string | null): DashboardSection | null => {
@@ -337,6 +338,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     { to: '/dashboard/organizacoes', label: 'Organizações', icon: Building2, visible: allowedModules.includes('organizacoes') },
   ].filter((item) => item.visible);
 
+  const sectionModuleMap: Partial<Record<DashboardSection, 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes'>> = {
+    dashboard: 'dashboard',
+    processos: 'processos',
+    clientes: 'clientes',
+    configuracoes: 'configuracoes',
+    organizacoes: 'organizacoes',
+  };
+
+  const canAccessSection = (sectionName: DashboardSection) => {
+    if (sectionName === 'dashboard') return true;
+    const mappedModule = sectionModuleMap[sectionName];
+    if (!mappedModule) return false;
+    return allowedModules.includes(mappedModule);
+  };
+
   useEffect(() => {
     setSidebarOpen(false);
   }, [location.pathname]);
@@ -344,6 +360,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   useEffect(() => {
     setCurrentSection(resolveSectionFromLocation());
   }, [location.hash, location.pathname, location.search]);
+
+  useEffect(() => {
+    if (canAccessSection(currentSection)) return;
+    navigate('/dashboard', { replace: true });
+    setCurrentSection('dashboard');
+  }, [currentSection, navigate, allowedModules]);
 
   useEffect(() => {
     if (currentSection === 'configuracoes') {
@@ -397,6 +419,46 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       details: supabaseError.details || 'sem-detalhes',
       hint: supabaseError.hint || 'sem-hint',
     });
+  };
+
+  const resolveOrganizationScope = async () => {
+    const { data, error } = await supabase
+      .from('org_members')
+      .select('org_id,role,organizations(name,slug)')
+      .eq('user_id', currentUser.id);
+
+    if (error) {
+      return {
+        allowedOrgIds: new Set<string>(),
+        hasGlobalScope: false,
+        error,
+      };
+    }
+
+    const scopeRows = (data || []) as Array<{
+      org_id: string;
+      role?: string | null;
+      organizations?: { name?: string | null; slug?: string | null } | Array<{ name?: string | null; slug?: string | null }> | null;
+    }>;
+
+    const allowedOrgIds = new Set(scopeRows.map((row) => row.org_id).filter(Boolean));
+    const hasGlobalScope = scopeRows.some((row) => {
+      const normalizedRole = sanitizeDisplayValue(row.role).toLowerCase();
+      if (!['owner', 'admin'].includes(normalizedRole)) return false;
+
+      const organizationsValue = row.organizations;
+      const firstOrg = Array.isArray(organizationsValue) ? organizationsValue[0] : organizationsValue;
+      const orgSlug = sanitizeDisplayValue(firstOrg?.slug).toLowerCase();
+      const orgName = sanitizeDisplayValue(firstOrg?.name);
+
+      return orgSlug === 'default' || isDefaultOrganizationName(orgName);
+    });
+
+    return {
+      allowedOrgIds,
+      hasGlobalScope,
+      error: null as null,
+    };
   };
 
   const getEditingProcessRecordId = (user: AdminProcessRow | User | null) =>
@@ -983,10 +1045,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const normalizedUserId = sanitizeDisplayValue(currentUser.id);
     const canFilterByUserId = Boolean(normalizedUserId);
     const normalizedOrgId = sanitizeDisplayValue(currentUser.organizationId);
-    const hasGlobalOrganizationScope = currentUser.role === UserRole.ADMIN && !normalizedOrgId;
+    const { allowedOrgIds, hasGlobalScope, error: scopeError } = await resolveOrganizationScope();
+    const hasGlobalOrganizationScope = hasGlobalScope && !normalizedOrgId;
+
+    if (scopeError) {
+      setProcessesError('Não foi possível validar o escopo de organização do usuário.');
+      setDbProcesses([]);
+      setProcessesLoading(false);
+      return;
+    }
 
     if (!hasGlobalOrganizationScope && !normalizedOrgId) {
       setProcessesError('Filtro por organização obrigatório para este perfil.');
+      setDbProcesses([]);
+      setProcessesLoading(false);
+      return;
+    }
+
+    if (normalizedOrgId && !hasGlobalOrganizationScope && !allowedOrgIds.has(normalizedOrgId)) {
+      setProcessesError('Escopo de organização inválido para este usuário.');
       setDbProcesses([]);
       setProcessesLoading(false);
       return;
@@ -1142,6 +1219,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
     if (!selectedOrganization) {
       setProcessActionFeedback({ type: 'error', message: 'Selecione uma organização válida para criar o processo.' });
+      return;
+    }
+
+    const { allowedOrgIds, hasGlobalScope, error: scopeError } = await resolveOrganizationScope();
+    if (scopeError) {
+      setProcessActionFeedback({ type: 'error', message: 'Não foi possível validar o escopo da organização.' });
+      return;
+    }
+    if (!hasGlobalScope && !allowedOrgIds.has(selectedOrganization.id)) {
+      setProcessActionFeedback({ type: 'error', message: 'Você não possui permissão para criar processo nesta organização.' });
       return;
     }
 
@@ -1429,6 +1516,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     setMembersLoading(true);
     setMembersError('');
 
+    const { allowedOrgIds, hasGlobalScope, error: scopeError } = await resolveOrganizationScope();
+    if (scopeError) {
+      setMembersError('Não foi possível validar o escopo de membros da organização.');
+      setMembersLoading(false);
+      return;
+    }
+    if (!hasGlobalScope && allowedOrgIds.size === 0) {
+      setOrgMembers([]);
+      setMembersLoading(false);
+      return;
+    }
+
     const orgMemberSelectOptions = [
       'org_id,user_id,role,nome_completo,nome,name,full_name,organizations(name)',
       'org_id,user_id,role,organizations(name)',
@@ -1439,10 +1538,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     let memberError: { message?: string } | null = null;
 
     for (const selectFields of orgMemberSelectOptions) {
-      const query = await supabase
+      const queryBuilder = supabase
         .from('org_members')
         .select(selectFields)
         .order('created_at', { ascending: false });
+      const query = !hasGlobalScope
+        ? await queryBuilder.in('org_id', Array.from(allowedOrgIds))
+        : await queryBuilder;
 
       if (!query.error) {
         memberRows = query.data as unknown as OrgMemberRow[] | null;
@@ -1535,10 +1637,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     let allProfilesError: { message?: string } | null = null;
 
     for (const selectFields of profileSelectOptions) {
-      const query = await supabase
+      const queryBuilder = supabase
         .from('profiles')
         .select(selectFields)
         .order('created_at', { ascending: false });
+      const query = !hasGlobalScope
+        ? await queryBuilder.in('org_id', Array.from(allowedOrgIds))
+        : await queryBuilder;
 
       if (!query.error) {
         profileRows = (query.data as unknown as ProfileRow[] | null) || [];
@@ -1982,27 +2087,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     setClientsLoading(true);
     setClientsError('');
 
-    const { data: membershipScopeRows, error: membershipScopeError } = await supabase
-      .from('org_members')
-      .select('org_id,user_id,role,organizations(name)')
-      .eq('user_id', currentUser.id);
-
+    const { allowedOrgIds, hasGlobalScope, error: membershipScopeError } = await resolveOrganizationScope();
     if (membershipScopeError) {
       setClientsError('Não foi possível validar o escopo de acesso do usuário.');
       setClientsLoading(false);
       return;
     }
+    if (!hasGlobalScope && allowedOrgIds.size === 0) {
+      setClientsData([]);
+      setClientsLoading(false);
+      return;
+    }
 
-    const hasGlobalScope = (membershipScopeRows || []).some((membership) => {
-      const role = String(membership.role || '').toLowerCase();
-      const orgName = extractOrganizationName(membership.organizations);
-      return (role === 'admin' || role === 'owner') && isDefaultOrganizationName(orgName);
-    });
-
-    const { data: memberRows, error: membersError } = await supabase
+    const membersQuery = supabase
       .from('org_members')
       .select('org_id,user_id,role,organizations(name)')
       .order('created_at', { ascending: false });
+    const { data: memberRows, error: membersError } = !hasGlobalScope
+      ? await membersQuery.in('org_id', Array.from(allowedOrgIds))
+      : await membersQuery;
 
     if (membersError) {
       setClientsError('Não foi possível carregar os membros da tabela org_members.');
@@ -2010,7 +2113,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       return;
     }
 
-    const allowedOrgIds = new Set((membershipScopeRows || []).map((row) => row.org_id));
     const scopedMembers = (memberRows || []).filter((member) => hasGlobalScope || allowedOrgIds.has(member.org_id));
 
     if (scopedMembers.length === 0) {
