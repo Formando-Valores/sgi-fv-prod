@@ -7,7 +7,7 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, FolderKanban, Users, Settings, Building2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { getAllowedModules } from '../lib/permissions';
+import { getAllowedModules, type PermissionModule } from '../lib/permissions';
 
 const hierarchyLabel: Record<string, string> = {
   admin: 'Administrador',
@@ -21,12 +21,17 @@ const Sidebar: React.FC = () => {
   const { userContext, hierarchy } = useAuth();
   const allowedModules = getAllowedModules(userContext);
 
-  const navItems = [
-    { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, visible: allowedModules.includes('dashboard') },
-    { to: '/processos', label: 'Processos', icon: FolderKanban, visible: allowedModules.includes('processos') },
-    { to: '/clientes', label: 'Clientes', icon: Users, visible: allowedModules.includes('clientes') },
-    { to: '/configuracoes', label: 'Configurações', icon: Settings, visible: allowedModules.includes('configuracoes') },
-  ].filter((item) => item.visible);
+  const moduleNavMap: Partial<Record<PermissionModule, { to: string; label: string; icon: React.ComponentType<{ className?: string }> }>> = {
+    dashboard: { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    processos: { to: '/processos', label: 'Processos', icon: FolderKanban },
+    clientes: { to: '/clientes', label: 'Clientes', icon: Users },
+    configuracoes: { to: '/configuracoes', label: 'Configurações', icon: Settings },
+    organizacoes: { to: '/organizacoes', label: 'Organizações', icon: Building2 },
+  };
+
+  const navItems = allowedModules
+    .map((module) => moduleNavMap[module])
+    .filter((item): item is NonNullable<typeof item> => Boolean(item));
 
   return (
     <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col">

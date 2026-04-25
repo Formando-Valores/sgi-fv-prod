@@ -321,6 +321,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
     return section || 'dashboard';
   };
+  const resolveRequestedSectionFromLocation = (): DashboardSection | null => {
+    const pathnameSection = parseSectionCandidate(location.pathname.split('/')[2]);
+    if (pathnameSection) return pathnameSection;
+
+    const hashValue = location.hash || (typeof window !== 'undefined' ? window.location.hash : '');
+    const hashSection = parseSectionCandidate(hashValue.split('/')[2]);
+    if (hashSection) return hashSection;
+
+    return null;
+  };
   const [currentSection, setCurrentSection] = useState<DashboardSection>(resolveSectionFromLocation);
 
   const permissions = resolvePermissions(currentUser.org_role ?? (currentUser.role === UserRole.ADMIN ? 'admin' : 'client'));
@@ -362,10 +372,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   }, [location.hash, location.pathname, location.search]);
 
   useEffect(() => {
-    if (canAccessSection(currentSection)) return;
+    const requestedSection = resolveRequestedSectionFromLocation();
+    const hasInvalidSectionInRoute =
+      Boolean(location.pathname.split('/')[2] || location.hash.split('/')[2]) && !requestedSection;
+
+    if (!hasInvalidSectionInRoute && canAccessSection(currentSection)) return;
     navigate('/dashboard', { replace: true });
     setCurrentSection('dashboard');
-  }, [currentSection, navigate, allowedModules]);
+  }, [currentSection, navigate, allowedModules, location.pathname, location.hash]);
 
   useEffect(() => {
     if (currentSection === 'configuracoes') {
