@@ -982,11 +982,46 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
     const normalizedUserId = sanitizeDisplayValue(currentUser.id);
     const canFilterByUserId = Boolean(normalizedUserId);
+    const normalizedOrgId = sanitizeDisplayValue(currentUser.organizationId);
+    const hasGlobalOrganizationScope = currentUser.role === UserRole.ADMIN && !normalizedOrgId;
+
+    if (!hasGlobalOrganizationScope && !normalizedOrgId) {
+      setProcessesError('Filtro por organização obrigatório para este perfil.');
+      setDbProcesses([]);
+      setProcessesLoading(false);
+      return;
+    }
+
+    const persistDashboardAudit = async (resultCount: number) => {
+      if (!normalizedUserId) return;
+
+      const auditPayload = {
+        actor_user_id: normalizedUserId,
+        event_code: 'dashboard_module_consulted',
+        details: {
+          profile: currentUser.role,
+          org: normalizedOrgId || null,
+          module: 'dashboard_unificado',
+          resultCount,
+          orgFilterApplied: Boolean(normalizedOrgId),
+          hasGlobalOrganizationScope,
+        },
+      };
+
+      const { error: auditError } = await supabase.from('financial_audit_events').insert(auditPayload);
+      if (auditError) {
+        console.warn('[dashboard] falha ao registrar auditoria mínima de consulta', auditError);
+      }
+    };
 
     const queryWithOptionalColumns = supabase
       .from('processes')
       .select(PROCESS_SELECT_WITH_OPTIONAL_COLUMNS)
       .order('created_at', { ascending: false });
+
+    if (normalizedOrgId) {
+      queryWithOptionalColumns.eq('org_id', normalizedOrgId);
+    }
 
     if (isClientScope) {
       if (!canFilterByUserId) {
@@ -1012,7 +1047,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     }
 
     if (!error) {
-      setDbProcesses(((data as DbProcess[] | null) || []).map((process) => normalizeProcessOptionalFields(process)));
+      const rows = ((data as DbProcess[] | null) || []).map((process) => normalizeProcessOptionalFields(process));
+      setDbProcesses(rows);
+      await persistDashboardAudit(rows.length);
       setProcessesLoading(false);
       return;
     }
@@ -1024,6 +1061,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         .from('processes')
         .select(PROCESS_SELECT_BASE_COLUMNS)
         .order('created_at', { ascending: false });
+
+      if (normalizedOrgId) {
+        fallbackQuery.eq('org_id', normalizedOrgId);
+      }
 
       if (isClientScope && canFilterByUserId) {
         fallbackQuery.or(`cliente_user_id.eq.${normalizedUserId},responsavel_user_id.eq.${normalizedUserId}`);
@@ -1037,6 +1078,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         );
 
         setDbProcesses(normalizedProcesses);
+        await persistDashboardAudit(normalizedProcesses.length);
         setProcessesError('Banco ainda sem colunas opcionais (data_prazo, gestor_servico, observacoes). Processos carregados em modo compatível.');
         setProcessesLoading(false);
         return;

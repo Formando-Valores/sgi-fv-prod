@@ -25,6 +25,76 @@ async function getAuthenticatedUserId(): Promise<string | null> {
   return data.user?.id ?? null;
 }
 
+type ProcessQueryScope = {
+  actorUserId: string | null;
+  actorProfileRole: string | null;
+  actorOrgRole: string | null;
+  isGlobalAdmin: boolean;
+  resolvedOrgId: string | null;
+};
+
+const GLOBAL_ADMIN_ROLE_VALUES = new Set([
+  'admin',
+  'administrator',
+  'administrador',
+  'administrador geral',
+  'owner',
+]);
+
+async function resolveProcessQueryScope(
+  orgId: string | null | undefined,
+  moduleName: string,
+): Promise<ProcessQueryScope | null> {
+  const actorUserId = await getAuthenticatedUserId();
+  if (!actorUserId) {
+    logError(`[${moduleName}] blocked: missing authenticated actor.`);
+    return null;
+  }
+
+  const { data: profileData, error: profileError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', actorUserId)
+    .maybeSingle();
+
+  if (profileError) {
+    logError(`[${moduleName}] failed to resolve profile role:`, profileError);
+  }
+
+  const normalizedProfileRole = String(profileData?.role || '').trim().toLowerCase();
+  const isGlobalAdmin = GLOBAL_ADMIN_ROLE_VALUES.has(normalizedProfileRole);
+  const normalizedOrgId = orgId ? String(orgId).trim() : '';
+  const resolvedOrgId = normalizedOrgId || null;
+
+  if (!isGlobalAdmin && !resolvedOrgId) {
+    logError(`[${moduleName}] blocked: org_id is mandatory for non-global profile.`, {
+      actorUserId,
+      actorProfileRole: normalizedProfileRole || null,
+      orgId,
+    });
+    return null;
+  }
+
+  const { data: membershipData, error: membershipError } = await supabase
+    .from('org_members')
+    .select('role')
+    .eq('user_id', actorUserId)
+    .eq('org_id', resolvedOrgId || '')
+    .maybeSingle();
+
+  if (membershipError && resolvedOrgId) {
+    logError(`[${moduleName}] failed to resolve org membership role:`, membershipError);
+  }
+
+  return {
+    actorUserId,
+    actorProfileRole: normalizedProfileRole || null,
+    actorOrgRole: membershipData?.role ? String(membershipData.role) : null,
+    isGlobalAdmin,
+    resolvedOrgId,
+  };
+}
+
 async function logFinancialAuditEvent(
   eventCode: string,
   details: Record<string, unknown>,
@@ -136,12 +206,18 @@ export async function listProcesses(org_id: string): Promise<Process[]> {
   log('listProcesses() starting for org_id:', org_id);
   
   try {
+    const scope = await resolveProcessQueryScope(org_id, 'processes.list');
+    if (!scope) return [];
+
     log('Executing query on processes table...');
-    const { data, error } = await supabase
+    let query = supabase
       .from('processes')
       .select('*')
-      .eq('org_id', org_id)
       .order('created_at', { ascending: false });
+    if (scope.resolvedOrgId) {
+      query = query.eq('org_id', scope.resolvedOrgId);
+    }
+    const { data, error } = await query;
 
     const elapsed = performance.now() - startTime;
     log(`Query completed in ${elapsed.toFixed(2)}ms`);
@@ -159,6 +235,17 @@ export async function listProcesses(org_id: string): Promise<Process[]> {
       return []; // Return empty array instead of throwing
     }
     
+    await logFinancialAuditEvent('module_query_scope_applied', {
+      module: 'processes',
+      query: 'listProcesses',
+      actorProfileRole: scope.actorProfileRole,
+      actorOrgRole: scope.actorOrgRole,
+      orgId: scope.resolvedOrgId,
+      orgFilterApplied: Boolean(scope.resolvedOrgId),
+      isGlobalAdmin: scope.isGlobalAdmin,
+      resultCount: data?.length || 0,
+    });
+
     log('Query successful, returned', data?.length || 0, 'processes');
     return data || [];
   } catch (err) {
@@ -174,20 +261,24 @@ export async function listProcesses(org_id: string): Promise<Process[]> {
  * - payment_status = paid
  * - process_status = liberado
  */
-export async function listAdminOperationalProcesses(org_id: string): Promise<Process[]> {
+export async function listAdminOperationalProcesses(org_id?: string | null): Promise<Process[]> {
   const startTime = performance.now();
   log('listAdminOperationalProcesses() starting for org_id:', org_id);
 
   try {
-    const actorUserId = await getAuthenticatedUserId();
+    const scope = await resolveProcessQueryScope(org_id, 'processes.listAdminOperational');
+    if (!scope) return [];
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('processes')
       .select('*')
-      .eq('org_id', org_id)
       .eq('payment_status', 'paid')
       .eq('process_status', 'liberado')
       .order('created_at', { ascending: false });
+    if (scope.resolvedOrgId) {
+      query = query.eq('org_id', scope.resolvedOrgId);
+    }
+    const { data, error } = await query;
 
     const elapsed = performance.now() - startTime;
     log(`Admin operational query completed in ${elapsed.toFixed(2)}ms`);
@@ -199,9 +290,14 @@ export async function listAdminOperationalProcesses(org_id: string): Promise<Pro
     }
 
     await logFinancialAuditEvent('admin_financial_processes_viewed', {
-      orgId: org_id,
-      actorUserId,
+      orgId: scope.resolvedOrgId,
+      actorUserId: scope.actorUserId,
+      actorProfileRole: scope.actorProfileRole,
+      actorOrgRole: scope.actorOrgRole,
+      module: 'dashboard_unificado',
       resultCount: data?.length || 0,
+      orgFilterApplied: Boolean(scope.resolvedOrgId),
+      isGlobalAdmin: scope.isGlobalAdmin,
       constraints: {
         payment_status: 'paid',
         process_status: 'liberado',
@@ -604,18 +700,24 @@ export async function deleteProcess(org_id: string, process_id: string): Promise
 /**
  * Get process statistics for dashboard
  */
-export async function getProcessStats(org_id: string) {
+export async function getProcessStats(org_id?: string | null) {
   const startTime = performance.now();
   log('getProcessStats() starting for org_id:', org_id);
   
   const defaultStats = { total: 0, cadastro: 0, triagem: 0, analise: 0, concluido: 0 };
   
   try {
+    const scope = await resolveProcessQueryScope(org_id, 'processes.getStats');
+    if (!scope) return defaultStats;
+
     log('Executing query on processes table...');
-    const { data, error } = await supabase
+    let query = supabase
       .from('processes')
-      .select('status')
-      .eq('org_id', org_id);
+      .select('status');
+    if (scope.resolvedOrgId) {
+      query = query.eq('org_id', scope.resolvedOrgId);
+    }
+    const { data, error } = await query;
 
     const elapsed = performance.now() - startTime;
     log(`Query completed in ${elapsed.toFixed(2)}ms`);
@@ -643,6 +745,17 @@ export async function getProcessStats(org_id: string) {
       if (p.status in stats) {
         stats[p.status as keyof typeof stats]++;
       }
+    });
+
+    await logFinancialAuditEvent('module_query_scope_applied', {
+      module: 'dashboard_unificado',
+      query: 'getProcessStats',
+      actorProfileRole: scope.actorProfileRole,
+      actorOrgRole: scope.actorOrgRole,
+      orgId: scope.resolvedOrgId,
+      orgFilterApplied: Boolean(scope.resolvedOrgId),
+      isGlobalAdmin: scope.isGlobalAdmin,
+      resultCount: data?.length || 0,
     });
 
     log('Stats calculated:', JSON.stringify(stats));

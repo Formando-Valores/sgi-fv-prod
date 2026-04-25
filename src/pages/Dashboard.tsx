@@ -27,6 +27,9 @@ const Dashboard: React.FC = () => {
   log('Dashboard component rendering');
   
   const { userContext } = useAuth();
+  const isGlobalAdminProfile =
+    ['admin', 'owner'].includes(String(userContext?.role || '').toLowerCase()) &&
+    !userContext?.org_id;
   const canViewAllProcesses = can('view_all', 'processos', userContext);
   const canCreateProcess = can('create', 'processos', userContext);
   const [stats, setStats] = useState({ total: 0, cadastro: 0, triagem: 0, analise: 0, concluido: 0 });
@@ -58,15 +61,15 @@ const Dashboard: React.FC = () => {
     log('  - userContext?.org_id:', userContext?.org_id);
     log('  - migrationStatus?.allReady:', migrationStatus?.allReady);
     
-    if (userContext?.org_id && migrationStatus?.allReady) {
+    if ((userContext?.org_id || isGlobalAdminProfile) && migrationStatus?.allReady) {
       log('Conditions met, calling loadData()');
       loadData();
     } else {
       log('Conditions not met for loadData()');
-      if (!userContext?.org_id) log('  - Missing org_id');
+      if (!userContext?.org_id && !isGlobalAdminProfile) log('  - Missing org_id');
       if (!migrationStatus?.allReady) log('  - Migrations not ready');
     }
-  }, [userContext?.org_id, migrationStatus?.allReady]);
+  }, [userContext?.org_id, migrationStatus?.allReady, isGlobalAdminProfile]);
 
   const checkSetup = async () => {
     const startTime = performance.now();
@@ -101,7 +104,7 @@ const Dashboard: React.FC = () => {
     log('loadData() starting...');
     log('org_id:', userContext?.org_id);
     
-    if (!userContext?.org_id) {
+    if (!userContext?.org_id && !isGlobalAdminProfile) {
       log('No org_id in userContext, returning early');
       setStats({ total: 0, cadastro: 0, triagem: 0, analise: 0, concluido: 0 });
       setLoading(false);
@@ -118,12 +121,12 @@ const Dashboard: React.FC = () => {
       const processesStartTime = performance.now();
       
       const [statsData, processesData] = await Promise.all([
-        getProcessStats(userContext.org_id).then(data => {
+        getProcessStats(userContext?.org_id).then(data => {
           const elapsed = performance.now() - statsStartTime;
           log(`getProcessStats() completed in ${elapsed.toFixed(2)}ms:`, data);
           return data;
         }),
-        (canViewAllProcesses ? listAdminOperationalProcesses(userContext.org_id) : listProcesses(userContext.org_id)).then(data => {
+        (canViewAllProcesses ? listAdminOperationalProcesses(userContext?.org_id) : listProcesses(userContext?.org_id || '')).then(data => {
           const elapsed = performance.now() - processesStartTime;
           log(`process listing completed in ${elapsed.toFixed(2)}ms, count:`, data.length);
           return data.filter((process) => process.process_status !== 'pending_payment');
