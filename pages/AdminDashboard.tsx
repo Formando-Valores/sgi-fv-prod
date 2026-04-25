@@ -379,6 +379,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const navigate = useNavigate();
   const validSections = ['dashboard', 'processos', 'clientes', 'configuracoes', 'organizacoes'] as const;
   type DashboardSection = typeof validSections[number];
+  type DashboardPresetFilter =
+    | 'clientes-todos'
+    | 'processos-em-andamento'
+    | 'processos-prioridade'
+    | 'processos-novos-7d';
   const parseSectionCandidate = (value?: string | null): DashboardSection | null => {
     if (!value) return null;
     if ((validSections as readonly string[]).includes(value)) return value as DashboardSection;
@@ -464,6 +469,35 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       setActiveTab('users');
     }
   }, [currentSection]);
+
+  useEffect(() => {
+    const presetFilter = new URLSearchParams(location.search).get('preset') as DashboardPresetFilter | null;
+    if (!presetFilter) return;
+
+    if (currentSection === 'clientes' && presetFilter === 'clientes-todos') {
+      setSearchTerm('');
+      return;
+    }
+
+    if (currentSection !== 'processos') return;
+
+    if (presetFilter === 'processos-em-andamento') {
+      setProcessStatusFilter('all');
+      setProcessPeriodFilter('all');
+      return;
+    }
+
+    if (presetFilter === 'processos-prioridade') {
+      setProcessStatusFilter(ProcessStatus.ANALISE);
+      setProcessPeriodFilter('all');
+      return;
+    }
+
+    if (presetFilter === 'processos-novos-7d') {
+      setProcessStatusFilter('all');
+      setProcessPeriodFilter('7d');
+    }
+  }, [currentSection, location.search]);
 
   const filteredUsers = users.filter(u => 
     u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -788,6 +822,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       helper: `${filteredUsers.length} visíveis no filtro atual`,
       icon: Users2,
       styles: 'border-blue-100 bg-blue-50 text-blue-700',
+      targetSection: 'clientes' as DashboardSection,
+      presetFilter: 'clientes-todos' as DashboardPresetFilter,
+      ariaLabel: 'Ir para a seção de clientes com o filtro de usuários cadastrados',
     },
     {
       key: 'processos-ativos',
@@ -796,6 +833,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       helper: `${processStats.total} processos no total`,
       icon: FolderKanban,
       styles: 'border-indigo-100 bg-indigo-50 text-indigo-700',
+      targetSection: 'processos' as DashboardSection,
+      presetFilter: 'processos-em-andamento' as DashboardPresetFilter,
+      ariaLabel: 'Ir para a seção de processos em andamento',
     },
     {
       key: 'prioridade',
@@ -804,6 +844,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       helper: 'Triagem + Análise',
       icon: MessageSquare,
       styles: 'border-amber-100 bg-amber-50 text-amber-700',
+      targetSection: 'processos' as DashboardSection,
+      presetFilter: 'processos-prioridade' as DashboardPresetFilter,
+      ariaLabel: 'Ir para a seção de processos com foco em demandas prioritárias',
     },
     {
       key: 'novos',
@@ -812,8 +855,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       helper: 'Velocidade de entrada',
       icon: Calendar,
       styles: 'border-emerald-100 bg-emerald-50 text-emerald-700',
+      targetSection: 'processos' as DashboardSection,
+      presetFilter: 'processos-novos-7d' as DashboardPresetFilter,
+      ariaLabel: 'Ir para a seção de processos com filtro de últimos sete dias',
     },
   ];
+
+  const navigateToDashboardHighlight = (targetSection: DashboardSection, presetFilter: DashboardPresetFilter) => {
+    setCurrentSection(targetSection);
+    navigate(`/dashboard/${targetSection}?preset=${presetFilter}`);
+  };
 
   const statusDistribution = [
     { label: 'Triagem', value: processRows.filter((process) => process.status === ProcessStatus.TRIAGEM).length, color: '#4F8FE8' },
@@ -2720,14 +2771,26 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         <OverviewContainer>
         <section className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5 no-print">
           {dashboardHighlights.map((item) => (
-            <article key={item.key} className={`rounded-2xl border p-4 shadow-sm ${item.styles} min-h-[112px]`}>
+            <button
+              key={item.key}
+              type="button"
+              aria-label={item.ariaLabel}
+              onClick={() => navigateToDashboardHighlight(item.targetSection, item.presetFilter)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  navigateToDashboardHighlight(item.targetSection, item.presetFilter);
+                }
+              }}
+              className={`rounded-2xl border p-4 shadow-sm ${item.styles} min-h-[112px] text-left cursor-pointer transition outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500`}
+            >
               <div className="mb-2 flex items-start justify-between gap-2">
                 <p className="text-[11px] font-black uppercase tracking-widest">{item.label}</p>
                 <item.icon className="h-5 w-5 opacity-80" />
               </div>
               <p className="text-3xl font-black leading-none">{item.value}</p>
               <p className="mt-2 text-xs font-semibold opacity-80">{item.helper}</p>
-            </article>
+            </button>
           ))}
         </section>
         </OverviewContainer>
