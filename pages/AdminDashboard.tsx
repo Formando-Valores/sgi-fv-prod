@@ -383,7 +383,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const validSections = ['dashboard', 'processos', 'clientes', 'configuracoes', 'organizacoes'] as const;
   type DashboardSection = typeof validSections[number];
   type DashboardPresetFilter =
-    | 'clientes-todos'
+    | 'usuarios_cadastrados'
     | 'processos-em-andamento'
     | 'processos-prioridade'
     | 'processos-novos-7d';
@@ -487,6 +487,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
   useEffect(() => {
     if (currentSection === 'configuracoes') {
+      const preset = new URLSearchParams(location.search).get('preset');
+      if (preset === 'usuarios_cadastrados') {
+        setActiveTab('users');
+        setSearchTerm('');
+        return;
+      }
+
       setActiveTab('management');
       return;
     }
@@ -494,7 +501,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     if (currentSection === 'dashboard') {
       setActiveTab('users');
     }
-  }, [currentSection]);
+  }, [currentSection, location.search]);
 
   useEffect(() => {
     if (currentSection !== 'processos') {
@@ -860,9 +867,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       helper: `${filteredUsers.length} visíveis no filtro atual`,
       icon: Users2,
       styles: 'border-blue-100 bg-blue-50 text-blue-700',
-      targetSection: 'clientes' as DashboardSection,
-      presetFilter: 'clientes-todos' as DashboardPresetFilter,
-      ariaLabel: 'Ir para a seção de clientes com o filtro de usuários cadastrados',
+      targetSection: 'configuracoes' as DashboardSection,
+      presetFilter: 'usuarios_cadastrados' as DashboardPresetFilter,
+      ariaLabel: 'Ir para a seção de configurações na aba de usuários cadastrados',
     },
     {
       key: 'processos-ativos',
@@ -2808,19 +2815,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       {currentSection === 'dashboard' && (
         <OverviewContainer>
         <section className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5 no-print">
-          {dashboardHighlights.map((item) => (
+          {dashboardHighlights.map((item) => {
+            const canNavigateToHighlight = canAccessSection(item.targetSection);
+
+            return (
             <button
               key={item.key}
               type="button"
               aria-label={item.ariaLabel}
-              onClick={() => navigateToDashboardHighlight(item.targetSection, item.presetFilter)}
+              aria-disabled={!canNavigateToHighlight}
+              disabled={!canNavigateToHighlight}
+              onClick={() => {
+                if (!canNavigateToHighlight) return;
+                navigateToDashboardHighlight(item.targetSection, item.presetFilter);
+              }}
               onKeyDown={(event) => {
+                if (!canNavigateToHighlight) return;
                 if (event.key === 'Enter' || event.key === ' ') {
                   event.preventDefault();
                   navigateToDashboardHighlight(item.targetSection, item.presetFilter);
                 }
               }}
-              className={`rounded-2xl border p-4 shadow-sm ${item.styles} min-h-[112px] text-left cursor-pointer transition outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500`}
+              className={`rounded-2xl border p-4 shadow-sm ${item.styles} min-h-[112px] text-left transition outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500 ${canNavigateToHighlight ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
             >
               <div className="mb-2 flex items-start justify-between gap-2">
                 <p className="text-[11px] font-black uppercase tracking-widest">{item.label}</p>
@@ -2829,7 +2845,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               <p className="text-3xl font-black leading-none">{item.value}</p>
               <p className="mt-2 text-xs font-semibold opacity-80">{item.helper}</p>
             </button>
-          ))}
+          )})}
         </section>
         </OverviewContainer>
       )}
