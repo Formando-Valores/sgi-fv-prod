@@ -105,6 +105,8 @@ type ProcessChecklistItem = {
   updatedByName?: string;
 };
 
+type ProcessQuickPreset = 'andamento' | 'atencao' | 'novos7d';
+
 const CHECKLIST_EVENT_PREFIX = 'CHECKLIST_EVENT:';
 
 const ACCESS_LEVELS: AccessLevel[] = ['Administrador', 'Usuário Sênior', 'Usuário Pleno', 'Operador', 'Cliente'];
@@ -283,6 +285,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [processResponsibleFilter, setProcessResponsibleFilter] = useState('all');
   const [processTypeFilter, setProcessTypeFilter] = useState<'all' | ServiceUnit>('all');
   const [processPeriodFilter, setProcessPeriodFilter] = useState<'all' | 'today' | '7d' | '30d'>('all');
+  const [activeProcessQuickPreset, setActiveProcessQuickPreset] = useState<ProcessQuickPreset | null>(null);
   const [processRowsLimit, setProcessRowsLimit] = useState(10);
   const [showCreateProcessModal, setShowCreateProcessModal] = useState(false);
   const [creatingProcess, setCreatingProcess] = useState(false);
@@ -411,6 +414,29 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   };
   const [currentSection, setCurrentSection] = useState<DashboardSection>(resolveSectionFromLocation);
 
+  const parseProcessQuickPresetFromSearch = (search: string): ProcessQuickPreset | null => {
+    const preset = new URLSearchParams(search).get('preset');
+    if (preset === 'andamento' || preset === 'atencao' || preset === 'novos7d') return preset;
+    return null;
+  };
+
+  const applyProcessQuickPreset = (preset: ProcessQuickPreset) => {
+    setProcessSearch('');
+    setProcessResponsibleFilter('all');
+    setProcessTypeFilter('all');
+
+    if (preset === 'andamento') {
+      setProcessStatusFilter('all');
+      setProcessPeriodFilter('all');
+    } else if (preset === 'atencao') {
+      setProcessStatusFilter('all');
+      setProcessPeriodFilter('all');
+    } else if (preset === 'novos7d') {
+      setProcessStatusFilter('all');
+      setProcessPeriodFilter('7d');
+    }
+  };
+
   const permissions = resolvePermissions(currentUser.org_role ?? (currentUser.role === UserRole.ADMIN ? 'admin' : 'client'));
   const permissionSubject = { org_role: currentUser.org_role ?? null, hierarchy: permissions.hierarchy };
   const allowedModules = getAllowedModules(permissionSubject);
@@ -471,32 +497,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   }, [currentSection]);
 
   useEffect(() => {
-    const presetFilter = new URLSearchParams(location.search).get('preset') as DashboardPresetFilter | null;
-    if (!presetFilter) return;
-
-    if (currentSection === 'clientes' && presetFilter === 'clientes-todos') {
-      setSearchTerm('');
+    if (currentSection !== 'processos') {
+      setActiveProcessQuickPreset(null);
       return;
     }
 
-    if (currentSection !== 'processos') return;
-
-    if (presetFilter === 'processos-em-andamento') {
-      setProcessStatusFilter('all');
-      setProcessPeriodFilter('all');
+    const detectedPreset = parseProcessQuickPresetFromSearch(location.search);
+    if (!detectedPreset) {
+      setActiveProcessQuickPreset(null);
       return;
     }
 
-    if (presetFilter === 'processos-prioridade') {
-      setProcessStatusFilter(ProcessStatus.ANALISE);
-      setProcessPeriodFilter('all');
-      return;
-    }
-
-    if (presetFilter === 'processos-novos-7d') {
-      setProcessStatusFilter('all');
-      setProcessPeriodFilter('7d');
-    }
+    setActiveProcessQuickPreset(detectedPreset);
+    applyProcessQuickPreset(detectedPreset);
   }, [currentSection, location.search]);
 
   const filteredUsers = users.filter(u => 
@@ -788,6 +801,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   };
 
   const processRows = baseProcessRows.filter((process) => {
+    const quickPresetStatuses =
+      activeProcessQuickPreset === 'andamento'
+        ? [ProcessStatus.PENDENTE, ProcessStatus.TRIAGEM, ProcessStatus.ANALISE]
+        : activeProcessQuickPreset === 'atencao'
+          ? [ProcessStatus.TRIAGEM, ProcessStatus.ANALISE]
+          : null;
+
     const matchesSearch =
       process.name.toLowerCase().includes(processSearch.toLowerCase()) ||
       process.email.toLowerCase().includes(processSearch.toLowerCase()) ||
@@ -800,9 +820,27 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const matchesResponsible = processResponsibleFilter === 'all' || (process.serviceManager || 'Não definido') === processResponsibleFilter;
     const matchesType = processTypeFilter === 'all' || process.processType === processTypeFilter;
     const matchesPeriod = isWithinPeriod(process.registrationDate, processPeriodFilter);
+    const matchesQuickPreset = !quickPresetStatuses || quickPresetStatuses.includes(process.status);
 
-    return matchesSearch && matchesStatus && matchesResponsible && matchesType && matchesPeriod;
+    return matchesSearch && matchesStatus && matchesResponsible && matchesType && matchesPeriod && matchesQuickPreset;
   });
+
+  const quickPresetVisual = activeProcessQuickPreset
+    ? {
+      andamento: {
+        label: 'Em andamento',
+        helper: 'Aplicado via URL (?preset=andamento): Cadastro, Triagem e Análise.',
+      },
+      atencao: {
+        label: 'Atenção',
+        helper: 'Aplicado via URL (?preset=atencao): Triagem e Análise.',
+      },
+      novos7d: {
+        label: 'Novos em 7 dias',
+        helper: 'Aplicado via URL (?preset=novos7d): período configurado para últimos 7 dias.',
+      },
+    }[activeProcessQuickPreset]
+    : null;
 
   const visibleProcessRows = processRows.slice(0, processRowsLimit);
 
@@ -3226,6 +3264,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                 : 'border border-red-700/60 bg-red-900/20 text-red-200'
             }`}>
               {processActionFeedback.message}
+            </div>
+          )}
+
+          {quickPresetVisual && (
+            <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+              <p className="text-xs font-black uppercase tracking-wider text-blue-600">Filtro rápido ativo</p>
+              <p className="text-sm font-bold text-blue-700">{quickPresetVisual.label}</p>
+              <p className="text-xs font-semibold text-blue-600 mt-1">{quickPresetVisual.helper}</p>
             </div>
           )}
 
