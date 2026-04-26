@@ -4159,6 +4159,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                       <p className="text-lg font-black text-emerald-400 break-words">{selectedUser.protocol}</p>
                     </div>
                     <div>
+                      <label className="text-[10px] font-black text-gray-500 uppercase">Título do processo</label>
+                      <p className="font-bold break-words">{sanitizeDisplayValue((selectedUser as AdminProcessRow).contractedServiceName) || 'Não informado'}</p>
+                    </div>
+                    <div>
                       <label className="text-[10px] font-black text-gray-500 uppercase">Unidade Atendimento</label>
                       <p className="font-bold text-blue-300 break-words leading-snug">{selectedUser.unit}</p>
                     </div>
