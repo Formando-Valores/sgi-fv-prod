@@ -26,6 +26,13 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ defaultOrgId, operationalOnly
   const [error, setError] = useState('');
   const [result, setResult] = useState<Awaited<ReturnType<typeof listProcessReports>> | null>(null);
   const [expandedProcessId, setExpandedProcessId] = useState<string | null>(null);
+  const organizationFilterEnabled = result?.scope.organizationFilterEnabled ?? false;
+  const isProfileLimited = result?.scope.limitedByProfile ?? false;
+
+  useEffect(() => {
+    if (organizationFilterEnabled) return;
+    setFilters((prev) => (prev.organizationId === 'all' ? prev : { ...prev, organizationId: 'all' }));
+  }, [organizationFilterEnabled]);
 
   useEffect(() => {
     const run = async () => {
@@ -151,15 +158,23 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ defaultOrgId, operationalOnly
             <option value="all">Todos os usuários ator</option>
             {result?.options.actors.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
-          <select value={filters.organizationId || 'all'} onChange={(e) => { setPage(1); setFilters((p) => ({ ...p, organizationId: e.target.value })); }} className="rounded-lg border border-gray-200 p-2 text-sm">
-            <option value="all">Todas as organizações</option>
-            {result?.options.organizations.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-          </select>
+          {organizationFilterEnabled ? (
+            <select value={filters.organizationId || 'all'} onChange={(e) => { setPage(1); setFilters((p) => ({ ...p, organizationId: e.target.value })); }} className="rounded-lg border border-gray-200 p-2 text-sm">
+              <option value="all">Todas as organizações</option>
+              {result?.options.organizations.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          ) : null}
           <select value={filters.eventType || 'all'} onChange={(e) => { setPage(1); setFilters((p) => ({ ...p, eventType: e.target.value })); }} className="rounded-lg border border-gray-200 p-2 text-sm">
             <option value="all">Todos os tipos de evento</option>
             {result?.options.eventTypes.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
         </div>
+
+        {isProfileLimited ? (
+          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+            Dados limitados ao seu perfil.
+          </div>
+        ) : null}
 
         <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="relative w-full md:max-w-xl">
