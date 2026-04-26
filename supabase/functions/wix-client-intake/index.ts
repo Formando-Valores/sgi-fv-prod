@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { sendAccessCredentialsEmail } from './accessEmail.ts';
-import { CONSENT_TEXT_VERSION } from '../../../shared.consent.ts';
+import { CONSENT_TEXT_VERSION } from '../../../shared/consent.ts';
 
 type IntakePayload = {
   organizationSlug?: string;

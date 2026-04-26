@@ -11,7 +11,7 @@ import { ServiceUnit, ProcessStatus, User, UserRole, Organization } from '../typ
 import { isSupabaseConfigured, supabase } from '../supabase';
 import { buildOrganizationErrorMessage, loadOrganizations } from '../organizationRepository';
 import { SUPABASE_EDGE_FUNCTIONS } from '../src/lib/supabaseFunctions';
-import { CONSENT_TEXT_VERSION } from '../shared.consent';
+import { CONSENT_TEXT_VERSION } from '../shared/consent';
 
 interface RegisterProps {
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
