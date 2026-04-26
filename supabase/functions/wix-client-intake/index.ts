@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { sendAccessCredentialsEmail } from './accessEmail.ts';
+import { CONSENT_TEXT_VERSION } from '../../../shared.consent.ts';
 
 type IntakePayload = {
   organizationSlug?: string;
@@ -107,7 +108,7 @@ Deno.serve(async (request) => {
   const consentPrivacyPolicy = normalizeBoolean(payload.consentPrivacyPolicy);
   const consentServiceContact = normalizeBoolean(payload.consentServiceContact);
   const consentInformativeCommunications = normalizeBoolean(payload.consentInformativeCommunications);
-  const consentTextVersion = String(payload.consentTextVersion ?? '').trim() || null;
+  const consentTextVersion = String(payload.consentTextVersion ?? '').trim() || CONSENT_TEXT_VERSION;
   const consentCapturedAtRaw = String(payload.consentCapturedAt ?? '').trim();
   const consentCapturedAt = consentCapturedAtRaw || new Date().toISOString();
 
@@ -230,6 +231,27 @@ Deno.serve(async (request) => {
 
     if (memberError) {
       return buildResponse(500, { success: false, error: `Erro ao vincular usuário na organização: ${memberError.message}` });
+    }
+
+    const userAgent = request.headers.get('user-agent');
+
+    const { error: consentError } = await adminClient
+      .from('profile_consents')
+      .insert([
+        {
+          profile_id: userId,
+          source,
+          consent_text_version: consentTextVersion,
+          privacy_policy_accepted: consentPrivacyPolicy,
+          service_contact_accepted: consentServiceContact,
+          informative_comms_accepted: consentInformativeCommunications,
+          accepted_at: consentCapturedAt,
+          user_agent: userAgent || null,
+        },
+      ]);
+
+    if (consentError) {
+      return buildResponse(500, { success: false, error: `Erro ao registrar consentimento: ${consentError.message}` });
     }
 
     const processTitle = String(payload.processTitle ?? '').trim() || `Cadastro inicial - ${fullName}`;

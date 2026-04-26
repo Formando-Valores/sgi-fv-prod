@@ -11,6 +11,7 @@ import { ServiceUnit, ProcessStatus, User, UserRole, Organization } from '../typ
 import { isSupabaseConfigured, supabase } from '../supabase';
 import { buildOrganizationErrorMessage, loadOrganizations } from '../organizationRepository';
 import { SUPABASE_EDGE_FUNCTIONS } from '../src/lib/supabaseFunctions';
+import { CONSENT_TEXT_VERSION } from '../shared.consent';
 
 interface RegisterProps {
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
@@ -36,7 +37,7 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
     consentPrivacyPolicy: false,
     consentServiceContact: false,
     consentInformativeCommunications: false,
-    consentTextVersion: 'rgpd-v1-2026-04'
+    consentTextVersion: CONSENT_TEXT_VERSION
   });
 
   const [error, setError] = useState('');
@@ -208,6 +209,26 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
         if (profileInsertError) {
           console.error('[register] erro ao criar profile', profileInsertError);
           setError('Cadastro criado, mas houve falha ao criar perfil. Tente entrar novamente.');
+          return;
+        }
+
+        const { error: consentInsertError } = await supabase
+          .from('profile_consents')
+          .insert([
+            {
+              profile_id: data.user.id,
+              source: 'register-web',
+              consent_text_version: formData.consentTextVersion,
+              privacy_policy_accepted: formData.consentPrivacyPolicy,
+              service_contact_accepted: formData.consentServiceContact,
+              informative_comms_accepted: formData.consentInformativeCommunications,
+              user_agent: navigator.userAgent || null,
+            },
+          ]);
+
+        if (consentInsertError) {
+          console.error('[register] erro ao registrar consentimento', consentInsertError);
+          setError('Cadastro criado, mas houve falha ao registrar consentimento. Tente entrar novamente.');
           return;
         }
 
