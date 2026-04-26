@@ -23,6 +23,7 @@ import ClientJourneyBlock from '../src/components/dashboard/blocks/ClientJourney
 import ClientProcessProgressPanel, {
   ClientProcessProgressHistoryItem,
 } from '../src/components/dashboard/ClientProcessProgressPanel';
+import ReportsPage from '../src/pages/Reports/ReportsPage';
 
 type AccessLevel = 'Administrador' | 'Usuário Sênior' | 'Usuário Pleno' | 'Operador' | 'Cliente';
 
@@ -457,6 +458,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const allowedModules = getAllowedModules(permissionSubject);
   const canCreateProcess = can('create', 'processos', permissionSubject);
   const canManageOrganizations = can('manage', 'organizacoes', permissionSubject);
+  const canViewAllReports = can('view_all', 'relatorios', permissionSubject);
   const isClientScope = permissions.hierarchy === 'cliente';
 
   const sidebarLinks = [
@@ -3500,6 +3502,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           </div>
         </DashboardCardContainer>
         </ClientsContainer>
+      ) : currentSection === 'relatorios' ? (
+        <section className="no-print">
+          <ReportsPage
+            defaultOrgId={currentUser.organizationId ?? null}
+            operationalOnly={!canViewAllReports}
+          />
+        </section>
       ) : currentSection === 'configuracoes' && activeTab === 'users' ? (
         <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
           <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 no-print">
