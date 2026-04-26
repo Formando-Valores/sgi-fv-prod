@@ -1,11 +1,5 @@
 import { supabase } from '../../supabase';
-import {
-  listAdminOperationalProcesses,
-  listProcessEvents,
-  listProcesses,
-  type Process,
-  type ProcessEvent,
-} from './processes';
+import { listProcessEvents, type Process, type ProcessEvent } from './processes';
 import { can, getReportScope, mapToSystemHierarchy } from './permissions';
 
 export type ReportFilters = {
@@ -18,6 +12,7 @@ export type ReportFilters = {
   organizationId?: string;
   eventType?: string;
   textSearch?: string;
+  sortOrder?: 'asc' | 'desc';
 };
 
 export type ReportPagination = {
@@ -66,13 +61,13 @@ export type ReportsResult = {
   };
 };
 
-const normalize = (value?: string | null) => (value || '').trim().toLowerCase();
-
-const inPeriod = (createdAt: string, periodStart?: string, periodEnd?: string) => {
-  const date = new Date(createdAt);
-  if (periodStart && date < new Date(`${periodStart}T00:00:00`)) return false;
-  if (periodEnd && date > new Date(`${periodEnd}T23:59:59`)) return false;
-  return true;
+type ReportActorScope = {
+  actorId: string;
+  orgId: string | null;
+  canViewAllReports: boolean;
+  canViewGlobalOrganizations: boolean;
+  restrictToOwnUser: boolean;
+  restrictToResponsibleUser: boolean;
 };
 
 const toOptions = (map: Map<string, string>): ReportSelectOption[] =>
@@ -80,15 +75,8 @@ const toOptions = (map: Map<string, string>): ReportSelectOption[] =>
     .sort((a, b) => a[1].localeCompare(b[1], 'pt-BR'))
     .map(([value, label]) => ({ value, label }));
 
-type ReportActorScope = {
-  actorId: string;
-  hierarchy: ReturnType<typeof mapToSystemHierarchy>;
-  orgId: string | null;
-  canViewAllReports: boolean;
-  canViewGlobalOrganizations: boolean;
-  restrictToOwnUser: boolean;
-  restrictToResponsibleUser: boolean;
-};
+const toDateTimeStart = (date?: string) => (date ? `${date}T00:00:00.000Z` : null);
+const toDateTimeEnd = (date?: string) => (date ? `${date}T23:59:59.999Z` : null);
 
 const resolveReportActorScope = async (): Promise<ReportActorScope | null> => {
   const { data: authData, error: authError } = await supabase.auth.getUser();
@@ -108,6 +96,7 @@ const resolveReportActorScope = async (): Promise<ReportActorScope | null> => {
     profile_role: contextData?.profile_role || contextData?.role || null,
     hierarchy: contextData?.hierarchy || null,
   };
+
   const hierarchy = mapToSystemHierarchy(subject.org_role, {
     profileRole: subject.profile_role,
     hierarchy: subject.hierarchy,
@@ -116,7 +105,6 @@ const resolveReportActorScope = async (): Promise<ReportActorScope | null> => {
 
   return {
     actorId,
-    hierarchy,
     orgId: scope.orgId,
     canViewAllReports: can('view_all', 'relatorios', { ...subject, hierarchy }),
     canViewGlobalOrganizations: scope.canViewGlobalOrganizations,
@@ -125,7 +113,7 @@ const resolveReportActorScope = async (): Promise<ReportActorScope | null> => {
   };
 };
 
-export async function listProcessReports(
+export async function listReportActivities(
   filters: ReportFilters,
   pagination: ReportPagination,
   scope: { defaultOrgId?: string | null; operationalOnly?: boolean } = {},
@@ -145,145 +133,83 @@ export async function listProcessReports(
 
   const requestedOrgId = filters.organizationId && filters.organizationId !== 'all' ? filters.organizationId : null;
   const scopedOrganizationId = actorScope.canViewGlobalOrganizations
-    ? requestedOrgId || scope.defaultOrgId || actorScope.orgId || ''
-    : actorScope.orgId || scope.defaultOrgId || '';
+    ? requestedOrgId || scope.defaultOrgId || actorScope.orgId || null
+    : actorScope.orgId || scope.defaultOrgId || null;
 
-  const effectiveFilters: ReportFilters = {
-    ...filters,
-    organizationId: actorScope.canViewGlobalOrganizations ? filters.organizationId : 'all',
+  const actorFilter = filters.actorUserId && filters.actorUserId !== 'all' ? filters.actorUserId : null;
+  const effectiveActorFilter = actorScope.restrictToOwnUser ? actorScope.actorId : actorFilter;
+  const effectiveStatus = filters.processStatus && filters.processStatus !== 'all' ? filters.processStatus : null;
+  const effectiveEventType = filters.eventType && filters.eventType !== 'all' ? filters.eventType : null;
+
+  const baseParams = {
+    p_org_id: scopedOrganizationId,
+    p_actor_user_id: effectiveActorFilter,
+    p_process_status: effectiveStatus,
+    p_event_type: effectiveEventType,
+    p_date_from: toDateTimeStart(filters.periodStart),
+    p_date_to: toDateTimeEnd(filters.periodEnd),
+    p_search: filters.textSearch?.trim() || null,
   };
 
-  const useOperationalListing = scope.operationalOnly || !actorScope.canViewAllReports;
-  const processes = useOperationalListing
-    ? await listAdminOperationalProcesses(scopedOrganizationId || undefined)
-    : await listProcesses(scopedOrganizationId);
-
-  const scopedProcesses = processes.filter((process) => {
-    if (actorScope.restrictToOwnUser) {
-      return process.responsavel_user_id === actorScope.actorId;
-    }
-    if (actorScope.restrictToResponsibleUser) {
-      return process.responsavel_user_id === actorScope.actorId;
-    }
-    return true;
+  const offset = Math.max(0, (pagination.page - 1) * pagination.pageSize);
+  const { data: activityRows, error: activityError } = await supabase.rpc('report_process_activity', {
+    ...baseParams,
+    p_limit: pagination.pageSize,
+    p_offset: offset,
+    p_sort_order: filters.sortOrder || 'desc',
   });
 
-  const orgIds = Array.from(new Set(scopedProcesses.map((item) => item.org_id).filter(Boolean)));
-  const responsibleIds = Array.from(new Set(scopedProcesses.map((item) => item.responsavel_user_id).filter(Boolean))) as string[];
+  if (activityError) throw activityError;
 
-  const [profilesResult, organizationsResult] = await Promise.all([
-    supabase.from('profiles').select('id,nome_completo,email').in('id', responsibleIds.length ? responsibleIds : ['']),
-    supabase.from('organizations').select('id,name').in('id', orgIds.length ? orgIds : ['']),
-  ]);
+  const { data: summaryPayload, error: summaryError } = await supabase.rpc('report_process_activity_stats', baseParams);
+  if (summaryError) throw summaryError;
 
-  const profileMap = new Map<string, string>();
-  (profilesResult.data || []).forEach((profile) => {
-    profileMap.set(profile.id, profile.nome_completo || profile.email || profile.id);
-  });
+  const rows = (activityRows || []) as any[];
 
-  const orgMap = new Map<string, string>();
-  (organizationsResult.data || []).forEach((org) => {
-    orgMap.set(org.id, org.name || org.id);
-  });
+  const enrichedRows = await Promise.all(
+    rows.map(async (entry) => {
+      const events = await listProcessEvents(entry.org_id, entry.process_id);
+      const process: Process = {
+        id: entry.process_id,
+        org_id: entry.org_id,
+        protocolo: entry.protocol,
+        titulo: entry.title,
+        cliente_nome: entry.client_name,
+        status: entry.process_status,
+        process_status: entry.process_status,
+        unidade_atendimento: entry.process_type,
+        responsavel_user_id: entry.responsible_user_id,
+        created_at: entry.process_created_at,
+        updated_at: entry.process_created_at,
+        cliente_documento: null,
+        cliente_contato: null,
+      };
 
-  const eventRows = await Promise.all(
-    scopedProcesses.map(async (process) => {
-      const events = await listProcessEvents(process.org_id, process.id);
-      return { process, events };
-    }),
-  );
-
-  const actorIds = Array.from(
-    new Set(eventRows.flatMap((entry) => entry.events.map((event) => event.created_by).filter(Boolean))),
-  ) as string[];
-
-  if (actorIds.length > 0) {
-    const { data } = await supabase.from('profiles').select('id,nome_completo,email').in('id', actorIds);
-    (data || []).forEach((profile) => {
-      profileMap.set(profile.id, profile.nome_completo || profile.email || profile.id);
-    });
-  }
-
-  const textSearch = normalize(filters.textSearch);
-
-  const filteredRows: ReportRow[] = eventRows
-    .map(({ process, events }) => {
-      const latestEvent = events[0] || null;
-      const responsibleName = process.responsavel_user_id ? profileMap.get(process.responsavel_user_id) || process.responsavel_user_id : 'Não atribuído';
-      const actorName = latestEvent?.created_by ? profileMap.get(latestEvent.created_by) || latestEvent.created_by : 'Sistema';
-      const organizationName = orgMap.get(process.org_id) || process.org_id;
+      const latestEvent: ProcessEvent | null = entry.latest_event_id
+        ? {
+            id: entry.latest_event_id,
+            org_id: entry.org_id,
+            process_id: entry.process_id,
+            actor_user_id: entry.actor_user_id,
+            event_type: entry.latest_event_type,
+            tipo: 'observacao',
+            mensagem: entry.latest_event_message || '',
+            created_by: entry.actor_user_id,
+            created_at: entry.latest_event_at,
+          }
+        : null;
 
       return {
         process,
         events,
         latestEvent,
-        eventCount: events.length,
-        responsibleName,
-        actorName,
-        organizationName,
-      };
-    })
-    .filter((row) => {
-      const status = row.process.process_status || row.process.status || '';
-      const type = row.process.unidade_atendimento || '';
-
-      if (!inPeriod(row.process.created_at, effectiveFilters.periodStart, effectiveFilters.periodEnd)) return false;
-      if (effectiveFilters.processStatus && effectiveFilters.processStatus !== 'all' && normalize(status) !== normalize(effectiveFilters.processStatus)) return false;
-      if (effectiveFilters.processType && effectiveFilters.processType !== 'all' && normalize(type) !== normalize(effectiveFilters.processType)) return false;
-      if (effectiveFilters.responsibleUserId && effectiveFilters.responsibleUserId !== 'all' && row.process.responsavel_user_id !== effectiveFilters.responsibleUserId) return false;
-      if (effectiveFilters.organizationId && effectiveFilters.organizationId !== 'all' && row.process.org_id !== effectiveFilters.organizationId) return false;
-      if (effectiveFilters.eventType && effectiveFilters.eventType !== 'all' && !row.events.some((event) => normalize(event.event_type || event.tipo) === normalize(effectiveFilters.eventType))) return false;
-      if (effectiveFilters.actorUserId && effectiveFilters.actorUserId !== 'all' && !row.events.some((event) => (event.actor_user_id || event.created_by) === effectiveFilters.actorUserId)) return false;
-
-      if (!textSearch) return true;
-
-      const textPool = [
-        row.process.protocolo || '',
-        row.process.titulo || '',
-        row.process.cliente_nome || '',
-        ...row.events.map((event) => event.mensagem || ''),
-      ]
-        .join(' ')
-        .toLowerCase();
-
-      return textPool.includes(textSearch);
-    });
-
-  const summary: ReportSummary = {
-    total: filteredRows.length,
-    byStatus: [],
-    byEventType: [],
-    byActor: [],
-    byOrganization: [],
-    byUser: [],
-  };
-
-  const statusCounter = new Map<string, number>();
-  const eventTypeCounter = new Map<string, number>();
-  const actorCounter = new Map<string, number>();
-  const organizationCounter = new Map<string, number>();
-  const userCounter = new Map<string, number>();
-
-  filteredRows.forEach((row) => {
-    const status = row.process.process_status || row.process.status || 'sem_status';
-    statusCounter.set(status, (statusCounter.get(status) || 0) + 1);
-    organizationCounter.set(row.organizationName, (organizationCounter.get(row.organizationName) || 0) + 1);
-
-    row.events.forEach((event) => {
-      const normalizedEventType = event.event_type || event.tipo;
-      eventTypeCounter.set(normalizedEventType, (eventTypeCounter.get(normalizedEventType) || 0) + 1);
-      const actorId = event.actor_user_id || event.created_by;
-      const actor = actorId ? profileMap.get(actorId) || actorId : 'Sistema';
-      actorCounter.set(actor, (actorCounter.get(actor) || 0) + 1);
-      userCounter.set(actor, (userCounter.get(actor) || 0) + 1);
-    });
-  });
-
-  summary.byStatus = Array.from(statusCounter.entries()).map(([key, total]) => ({ key, total }));
-  summary.byEventType = Array.from(eventTypeCounter.entries()).map(([key, total]) => ({ key, total }));
-  summary.byActor = Array.from(actorCounter.entries()).map(([key, total]) => ({ key, total }));
-  summary.byOrganization = Array.from(organizationCounter.entries()).map(([key, total]) => ({ key, total }));
-  summary.byUser = Array.from(userCounter.entries()).map(([key, total]) => ({ key, total }));
+        eventCount: Number(entry.event_count || 0),
+        responsibleName: entry.responsible_name || 'Não atribuído',
+        actorName: entry.actor_name || 'Sistema',
+        organizationName: entry.organization_name || entry.org_id,
+      } as ReportRow;
+    }),
+  );
 
   const statuses = new Map<string, string>();
   const types = new Map<string, string>();
@@ -292,37 +218,29 @@ export async function listProcessReports(
   const organizations = new Map<string, string>();
   const eventTypes = new Map<string, string>();
 
-  eventRows.forEach(({ process, events }) => {
-    const status = process.process_status || process.status || 'sem_status';
-    statuses.set(status, status);
-
-    const type = process.unidade_atendimento || 'Não informado';
-    types.set(type, type);
-
-    if (process.responsavel_user_id) {
-      responsibles.set(process.responsavel_user_id, profileMap.get(process.responsavel_user_id) || process.responsavel_user_id);
-    }
-
-    organizations.set(process.org_id, orgMap.get(process.org_id) || process.org_id);
-
-    events.forEach((event) => {
-      const normalizedEventType = event.event_type || event.tipo;
-      eventTypes.set(normalizedEventType, normalizedEventType);
-      const actorId = event.actor_user_id || event.created_by;
-      if (actorId) {
-        actors.set(actorId, profileMap.get(actorId) || actorId);
-      }
-    });
+  enrichedRows.forEach((row) => {
+    statuses.set(row.process.process_status || row.process.status || 'sem_status', row.process.process_status || row.process.status || 'sem_status');
+    types.set(row.process.unidade_atendimento || 'Não informado', row.process.unidade_atendimento || 'Não informado');
+    if (row.process.responsavel_user_id) responsibles.set(row.process.responsavel_user_id, row.responsibleName);
+    if (row.latestEvent?.created_by) actors.set(row.latestEvent.created_by, row.actorName);
+    organizations.set(row.process.org_id, row.organizationName);
+    if (row.latestEvent?.event_type) eventTypes.set(row.latestEvent.event_type, row.latestEvent.event_type);
   });
 
-  const start = Math.max(0, (pagination.page - 1) * pagination.pageSize);
-  const end = start + pagination.pageSize;
+  const summary = (summaryPayload || {
+    total: 0,
+    byStatus: [],
+    byEventType: [],
+    byActor: [],
+    byOrganization: [],
+    byUser: [],
+  }) as ReportSummary;
 
   return {
-    total: filteredRows.length,
+    total: summary.total || 0,
     page: pagination.page,
     pageSize: pagination.pageSize,
-    rows: filteredRows.slice(start, end),
+    rows: enrichedRows,
     summary,
     options: {
       statuses: toOptions(statuses),
@@ -334,7 +252,9 @@ export async function listProcessReports(
     },
     scope: {
       organizationFilterEnabled: actorScope.canViewGlobalOrganizations,
-      limitedByProfile: actorScope.restrictToOwnUser || actorScope.restrictToResponsibleUser || !actorScope.canViewGlobalOrganizations,
+      limitedByProfile: actorScope.restrictToOwnUser || actorScope.restrictToResponsibleUser || !actorScope.canViewGlobalOrganizations || !actorScope.canViewAllReports,
     },
   };
 }
+
+export const listProcessReports = listReportActivities;
