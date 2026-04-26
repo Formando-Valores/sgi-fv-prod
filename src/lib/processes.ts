@@ -181,10 +181,60 @@ export interface ProcessEvent {
   id: string;
   org_id: string;
   process_id: string;
+  actor_user_id?: string | null;
+  event_type?: string | null;
+  field?: string | null;
+  old_value?: string | null;
+  new_value?: string | null;
+  metadata?: Record<string, unknown> | null;
   tipo: 'registro' | 'status_change' | 'observacao' | 'documento' | 'atribuicao';
   mensagem: string;
   created_by: string | null;
   created_at: string;
+}
+
+type ProcessAuditInsert = {
+  org_id: string;
+  process_id: string;
+  actor_user_id: string;
+  event_type: string;
+  field?: string | null;
+  old_value?: string | null;
+  new_value?: string | null;
+  metadata?: Record<string, unknown>;
+  mensagem: string;
+  tipo?: ProcessEvent['tipo'];
+};
+
+function normalizeAuditValue(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  return JSON.stringify(value);
+}
+
+async function insertProcessAuditEvents(events: ProcessAuditInsert[]): Promise<void> {
+  if (!events.length) return;
+
+  const payload = events.map((event) => ({
+    org_id: event.org_id,
+    process_id: event.process_id,
+    actor_user_id: event.actor_user_id,
+    event_type: event.event_type,
+    field: event.field || null,
+    old_value: event.old_value || null,
+    new_value: event.new_value || null,
+    metadata: event.metadata || {},
+    created_at: new Date().toISOString(),
+    tipo: event.tipo || (event.event_type === 'status_changed' ? 'status_change' : 'observacao'),
+    mensagem: event.mensagem,
+    created_by: event.actor_user_id,
+  }));
+
+  const { error } = await supabase.from('process_events').insert(payload);
+  if (error) {
+    logError('Failed to insert structured process audit events:', error, payload);
+  }
 }
 
 export interface ClientProcessFinance {
@@ -593,18 +643,28 @@ export async function createProcess(
 
   log('Process created successfully, id:', process.id);
 
-  // Create the initial event
-  log('Creating initial event...');
+  log('Creating initial structured audit event...');
   const eventStartTime = performance.now();
-  await supabase
-    .from('process_events')
-    .insert({
+  await insertProcessAuditEvents([
+    {
       org_id,
       process_id: process.id,
-      tipo: 'registro',
+      actor_user_id: created_by,
+      event_type: 'process_created',
+      field: null,
+      old_value: null,
+      new_value: normalizeAuditValue({
+        titulo: process.titulo,
+        status: process.status,
+      }),
+      metadata: {
+        source: 'createProcess',
+        protocolo: process.protocolo,
+      },
       mensagem: `Processo "${payload.titulo}" criado com sucesso`,
-      created_by
-    });
+      tipo: 'registro',
+    },
+  ]);
   
   const eventElapsed = performance.now() - eventStartTime;
   log(`Event insert completed in ${eventElapsed.toFixed(2)}ms`);
@@ -635,6 +695,13 @@ export async function updateProcessStatus(
     concluido: 'Concluído'
   };
 
+  const { data: existing } = await supabase
+    .from('processes')
+    .select('status')
+    .eq('org_id', org_id)
+    .eq('id', process_id)
+    .maybeSingle();
+
   // Update the process
   log('Updating process status...');
   const { data: process, error: processError } = await supabase
@@ -656,17 +723,24 @@ export async function updateProcessStatus(
 
   log('Status updated successfully');
 
-  // Create status change event
-  log('Creating status change event...');
-  await supabase
-    .from('process_events')
-    .insert({
+  log('Creating status change audit event...');
+  await insertProcessAuditEvents([
+    {
       org_id,
       process_id,
-      tipo: 'status_change',
+      actor_user_id: created_by,
+      event_type: 'status_changed',
+      field: 'status',
+      old_value: normalizeAuditValue(existing?.status),
+      new_value: normalizeAuditValue(status),
+      metadata: {
+        source: 'updateProcessStatus',
+        status_label: statusLabels[status],
+      },
       mensagem: `Status alterado para: ${statusLabels[status]}`,
-      created_by
-    });
+      tipo: 'status_change',
+    },
+  ]);
 
   const totalElapsed = performance.now() - startTime;
   log(`updateProcessStatus() completed in ${totalElapsed.toFixed(2)}ms`);
@@ -688,11 +762,24 @@ export async function addProcessEvent(
   log('addProcessEvent() starting');
   log('org_id:', org_id, 'process_id:', process_id, 'tipo:', tipo);
   
+  const eventType =
+    tipo === 'observacao' ? 'note_added' :
+    tipo === 'documento' ? 'document_attached' :
+    tipo === 'atribuicao' ? 'assignee_changed' :
+    tipo === 'status_change' ? 'status_changed' :
+    'event_logged';
+
   const { data, error } = await supabase
     .from('process_events')
     .insert({
       org_id,
       process_id,
+      actor_user_id: created_by,
+      event_type: eventType,
+      field: null,
+      old_value: null,
+      new_value: normalizeAuditValue(mensagem),
+      metadata: { source: 'addProcessEvent', tipo },
       tipo,
       mensagem,
       created_by
@@ -719,13 +806,21 @@ export async function addProcessEvent(
 export async function updateProcess(
   org_id: string,
   process_id: string,
-  updates: Partial<Pick<Process, 'titulo' | 'cliente_nome' | 'cliente_documento' | 'cliente_contato' | 'responsavel_user_id' | 'data_prazo' | 'gestor_servico' | 'observacoes'>>
+  updates: Partial<Pick<Process, 'titulo' | 'cliente_nome' | 'cliente_documento' | 'cliente_contato' | 'responsavel_user_id' | 'data_prazo' | 'gestor_servico' | 'observacoes'>>,
+  actor_user_id?: string,
 ): Promise<Process> {
   const startTime = performance.now();
   log('updateProcess() starting');
   log('org_id:', org_id, 'process_id:', process_id);
   log('updates:', JSON.stringify(updates, null, 2));
   
+  const { data: currentProcess } = await supabase
+    .from('processes')
+    .select('titulo,cliente_nome,cliente_documento,cliente_contato,responsavel_user_id,data_prazo,gestor_servico,observacoes')
+    .eq('org_id', org_id)
+    .eq('id', process_id)
+    .maybeSingle();
+
   const { data, error } = await supabase
     .from('processes')
     .update(updates)
@@ -744,17 +839,71 @@ export async function updateProcess(
   }
 
   log('Process updated successfully');
+
+  const actorUserId = actor_user_id || (await getAuthenticatedUserId());
+  if (actorUserId && currentProcess) {
+    const changedEvents: ProcessAuditInsert[] = [];
+    Object.entries(updates).forEach(([field, newRawValue]) => {
+      const oldRawValue = (currentProcess as Record<string, unknown>)[field];
+      const oldValue = normalizeAuditValue(oldRawValue);
+      const newValue = normalizeAuditValue(newRawValue);
+      if (oldValue === newValue) return;
+
+      changedEvents.push({
+        org_id,
+        process_id,
+        actor_user_id: actorUserId,
+        event_type: 'field_updated',
+        field,
+        old_value: oldValue,
+        new_value: newValue,
+        metadata: {
+          source: 'updateProcess',
+        },
+        mensagem: `Campo "${field}" alterado`,
+        tipo: field === 'responsavel_user_id' ? 'atribuicao' : 'observacao',
+      });
+    });
+
+    await insertProcessAuditEvents(changedEvents);
+  }
+
   return data;
 }
 
 /**
  * Delete a process
  */
-export async function deleteProcess(org_id: string, process_id: string): Promise<void> {
+export async function deleteProcess(org_id: string, process_id: string, actor_user_id?: string): Promise<void> {
   const startTime = performance.now();
   log('deleteProcess() starting');
   log('org_id:', org_id, 'process_id:', process_id);
   
+  const { data: processBeforeDelete } = await supabase
+    .from('processes')
+    .select('titulo,status')
+    .eq('org_id', org_id)
+    .eq('id', process_id)
+    .maybeSingle();
+
+  const actorUserId = actor_user_id || (await getAuthenticatedUserId());
+  if (actorUserId) {
+    await insertProcessAuditEvents([
+      {
+        org_id,
+        process_id,
+        actor_user_id: actorUserId,
+        event_type: 'process_deleted',
+        field: null,
+        old_value: normalizeAuditValue(processBeforeDelete),
+        new_value: null,
+        metadata: { source: 'deleteProcess' },
+        mensagem: `Processo ${processBeforeDelete?.titulo || process_id} removido`,
+        tipo: 'observacao',
+      },
+    ]);
+  }
+
   const { error } = await supabase
     .from('processes')
     .delete()

@@ -41,6 +41,8 @@ export type ReportSummary = {
   byStatus: Array<{ key: string; total: number }>;
   byEventType: Array<{ key: string; total: number }>;
   byActor: Array<{ key: string; total: number }>;
+  byOrganization: Array<{ key: string; total: number }>;
+  byUser: Array<{ key: string; total: number }>;
 };
 
 export type ReportsResult = {
@@ -147,8 +149,8 @@ export async function listProcessReports(
       if (filters.processType && filters.processType !== 'all' && normalize(type) !== normalize(filters.processType)) return false;
       if (filters.responsibleUserId && filters.responsibleUserId !== 'all' && row.process.responsavel_user_id !== filters.responsibleUserId) return false;
       if (filters.organizationId && filters.organizationId !== 'all' && row.process.org_id !== filters.organizationId) return false;
-      if (filters.eventType && filters.eventType !== 'all' && !row.events.some((event) => normalize(event.tipo) === normalize(filters.eventType))) return false;
-      if (filters.actorUserId && filters.actorUserId !== 'all' && !row.events.some((event) => event.created_by === filters.actorUserId)) return false;
+      if (filters.eventType && filters.eventType !== 'all' && !row.events.some((event) => normalize(event.event_type || event.tipo) === normalize(filters.eventType))) return false;
+      if (filters.actorUserId && filters.actorUserId !== 'all' && !row.events.some((event) => (event.actor_user_id || event.created_by) === filters.actorUserId)) return false;
 
       if (!textSearch) return true;
 
@@ -169,26 +171,36 @@ export async function listProcessReports(
     byStatus: [],
     byEventType: [],
     byActor: [],
+    byOrganization: [],
+    byUser: [],
   };
 
   const statusCounter = new Map<string, number>();
   const eventTypeCounter = new Map<string, number>();
   const actorCounter = new Map<string, number>();
+  const organizationCounter = new Map<string, number>();
+  const userCounter = new Map<string, number>();
 
   filteredRows.forEach((row) => {
     const status = row.process.process_status || row.process.status || 'sem_status';
     statusCounter.set(status, (statusCounter.get(status) || 0) + 1);
+    organizationCounter.set(row.organizationName, (organizationCounter.get(row.organizationName) || 0) + 1);
 
     row.events.forEach((event) => {
-      eventTypeCounter.set(event.tipo, (eventTypeCounter.get(event.tipo) || 0) + 1);
-      const actor = event.created_by ? profileMap.get(event.created_by) || event.created_by : 'Sistema';
+      const normalizedEventType = event.event_type || event.tipo;
+      eventTypeCounter.set(normalizedEventType, (eventTypeCounter.get(normalizedEventType) || 0) + 1);
+      const actorId = event.actor_user_id || event.created_by;
+      const actor = actorId ? profileMap.get(actorId) || actorId : 'Sistema';
       actorCounter.set(actor, (actorCounter.get(actor) || 0) + 1);
+      userCounter.set(actor, (userCounter.get(actor) || 0) + 1);
     });
   });
 
   summary.byStatus = Array.from(statusCounter.entries()).map(([key, total]) => ({ key, total }));
   summary.byEventType = Array.from(eventTypeCounter.entries()).map(([key, total]) => ({ key, total }));
   summary.byActor = Array.from(actorCounter.entries()).map(([key, total]) => ({ key, total }));
+  summary.byOrganization = Array.from(organizationCounter.entries()).map(([key, total]) => ({ key, total }));
+  summary.byUser = Array.from(userCounter.entries()).map(([key, total]) => ({ key, total }));
 
   const statuses = new Map<string, string>();
   const types = new Map<string, string>();
@@ -211,9 +223,11 @@ export async function listProcessReports(
     organizations.set(process.org_id, orgMap.get(process.org_id) || process.org_id);
 
     events.forEach((event) => {
-      eventTypes.set(event.tipo, event.tipo);
-      if (event.created_by) {
-        actors.set(event.created_by, profileMap.get(event.created_by) || event.created_by);
+      const normalizedEventType = event.event_type || event.tipo;
+      eventTypes.set(normalizedEventType, normalizedEventType);
+      const actorId = event.actor_user_id || event.created_by;
+      if (actorId) {
+        actors.set(actorId, profileMap.get(actorId) || actorId);
       }
     });
   });
