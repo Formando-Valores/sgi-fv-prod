@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Download, FileText, Search } from 'lucide-react';
+import { ChevronDown, ChevronUp, Download, FileText, Search } from 'lucide-react';
 import { listReportActivities, type ReportFilters, type ReportRow } from '../../lib/reports';
 
 interface ReportsPageProps {
@@ -244,39 +244,48 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ defaultOrgId, operationalOnly
               </tr>
             </thead>
             <tbody>
-              {result?.rows.map((row) => (
-                <tr key={row.process.id} className="border-t border-gray-100">
-                  <td className="px-3 py-2 font-bold">{row.process.protocolo || '-'}</td>
-                  <td className="px-3 py-2">{row.process.titulo}</td>
-                  <td className="px-3 py-2">{row.process.cliente_nome || '-'}</td>
-                  <td className="px-3 py-2">{row.process.process_status || row.process.status || '-'}</td>
-                  <td className="px-3 py-2">{row.process.unidade_atendimento || '-'}</td>
-                  <td className="px-3 py-2">{row.responsibleName}</td>
-                  <td className="px-3 py-2">{row.actorName}</td>
-                  <td className="px-3 py-2">{row.organizationName}</td>
-                  <td className="px-3 py-2">
-                    <button onClick={() => setExpandedProcessId((current) => current === row.process.id ? null : row.process.id)} className="text-left text-blue-600 hover:underline">
-                      {row.latestEvent?.mensagem || '-'}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {result?.rows.map((row) => expandedProcessId === row.process.id ? (
-                <tr key={`${row.process.id}-timeline`} className="border-t border-gray-100 bg-gray-50">
-                  <td className="px-3 py-2" colSpan={9}>
-                    <p className="mb-2 text-xs font-bold uppercase text-gray-500">Timeline detalhada</p>
-                    <ul className="space-y-1 text-xs text-gray-700">
-                      {row.events.map((event) => (
-                        <li key={event.id}>
-                          {new Date(event.created_at).toLocaleString('pt-BR')} · {event.event_type || event.tipo}
-                          {event.field ? ` · ${event.field}` : ''} · {event.mensagem}
-                          {(event.old_value || event.new_value) ? ` (${event.old_value || '∅'} → ${event.new_value || '∅'})` : ''}
-                        </li>
-                      ))}
-                    </ul>
-                  </td>
-                </tr>
-              ) : null)}
+              {result?.rows.map((row) => {
+                const isExpanded = expandedProcessId === row.process.id;
+                return (
+                  <React.Fragment key={row.process.id}>
+                    <tr className="border-t border-gray-100">
+                      <td className="px-3 py-2 font-bold">{row.process.protocolo || '-'}</td>
+                      <td className="px-3 py-2">{row.process.titulo}</td>
+                      <td className="px-3 py-2">{row.process.cliente_nome || '-'}</td>
+                      <td className="px-3 py-2">{row.process.process_status || row.process.status || '-'}</td>
+                      <td className="px-3 py-2">{row.process.unidade_atendimento || '-'}</td>
+                      <td className="px-3 py-2">{row.responsibleName}</td>
+                      <td className="px-3 py-2">{row.actorName}</td>
+                      <td className="px-3 py-2">{row.organizationName}</td>
+                      <td className="px-3 py-2">
+                        <button
+                          onClick={() => setExpandedProcessId((current) => current === row.process.id ? null : row.process.id)}
+                          className="inline-flex items-start gap-1 text-left text-blue-600 hover:underline"
+                        >
+                          <span>{row.latestEvent?.mensagem || '-'}</span>
+                          {isExpanded ? <ChevronUp className="mt-0.5 h-4 w-4 shrink-0" /> : <ChevronDown className="mt-0.5 h-4 w-4 shrink-0" />}
+                        </button>
+                      </td>
+                    </tr>
+                    {isExpanded ? (
+                      <tr className="border-t border-gray-100 bg-gray-50">
+                        <td className="px-3 py-2" colSpan={9}>
+                          <p className="mb-2 text-xs font-bold uppercase text-gray-500">Timeline detalhada</p>
+                          <ul className="space-y-1 text-xs text-gray-700">
+                            {row.events.map((event) => (
+                              <li key={event.id}>
+                                {new Date(event.created_at).toLocaleString('pt-BR')} · {event.event_type || event.tipo}
+                                {event.field ? ` · ${event.field}` : ''} · {event.mensagem}
+                                {(event.old_value || event.new_value) ? ` (${event.old_value || '∅'} → ${event.new_value || '∅'})` : ''}
+                              </li>
+                            ))}
+                          </ul>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </React.Fragment>
+                );
+              })}
             </tbody>
           </table>
         )}
