@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Download, FileText, Search } from 'lucide-react';
-import { listProcessReports, type ReportFilters, type ReportRow } from '../../lib/reports';
+import { listReportActivities, type ReportFilters, type ReportRow } from '../../lib/reports';
 
 interface ReportsPageProps {
   defaultOrgId?: string | null;
@@ -8,6 +8,17 @@ interface ReportsPageProps {
 }
 
 const PAGE_SIZE = 10;
+
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebounced(value), delayMs);
+    return () => window.clearTimeout(timer);
+  }, [value, delayMs]);
+
+  return debounced;
+}
 
 const ReportsPage: React.FC<ReportsPageProps> = ({ defaultOrgId, operationalOnly }) => {
   const [filters, setFilters] = useState<ReportFilters>({
@@ -20,14 +31,20 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ defaultOrgId, operationalOnly
     periodStart: '',
     periodEnd: '',
     textSearch: '',
+    sortOrder: 'desc',
   });
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [result, setResult] = useState<Awaited<ReturnType<typeof listProcessReports>> | null>(null);
+  const [result, setResult] = useState<Awaited<ReturnType<typeof listReportActivities>> | null>(null);
   const [expandedProcessId, setExpandedProcessId] = useState<string | null>(null);
   const organizationFilterEnabled = result?.scope.organizationFilterEnabled ?? false;
   const isProfileLimited = result?.scope.limitedByProfile ?? false;
+  const debouncedSearch = useDebouncedValue(filters.textSearch || '', 350);
+  const debouncedFilters = useMemo(
+    () => ({ ...filters, textSearch: debouncedSearch }),
+    [filters, debouncedSearch],
+  );
 
   useEffect(() => {
     if (organizationFilterEnabled) return;
@@ -39,7 +56,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ defaultOrgId, operationalOnly
       setLoading(true);
       setError('');
       try {
-        const data = await listProcessReports(filters, { page, pageSize: PAGE_SIZE }, { defaultOrgId, operationalOnly });
+        const data = await listReportActivities(debouncedFilters, { page, pageSize: PAGE_SIZE }, { defaultOrgId, operationalOnly });
         setResult(data);
       } catch (err) {
         console.error(err);
@@ -50,7 +67,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ defaultOrgId, operationalOnly
     };
 
     void run();
-  }, [filters, page, defaultOrgId, operationalOnly]);
+  }, [debouncedFilters, page, defaultOrgId, operationalOnly]);
 
   const totalPages = useMemo(() => {
     if (!result) return 1;
@@ -58,7 +75,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ defaultOrgId, operationalOnly
   }, [result]);
 
   const exportCsv = async () => {
-    const full = await listProcessReports(filters, { page: 1, pageSize: 10000 }, { defaultOrgId, operationalOnly });
+    const full = await listReportActivities(debouncedFilters, { page: 1, pageSize: 10000 }, { defaultOrgId, operationalOnly });
     const headers = ['Protocolo', 'Título', 'Cliente', 'Status', 'Tipo', 'Responsável', 'Usuário ator', 'Organização', 'Último evento', 'Data cadastro'];
     const rows = full.rows.map((row) => [
       row.process.protocolo || '',
@@ -87,7 +104,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ defaultOrgId, operationalOnly
   };
 
   const exportPdf = async () => {
-    const full = await listProcessReports(filters, { page: 1, pageSize: 10000 }, { defaultOrgId, operationalOnly });
+    const full = await listReportActivities(debouncedFilters, { page: 1, pageSize: 10000 }, { defaultOrgId, operationalOnly });
     const htmlRows = full.rows
       .map(
         (row: ReportRow) => `
@@ -187,6 +204,17 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ defaultOrgId, operationalOnly
             />
           </div>
           <div className="flex gap-2">
+            <select
+              value={filters.sortOrder || 'desc'}
+              onChange={(e) => {
+                setPage(1);
+                setFilters((p) => ({ ...p, sortOrder: e.target.value as 'asc' | 'desc' }));
+              }}
+              className="rounded-lg border border-gray-200 px-2 py-2 text-xs font-semibold"
+            >
+              <option value="desc">Mais recente</option>
+              <option value="asc">Mais antigo</option>
+            </select>
             <button onClick={() => void exportCsv()} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white"><Download className="h-4 w-4" /> CSV</button>
             <button onClick={() => void exportPdf()} className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-3 py-2 text-xs font-bold text-white"><FileText className="h-4 w-4" /> PDF</button>
           </div>
