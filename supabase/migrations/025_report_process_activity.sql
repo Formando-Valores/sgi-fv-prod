@@ -50,7 +50,7 @@ WITH filtered AS (
     p.protocolo,
     p.titulo,
     p.cliente_nome,
-    COALESCE(p.process_status, p.status) AS process_status,
+    COALESCE(p.process_status::text, p.status::text) AS process_status,
     p.unidade_atendimento AS process_type,
     p.responsavel_user_id,
     COALESCE(responsible.nome_completo, responsible.email, p.responsavel_user_id::text, 'Não atribuído') AS responsible_name,
@@ -74,7 +74,7 @@ WITH filtered AS (
     ON org.id = p.org_id
   WHERE
     (p_org_id IS NULL OR p.org_id = p_org_id)
-    AND (p_process_status IS NULL OR p_process_status = '' OR p_process_status = 'all' OR lower(COALESCE(p.process_status, p.status, '')) = lower(p_process_status))
+    AND (p_process_status IS NULL OR p_process_status = '' OR p_process_status = 'all' OR lower(COALESCE(p.process_status::text, p.status::text, '')) = lower(p_process_status))
     AND (p_actor_user_id IS NULL OR COALESCE(pe.actor_user_id, pe.created_by) = p_actor_user_id)
     AND (p_event_type IS NULL OR p_event_type = '' OR p_event_type = 'all' OR lower(COALESCE(pe.event_type, pe.tipo, '')) = lower(p_event_type))
     AND (p_date_from IS NULL OR COALESCE(pe.created_at, p.created_at) >= p_date_from)
@@ -142,7 +142,7 @@ WITH filtered AS (
   SELECT
     p.id AS process_id,
     p.org_id,
-    COALESCE(p.process_status, p.status, 'sem_status') AS process_status,
+    COALESCE(p.process_status::text, p.status::text, 'sem_status') AS process_status,
     COALESCE(pe.event_type, pe.tipo, 'sem_evento') AS event_type,
     COALESCE(pe.actor_user_id, pe.created_by) AS actor_user_id,
     COALESCE(actor.nome_completo, actor.email, COALESCE(pe.actor_user_id, pe.created_by)::text, 'Sistema') AS actor_name,
@@ -159,7 +159,7 @@ WITH filtered AS (
     ON org.id = p.org_id
   WHERE
     (p_org_id IS NULL OR p.org_id = p_org_id)
-    AND (p_process_status IS NULL OR p_process_status = '' OR p_process_status = 'all' OR lower(COALESCE(p.process_status, p.status, '')) = lower(p_process_status))
+    AND (p_process_status IS NULL OR p_process_status = '' OR p_process_status = 'all' OR lower(COALESCE(p.process_status::text, p.status::text, '')) = lower(p_process_status))
     AND (p_actor_user_id IS NULL OR COALESCE(pe.actor_user_id, pe.created_by) = p_actor_user_id)
     AND (p_event_type IS NULL OR p_event_type = '' OR p_event_type = 'all' OR lower(COALESCE(pe.event_type, pe.tipo, '')) = lower(p_event_type))
     AND (p_date_from IS NULL OR COALESCE(pe.created_at, p.created_at) >= p_date_from)
