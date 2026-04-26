@@ -79,6 +79,12 @@ Ela adiciona nas `processes`:
 - `origem_canal`
 - `unidade_atendimento`
 - `org_nome_solicitado`
+- campos de consentimento LGPD (conforme task de schema):
+  - `consent_privacy_policy`
+  - `consent_service_contact`
+  - `consent_informative_communications`
+  - `consent_text_version`
+  - `consent_captured_at`
 
 ## 4) Formulário Wix
 
@@ -92,6 +98,44 @@ Esse formulário já inclui:
 - campo de **nome da organização solicitada**;
 - envio com `source: "wix"` e `siteName: "Wix"`.
 
+### Exemplo de payload JSON (POST)
+
+```json
+{
+  "organizationSlug": "default",
+  "organizationRequestedName": "Empresa XPTO",
+  "siteName": "Wix",
+  "source": "wix",
+  "serviceUnit": "JURÍDICO / ADVOCACIA",
+  "fullName": "Maria Souza",
+  "email": "maria@exemplo.com",
+  "password": "SenhaSegura123",
+  "confirmPassword": "SenhaSegura123",
+  "taxId": "12345678900",
+  "phone": "+55 11 99999-9999",
+  "consentPrivacyPolicy": true,
+  "consentServiceContact": true,
+  "consentInformativeCommunications": false,
+  "consentTextVersion": "v2026-04-26",
+  "consentCapturedAt": "2026-04-26T15:30:00.000Z"
+}
+```
+
+Campos obrigatórios:
+
+- `fullName`
+- `email`
+- `password`
+- `confirmPassword`
+- `consentPrivacyPolicy` **deve ser `true`** (se `false`/ausente, a API retorna `400`).
+
+Campos opcionais de consentimento:
+
+- `consentServiceContact`
+- `consentInformativeCommunications`
+- `consentTextVersion`
+- `consentCapturedAt` (ISO; se não enviado, a função salva timestamp atual no servidor).
+
 ## 5) Resultado esperado
 
 Ao enviar formulário com sucesso:
@@ -99,7 +143,8 @@ Ao enviar formulário com sucesso:
 1. cria/atualiza `auth.users` e `profiles`;
 2. vincula em `org_members` com role `client` na organização default;
 3. cria `processes` com origem do canal e unidade, com status inicial `analise`;
-4. cria evento inicial em `process_events` informando a origem do recebimento.
+4. persiste metadados de consentimento no registro de `processes`;
+5. cria evento inicial em `process_events` informando origem + resumo de consentimentos (flags e versão).
 
 
 ## 6) Teste rápido no Postman
