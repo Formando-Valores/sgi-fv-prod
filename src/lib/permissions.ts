@@ -43,6 +43,11 @@ export type DataScope = {
   restrictToOwnUser: boolean;
 };
 
+export type ReportScope = DataScope & {
+  canViewGlobalOrganizations: boolean;
+  restrictToResponsibleUser: boolean;
+};
+
 const normalizeText = (value?: string | null): string =>
   (value || '')
     .normalize('NFD')
@@ -251,5 +256,18 @@ export function getProcessScope(subject?: PermissionSubject | null): DataScope {
     orgId,
     userId,
     restrictToOwnUser: hierarchy === 'cliente',
+  };
+}
+
+export function getReportScope(subject?: PermissionSubject | null): ReportScope {
+  const hierarchy = resolveHierarchyFromSubject(subject);
+  const baseScope = getProcessScope(subject);
+  const canViewGlobalOrganizations = hierarchy === 'admin';
+  const canViewAllReports = can('view_all', 'relatorios', subject);
+
+  return {
+    ...baseScope,
+    canViewGlobalOrganizations,
+    restrictToResponsibleUser: !canViewAllReports,
   };
 }
