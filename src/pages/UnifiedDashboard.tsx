@@ -13,7 +13,7 @@ interface UnifiedDashboardProps {
   users: User[];
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
   onLogout: () => void;
-  section?: 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes';
+  section?: 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes' | 'relatorios';
 }
 
 const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({

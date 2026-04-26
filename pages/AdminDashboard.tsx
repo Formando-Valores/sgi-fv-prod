@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { LogOut, Printer, FileDown, Eye, Pencil, Search, Users, ShieldCheck, X, Plus, Trash2, Calendar, MessageSquare, Check, User as UserIcon, UserCheck, LayoutDashboard, FolderKanban, Users2, Settings, Building2, Flag } from 'lucide-react';
+import { LogOut, Printer, FileDown, Eye, Pencil, Search, Users, ShieldCheck, X, Plus, Trash2, Calendar, MessageSquare, Check, User as UserIcon, UserCheck, LayoutDashboard, FolderKanban, Users2, Settings, Building2, Flag, FileBarChart2 } from 'lucide-react';
 import { User, ProcessStatus, UserRole, Hierarchy, ServiceUnit, Organization } from '../types';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { SERVICE_MANAGERS } from '../constants';
@@ -250,7 +250,7 @@ interface AdminDashboardProps {
   users: User[];
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
   onLogout: () => void;
-  section?: 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes';
+  section?: 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes' | 'relatorios';
   blocks?: {
     OverviewBlock?: React.ComponentType<{ children: React.ReactNode }>;
     ProcessesBlock?: React.ComponentType<{ children: React.ReactNode }>;
@@ -381,7 +381,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
   const location = useLocation();
   const navigate = useNavigate();
-  const validSections = ['dashboard', 'processos', 'clientes', 'configuracoes', 'organizacoes'] as const;
+  const validSections = ['dashboard', 'processos', 'clientes', 'configuracoes', 'organizacoes', 'relatorios'] as const;
   type DashboardSection = typeof validSections[number];
   type DashboardPresetFilter =
     | 'usuarios_cadastrados'
@@ -465,14 +465,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     { to: '/dashboard/clientes', label: 'Clientes', icon: Users2, visible: allowedModules.includes('clientes') },
     { to: '/dashboard/configuracoes', label: 'Configurações', icon: Settings, visible: allowedModules.includes('configuracoes') },
     { to: '/dashboard/organizacoes', label: 'Organizações', icon: Building2, visible: allowedModules.includes('organizacoes') },
+    { to: '/dashboard/relatorios', label: 'Relatórios', icon: FileBarChart2, visible: allowedModules.includes('relatorios') },
   ].filter((item) => item.visible);
 
-  const sectionModuleMap: Partial<Record<DashboardSection, 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes'>> = {
+  const sectionModuleMap: Partial<Record<DashboardSection, 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes' | 'relatorios'>> = {
     dashboard: 'dashboard',
     processos: 'processos',
     clientes: 'clientes',
     configuracoes: 'configuracoes',
     organizacoes: 'organizacoes',
+    relatorios: 'relatorios',
   };
 
   const canAccessSection = (sectionName: DashboardSection) => {

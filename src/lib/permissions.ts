@@ -2,7 +2,7 @@ import type { CapabilityMap, OrgRole, User, UserContext } from '../../types';
 
 export type SystemHierarchy = 'admin' | 'senior' | 'pleno' | 'operador' | 'cliente';
 
-export type PermissionModule = 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes' | 'financeiro';
+export type PermissionModule = 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes' | 'financeiro' | 'relatorios';
 export type PermissionAction = 'view' | 'view_own' | 'view_all' | 'create' | 'update' | 'delete' | 'manage';
 export type PermissionScope = PermissionModule;
 
@@ -131,7 +131,7 @@ const CAPABILITIES_BY_HIERARCHY: Record<SystemHierarchy, PermissionCapabilities>
 
 const PERMISSION_MATRIX_BY_HIERARCHY: Record<SystemHierarchy, PermissionMatrix> = {
   admin: {
-    modules: ['dashboard', 'processos', 'clientes', 'configuracoes', 'organizacoes', 'financeiro'],
+    modules: ['dashboard', 'processos', 'clientes', 'configuracoes', 'organizacoes', 'financeiro', 'relatorios'],
     actionsByScope: {
       dashboard: ['view', 'view_all'],
       processos: ['view', 'view_all', 'create', 'update', 'delete', 'manage'],
@@ -139,40 +139,45 @@ const PERMISSION_MATRIX_BY_HIERARCHY: Record<SystemHierarchy, PermissionMatrix> 
       configuracoes: ['view', 'manage'],
       organizacoes: ['view', 'view_all', 'create', 'update', 'delete', 'manage'],
       financeiro: ['view', 'view_all', 'manage'],
+      relatorios: ['view', 'view_all'],
     },
   },
   senior: {
-    modules: ['dashboard', 'processos', 'clientes', 'configuracoes', 'financeiro'],
+    modules: ['dashboard', 'processos', 'clientes', 'configuracoes', 'financeiro', 'relatorios'],
     actionsByScope: {
       dashboard: ['view', 'view_all'],
       processos: ['view', 'view_all', 'create', 'update', 'manage'],
       clientes: ['view', 'view_all', 'create', 'update', 'manage'],
       configuracoes: ['view', 'manage'],
       financeiro: ['view', 'view_all'],
+      relatorios: ['view', 'view_all'],
     },
   },
   pleno: {
-    modules: ['dashboard', 'processos', 'clientes', 'financeiro'],
+    modules: ['dashboard', 'processos', 'clientes', 'financeiro', 'relatorios'],
     actionsByScope: {
       dashboard: ['view'],
       processos: ['view', 'create', 'update'],
       clientes: ['view', 'create', 'update'],
       financeiro: ['view'],
+      relatorios: ['view'],
     },
   },
   operador: {
-    modules: ['dashboard', 'processos'],
+    modules: ['dashboard', 'processos', 'relatorios'],
     actionsByScope: {
       dashboard: ['view'],
       processos: ['view', 'update'],
+      relatorios: ['view'],
     },
   },
   cliente: {
-    modules: ['dashboard', 'processos', 'financeiro'],
+    modules: ['dashboard', 'processos', 'financeiro', 'relatorios'],
     actionsByScope: {
       dashboard: ['view_own'],
       processos: ['view_own'],
       financeiro: ['view_own'],
+      relatorios: ['view_own'],
     },
   },
 };
