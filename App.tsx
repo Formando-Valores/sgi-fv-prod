@@ -185,7 +185,7 @@ const RootApp: React.FC = () => {
   );
 
 
-  const renderUnifiedSectionRoute = (section: 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes') => {
+  const renderUnifiedSectionRoute = (section: 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes' | 'relatorios') => {
     if (authBootstrapping) {
       return authLoadingScreen;
     }
@@ -242,6 +242,7 @@ const RootApp: React.FC = () => {
           <Route path="/clientes" element={renderUnifiedSectionRoute('clientes')} />
           <Route path="/configuracoes" element={renderUnifiedSectionRoute('configuracoes')} />
           <Route path="/organizacoes" element={renderUnifiedSectionRoute('organizacoes')} />
+          <Route path="/relatorios" element={renderUnifiedSectionRoute('relatorios')} />
           <Route path="/payments/success" element={<PaymentSuccess />} />
           <Route path="/payments/cancel" element={<PaymentCancel />} />
           <Route path="*" element={authBootstrapping ? authLoadingScreen : <Navigate to="/login" />} />

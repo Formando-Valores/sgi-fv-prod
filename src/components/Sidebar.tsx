@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, FolderKanban, Users, Settings, Building2 } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, Users, Settings, Building2, FileBarChart2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { getNavigationModules, type PermissionModule } from '../lib/permissions';
 
@@ -27,6 +27,7 @@ const Sidebar: React.FC = () => {
     clientes: { to: '/clientes', label: 'Clientes', icon: Users },
     configuracoes: { to: '/configuracoes', label: 'Configurações', icon: Settings },
     organizacoes: { to: '/organizacoes', label: 'Organizações', icon: Building2 },
+    relatorios: { to: '/relatorios', label: 'Relatórios', icon: FileBarChart2 },
   };
 
   const navItems = allowedModules
