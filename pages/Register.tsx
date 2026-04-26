@@ -32,7 +32,11 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
     phone: '',
     processNumber: '',
     unit: ServiceUnit.JURIDICO,
-    organizationId: ''
+    organizationId: '',
+    consentPrivacyPolicy: false,
+    consentServiceContact: false,
+    consentInformativeCommunications: false,
+    consentTextVersion: 'rgpd-v1-2026-04'
   });
 
   const [error, setError] = useState('');
@@ -42,6 +46,7 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
   const [showPassword, setShowPassword] = useState(false);
 
   const inputClass = 'w-full p-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500';
+  const privacyPolicyUrl = import.meta.env.VITE_PRIVACY_POLICY_URL || 'https://example.com/politica-de-privacidade';
 
   const validatePassword = (pass: string) => {
     const hasMinLength = pass.length >= 8;
@@ -80,6 +85,12 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
 
     if (!formData.organizationId) {
       setError('Selecione a organização vinculada ao cliente.');
+      setIsLoading(false);
+      return;
+    }
+
+    if (!formData.consentPrivacyPolicy) {
+      setError('Para concluir o cadastro, é obrigatório aceitar a Política de Privacidade e o tratamento de dados pessoais.');
       setIsLoading(false);
       return;
     }
@@ -458,6 +469,68 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
                     </div>
                   </label>
                 ))}
+              </div>
+            </section>
+
+            {/* Secção 4 */}
+            <section>
+              <h3 className="text-blue-600 font-bold uppercase text-xs tracking-[0.2em] mb-4 flex items-center gap-2">
+                <span className="w-6 h-px bg-blue-600"></span> 4. Consentimentos
+              </h3>
+
+              <div className="border border-gray-200 rounded-xl p-4 sm:p-5 bg-gray-50 space-y-4">
+                <p className="text-xs font-bold text-gray-500">
+                  Declaro que li e aceito a Política de Privacidade, autorizando o tratamento dos meus dados pessoais para fins de cadastro e atendimento.
+                </p>
+                <a
+                  href={privacyPolicyUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs font-bold text-blue-600 underline"
+                >
+                  Ler Política de Privacidade
+                </a>
+
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3">
+                    <input
+                      id="consentPrivacyPolicy"
+                      type="checkbox"
+                      checked={formData.consentPrivacyPolicy}
+                      onChange={(e) => setFormData({ ...formData, consentPrivacyPolicy: e.target.checked })}
+                      className="mt-0.5 h-4 w-4 border border-gray-300 rounded"
+                    />
+                    <label htmlFor="consentPrivacyPolicy" className="text-xs font-bold text-gray-500">
+                      Autorizo o tratamento dos meus dados pessoais conforme a Política de Privacidade. (Obrigatório)
+                    </label>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <input
+                      id="consentServiceContact"
+                      type="checkbox"
+                      checked={formData.consentServiceContact}
+                      onChange={(e) => setFormData({ ...formData, consentServiceContact: e.target.checked })}
+                      className="mt-0.5 h-4 w-4 border border-gray-300 rounded"
+                    />
+                    <label htmlFor="consentServiceContact" className="text-xs font-bold text-gray-500">
+                      Autorizo contato por e-mail, telefone ou WhatsApp para tratativas de atendimento e andamento do serviço. (Opcional)
+                    </label>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <input
+                      id="consentInformativeCommunications"
+                      type="checkbox"
+                      checked={formData.consentInformativeCommunications}
+                      onChange={(e) => setFormData({ ...formData, consentInformativeCommunications: e.target.checked })}
+                      className="mt-0.5 h-4 w-4 border border-gray-300 rounded"
+                    />
+                    <label htmlFor="consentInformativeCommunications" className="text-xs font-bold text-gray-500">
+                      Aceito receber comunicações informativas sobre conteúdos, novidades e orientações relacionadas aos serviços. (Opcional)
+                    </label>
+                  </div>
+                </div>
               </div>
             </section>
 
