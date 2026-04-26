@@ -3345,11 +3345,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-gray-800 font-black text-lg tracking-tight">{process.protocol}</p>
+                          <p className="text-gray-800 font-black text-lg tracking-tight break-words">{process.protocol}</p>
                           <Badge variant={process.sourceLabel === 'WIX' ? 'info' : 'neutral'} className="text-xs px-2.5 py-1">{process.sourceLabel}</Badge>
                           <Badge variant={statusBadgeVariant(process.status)} className="text-xs px-2.5 py-1">{process.status}</Badge>
                         </div>
-                        <p className="text-gray-800 font-bold mt-1">{process.name}</p>
+                        <p className="text-gray-800 text-base font-semibold mt-1 break-words">{process.contractedServiceName}</p>
+                        <p className="text-gray-700 text-sm mt-1 break-words"><span className="font-black uppercase tracking-wide text-[10px] text-gray-500 mr-1">Cliente:</span>{process.name}</p>
                         <p className="text-gray-500 text-xs mt-1">Etapa: {process.etapaAtual}{process.requestedOrganizationName !== 'Não informado' ? ` · ${process.requestedOrganizationName}` : ''}</p>
                       </div>
 
