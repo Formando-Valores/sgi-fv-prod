@@ -18,6 +18,11 @@ type IntakePayload = {
   processTitle?: string;
   serviceUnit?: string;
   source?: string;
+  consentPrivacyPolicy?: boolean | string | number | null;
+  consentServiceContact?: boolean | string | number | null;
+  consentInformativeCommunications?: boolean | string | number | null;
+  consentTextVersion?: string;
+  consentCapturedAt?: string;
 };
 
 const corsHeaders = {
@@ -44,6 +49,14 @@ const buildResponse = (status: number, body: Record<string, unknown>) =>
       'Content-Type': 'application/json',
     },
   });
+
+const normalizeBoolean = (value: unknown): boolean => {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value === 1;
+
+  const normalized = String(value ?? '').trim().toLowerCase();
+  return ['1', 'true', 'yes', 'sim', 'on'].includes(normalized);
+};
 
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') {
@@ -91,6 +104,19 @@ Deno.serve(async (request) => {
   const source = String(payload.source ?? 'wix').trim() || 'wix';
   const siteName = String(payload.siteName ?? '').trim() || (source.toLowerCase() === 'wix' ? 'Wix' : source);
   const organizationRequestedName = String(payload.organizationRequestedName ?? '').trim();
+  const consentPrivacyPolicy = normalizeBoolean(payload.consentPrivacyPolicy);
+  const consentServiceContact = normalizeBoolean(payload.consentServiceContact);
+  const consentInformativeCommunications = normalizeBoolean(payload.consentInformativeCommunications);
+  const consentTextVersion = String(payload.consentTextVersion ?? '').trim() || null;
+  const consentCapturedAtRaw = String(payload.consentCapturedAt ?? '').trim();
+  const consentCapturedAt = consentCapturedAtRaw || new Date().toISOString();
+
+  if (!consentPrivacyPolicy) {
+    return buildResponse(400, {
+      success: false,
+      error: 'Consentimento obrigatório ausente: é necessário aceitar a política de privacidade.',
+    });
+  }
 
   const adminClient = createClient(supabaseUrl, serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
@@ -218,6 +244,11 @@ Deno.serve(async (request) => {
       unidade_atendimento: serviceUnit,
       org_nome_solicitado: organizationRequestedName || null,
       origem_canal: source,
+      consent_privacy_policy: consentPrivacyPolicy,
+      consent_service_contact: consentServiceContact,
+      consent_informative_communications: consentInformativeCommunications,
+      consent_text_version: consentTextVersion,
+      consent_captured_at: consentCapturedAt,
     };
 
     const { data: process, error: processError } = await adminClient
@@ -238,7 +269,7 @@ Deno.serve(async (request) => {
           org_id: orgId,
           process_id: processId,
           tipo: 'registro',
-          mensagem: `Processo recebido via integração externa (${source}). Site/portal: ${siteName}. Unidade: ${serviceUnit}. Organização solicitada: ${organizationRequestedName || 'não informada'}.`,
+          mensagem: `Processo recebido via integração externa (${source}). Site/portal: ${siteName}. Unidade: ${serviceUnit}. Organização solicitada: ${organizationRequestedName || 'não informada'}. Consentimentos: política_privacidade=${consentPrivacyPolicy ? 'sim' : 'não'}, contato_serviço=${consentServiceContact ? 'sim' : 'não'}, comunicações_informativas=${consentInformativeCommunications ? 'sim' : 'não'}, versão='${consentTextVersion ?? 'não informada'}', capturado_em='${consentCapturedAt}'.`,
           created_by: userId,
         },
       ]);
