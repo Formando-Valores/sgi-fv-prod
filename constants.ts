@@ -71,3 +71,5 @@ export const INITIAL_MOCK_USERS: User[] = [
     lastUpdate: '28/01/2026, 10:00'
   }
 ];
+
+export const CONSENT_TEXT_VERSION = 'rgpd-v1-2026-04';
