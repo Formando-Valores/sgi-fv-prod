@@ -834,7 +834,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       process.protocol.toLowerCase().includes(processSearch.toLowerCase()) ||
       process.processType.toLowerCase().includes(processSearch.toLowerCase()) ||
       process.sourceLabel.toLowerCase().includes(processSearch.toLowerCase()) ||
-      process.requestedOrganizationName.toLowerCase().includes(processSearch.toLowerCase());
+      process.requestedOrganizationName.toLowerCase().includes(processSearch.toLowerCase()) ||
+      process.contractedServiceName.toLowerCase().includes(processSearch.toLowerCase());
 
     const matchesStatus =
       processStatusPreset === 'atencao'
@@ -3236,7 +3237,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                 <input
                   value={processSearch}
                   onChange={(event) => setProcessSearch(event.target.value)}
-                  placeholder="Buscar processo, cliente, responsável..."
+                  placeholder="Buscar processo, título, cliente, responsável..."
                   className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
                 />
               </div>
