@@ -25,6 +25,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ defaultOrgId, operationalOnly
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<Awaited<ReturnType<typeof listProcessReports>> | null>(null);
+  const [expandedProcessId, setExpandedProcessId] = useState<string | null>(null);
 
   useEffect(() => {
     const run = async () => {
@@ -183,6 +184,10 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ defaultOrgId, operationalOnly
         <div className="rounded-xl border border-gray-100 bg-white p-4"><p className="text-xs text-gray-500">Evento (top)</p><p className="text-sm font-bold text-gray-900">{result?.summary.byEventType.sort((a,b)=>b.total-a.total)[0]?.key || '-'}</p><p className="text-xs text-gray-500">{result?.summary.byEventType.sort((a,b)=>b.total-a.total)[0]?.total || 0}</p></div>
         <div className="rounded-xl border border-gray-100 bg-white p-4"><p className="text-xs text-gray-500">Usuário ator (top)</p><p className="text-sm font-bold text-gray-900">{result?.summary.byActor.sort((a,b)=>b.total-a.total)[0]?.key || '-'}</p><p className="text-xs text-gray-500">{result?.summary.byActor.sort((a,b)=>b.total-a.total)[0]?.total || 0}</p></div>
       </div>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <div className="rounded-xl border border-gray-100 bg-white p-4"><p className="text-xs text-gray-500">Consolidado por organização (top)</p><p className="text-sm font-bold text-gray-900">{result?.summary.byOrganization.sort((a,b)=>b.total-a.total)[0]?.key || '-'}</p><p className="text-xs text-gray-500">{result?.summary.byOrganization.sort((a,b)=>b.total-a.total)[0]?.total || 0}</p></div>
+        <div className="rounded-xl border border-gray-100 bg-white p-4"><p className="text-xs text-gray-500">Consolidado por usuário (top)</p><p className="text-sm font-bold text-gray-900">{result?.summary.byUser.sort((a,b)=>b.total-a.total)[0]?.key || '-'}</p><p className="text-xs text-gray-500">{result?.summary.byUser.sort((a,b)=>b.total-a.total)[0]?.total || 0}</p></div>
+      </div>
 
       <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-x-auto">
         {error && <div className="p-3 text-sm text-red-600">{error}</div>}
@@ -206,9 +211,29 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ defaultOrgId, operationalOnly
                   <td className="px-3 py-2">{row.responsibleName}</td>
                   <td className="px-3 py-2">{row.actorName}</td>
                   <td className="px-3 py-2">{row.organizationName}</td>
-                  <td className="px-3 py-2">{row.latestEvent?.mensagem || '-'}</td>
+                  <td className="px-3 py-2">
+                    <button onClick={() => setExpandedProcessId((current) => current === row.process.id ? null : row.process.id)} className="text-left text-blue-600 hover:underline">
+                      {row.latestEvent?.mensagem || '-'}
+                    </button>
+                  </td>
                 </tr>
               ))}
+              {result?.rows.map((row) => expandedProcessId === row.process.id ? (
+                <tr key={`${row.process.id}-timeline`} className="border-t border-gray-100 bg-gray-50">
+                  <td className="px-3 py-2" colSpan={9}>
+                    <p className="mb-2 text-xs font-bold uppercase text-gray-500">Timeline detalhada</p>
+                    <ul className="space-y-1 text-xs text-gray-700">
+                      {row.events.map((event) => (
+                        <li key={event.id}>
+                          {new Date(event.created_at).toLocaleString('pt-BR')} · {event.event_type || event.tipo}
+                          {event.field ? ` · ${event.field}` : ''} · {event.mensagem}
+                          {(event.old_value || event.new_value) ? ` (${event.old_value || '∅'} → ${event.new_value || '∅'})` : ''}
+                        </li>
+                      ))}
+                    </ul>
+                  </td>
+                </tr>
+              ) : null)}
             </tbody>
           </table>
         )}
