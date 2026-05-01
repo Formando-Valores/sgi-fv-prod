@@ -6,7 +6,7 @@
  */
 
 import { supabase } from '../../supabase';
-import { getProcessScope } from './permissions';
+import { getAuthorizationDeniedMessage, getProcessScope } from './permissions';
 
 // Debug mode flag
 const DEBUG = true;
@@ -21,7 +21,7 @@ async function getAuthenticatedUserId(): Promise<string | null> {
   const { data, error } = await supabase.auth.getUser();
   if (error) {
     logError('Unable to resolve authenticated user from Supabase auth context:', error);
-    return null;
+    throw buildManagementDeniedError('processos');
   }
   return data.user?.id ?? null;
 }
@@ -59,6 +59,10 @@ function applyScopedProcessFilters<T extends { eq: (...args: any[]) => T }>(quer
   return scopedQuery;
 }
 
+
+function buildManagementDeniedError(scope: 'processos' | 'financeiro' | 'relatorios' = 'processos'): Error {
+  return new Error(getAuthorizationDeniedMessage('manage', scope));
+}
 const GLOBAL_ADMIN_ROLE_VALUES = new Set([
   'admin',
   'administrator',
