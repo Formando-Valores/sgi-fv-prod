@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS public.org_financial_settings (
 
 CREATE TABLE IF NOT EXISTS public.org_complementary_tiers (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  org_id uuid REFERENCES public.organizations(id) ON DELETE CASCADE,
   range_min numeric(12,2) NOT NULL,
   range_max numeric(12,2),
   contribution_amount numeric(12,2) NOT NULL,
@@ -40,7 +40,7 @@ CREATE INDEX IF NOT EXISTS idx_payments_charge_type ON public.payments(charge_ty
 
 CREATE TABLE IF NOT EXISTS public.financial_audit_notifications (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  org_id uuid REFERENCES public.organizations(id) ON DELETE CASCADE,
   payment_id uuid REFERENCES public.payments(id) ON DELETE CASCADE,
   event_code text NOT NULL,
   payload jsonb NOT NULL DEFAULT '{}'::jsonb,
@@ -76,7 +76,7 @@ AS $$
     WHERE p.charge_type = 'annual_membership'
       AND p.process_id IS NULL
       AND p.client_id IS NULL
-      AND p.payment_status IN ('pending','failed','canceled')
+      AND COALESCE(to_jsonb(p)->>'payment_status', to_jsonb(p)->>'status', 'pending') IN ('pending','failed','canceled')
       AND p.reference_year = EXTRACT(YEAR FROM now())::integer
       AND p.org_id = p_org_id
   );
