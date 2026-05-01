@@ -292,6 +292,7 @@ export interface CreateProcessPayload {
   origem_canal?: string;
   unidade_atendimento?: string;
   org_nome_solicitado?: string;
+  os_value?: number;
 }
 
 /**
@@ -659,7 +660,8 @@ export async function createProcess(
       cliente_nome: payload.cliente_nome || null,
       cliente_documento: payload.cliente_documento || null,
       cliente_contato: payload.cliente_contato || null,
-      responsavel_user_id: payload.responsavel_user_id || null
+      responsavel_user_id: payload.responsavel_user_id || null,
+      os_value: typeof payload.os_value === 'number' ? payload.os_value : null
     })
     .select()
     .single();
