@@ -130,7 +130,7 @@ const Dashboard: React.FC = () => {
         (canViewAllProcesses ? listAdminOperationalProcesses(userContext?.org_id) : listProcesses(userContext?.org_id || '')).then(data => {
           const elapsed = performance.now() - processesStartTime;
           log(`process listing completed in ${elapsed.toFixed(2)}ms, count:`, data.length);
-          return data.filter((process) => process.process_status !== 'pending_payment');
+          return data;
         })
       ]);
       
@@ -350,6 +350,11 @@ const Dashboard: React.FC = () => {
                   <div>
                     <p className="font-bold text-white text-sm">{process.titulo}</p>
                     <p className="text-slate-500 text-xs">{process.cliente_nome || 'Sem cliente'}</p>
+                    {process.process_status === 'pending_payment' && (
+                      <p className="text-amber-300 text-[10px] font-black uppercase tracking-wide">
+                        Pagamento pendente: edição bloqueada
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="text-right">
