@@ -8,20 +8,6 @@
 --   - Bloqueia gestão fora do escopo por perfil
 -- ============================================
 
-CREATE OR REPLACE FUNCTION public.current_user_hierarchy()
-RETURNS text
-LANGUAGE sql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT COALESCE(NULLIF(lower(trim(hierarchy)), ''), 'cliente')
-  FROM public.profiles
-  WHERE id = auth.uid()
-  LIMIT 1
-$$;
-
-GRANT EXECUTE ON FUNCTION public.current_user_hierarchy() TO authenticated;
-
 CREATE OR REPLACE FUNCTION public.can_manage_entity(target_org_id uuid)
 RETURNS boolean
 LANGUAGE plpgsql
@@ -29,32 +15,38 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  user_hierarchy text;
+  normalized_profile_role text;
+  membership_role text;
 BEGIN
-  user_hierarchy := public.current_user_hierarchy();
+  SELECT COALESCE(NULLIF(lower(trim(p.role)), ''), 'cliente')
+    INTO normalized_profile_role
+  FROM public.profiles p
+  WHERE p.id = auth.uid()
+  LIMIT 1;
 
-  IF user_hierarchy = 'admin' THEN
+  SELECT COALESCE(NULLIF(lower(trim(om.role)), ''), 'client')
+    INTO membership_role
+  FROM public.org_members om
+  WHERE om.org_id = target_org_id
+    AND om.user_id = auth.uid()
+  LIMIT 1;
+
+  -- Admin global: pode gerir qualquer organização.
+  IF normalized_profile_role IN ('admin', 'administrator', 'administrador', 'owner') THEN
     RETURN true;
   END IF;
 
-  IF user_hierarchy = 'senior' THEN
-    RETURN EXISTS (
-      SELECT 1 FROM public.org_members om
-      WHERE om.org_id = target_org_id
-        AND om.user_id = auth.uid()
-        AND om.role IN ('owner', 'admin')
-    );
+  -- Sênior: pode visualizar global (fora desta função), mas gerir apenas na própria organização.
+  IF normalized_profile_role IN ('senior', 'usuario senior', 'usuário sênior') THEN
+    RETURN membership_role IN ('owner', 'admin');
   END IF;
 
-  IF user_hierarchy = 'pleno' THEN
-    RETURN EXISTS (
-      SELECT 1 FROM public.org_members om
-      WHERE om.org_id = target_org_id
-        AND om.user_id = auth.uid()
-        AND om.role = 'staff'
-    );
+  -- Pleno: gerir apenas na organização/área em que atua.
+  IF normalized_profile_role IN ('pleno', 'usuario pleno', 'usuário pleno', 'staff') THEN
+    RETURN membership_role = 'staff';
   END IF;
 
+  -- Cliente (e demais perfis): sem gestão administrativa por esta função.
   RETURN false;
 END;
 $$;
