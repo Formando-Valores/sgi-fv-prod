@@ -64,6 +64,10 @@ function applyScopedProcessFilters<T extends { eq: (...args: any[]) => T }>(quer
 function buildManagementDeniedError(scope: 'processos' | 'financeiro' | 'relatorios' = 'processos'): Error {
   return new Error(getAuthorizationDeniedMessage('manage', scope));
 }
+
+function buildAreaDeniedError(): Error {
+  return new Error('Ação bloqueada: este processo está fora da sua área de atuação (perfil/vínculo). Solicite acesso à área responsável.');
+}
 const GLOBAL_ADMIN_ROLE_VALUES = new Set([
   'admin',
   'administrator',
@@ -143,6 +147,82 @@ async function logFinancialAuditEvent(
 
   if (error) {
     logError('Failed to persist financial audit event:', eventCode, error);
+  }
+}
+
+async function logAreaScopeDeniedAttempt(
+  action: string,
+  context: Record<string, unknown>,
+): Promise<void> {
+  await logFinancialAuditEvent('area_scope_denied_attempt', {
+    module: 'processos',
+    action,
+    ...context,
+  });
+}
+
+async function assertProcessAreaAccess(
+  requestedOrgId: string,
+  processId: string,
+  action: string,
+): Promise<void> {
+  const actorUserId = await getAuthenticatedUserId();
+  const normalizedRequestedOrgId = String(requestedOrgId || '').trim();
+  if (!actorUserId || !normalizedRequestedOrgId) {
+    await logAreaScopeDeniedAttempt(action, { requestedOrgId, processId, reason: 'missing_scope_or_actor' });
+    throw buildAreaDeniedError();
+  }
+
+  const { data: membership, error: membershipError } = await supabase
+    .from('org_members')
+    .select('org_id')
+    .eq('user_id', actorUserId)
+    .eq('org_id', normalizedRequestedOrgId)
+    .maybeSingle();
+
+  if (membershipError || !membership?.org_id) {
+    await logAreaScopeDeniedAttempt(action, { requestedOrgId: normalizedRequestedOrgId, processId, reason: 'missing_membership' });
+    throw buildAreaDeniedError();
+  }
+
+  const { data: targetProcess } = await supabase
+    .from('processes')
+    .select('org_id')
+    .eq('id', processId)
+    .maybeSingle();
+
+  if (targetProcess?.org_id && targetProcess.org_id !== normalizedRequestedOrgId) {
+    await logAreaScopeDeniedAttempt(action, {
+      requestedOrgId: normalizedRequestedOrgId,
+      processId,
+      processOrgId: targetProcess.org_id,
+      reason: 'process_org_mismatch',
+    });
+    throw buildAreaDeniedError();
+  }
+}
+
+async function assertOrganizationAreaAccess(
+  requestedOrgId: string,
+  action: string,
+): Promise<void> {
+  const actorUserId = await getAuthenticatedUserId();
+  const normalizedRequestedOrgId = String(requestedOrgId || '').trim();
+  if (!actorUserId || !normalizedRequestedOrgId) {
+    await logAreaScopeDeniedAttempt(action, { requestedOrgId, reason: 'missing_scope_or_actor' });
+    throw buildAreaDeniedError();
+  }
+
+  const { data: membership, error: membershipError } = await supabase
+    .from('org_members')
+    .select('org_id')
+    .eq('user_id', actorUserId)
+    .eq('org_id', normalizedRequestedOrgId)
+    .maybeSingle();
+
+  if (membershipError || !membership?.org_id) {
+    await logAreaScopeDeniedAttempt(action, { requestedOrgId: normalizedRequestedOrgId, reason: 'missing_membership' });
+    throw buildAreaDeniedError();
   }
 }
 
@@ -648,6 +728,7 @@ export async function createProcess(
   log('org_id:', org_id);
   log('payload:', JSON.stringify(payload, null, 2));
   log('created_by:', created_by);
+  await assertOrganizationAreaAccess(org_id, 'create_process');
   
   // Create the process
   log('Inserting process...');
@@ -729,6 +810,8 @@ export async function updateProcessStatus(
     concluido: 'Concluído'
   };
 
+  await assertProcessAreaAccess(org_id, process_id, 'update_status');
+
   const { data: existing } = await supabase
     .from('processes')
     .select('status')
@@ -803,6 +886,8 @@ export async function addProcessEvent(
     tipo === 'status_change' ? 'status_changed' :
     'event_logged';
 
+  await assertProcessAreaAccess(org_id, process_id, 'add_event');
+
   const { data, error } = await supabase
     .from('process_events')
     .insert({
@@ -847,6 +932,8 @@ export async function updateProcess(
   log('updateProcess() starting');
   log('org_id:', org_id, 'process_id:', process_id);
   log('updates:', JSON.stringify(updates, null, 2));
+
+  await assertProcessAreaAccess(org_id, process_id, 'update_fields');
   
   const { data: currentProcess } = await supabase
     .from('processes')
@@ -912,6 +999,8 @@ export async function deleteProcess(org_id: string, process_id: string, actor_us
   const startTime = performance.now();
   log('deleteProcess() starting');
   log('org_id:', org_id, 'process_id:', process_id);
+
+  await assertProcessAreaAccess(org_id, process_id, 'delete_process');
   
   const { data: processBeforeDelete } = await supabase
     .from('processes')
