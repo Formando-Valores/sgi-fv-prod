@@ -30,6 +30,25 @@ export type ReportRow = {
   responsibleName: string;
   actorName: string;
   organizationName: string;
+  payments: Array<{
+    id: string;
+    amount: number | null;
+    currency: string | null;
+    paymentStatus: string | null;
+    paidAt: string | null;
+    createdAt: string | null;
+  }>;
+  attachments: Array<{
+    id: string;
+    name: string;
+    source: 'event' | 'metadata';
+    createdAt: string | null;
+  }>;
+  financialHighlights: Array<{
+    type: string;
+    message: string;
+    createdAt: string | null;
+  }>;
 };
 
 export type ReportSummary = {
@@ -165,10 +184,68 @@ export async function listReportActivities(
   if (summaryError) throw summaryError;
 
   const rows = (activityRows || []) as any[];
+  const processIds = rows.map((entry) => entry.process_id).filter(Boolean);
+  const processesById = new Map<string, any>();
+  if (processIds.length) {
+    const { data: processData } = await supabase
+      .from('processes')
+      .select('id,amount,currency,payment_status,paid_at,process_status')
+      .in('id', processIds);
+    (processData || []).forEach((item: any) => processesById.set(item.id, item));
+  }
+
+  const paymentsByProcessId = new Map<string, any[]>();
+  if (processIds.length) {
+    const { data: paymentData } = await supabase
+      .from('payments')
+      .select('id,process_id,amount,currency,payment_status,paid_at,created_at')
+      .in('process_id', processIds)
+      .order('created_at', { ascending: false });
+    (paymentData || []).forEach((item: any) => {
+      const current = paymentsByProcessId.get(item.process_id) || [];
+      current.push(item);
+      paymentsByProcessId.set(item.process_id, current);
+    });
+  }
 
   const enrichedRows = await Promise.all(
     rows.map(async (entry) => {
       const events = await listProcessEvents(entry.org_id, entry.process_id);
+      const processFinancial = processesById.get(entry.process_id);
+      const payments = paymentsByProcessId.get(entry.process_id) || [];
+      const attachments = events
+        .filter((event) => event.tipo === 'documento' || event.event_type === 'document_attached')
+        .map((event) => {
+          const metadata = (event.metadata || {}) as Record<string, unknown>;
+          const name = String(metadata.file_name || metadata.name || metadata.filename || event.mensagem || 'Anexo');
+          return {
+            id: event.id,
+            name,
+            source: metadata.file_name || metadata.name || metadata.filename ? 'metadata' : 'event',
+            createdAt: event.created_at || null,
+          };
+        });
+      const financialHighlights = events
+        .filter((event) => {
+          const eventType = String(event.event_type || '').toLowerCase();
+          return eventType.includes('payment') || eventType.includes('finance') || eventType.includes('refund');
+        })
+        .map((event) => ({
+          type: event.event_type || event.tipo,
+          message: event.mensagem || 'Evento financeiro',
+          createdAt: event.created_at || null,
+        }));
+
+      if (processFinancial?.payment_status || processFinancial?.paid_at) {
+        financialHighlights.unshift({
+          type: 'process_payment_state',
+          message: `Status do pagamento: ${processFinancial.payment_status || 'não informado'}${
+            processFinancial.paid_at ? ` (pago em ${new Date(processFinancial.paid_at).toLocaleString('pt-BR')})` : ''
+          }`,
+          createdAt: processFinancial.paid_at || null,
+        });
+      }
+
       const process: Process = {
         id: entry.process_id,
         org_id: entry.org_id,
@@ -176,8 +253,9 @@ export async function listReportActivities(
         titulo: entry.title,
         cliente_nome: entry.client_name,
         status: entry.process_status,
-        process_status: entry.process_status,
         unidade_atendimento: entry.process_type,
+        payment_status: processFinancial?.payment_status || null,
+        process_status: processFinancial?.process_status || entry.process_status,
         responsavel_user_id: entry.responsible_user_id,
         created_at: entry.process_created_at,
         updated_at: entry.process_created_at,
@@ -207,6 +285,16 @@ export async function listReportActivities(
         responsibleName: entry.responsible_name || 'Não atribuído',
         actorName: entry.actor_name || 'Sistema',
         organizationName: entry.organization_name || entry.org_id,
+        payments: payments.map((payment) => ({
+          id: payment.id,
+          amount: typeof payment.amount === 'number' ? payment.amount : payment.amount ? Number(payment.amount) : null,
+          currency: payment.currency || processFinancial?.currency || 'BRL',
+          paymentStatus: payment.payment_status || null,
+          paidAt: payment.paid_at || null,
+          createdAt: payment.created_at || null,
+        })),
+        attachments,
+        financialHighlights,
       } as ReportRow;
     }),
   );

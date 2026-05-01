@@ -108,16 +108,23 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ defaultOrgId, operationalOnly
     const htmlRows = full.rows
       .map(
         (row: ReportRow) => `
-          <tr>
-            <td>${row.process.protocolo || '-'}</td>
-            <td>${row.process.titulo || '-'}</td>
-            <td>${row.process.cliente_nome || '-'}</td>
-            <td>${row.process.process_status || row.process.status || '-'}</td>
-            <td>${row.process.unidade_atendimento || '-'}</td>
-            <td>${row.responsibleName}</td>
-            <td>${row.actorName}</td>
-            <td>${row.organizationName}</td>
-          </tr>
+          <section class="process-block">
+            <h3>${row.process.protocolo || '-'} · ${row.process.titulo || '-'}</h3>
+            <p><strong>Cliente:</strong> ${row.process.cliente_nome || '-'} · <strong>Organização:</strong> ${row.organizationName}</p>
+            <p><strong>Status:</strong> ${row.process.process_status || row.process.status || '-'} · <strong>Fase:</strong> ${row.process.unidade_atendimento || '-'}</p>
+            <p><strong>Responsável:</strong> ${row.responsibleName} · <strong>Último ator:</strong> ${row.actorName}</p>
+            <p><strong>Ações/Apontamentos:</strong> ${row.eventCount}</p>
+            <p><strong>Documentos/Anexos:</strong> ${row.attachments.length ? row.attachments.map((a) => a.name).join(', ') : 'Nenhum'}</p>
+            <p><strong>Eventos financeiros relevantes:</strong> ${row.financialHighlights.length ? row.financialHighlights.map((event) => `${event.type}: ${event.message}`).join(' | ') : 'Nenhum'}</p>
+            <p><strong>Pagamentos:</strong> ${row.payments.length ? row.payments.map((payment) => `${payment.paymentStatus || 'sem status'} ${payment.amount != null ? `- ${Number(payment.amount).toLocaleString('pt-BR', { style: 'currency', currency: payment.currency || 'BRL' })}` : ''}`).join(' | ') : 'Nenhum'}</p>
+            <ul>
+              ${row.events
+                .map(
+                  (event) => `<li>${new Date(event.created_at).toLocaleString('pt-BR')} · ${event.event_type || event.tipo}${event.field ? ` · ${event.field}` : ''} · ${event.mensagem}</li>`,
+                )
+                .join('')}
+            </ul>
+          </section>
         `,
       )
       .join('');
@@ -131,20 +138,19 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ defaultOrgId, operationalOnly
           <title>Relatório de Processos</title>
           <style>
             body { font-family: Arial, sans-serif; padding: 16px; }
-            table { border-collapse: collapse; width: 100%; }
-            th, td { border: 1px solid #ddd; padding: 6px; font-size: 12px; text-align: left; }
-            th { background: #f5f5f5; }
+            .process-block { border: 1px solid #ddd; border-radius: 8px; padding: 10px; margin-bottom: 12px; page-break-inside: avoid; }
+            .process-block h3 { margin: 0 0 8px; }
+            p { margin: 4px 0; font-size: 12px; }
+            ul { margin: 8px 0 0 16px; padding: 0; }
+            li { margin: 3px 0; font-size: 11px; }
           </style>
         </head>
         <body>
-          <h2>Relatório de Processos</h2>
+          <h2>Relatório Técnico Consolidado de Processos</h2>
           <p>Total de registros: ${full.total}</p>
-          <table>
-            <thead>
-              <tr><th>Protocolo</th><th>Título</th><th>Cliente</th><th>Status</th><th>Tipo</th><th>Responsável</th><th>Usuário ator</th><th>Organização</th></tr>
-            </thead>
-            <tbody>${htmlRows}</tbody>
-          </table>
+          <p>Estrutura canônica: ações, fases, responsáveis, apontamentos, documentos e eventos financeiros relevantes.</p>
+          ${full.scope.limitedByProfile ? '<p><strong>Escopo:</strong> Dados limitados ao perfil do solicitante.</p>' : ''}
+          ${htmlRows}
         </body>
       </html>
     `);
@@ -279,6 +285,29 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ defaultOrgId, operationalOnly
                                 {(event.old_value || event.new_value) ? ` (${event.old_value || '∅'} → ${event.new_value || '∅'})` : ''}
                               </li>
                             ))}
+                          </ul>
+                          <p className="mt-3 mb-1 text-xs font-bold uppercase text-gray-500">Financeiro</p>
+                          <ul className="space-y-1 text-xs text-gray-700">
+                            {row.financialHighlights.length ? row.financialHighlights.map((event, index) => (
+                              <li key={`${event.type}-${index}`}>
+                                {event.createdAt ? new Date(event.createdAt).toLocaleString('pt-BR') : '-'} · {event.type} · {event.message}
+                              </li>
+                            )) : <li>Nenhum evento financeiro relevante.</li>}
+                          </ul>
+                          <p className="mt-3 mb-1 text-xs font-bold uppercase text-gray-500">Pagamentos</p>
+                          <ul className="space-y-1 text-xs text-gray-700">
+                            {row.payments.length ? row.payments.map((payment) => (
+                              <li key={payment.id}>
+                                {payment.createdAt ? new Date(payment.createdAt).toLocaleString('pt-BR') : '-'} · {payment.paymentStatus || 'sem status'}
+                                {payment.amount != null ? ` · ${Number(payment.amount).toLocaleString('pt-BR', { style: 'currency', currency: payment.currency || 'BRL' })}` : ''}
+                              </li>
+                            )) : <li>Nenhum pagamento vinculado.</li>}
+                          </ul>
+                          <p className="mt-3 mb-1 text-xs font-bold uppercase text-gray-500">Documentos/Anexos</p>
+                          <ul className="space-y-1 text-xs text-gray-700">
+                            {row.attachments.length ? row.attachments.map((attachment) => (
+                              <li key={attachment.id}>{attachment.createdAt ? new Date(attachment.createdAt).toLocaleString('pt-BR') : '-'} · {attachment.name}</li>
+                            )) : <li>Nenhum anexo registrado.</li>}
                           </ul>
                         </td>
                       </tr>
