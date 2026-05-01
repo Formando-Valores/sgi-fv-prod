@@ -197,6 +197,33 @@ export interface ProcessEvent {
   created_at: string;
 }
 
+export type DocumentValidationStatus = 'pending' | 'approved' | 'rejected' | 'resubmission_requested';
+export interface ProcessDocumentChecklistItem {
+  id: string;
+  org_id: string;
+  service_id: string;
+  document_name: string;
+  description?: string | null;
+  is_required: boolean;
+  sort_order: number;
+  active: boolean;
+}
+
+export interface ProcessDocumentAttachment {
+  id: string;
+  org_id: string;
+  process_id: string;
+  checklist_id?: string | null;
+  document_name: string;
+  file_path: string;
+  file_type?: string | null;
+  validation_status: DocumentValidationStatus;
+  pending_reason?: string | null;
+  review_notes?: string | null;
+  guidance?: string | null;
+  created_at: string;
+}
+
 type ProcessAuditInsert = {
   org_id: string;
   process_id: string;
@@ -924,6 +951,111 @@ export async function deleteProcess(org_id: string, process_id: string, actor_us
   }
 
   log('Process deleted successfully');
+}
+
+export async function listRequiredChecklistDocuments(org_id: string, service_id: string): Promise<ProcessDocumentChecklistItem[]> {
+  const { data, error } = await supabase
+    .from('service_order_document_checklists')
+    .select('*')
+    .eq('org_id', org_id)
+    .eq('service_id', service_id)
+    .eq('active', true)
+    .order('sort_order', { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function listProcessAttachments(org_id: string, process_id: string): Promise<ProcessDocumentAttachment[]> {
+  const { data, error } = await supabase
+    .from('process_document_attachments')
+    .select('*')
+    .eq('org_id', org_id)
+    .eq('process_id', process_id)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function addProcessAttachment(
+  org_id: string,
+  process_id: string,
+  payload: Pick<ProcessDocumentAttachment, 'document_name' | 'file_path' | 'file_type' | 'pending_reason'>,
+  actor_user_id: string,
+): Promise<void> {
+  const { error } = await supabase.from('process_document_attachments').insert({
+    org_id,
+    process_id,
+    document_name: payload.document_name,
+    file_path: payload.file_path,
+    file_type: payload.file_type || null,
+    pending_reason: payload.pending_reason || 'Aguardando validação documental',
+    uploaded_by: actor_user_id,
+  });
+  if (error) throw error;
+
+  await insertProcessAuditEvents([
+    {
+      org_id,
+      process_id,
+      actor_user_id,
+      event_type: 'document_pending',
+      mensagem: `Documento anexado com pendência: ${payload.document_name}`,
+      tipo: 'documento',
+      metadata: { status: 'pending', file_path: payload.file_path },
+    },
+  ]);
+
+  await supabase.from('processes').update({ process_status: 'awaiting_documents' }).eq('org_id', org_id).eq('id', process_id);
+}
+
+export async function reviewProcessAttachment(
+  org_id: string,
+  process_id: string,
+  attachment_id: string,
+  decision: 'approved' | 'rejected' | 'resubmission_requested',
+  actor_user_id: string,
+  options?: { justification?: string; guidance?: string },
+): Promise<void> {
+  if (decision === 'rejected' && !options?.justification?.trim()) {
+    throw new Error('Justificativa é obrigatória para recusa.');
+  }
+  if (decision === 'resubmission_requested' && !options?.guidance?.trim()) {
+    throw new Error('Orientação é obrigatória para solicitar reenvio.');
+  }
+
+  const review_notes = decision === 'rejected' ? options?.justification?.trim() : null;
+  const guidance = decision === 'resubmission_requested' ? options?.guidance?.trim() : null;
+
+  const { error } = await supabase
+    .from('process_document_attachments')
+    .update({
+      validation_status: decision,
+      reviewer_user_id: actor_user_id,
+      reviewed_at: new Date().toISOString(),
+      review_notes,
+      guidance,
+    })
+    .eq('org_id', org_id)
+    .eq('process_id', process_id)
+    .eq('id', attachment_id);
+  if (error) throw error;
+
+  await insertProcessAuditEvents([
+    {
+      org_id,
+      process_id,
+      actor_user_id,
+      event_type: 'document_reviewed',
+      mensagem: `Documento ${decision === 'approved' ? 'aprovado' : decision === 'rejected' ? 'recusado' : 'com reenvio solicitado'}`,
+      tipo: 'documento',
+      metadata: { attachment_id, decision, review_notes, guidance },
+    },
+  ]);
+
+  if (decision !== 'approved') {
+    await supabase.from('processes').update({ process_status: 'awaiting_documents' }).eq('org_id', org_id).eq('id', process_id);
+  }
 }
 
 /**

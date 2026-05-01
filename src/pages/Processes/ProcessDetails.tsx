@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Activity, Calendar, Landmark, UserCheck, MessageSquare, User as UserIcon, Loader2, AlertCircle, X, ChevronRight } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { getProcessById, listProcessEvents, updateProcessStatus, addProcessEvent, type Process, type ProcessEvent } from '../../lib/processes';
+import { getProcessById, listProcessEvents, updateProcessStatus, addProcessEvent, listRequiredChecklistDocuments, listProcessAttachments, reviewProcessAttachment, type Process, type ProcessEvent, type ProcessDocumentAttachment, type ProcessDocumentChecklistItem } from '../../lib/processes';
 
 const statusSteps = [
   { key: 'cadastro', label: 'CADASTRO', color: 'bg-slate-500' },
@@ -32,6 +32,8 @@ const ProcessDetails: React.FC = () => {
   const [process, setProcess] = useState<Process | null>(null);
   const [events, setEvents] = useState<ProcessEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [attachments, setAttachments] = useState<ProcessDocumentAttachment[]>([]);
+  const [requiredDocuments, setRequiredDocuments] = useState<ProcessDocumentChecklistItem[]>([]);
   const [error, setError] = useState('');
   
   // Modal states
@@ -61,6 +63,13 @@ const ProcessDetails: React.FC = () => {
       
       setProcess(processData);
       setEvents(eventsData);
+
+      const [attachmentsData, checklistData] = await Promise.all([
+        listProcessAttachments(userContext.org_id, id),
+        listRequiredChecklistDocuments(userContext.org_id, id).catch(() => []),
+      ]);
+      setAttachments(attachmentsData);
+      setRequiredDocuments(checklistData);
     } catch (err) {
       console.error('Error loading process:', err);
       setError('Erro ao carregar processo');
@@ -105,6 +114,23 @@ const ProcessDetails: React.FC = () => {
   };
 
   const currentStepIndex = statusSteps.findIndex(s => s.key === process?.status);
+  const canReviewDocuments = ['admin', 'pleno', 'senior'].includes((userContext?.hierarchy || '').toLowerCase());
+
+  const handleReview = async (attachmentId: string, decision: 'approved' | 'rejected' | 'resubmission_requested') => {
+    if (!userContext?.org_id || !userContext?.id || !process) return;
+    let justification = '';
+    let guidance = '';
+    if (decision === 'rejected') {
+      justification = window.prompt('Informe a justificativa da recusa (obrigatório):', '') || '';
+      if (!justification.trim()) return;
+    }
+    if (decision === 'resubmission_requested') {
+      guidance = window.prompt('Informe a orientação para reenvio (obrigatório):', '') || '';
+      if (!guidance.trim()) return;
+    }
+    await reviewProcessAttachment(userContext.org_id, process.id, attachmentId, decision, userContext.id, { justification, guidance });
+    await loadData();
+  };
 
   if (loading) {
     return (
@@ -245,6 +271,38 @@ const ProcessDetails: React.FC = () => {
                 </p>
               </div>
             </div>
+          </div>
+
+          {requiredDocuments.length > 0 && (
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+              <h2 className="text-lg font-bold mb-3">Documentos obrigatórios</h2>
+              <ul className="space-y-2">
+                {requiredDocuments.map((doc) => (
+                  <li key={doc.id} className="text-sm text-slate-300">• {doc.document_name}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+            <h2 className="text-lg font-bold mb-3">Anexos do processo</h2>
+            {attachments.length === 0 ? <p className="text-sm text-slate-500">Nenhum anexo.</p> : (
+              <div className="space-y-3">
+                {attachments.map((a) => (
+                  <div key={a.id} className="border border-slate-700 rounded-lg p-3">
+                    <p className="font-bold text-sm text-white">{a.document_name}</p>
+                    <p className="text-xs text-slate-400">Status: {a.validation_status}</p>
+                    {canReviewDocuments && (
+                      <div className="flex gap-2 mt-2">
+                        <button className="text-xs px-2 py-1 bg-emerald-700 rounded" onClick={() => handleReview(a.id, 'approved')}>Aprovar</button>
+                        <button className="text-xs px-2 py-1 bg-red-700 rounded" onClick={() => handleReview(a.id, 'rejected')}>Recusar</button>
+                        <button className="text-xs px-2 py-1 bg-yellow-700 rounded" onClick={() => handleReview(a.id, 'resubmission_requested')}>Solicitar reenvio</button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </section>
 
