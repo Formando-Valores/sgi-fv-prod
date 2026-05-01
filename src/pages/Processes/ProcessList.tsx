@@ -38,7 +38,8 @@ const ProcessList: React.FC = () => {
     titulo: '',
     cliente_nome: '',
     cliente_documento: '',
-    cliente_contato: ''
+    cliente_contato: '',
+    os_value: undefined
   });
   const [formError, setFormError] = useState('');
 
@@ -84,7 +85,7 @@ const ProcessList: React.FC = () => {
     try {
       const newProcess = await createProcess(userContext.org_id, formData, userContext.id);
       setShowModal(false);
-      setFormData({ titulo: '', cliente_nome: '', cliente_documento: '', cliente_contato: '' });
+      setFormData({ titulo: '', cliente_nome: '', cliente_documento: '', cliente_contato: '', os_value: undefined });
       navigate(`/processos/${newProcess.id}`);
     } catch (err) {
       console.error('Error creating process:', err);
@@ -270,6 +271,18 @@ const ProcessList: React.FC = () => {
                   onChange={(e) => setFormData({ ...formData, cliente_documento: e.target.value })}
                   className="w-full px-4 py-3 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none"
                   placeholder="000.000.000-00"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-slate-300 mb-2">Valor da OS (R$)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.os_value ?? ''}
+                  onChange={(e) => setFormData({ ...formData, os_value: e.target.value ? Number(e.target.value) : undefined })}
+                  className="w-full px-4 py-3 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none"
+                  placeholder="0,00"
                 />
               </div>
               <div>

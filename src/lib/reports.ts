@@ -37,6 +37,7 @@ export type ReportRow = {
     paymentStatus: string | null;
     paidAt: string | null;
     createdAt: string | null;
+    chargeType: string | null;
   }>;
   attachments: Array<{
     id: string;
@@ -198,7 +199,7 @@ export async function listReportActivities(
   if (processIds.length) {
     const { data: paymentData } = await supabase
       .from('payments')
-      .select('id,process_id,amount,currency,payment_status,paid_at,created_at')
+      .select('id,process_id,amount,currency,payment_status,paid_at,created_at,charge_type')
       .in('process_id', processIds)
       .order('created_at', { ascending: false });
     (paymentData || []).forEach((item: any) => {
@@ -292,6 +293,7 @@ export async function listReportActivities(
           paymentStatus: payment.payment_status || null,
           paidAt: payment.paid_at || null,
           createdAt: payment.created_at || null,
+          chargeType: payment.charge_type || null,
         })),
         attachments,
         financialHighlights,
