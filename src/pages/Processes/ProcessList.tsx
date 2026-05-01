@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Search, Eye, FolderKanban, X, AlertCircle, Loader2 } from 'lucide-react';
+import { Plus, Search, Eye, FolderKanban, X, AlertCircle, Loader2, Lock } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { can } from '../../lib/permissions';
 import {
@@ -61,8 +61,7 @@ const ProcessList: React.FC = () => {
       const data = canViewAllProcesses
         ? await listAdminOperationalProcesses(userContext.org_id)
         : await listProcesses(userContext.org_id);
-      const safeData = data.filter((process) => process.process_status !== 'pending_payment');
-      setProcesses(safeData);
+      setProcesses(data);
     } catch (err) {
       console.error('Error loading processes:', err);
       setError('Erro ao carregar processos. Verifique se as migrações foram executadas.');
@@ -216,12 +215,21 @@ const ProcessList: React.FC = () => {
                     <td className="px-6 py-4 text-slate-300">{process.unidade_atendimento || '-'}</td>
                     <td className="px-6 py-4 text-slate-400 font-bold">{formatDate(process.created_at)}</td>
                     <td className="px-6 py-4 text-right">
-                      <Link
-                        to={`/processos/${process.id}`}
-                        className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 inline-flex"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </Link>
+                      <div className="inline-flex items-center gap-2">
+                        {process.process_status === 'pending_payment' && (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-wide bg-amber-900/30 text-amber-300 border border-amber-700">
+                            <Lock className="w-3 h-3" />
+                            Ações bloqueadas
+                          </span>
+                        )}
+                        <Link
+                          to={`/processos/${process.id}`}
+                          title={process.process_status === 'pending_payment' ? 'Visualização liberada. Edição bloqueada até confirmação do pagamento.' : 'Visualizar processo'}
+                          className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 inline-flex"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Link>
+                      </div>
                     </td>
                   </tr>
                 ))}
