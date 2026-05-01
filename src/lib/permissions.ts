@@ -162,8 +162,8 @@ const PERMISSION_MATRIX_BY_HIERARCHY: Record<SystemHierarchy, PermissionMatrix> 
     modules: ['dashboard', 'processos', 'clientes', 'financeiro', 'relatorios'],
     actionsByScope: {
       dashboard: ['view'],
-      processos: ['view', 'create', 'update'],
-      clientes: ['view', 'create', 'update'],
+      processos: ['view', 'create', 'update', 'manage'],
+      clientes: ['view', 'create', 'update', 'manage'],
       financeiro: ['view'],
       relatorios: ['view'],
     },
@@ -180,12 +180,16 @@ const PERMISSION_MATRIX_BY_HIERARCHY: Record<SystemHierarchy, PermissionMatrix> 
     modules: ['dashboard', 'processos', 'financeiro', 'relatorios'],
     actionsByScope: {
       dashboard: ['view_own'],
-      processos: ['view_own'],
-      financeiro: ['view_own'],
-      relatorios: ['view_own'],
+      processos: ['view_own', 'update'],
+      financeiro: ['view_own', 'update'],
+      relatorios: ['view_own', 'update'],
     },
   },
 };
+
+export function getAuthorizationDeniedMessage(action: PermissionAction, scope: PermissionScope): string {
+  return `Permissão negada: seu perfil/escopo não permite ${action} em ${scope}.`;
+}
 
 function resolveHierarchyFromSubject(subject?: PermissionSubject | null): SystemHierarchy {
   if (!subject) return 'cliente';
