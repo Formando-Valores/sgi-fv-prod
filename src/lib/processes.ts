@@ -7,6 +7,7 @@
 
 import { supabase } from '../../supabase';
 import { getAuthorizationDeniedMessage, getProcessScope } from './permissions';
+import { SUPABASE_EDGE_FUNCTIONS } from './supabaseFunctions';
 
 // Debug mode flag
 const DEBUG = true;
@@ -1027,6 +1028,13 @@ export async function reviewProcessAttachment(
   const review_notes = decision === 'rejected' ? options?.justification?.trim() : null;
   const guidance = decision === 'resubmission_requested' ? options?.guidance?.trim() : null;
 
+  const { data: processData } = await supabase
+    .from('processes')
+    .select('id,titulo,cliente_nome,cliente_contato,responsavel_user_id')
+    .eq('org_id', org_id)
+    .eq('id', process_id)
+    .maybeSingle();
+
   const { error } = await supabase
     .from('process_document_attachments')
     .update({
@@ -1046,7 +1054,7 @@ export async function reviewProcessAttachment(
       org_id,
       process_id,
       actor_user_id,
-      event_type: 'document_reviewed',
+      event_type: decision === 'approved' ? 'document_reviewed' : 'document_rejected_resubmission_requested',
       mensagem: `Documento ${decision === 'approved' ? 'aprovado' : decision === 'rejected' ? 'recusado' : 'com reenvio solicitado'}`,
       tipo: 'documento',
       metadata: { attachment_id, decision, review_notes, guidance },
@@ -1055,6 +1063,38 @@ export async function reviewProcessAttachment(
 
   if (decision !== 'approved') {
     await supabase.from('processes').update({ process_status: 'awaiting_documents' }).eq('org_id', org_id).eq('id', process_id);
+
+    const notificationReason = review_notes || guidance || 'Documento recusado durante validação.';
+
+    await insertProcessAuditEvents([
+      {
+        org_id,
+        process_id,
+        actor_user_id,
+        event_type: 'document_notification_sent',
+        mensagem: `Notificação de pendência documental enviada ao cliente (${decision === 'rejected' ? 'recusa' : 'reenvio solicitado'}).`,
+        tipo: 'observacao',
+        metadata: {
+          timestamp: new Date().toISOString(),
+          author_user_id: actor_user_id,
+          reason: notificationReason,
+          decision,
+        },
+      },
+    ]);
+
+    await supabase.functions.invoke(SUPABASE_EDGE_FUNCTIONS.DOCUMENT_REVIEW_NOTIFICATION, {
+      body: {
+        org_id,
+        process_id,
+        decision,
+        justification: review_notes,
+        guidance,
+        reason: notificationReason,
+        actor_user_id,
+        process: processData || null,
+      },
+    });
   }
 }
 
