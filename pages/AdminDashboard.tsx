@@ -461,6 +461,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const canViewAllReports = can('view_all', 'relatorios', permissionSubject);
   const isClientScope = permissions.hierarchy === 'cliente';
 
+  const sectionReadOnly = {
+    processos: !can('create', 'processos', permissionSubject) && !can('delete', 'processos', permissionSubject),
+    clientes: !can('manage', 'clientes', permissionSubject),
+    configuracoes: !can('manage', 'configuracoes', permissionSubject),
+    organizacoes: !can('manage', 'organizacoes', permissionSubject),
+    relatorios: !can('view_all', 'relatorios', permissionSubject),
+  } as const;
+
   const sidebarLinks = [
     { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, visible: allowedModules.includes('dashboard') },
     { to: '/dashboard/processos', label: 'Processos', icon: FolderKanban, visible: allowedModules.includes('processos') },
@@ -3206,6 +3214,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               )}
             </div>
             <p className="text-gray-500 text-sm mb-4">Visão geral em formato de planilha para filtrar, acompanhar status e agir rápido.</p>
+            {sectionReadOnly.processos && (
+              <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">Modo somente leitura neste escopo: visualização habilitada, ações de criação/remoção bloqueadas.</p>
+            )}
 
             <div className="grid min-w-0 grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5 gap-2.5 sm:gap-3">
               <div className="bg-white border-l-4 border-blue-500 rounded-xl p-3 shadow-sm border border-gray-100">
@@ -3459,6 +3470,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
           {clientsError && <p className="text-sm text-amber-600 font-bold mb-4">{clientsError}</p>}
 
+          {sectionReadOnly.clientes && (
+            <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">Modo somente leitura para clientes neste escopo.</p>
+          )}
           <div className="mb-3 flex items-center justify-between text-xs text-gray-500 font-bold">
             <span>Total encontrado: {clientsData.length}</span>
             <span>Exibindo: {visibleClients.length}</span>
