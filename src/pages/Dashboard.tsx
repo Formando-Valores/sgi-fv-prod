@@ -34,6 +34,7 @@ const Dashboard: React.FC = () => {
   const canCreateProcess = can('create', 'processos', userContext);
   const [stats, setStats] = useState({ total: 0, cadastro: 0, triagem: 0, analise: 0, concluido: 0 });
   const [recentProcesses, setRecentProcesses] = useState<Process[]>([]);
+  const [documentPendingAlerts, setDocumentPendingAlerts] = useState<Process[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [migrationStatus, setMigrationStatus] = useState<MigrationStatus | null>(null);
@@ -138,6 +139,11 @@ const Dashboard: React.FC = () => {
       
       setStats(statsData);
       setRecentProcesses(processesData.slice(0, 5));
+      setDocumentPendingAlerts(
+        processesData.filter(
+          (process) => process.process_status === 'awaiting_documents' && process.responsavel_user_id === userContext?.id
+        )
+      );
       
       log('Stats set:', statsData);
       log('Recent processes set:', processesData.slice(0, 5).length, 'items');
@@ -274,6 +280,20 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {!loading && documentPendingAlerts.length > 0 && (
+        <div className="bg-amber-900/20 border border-amber-700 rounded-2xl p-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-400 mt-0.5" />
+            <div>
+              <p className="font-bold text-amber-200">Pendência documental aguardando resolução</p>
+              <p className="text-sm text-amber-100">
+                Você possui {documentPendingAlerts.length} processo(s) com documento recusado ou solicitação de reenvio.
+              </p>
+            </div>
+          </div>
         </div>
       )}
 
