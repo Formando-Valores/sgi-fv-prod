@@ -6,6 +6,8 @@
  * - Ordens de serviço por cliente
  * - Status e timeline
  * - Documentos anexos
+ * - Checklist obrigatório por serviço/OS
+ * - Validação de anexos por equipe (Admin/Pleno/Sênior)
  */
 
 import { ProcessStatus, ServiceUnit } from '../../types';
@@ -69,4 +71,51 @@ export interface ServiceOrderDocument {
   file_type: string;
   uploaded_by: string;
   created_at: string;
+}
+
+/**
+ * Checklist de documentos obrigatórios por serviço
+ * Tabela: `service_order_document_checklists`
+ */
+export interface ServiceOrderDocumentChecklist {
+  id: string;
+  org_id: string;
+  service_id: string;
+  document_name: string;
+  description?: string | null;
+  is_required: boolean;
+  sort_order: number;
+  active: boolean;
+  created_at: string;
+  updated_at?: string;
+}
+
+export type DocumentValidationStatus =
+  | 'pending'
+  | 'approved'
+  | 'rejected'
+  | 'resubmission_requested';
+
+/**
+ * Anexo por processo/OS com trilha de validação
+ * Tabela: `process_document_attachments`
+ */
+export interface ProcessDocumentAttachment {
+  id: string;
+  org_id: string;
+  process_id: string;
+  service_order_id?: string | null;
+  checklist_id?: string | null;
+  document_name: string;
+  file_path: string;
+  file_type?: string | null;
+  uploaded_by: string;
+  validation_status: DocumentValidationStatus;
+  pending_reason?: string | null;
+  reviewer_user_id?: string | null;
+  reviewed_at?: string | null;
+  review_notes?: string | null;
+  guidance?: string | null;
+  created_at: string;
+  updated_at?: string;
 }
