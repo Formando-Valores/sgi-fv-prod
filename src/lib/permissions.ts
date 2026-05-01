@@ -214,6 +214,9 @@ export function getCapabilitiesForHierarchy(hierarchy: SystemHierarchy): Permiss
 
 export function getAllowedModules(subject?: PermissionSubject | null): PermissionModule[] {
   const hierarchy = resolveHierarchyFromSubject(subject);
+
+  // Produto: "todas as telas" = dashboard unificado com seções visíveis por escopo
+  // (não liberação irrestrita de rotas nem dados sensíveis).
   return PERMISSION_MATRIX_BY_HIERARCHY[hierarchy].modules;
 }
 
@@ -248,6 +251,7 @@ export function hierarchyToOrgRole(hierarchy: SystemHierarchy): OrgRole {
 }
 
 export function getNavigationModules(subject?: PermissionSubject | null): PermissionModule[] {
+  // Navegação deve refletir somente módulos navegáveis; financeiro permanece no dashboard/relatórios.
   return getAllowedModules(subject).filter((module) => module !== 'financeiro');
 }
 

@@ -22,7 +22,7 @@ import PaymentCancel from './src/pages/Payments/PaymentCancel';
 import { ProcessStatus, ServiceUnit, User, UserRole } from './types';
 import { INITIAL_MOCK_USERS } from './constants';
 import { supabase } from './supabase';
-import { resolvePermissions } from './src/lib/permissions';
+import { getAllowedModules, resolvePermissions } from './src/lib/permissions';
 
 const parseStorageItem = <T,>(key: string, fallback: T): T => {
   const rawValue = localStorage.getItem(key);
@@ -192,6 +192,12 @@ const RootApp: React.FC = () => {
 
     if (!currentUser) {
       return <Navigate to="/login" />;
+    }
+
+    const permissions = resolvePermissions(currentUser.org_role ?? (currentUser.role === UserRole.ADMIN ? 'admin' : 'client'));
+    const allowedModules = getAllowedModules({ org_role: currentUser.org_role ?? null, hierarchy: permissions.hierarchy });
+    if (section !== 'dashboard' && !allowedModules.includes(section)) {
+      return <Navigate to="/dashboard" replace />;
     }
 
     return (
