@@ -1,6 +1,7 @@
 import { supabase } from '../../supabase';
 import { listProcessEvents, type Process, type ProcessEvent } from './processes';
 import { can, getReportScope, mapToSystemHierarchy } from './permissions';
+import { getPaymentStatusLabel, resolvePaymentStatus } from './paymentStatus';
 
 export type ReportFilters = {
   periodStart?: string;
@@ -199,7 +200,7 @@ export async function listReportActivities(
   if (processIds.length) {
     const { data: paymentData } = await supabase
       .from('payments')
-      .select('id,process_id,amount,currency,payment_status,paid_at,created_at,charge_type')
+      .select('id,process_id,amount,currency,status,paid_at,created_at,charge_type')
       .in('process_id', processIds)
       .order('created_at', { ascending: false });
     (paymentData || []).forEach((item: any) => {
@@ -237,10 +238,11 @@ export async function listReportActivities(
           createdAt: event.created_at || null,
         }));
 
-      if (processFinancial?.payment_status || processFinancial?.paid_at) {
+      const processPaymentStatus = resolvePaymentStatus(processFinancial);
+      if (processPaymentStatus || processFinancial?.paid_at) {
         financialHighlights.unshift({
           type: 'process_payment_state',
-          message: `Status do pagamento: ${processFinancial.payment_status || 'não informado'}${
+          message: `Status do pagamento: ${getPaymentStatusLabel(processPaymentStatus) || 'não informado'}${
             processFinancial.paid_at ? ` (pago em ${new Date(processFinancial.paid_at).toLocaleString('pt-BR')})` : ''
           }`,
           createdAt: processFinancial.paid_at || null,
@@ -290,7 +292,7 @@ export async function listReportActivities(
           id: payment.id,
           amount: typeof payment.amount === 'number' ? payment.amount : payment.amount ? Number(payment.amount) : null,
           currency: payment.currency || processFinancial?.currency || 'BRL',
-          paymentStatus: payment.payment_status || null,
+          paymentStatus: payment.status || null,
           paidAt: payment.paid_at || null,
           createdAt: payment.created_at || null,
           chargeType: payment.charge_type || null,

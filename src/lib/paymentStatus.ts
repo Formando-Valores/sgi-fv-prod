@@ -33,3 +33,26 @@ export const getPaymentStatusLabel = (status?: string | null) => {
   if (!status) return null;
   return PAYMENT_STATUS_BADGES[status]?.label || status;
 };
+
+
+export type PaymentStatusValue = 'pending' | 'paid' | 'failed' | 'refunded' | 'canceled' | 'released';
+
+export const resolvePaymentStatus = (
+  source: { payment_status?: string | null; status?: string | null } | null | undefined,
+): PaymentStatusValue | null => {
+  const raw = source?.payment_status ?? source?.status ?? null;
+  if (!raw) return null;
+  return (raw in PAYMENT_STATUS_BADGES ? raw : null) as PaymentStatusValue | null;
+};
+
+export const getPaymentStatusUi = (
+  source: { payment_status?: string | null; status?: string | null } | string | null | undefined,
+) => {
+  const resolved = typeof source === 'string' ? resolvePaymentStatus({ payment_status: source }) : resolvePaymentStatus(source);
+  if (!resolved) return null;
+  return {
+    key: resolved,
+    label: PAYMENT_STATUS_BADGES[resolved].label,
+    color: PAYMENT_STATUS_BADGES[resolved].color,
+  };
+};
