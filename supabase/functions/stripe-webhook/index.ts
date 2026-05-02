@@ -106,8 +106,21 @@ const validateProcessConsistency = (
   }
 };
 
-const logAudit = (message: string, context: Record<string, unknown>) => {
-  console.log(`[stripe-webhook] ${message}`, JSON.stringify(context));
+const logAudit = (
+  message: string,
+  context: Record<string, unknown> & { processId?: string | null; eventId?: string | null; checkoutSessionId?: string | null; paymentIntentId?: string | null },
+) => {
+  const payload = {
+    component: 'stripe-webhook',
+    message,
+    processId: context.processId ?? null,
+    eventId: context.eventId ?? null,
+    checkoutSessionId: context.checkoutSessionId ?? null,
+    paymentIntentId: context.paymentIntentId ?? null,
+    ...context,
+  };
+
+  console.log(JSON.stringify(payload));
 };
 
 Deno.serve(async (request) => {
@@ -149,7 +162,7 @@ Deno.serve(async (request) => {
 
   const actionableStatus = mapEventToPaymentStatus(event.type);
   if (!actionableStatus) {
-    logAudit('webhook_received_ignored', { stripeEventId: event.id, eventType: event.type });
+    logAudit('webhook_received_ignored', { eventId: event.id, eventType: event.type });
     return jsonResponse(200, { success: true, ignored: true, eventType: event.type });
   }
 
@@ -350,10 +363,11 @@ Deno.serve(async (request) => {
     await client.queryArray('COMMIT');
     logAudit('webhook_processed', {
       processId,
-      stripeEventId: event.id,
+      eventId: event.id,
       checkoutSessionId,
       paymentIntentId,
       paymentStatus: actionableStatus,
+      eventType: event.type,
     });
 
     return jsonResponse(200, {
@@ -365,7 +379,7 @@ Deno.serve(async (request) => {
   } catch (error) {
     await client.queryArray('ROLLBACK').catch(() => undefined);
     const message = error instanceof Error ? error.message : 'Falha ao processar webhook Stripe.';
-    logAudit('webhook_processing_failed', { error: message });
+    logAudit('webhook_processing_failed', { error: message, eventId: event?.id ?? null });
     return jsonResponse(500, { success: false, error: message });
   } finally {
     await client.end().catch(() => undefined);
