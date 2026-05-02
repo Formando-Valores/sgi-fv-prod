@@ -64,14 +64,6 @@ export async function createCheckoutSession(
   };
 }
 
-export async function handleStripeWebhook(
-  _payload: string,
-  _signature: string
-): Promise<boolean> {
-  console.warn('Stripe webhook handler não implementado');
-  return false;
-}
-
 export async function createCustomerPortalSession(
   _customerId: string
 ): Promise<{ url: string } | null> {

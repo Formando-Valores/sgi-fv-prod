@@ -1,5 +1,5 @@
 import { supabase } from '../../supabase';
-import { createCheckoutSession, handleStripeWebhook } from './stripe';
+import { createCheckoutSession } from './stripe';
 import type {
   CreateCheckoutInput,
   CreateCheckoutResult,
@@ -8,16 +8,12 @@ import type {
   PaymentStatusResult,
 } from './paymentProvider';
 
-/**
- * Adapter inicial para Stripe seguindo a interface de domínio de pagamentos.
- */
 export class StripePaymentProvider implements PaymentProvider {
   readonly name = 'stripe' as const;
   readonly defaultPaymentMethod = 'stripe_checkout' as const;
 
   async createCheckout(input: CreateCheckoutInput): Promise<CreateCheckoutResult> {
     const session = await createCheckoutSession(input);
-
     return {
       sessionId: session.sessionId,
       url: session.url,
@@ -26,16 +22,8 @@ export class StripePaymentProvider implements PaymentProvider {
     };
   }
 
-  async interpretWebhook(payload: string, signature?: string): Promise<InterpretedWebhook | null> {
-    const accepted = await handleStripeWebhook(payload, signature ?? '');
-    if (!accepted) return null;
-
-    return {
-      providerEventId: 'handled-by-edge-function',
-      eventType: 'stripe.webhook.accepted',
-      processId: '',
-      paymentStatus: 'pending',
-    };
+  async interpretWebhook(_payload: string, _signature?: string): Promise<InterpretedWebhook | null> {
+    return null;
   }
 
   async getPaymentStatus(processId: string): Promise<PaymentStatusResult | null> {
