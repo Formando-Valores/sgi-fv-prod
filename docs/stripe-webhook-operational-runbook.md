@@ -21,6 +21,56 @@ As funções `stripe-webhook` e `stripe-reconciliation` dependem de credenciais 
 - **Prod**: conta Stripe produção/live mode + projeto Supabase produção.
 - Proibido apontar `stage` para segredo de `prod` (e vice-versa).
 
+
+## 1.1) Onde obter cada secret (passo a passo)
+
+### `STRIPE_SECRET_KEY`
+
+No painel Stripe do **mesmo ambiente** (test para dev/stage, live para prod):
+
+1. Acesse **Developers > API keys**.
+2. Copie a chave **Secret key**:
+   - começa com `sk_test_...` em test mode
+   - começa com `sk_live_...` em live mode
+3. Salve como `STRIPE_SECRET_KEY` no projeto Supabase do ambiente correspondente.
+
+### `STRIPE_WEBHOOK_SECRET`
+
+No endpoint de webhook configurado no Stripe:
+
+1. Acesse **Developers > Webhooks**.
+2. Abra o endpoint `https://<PROJECT_REF>.supabase.co/functions/v1/stripe-webhook`.
+3. Clique em **Reveal** / **Signing secret**.
+4. Copie o segredo com prefixo `whsec_...` e salve como `STRIPE_WEBHOOK_SECRET`.
+
+> Se estiver usando Stripe CLI localmente, o segredo temporário vem do comando `stripe listen` e também é `whsec_...`.
+
+### `SUPABASE_DB_URL` (ou equivalentes)
+
+No painel do Supabase do ambiente:
+
+1. Acesse **Project Settings > Database**.
+2. Copie a **Connection string** (URI Postgres).
+3. Salve no secret `SUPABASE_DB_URL`.
+
+Equivalentes aceitos pelo código (fallback):
+
+- `POSTGRES_URL`
+- `DATABASE_URL`
+
+### Onde configurar esses secrets no Supabase
+
+Via CLI (recomendado para CI/CD):
+
+```bash
+supabase secrets set STRIPE_SECRET_KEY=... STRIPE_WEBHOOK_SECRET=... SUPABASE_DB_URL=...
+```
+
+Ou pelo Dashboard Supabase:
+
+- **Edge Functions > Secrets** (ou Settings equivalente)
+- Criar/atualizar os três nomes exatamente como acima.
+
 ## 2) Endpoint oficial no Stripe e eventos mínimos aceitos
 
 Endpoint oficial do webhook (Supabase Edge Function):
