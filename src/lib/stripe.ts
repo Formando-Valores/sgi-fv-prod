@@ -1,3 +1,4 @@
+import { supabase } from '../../supabase';
 import { SUPABASE_EDGE_FUNCTIONS } from './supabaseFunctions';
 
 type CreateCheckoutSessionParams = {
@@ -64,9 +65,31 @@ export async function createCheckoutSession(
   };
 }
 
-export async function createCustomerPortalSession(
-  _customerId: string
-): Promise<{ url: string } | null> {
-  console.warn('Stripe customer portal não implementado');
-  return null;
+export async function createCustomerPortalSession(params: { clientId: string; org_id: string; returnUrl?: string }): Promise<{ url: string }> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const accessToken = sessionData.session?.access_token ?? '';
+
+  if (!accessToken) {
+    throw new Error('Sessão expirada. Faça login novamente.');
+  }
+
+  const response = await fetch(buildFunctionUrl(SUPABASE_EDGE_FUNCTIONS.STRIPE_CREATE_CUSTOMER_PORTAL_SESSION), {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(params),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const message = String(payload?.error ?? 'Não foi possível criar a sessão de portal do Stripe.');
+    throw new Error(message);
+  }
+
+  return {
+    url: String(payload?.url ?? ''),
+  };
 }

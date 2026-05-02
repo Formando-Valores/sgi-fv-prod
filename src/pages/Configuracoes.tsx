@@ -3,20 +3,51 @@
  * Settings placeholder
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Settings, Users, Building2, Bell } from 'lucide-react';
+import { Settings, Users, Building2, Bell, CreditCard } from 'lucide-react';
+import { createCustomerPortalSession } from '../lib/stripe';
+import { getUserContext } from '../lib/userContext';
 
 const Configuracoes: React.FC = () => {
+  const [redirectingPayment, setRedirectingPayment] = useState(false);
+
   const settingsItems = [
     { to: '/configuracoes/membros', label: 'Membros da Equipe', description: 'Gerenciar usuários e permissões', icon: Users },
     { to: '#', label: 'Dados da Organização', description: 'Em construção', icon: Building2, disabled: true },
     { to: '#', label: 'Notificações', description: 'Em construção', icon: Bell, disabled: true },
   ];
 
+  const handleManagePayments = async () => {
+    try {
+      setRedirectingPayment(true);
+      const userContext = await getUserContext();
+
+      if (!userContext?.id || !userContext.org_id) {
+        throw new Error('Contexto de usuário inválido para acessar pagamentos.');
+      }
+
+      const result = await createCustomerPortalSession({
+        clientId: userContext.id,
+        org_id: userContext.org_id,
+        returnUrl: `${window.location.origin}/#/configuracoes`,
+      });
+
+      if (!result.url) {
+        throw new Error('URL de redirecionamento do Stripe não retornada.');
+      }
+
+      window.location.assign(result.url);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Falha ao abrir portal de pagamentos.';
+      window.alert(message);
+    } finally {
+      setRedirectingPayment(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-black text-white uppercase tracking-tight flex items-center gap-2">
           <Settings className="text-blue-500" /> Configurações
@@ -24,15 +55,14 @@ const Configuracoes: React.FC = () => {
         <p className="text-slate-400 text-sm font-bold mt-1">Gerencie sua organização</p>
       </div>
 
-      {/* Settings Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {settingsItems.map((item) => (
           <Link
             key={item.label}
             to={item.disabled ? '#' : item.to}
             className={`bg-slate-900 border border-slate-800 rounded-2xl p-6 transition-all ${
-              item.disabled 
-                ? 'opacity-50 cursor-not-allowed' 
+              item.disabled
+                ? 'opacity-50 cursor-not-allowed'
                 : 'hover:border-slate-700 hover:bg-slate-800/50'
             }`}
           >
@@ -48,6 +78,24 @@ const Configuracoes: React.FC = () => {
             )}
           </Link>
         ))}
+
+        <button
+          type="button"
+          onClick={handleManagePayments}
+          disabled={redirectingPayment}
+          className="text-left bg-slate-900 border border-slate-800 rounded-2xl p-6 transition-all hover:border-slate-700 hover:bg-slate-800/50 disabled:opacity-60"
+        >
+          <div className="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center mb-4">
+            <CreditCard className="w-6 h-6 text-emerald-400" />
+          </div>
+          <h3 className="text-lg font-bold text-white mb-1">Gerenciar pagamento/assinatura</h3>
+          <p className="text-sm text-slate-400">Abrir Stripe Customer Portal para métodos de pagamento e assinatura</p>
+          {redirectingPayment && (
+            <span className="inline-block mt-2 px-2 py-1 bg-emerald-900/30 text-emerald-400 text-[10px] font-bold rounded uppercase">
+              Redirecionando...
+            </span>
+          )}
+        </button>
       </div>
     </div>
   );
