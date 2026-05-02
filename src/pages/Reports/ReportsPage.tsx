@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, Download, FileText, Search } from 'lucide-react';
 import { listReportActivities, type ReportFilters, type ReportRow } from '../../lib/reports';
+import { listPendingPaymentsForReconciliation, type PendingPaymentRow } from '../../lib/paymentsReconciliation';
 
 interface ReportsPageProps {
   defaultOrgId?: string | null;
@@ -38,6 +39,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ defaultOrgId, operationalOnly
   const [error, setError] = useState('');
   const [result, setResult] = useState<Awaited<ReturnType<typeof listReportActivities>> | null>(null);
   const [expandedProcessId, setExpandedProcessId] = useState<string | null>(null);
+  const [pendingPayments, setPendingPayments] = useState<PendingPaymentRow[]>([]);
   const organizationFilterEnabled = result?.scope.organizationFilterEnabled ?? false;
   const isProfileLimited = result?.scope.limitedByProfile ?? false;
   const debouncedSearch = useDebouncedValue(filters.textSearch || '', 350);
@@ -69,6 +71,19 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ defaultOrgId, operationalOnly
     void run();
   }, [debouncedFilters, page, defaultOrgId, operationalOnly]);
 
+
+
+  useEffect(() => {
+    const runPending = async () => {
+      try {
+        const rows = await listPendingPaymentsForReconciliation(15, 20);
+        setPendingPayments(rows);
+      } catch (err) {
+        console.error('Falha ao carregar pendências de reconciliação', err);
+      }
+    };
+    void runPending();
+  }, []);
   const totalPages = useMemo(() => {
     if (!result) return 1;
     return Math.max(1, Math.ceil(result.total / result.pageSize));
@@ -224,6 +239,29 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ defaultOrgId, operationalOnly
             <button onClick={() => void exportCsv()} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white"><Download className="h-4 w-4" /> CSV</button>
             <button onClick={() => void exportPdf()} className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-3 py-2 text-xs font-bold text-white"><FileText className="h-4 w-4" /> PDF</button>
           </div>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
+        <div className="mb-2 flex items-center justify-between">
+          <h3 className="text-sm font-black text-amber-900">Pendências de reconciliação financeira</h3>
+          <span className="rounded-md bg-amber-100 px-2 py-1 text-xs font-bold text-amber-800">{pendingPayments.length} itens</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-xs">
+            <thead><tr className="text-amber-800"><th className="px-2 py-1 text-left">Protocolo</th><th className="px-2 py-1 text-left">Processo</th><th className="px-2 py-1 text-left">Valor</th><th className="px-2 py-1 text-left">Criado em</th></tr></thead>
+            <tbody>
+              {pendingPayments.map((row) => (
+                <tr key={row.id} className="border-t border-amber-200">
+                  <td className="px-2 py-1 font-bold">{row.process?.protocolo || '-'}</td>
+                  <td className="px-2 py-1">{row.process?.titulo || row.process_id}</td>
+                  <td className="px-2 py-1">{Number(row.amount || 0).toLocaleString('pt-BR', { style: 'currency', currency: row.currency || 'BRL' })}</td>
+                  <td className="px-2 py-1">{new Date(row.created_at).toLocaleString('pt-BR')}</td>
+                </tr>
+              ))}
+              {!pendingPayments.length ? (<tr><td colSpan={4} className="px-2 py-2 text-center text-amber-800">Nenhuma pendência fora da janela.</td></tr>) : null}
+            </tbody>
+          </table>
         </div>
       </div>
 
