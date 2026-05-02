@@ -333,6 +333,20 @@ Deno.serve(async (request) => {
       );
     }
 
+    const syncCheck = await client.queryObject<{ process_payment_status: string | null; payment_status: string | null }>(
+      `SELECT pr.payment_status AS process_payment_status, pay.status AS payment_status
+         FROM public.processes pr
+         JOIN public.payments pay ON pay.process_id = pr.id
+        WHERE pr.id = $1
+        LIMIT 1`,
+      [processId],
+    );
+
+    const syncRow = syncCheck.rows[0];
+    if (!syncRow || syncRow.process_payment_status !== syncRow.payment_status) {
+      throw new Error('Inconsistência pós-webhook: processes.payment_status diverge de payments.status.');
+    }
+
     await client.queryArray('COMMIT');
     logAudit('webhook_processed', {
       processId,
