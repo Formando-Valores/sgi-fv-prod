@@ -26,6 +26,23 @@ const isAdminRole = (value: unknown): boolean => {
 
 const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 
+
+const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> => {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
+};
+
 const extractRecoveryParamsFromUrl = () => {
   const href = window.location.href;
   const searchParams = new URLSearchParams(window.location.search);
@@ -111,22 +128,30 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
       const loginUrl = `${appOrigin}${window.location.pathname.includes('#') ? '' : '/#/login'}`;
       const redirectTo = `${appOrigin}/recovery.html`;
 
-      const { data: forgotData, error: forgotError } = await supabase.functions.invoke(SUPABASE_EDGE_FUNCTIONS.FORGOT_PASSWORD, {
-        body: {
-          email: forgotPasswordEmail,
-          loginUrl,
-          redirectTo,
-        },
-      });
+      const { data: forgotData, error: forgotError } = await withTimeout(
+        supabase.functions.invoke(SUPABASE_EDGE_FUNCTIONS.FORGOT_PASSWORD, {
+          body: {
+            email: forgotPasswordEmail,
+            loginUrl,
+            redirectTo,
+          },
+        }),
+        12000,
+        'Tempo limite ao contatar o Supabase.'
+      );
 
       const functionSucceeded = !forgotError && (forgotData?.success ?? true);
 
       if (!functionSucceeded) {
         console.error('[login] falha ao solicitar redefinição de senha', forgotError);
 
-        const { error: fallbackError } = await supabase.auth.resetPasswordForEmail(forgotPasswordEmail, {
-          redirectTo,
-        });
+        const { error: fallbackError } = await withTimeout(
+          supabase.auth.resetPasswordForEmail(forgotPasswordEmail, {
+            redirectTo,
+          }),
+          12000,
+          'Tempo limite no fallback de recuperação de senha.'
+        );
 
         if (fallbackError) {
           console.error('[login] fallback resetPasswordForEmail também falhou', fallbackError);
@@ -136,7 +161,12 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
       setForgotPasswordMessage('Se o email estiver cadastrado, você receberá instruções para redefinir sua senha.');
     } catch (forgotPasswordRequestError) {
       console.error('[login] erro inesperado ao solicitar redefinição de senha', forgotPasswordRequestError);
-      setForgotPasswordMessage('Se o email estiver cadastrado, você receberá instruções para redefinir sua senha.');
+      const typedError = forgotPasswordRequestError as Error;
+      if (typedError?.message?.includes('Tempo limite')) {
+        setForgotPasswordError('Não foi possível conectar ao servidor de autenticação. Verifique a configuração do Supabase e tente novamente.');
+      } else {
+        setForgotPasswordMessage('Se o email estiver cadastrado, você receberá instruções para redefinir sua senha.');
+      }
     } finally {
       setForgotPasswordLoading(false);
     }
