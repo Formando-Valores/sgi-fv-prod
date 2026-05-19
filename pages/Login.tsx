@@ -123,11 +123,25 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
 
     setForgotPasswordLoading(true);
 
-    try {
-      const appOrigin = window.location.origin.replace(/\/$/, '');
-      const loginUrl = `${appOrigin}${window.location.pathname.includes('#') ? '' : '/#/login'}`;
-      const redirectTo = `${appOrigin}/recovery.html`;
+    const appOrigin = window.location.origin.replace(/\/$/, '');
+    const loginUrl = `${appOrigin}${window.location.pathname.includes('#') ? '' : '/#/login'}`;
+    const redirectTo = `${appOrigin}/recovery.html`;
 
+    const runFallbackReset = async () => {
+      const { error: fallbackError } = await withTimeout(
+        supabase.auth.resetPasswordForEmail(forgotPasswordEmail, {
+          redirectTo,
+        }),
+        12000,
+        'Tempo limite no fallback de recuperação de senha.'
+      );
+
+      if (fallbackError) {
+        console.error('[login] fallback resetPasswordForEmail também falhou', fallbackError);
+      }
+    };
+
+    try {
       const { data: forgotData, error: forgotError } = await withTimeout(
         supabase.functions.invoke(SUPABASE_EDGE_FUNCTIONS.FORGOT_PASSWORD, {
           body: {
@@ -144,28 +158,18 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
 
       if (!functionSucceeded) {
         console.error('[login] falha ao solicitar redefinição de senha', forgotError);
-
-        const { error: fallbackError } = await withTimeout(
-          supabase.auth.resetPasswordForEmail(forgotPasswordEmail, {
-            redirectTo,
-          }),
-          12000,
-          'Tempo limite no fallback de recuperação de senha.'
-        );
-
-        if (fallbackError) {
-          console.error('[login] fallback resetPasswordForEmail também falhou', fallbackError);
-        }
+        await runFallbackReset();
       }
 
       setForgotPasswordMessage('Se o email estiver cadastrado, você receberá instruções para redefinir sua senha.');
     } catch (forgotPasswordRequestError) {
       console.error('[login] erro inesperado ao solicitar redefinição de senha', forgotPasswordRequestError);
-      const typedError = forgotPasswordRequestError as Error;
-      if (typedError?.message?.includes('Tempo limite')) {
-        setForgotPasswordError('Não foi possível conectar ao servidor de autenticação. Verifique a configuração do Supabase e tente novamente.');
-      } else {
+      try {
+        await runFallbackReset();
         setForgotPasswordMessage('Se o email estiver cadastrado, você receberá instruções para redefinir sua senha.');
+      } catch (fallbackExecutionError) {
+        console.error('[login] erro ao executar fallback de redefinição', fallbackExecutionError);
+        setForgotPasswordError('Não foi possível conectar ao servidor de autenticação. Verifique a configuração do Supabase e tente novamente.');
       }
     } finally {
       setForgotPasswordLoading(false);
