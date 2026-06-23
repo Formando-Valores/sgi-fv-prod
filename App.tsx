@@ -20,37 +20,14 @@ import UnifiedDashboard from './src/pages/UnifiedDashboard';
 import PaymentSuccess from './src/pages/Payments/PaymentSuccess';
 import PaymentCancel from './src/pages/Payments/PaymentCancel';
 import { ProcessStatus, ServiceUnit, User, UserRole } from './types';
-import { INITIAL_MOCK_USERS } from './constants';
 import { supabase } from './supabase';
 import { getAllowedModules, resolvePermissions } from './src/lib/permissions';
-
-const parseStorageItem = <T,>(key: string, fallback: T): T => {
-  const rawValue = localStorage.getItem(key);
-
-  if (!rawValue) {
-    return fallback;
-  }
-
-  try {
-    return JSON.parse(rawValue) as T;
-  } catch (error) {
-    console.error(`[storage] valor inválido para ${key}, limpando item`, error);
-    localStorage.removeItem(key);
-    return fallback;
-  }
-};
 
 const RootApp: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authBootstrapping, setAuthBootstrapping] = useState(true);
 
-  const [users, setUsers] = useState<User[]>(() =>
-    parseStorageItem<User[]>('sgi_users', INITIAL_MOCK_USERS)
-  );
-
-  useEffect(() => {
-    localStorage.setItem('sgi_users', JSON.stringify(users));
-  }, [users]);
+  const [users, setUsers] = useState<User[]>([]);
 
   useEffect(() => {
     let mounted = true;

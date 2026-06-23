@@ -349,12 +349,6 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
 
         setCurrentUser(normalizedUser);
 
-        const mergedUsers = [
-          ...users.filter((user) => user.id !== normalizedUser.id),
-          normalizedUser,
-        ];
-        localStorage.setItem('sgi_users', JSON.stringify(mergedUsers));
-
         navigate('/dashboard');
       }
     } catch (err) {
