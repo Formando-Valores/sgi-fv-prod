@@ -55,6 +55,72 @@ const RootApp: React.FC = () => {
   useEffect(() => {
     let mounted = true;
 
+    const loadUsersFromSupabase = async () => {
+      try {
+        const { data: profiles, error } = await supabase
+          .from('profiles')
+          .select('id, email, nome_completo, documento_identidade, nif_cpf, estado_civil, phone, endereco, pais, org_id, created_at')
+          .order('created_at', { ascending: false });
+
+        if (error || !profiles?.length) {
+          return;
+        }
+
+        const userIds = profiles.map(p => p.id);
+        const { data: members } = await supabase
+          .from('org_members')
+          .select('user_id, org_id, role, organizations(name)')
+          .in('user_id', userIds);
+
+        const memberByUserId = new Map((members || []).map(m => [m.user_id, m]));
+
+        const mappedUsers: User[] = profiles.map(profile => {
+          const member = memberByUserId.get(profile.id);
+          const isAdmin = member?.role === 'admin' || member?.role === 'owner';
+          const orgValue = member?.organizations;
+          const orgName = Array.isArray(orgValue) ? orgValue[0]?.name : orgValue?.name || null;
+
+          return {
+            id: profile.id,
+            name: profile.nome_completo || profile.email?.split('@')[0] || 'Usuário',
+            email: profile.email || '',
+            role: isAdmin ? UserRole.ADMIN : UserRole.CLIENT,
+            documentId: profile.documento_identidade || '-',
+            taxId: profile.nif_cpf || '-',
+            address: profile.endereco || '-',
+            maritalStatus: profile.estado_civil || 'Não informado',
+            country: profile.pais || 'Brasil',
+            phone: profile.phone || '-',
+            unit: ServiceUnit.JURIDICO,
+            status: ProcessStatus.PENDENTE,
+            protocol: `SGI-${new Date().getFullYear()}-000`,
+            registrationDate: profile.created_at
+              ? new Date(profile.created_at).toLocaleString('pt-BR')
+              : new Date().toLocaleString('pt-BR'),
+            organizationId: profile.org_id,
+            organizationName: orgName,
+          } as User;
+        });
+
+        if (mounted) {
+          setUsers(prev => {
+            const prevMap = new Map(prev.map(u => [u.id, u]));
+            mappedUsers.forEach(u => prevMap.set(u.id, u));
+            return Array.from(prevMap.values());
+          });
+        }
+      } catch (err) {
+        console.warn('[users] erro ao carregar do Supabase', err);
+      }
+    };
+
+    void loadUsersFromSupabase();
+    return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
     const bootstrapUserFromSession = async (showLoader = false) => {
       if (mounted && showLoader) {
         setAuthBootstrapping(true);
