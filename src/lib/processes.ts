@@ -376,6 +376,7 @@ export interface CreateProcessPayload {
   unidade_atendimento?: string;
   org_nome_solicitado?: string;
   os_value?: number;
+  services_selected?: { id: string; name: string; price: number; group: string }[];
 }
 
 /**
@@ -765,9 +766,16 @@ export async function createProcess(
 
   log('Process created successfully, id:', process.id);
 
-  // Set process_status after creation to avoid RLS/column issues
+  // Set process_status & services_selected after creation to avoid RLS/column issues
+  const updateFields: Record<string, any> = {};
   if (hasOsValue) {
-    await supabase.from('processes').update({ process_status: 'aguardando_pagamento' }).eq('id', process.id);
+    updateFields.process_status = 'aguardando_pagamento';
+  }
+  if (payload.services_selected?.length) {
+    updateFields.services_selected = payload.services_selected;
+  }
+  if (Object.keys(updateFields).length > 0) {
+    await supabase.from('processes').update(updateFields).eq('id', process.id);
   }
 
   log('Creating initial structured audit event...');

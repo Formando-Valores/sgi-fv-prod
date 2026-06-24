@@ -151,17 +151,22 @@ const ProcessList: React.FC = () => {
     setFormError('');
     try {
       const isClient = !can('view_all', 'processos', userContext);
+      const selectedServices = customMode && customServiceName.trim()
+        ? [...availableServices.filter(s => selectedServiceIds.includes(s.id)), { id: 'custom', name: customServiceName.trim(), price: CUSTOM_ANALYSIS_FEE, group: 'Outros' }]
+        : availableServices.filter(s => selectedServiceIds.includes(s.id));
       const payload = {
         ...formData,
         responsavel_user_id: isClient ? userContext.id : formData.responsavel_user_id,
         cliente_user_id: isClient ? userContext.id : undefined,
+        services_selected: selectedServices,
       };
       const newProcess = await createProcess(userContext.org_id, payload, userContext.id);
       resetModal();
       navigate(`/processos/${newProcess.id}`);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error creating process:', err);
-      setFormError('Erro ao criar processo');
+      const detail = err?.message || err?.details || err?.error_description || (typeof err === 'string' ? err : JSON.stringify(err));
+      setFormError(`Erro ao criar processo: ${detail}`);
     } finally {
       setCreating(false);
     }
