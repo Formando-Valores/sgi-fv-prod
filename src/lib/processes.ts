@@ -750,7 +750,6 @@ export async function createProcess(
       unidade_atendimento: payload.unidade_atendimento || null,
       origem_canal: payload.origem_canal || null,
       os_value: typeof payload.os_value === 'number' ? payload.os_value : null,
-      process_status: hasOsValue ? 'aguardando_pagamento' : undefined,
     })
     .select()
     .single();
@@ -765,6 +764,11 @@ export async function createProcess(
   }
 
   log('Process created successfully, id:', process.id);
+
+  // Set process_status after creation to avoid RLS/column issues
+  if (hasOsValue) {
+    await supabase.from('processes').update({ process_status: 'aguardando_pagamento' }).eq('id', process.id);
+  }
 
   log('Creating initial structured audit event...');
   const eventStartTime = performance.now();

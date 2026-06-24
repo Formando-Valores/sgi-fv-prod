@@ -604,7 +604,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     return ProcessStatus.PENDENTE;
   };
 
-  const PROCESS_SELECT_BASE_COLUMNS = 'id,org_id,titulo,protocolo,status,cliente_nome,cliente_documento,cliente_contato,responsavel_user_id,created_at,updated_at,origem_canal,unidade_atendimento,org_nome_solicitado,payment_status,process_status,os_value,services_selected';
+  const PROCESS_SELECT_BASE_COLUMNS = 'id,org_id,titulo,protocolo,status,cliente_nome,cliente_documento,cliente_contato,responsavel_user_id,created_at,updated_at,origem_canal,unidade_atendimento,org_nome_solicitado,payment_status,process_status,os_value';
   const PROCESS_SELECT_WITH_OPTIONAL_COLUMNS = 'id,org_id,titulo,protocolo,status,cliente_nome,cliente_documento,cliente_contato,responsavel_user_id,data_prazo,gestor_servico,observacoes,created_at,updated_at,origem_canal,unidade_atendimento,org_nome_solicitado,payment_status,process_status,os_value';
 
   const normalizeProcessOptionalFields = (process: Partial<DbProcess>): DbProcess => ({
@@ -612,6 +612,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     data_prazo: process.data_prazo ?? null,
     gestor_servico: process.gestor_servico ?? null,
     observacoes: process.observacoes ?? null,
+    services_selected: (process as Record<string, unknown>).services_selected ?? null,
   });
 
   const hasMissingOptionalProcessColumns = (error: unknown): boolean => {
@@ -1540,8 +1541,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       unidade_atendimento: newProcessForm.serviceUnit,
       org_nome_solicitado: selectedOrganization.name,
       os_value: typeof newProcessForm.osValue === 'number' ? newProcessForm.osValue : null,
-      process_status: hasOsValue ? 'aguardando_pagamento' : undefined,
-      services_selected: servicesSelected,
     };
 
     const { data: createdProcess, error: processInsertError } = await supabase
@@ -1554,6 +1553,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       setCreatingProcess(false);
       setProcessActionFeedback({ type: 'error', message: 'Não foi possível criar o processo manualmente no banco.' });
       return;
+    }
+
+    // Set process_status and services_selected after creation
+    if (hasOsValue || servicesSelected) {
+      const updates: Record<string, unknown> = {};
+      if (hasOsValue) updates.process_status = 'aguardando_pagamento';
+      if (servicesSelected) updates.services_selected = servicesSelected;
+      await supabase.from('processes').update(updates).eq('id', createdProcess.id);
     }
 
     await supabase.from('process_events').insert({
