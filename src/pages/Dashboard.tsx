@@ -350,7 +350,7 @@ const Dashboard: React.FC = () => {
                   <div>
                     <p className="font-bold text-white text-sm">{process.titulo}</p>
                     <p className="text-slate-500 text-xs">{process.cliente_nome || 'Sem cliente'}</p>
-                    {process.process_status === 'pending_payment' && (
+                    {process.process_status === 'aguardando_pagamento' && (
                       <p className="text-amber-300 text-[10px] font-black uppercase tracking-wide">
                         Pagamento pendente: edição bloqueada
                       </p>

@@ -287,7 +287,7 @@ const ProcessList: React.FC = () => {
                     <td className="px-6 py-4 text-slate-400 font-bold">{formatDate(process.created_at)}</td>
                     <td className="px-6 py-4 text-right">
                       <div className="inline-flex items-center gap-2">
-                        {process.process_status === 'pending_payment' && (
+                        {process.process_status === 'aguardando_pagamento' && (
                           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-wide bg-amber-900/30 text-amber-300 border border-amber-700">
                             <Lock className="w-3 h-3" />
                             Ações bloqueadas
@@ -295,7 +295,7 @@ const ProcessList: React.FC = () => {
                         )}
                         <Link
                           to={`/processos/${process.id}`}
-                          title={process.process_status === 'pending_payment' ? 'Visualização liberada. Edição bloqueada até confirmação do pagamento.' : 'Visualizar processo'}
+                          title={process.process_status === 'aguardando_pagamento' ? 'Visualização liberada. Edição bloqueada até confirmação do pagamento.' : 'Visualizar processo'}
                           className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 inline-flex"
                         >
                           <Eye className="w-4 h-4" />

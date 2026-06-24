@@ -26,7 +26,7 @@ import ClientProcessProgressPanel, {
 import ReportsPage from '../src/pages/Reports/ReportsPage';
 import { createCheckoutSession } from '../src/lib/stripe';
 import { getPaymentStatusUi } from '../src/lib/paymentStatus';
-import { getServicesByUnit, getGroupsByUnit, getServicesByGroup } from '../src/lib/servicesCatalog';
+import { getServicesByUnit, getGroupsByUnit, getServicesByGroup, SERVICE_CATALOG } from '../src/lib/servicesCatalog';
 
 type AccessLevel = 'Administrador' | 'Usuário Sênior' | 'Usuário Pleno' | 'Operador' | 'Cliente';
 
@@ -604,7 +604,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     return ProcessStatus.PENDENTE;
   };
 
-  const PROCESS_SELECT_BASE_COLUMNS = 'id,org_id,titulo,protocolo,status,cliente_nome,cliente_documento,cliente_contato,responsavel_user_id,created_at,updated_at,origem_canal,unidade_atendimento,org_nome_solicitado,payment_status,process_status,os_value';
+  const PROCESS_SELECT_BASE_COLUMNS = 'id,org_id,titulo,protocolo,status,cliente_nome,cliente_documento,cliente_contato,responsavel_user_id,created_at,updated_at,origem_canal,unidade_atendimento,org_nome_solicitado,payment_status,process_status,os_value,services_selected';
   const PROCESS_SELECT_WITH_OPTIONAL_COLUMNS = 'id,org_id,titulo,protocolo,status,cliente_nome,cliente_documento,cliente_contato,responsavel_user_id,data_prazo,gestor_servico,observacoes,created_at,updated_at,origem_canal,unidade_atendimento,org_nome_solicitado,payment_status,process_status,os_value';
 
   const normalizeProcessOptionalFields = (process: Partial<DbProcess>): DbProcess => ({
@@ -1518,6 +1518,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       sanitizeDisplayValue(newProcessForm.title) ||
       `Processo manual - ${sanitizeDisplayValue(newProcessForm.clientName)}`;
 
+    const selectedServiceIds = newProcessForm.selectedServiceIds ?? [];
+    const servicesSelected = selectedServiceIds.length > 0
+      ? selectedServiceIds.map((id: string) => {
+          const svc = SERVICE_CATALOG.find((s) => s.id === id);
+          return svc ? { id: svc.id, name: svc.name, price: svc.price, group: svc.group } : null;
+        }).filter(Boolean)
+      : null;
+
+    const hasOsValue = typeof newProcessForm.osValue === 'number' && newProcessForm.osValue > 0;
+
     const processPayload = {
       org_id: selectedOrganization.id,
       titulo: processTitle,
@@ -1530,6 +1540,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       unidade_atendimento: newProcessForm.serviceUnit,
       org_nome_solicitado: selectedOrganization.name,
       os_value: typeof newProcessForm.osValue === 'number' ? newProcessForm.osValue : null,
+      process_status: hasOsValue ? 'aguardando_pagamento' : undefined,
+      services_selected: servicesSelected,
     };
 
     const { data: createdProcess, error: processInsertError } = await supabase

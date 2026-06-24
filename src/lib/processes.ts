@@ -245,8 +245,10 @@ export interface Process {
   origem_canal?: string | null;
   unidade_atendimento?: string | null;
   org_nome_solicitado?: string | null;
+  services_selected?: { id: string; name: string; price: number; group: string }[] | null;
   payment_status?: 'pending' | 'paid' | 'failed' | 'refunded' | 'canceled' | 'released' | null;
   process_status?:
+    | 'aguardando_pagamento'
     | 'draft'
     | 'created'
     | 'pending_payment'
@@ -733,6 +735,7 @@ export async function createProcess(
   
   // Create the process
   log('Inserting process...');
+  const hasOsValue = typeof payload.os_value === 'number' && payload.os_value > 0;
   const { data: process, error: processError } = await supabase
     .from('processes')
     .insert({
@@ -746,7 +749,8 @@ export async function createProcess(
       cliente_user_id: payload.cliente_user_id || null,
       unidade_atendimento: payload.unidade_atendimento || null,
       origem_canal: payload.origem_canal || null,
-      os_value: typeof payload.os_value === 'number' ? payload.os_value : null
+      os_value: typeof payload.os_value === 'number' ? payload.os_value : null,
+      process_status: hasOsValue ? 'aguardando_pagamento' : undefined,
     })
     .select()
     .single();

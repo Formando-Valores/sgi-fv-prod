@@ -380,6 +380,31 @@ const ProcessDetails: React.FC = () => {
                     {getPaymentStatusUi(process.payment_status)?.label || process.payment_status}
                   </span>
                 </div>
+
+                {process.services_selected && process.services_selected.length > 0 && (
+                  <div>
+                    <p className="text-slate-500 text-[10px] font-black uppercase mb-2">Serviços contratados</p>
+                    <div className="space-y-2">
+                      {process.services_selected.map((svc) => (
+                        <div key={svc.id} className="flex items-center justify-between p-2 bg-gray-900 rounded-lg">
+                          <div>
+                            <p className="text-sm font-bold text-slate-200">{svc.name}</p>
+                            <p className="text-[10px] text-slate-500">{svc.group}</p>
+                          </div>
+                          <span className="text-sm font-black text-emerald-400">R$ {svc.price.toFixed(2)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {process.os_value != null && Number(process.os_value) > 0 && (
+                  <div className="flex items-center justify-between p-3 bg-gray-900 rounded-xl">
+                    <span className="text-sm font-bold text-slate-300">Valor total</span>
+                    <span className="text-lg font-black text-emerald-400">R$ {Number(process.os_value).toFixed(2)}</span>
+                  </div>
+                )}
+
                 {(process.payment_status === 'pending' || process.payment_status === 'failed' || process.payment_status === 'canceled') && (
                   <button
                     type="button"
