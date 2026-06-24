@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { LogOut, Printer, FileDown, Eye, Pencil, Search, Users, ShieldCheck, X, Plus, Trash2, Calendar, MessageSquare, Check, User as UserIcon, UserCheck, LayoutDashboard, FolderKanban, Users2, Settings, Building2, Flag, FileBarChart2, ExternalLink, Loader2, CreditCard } from 'lucide-react';
+import { LogOut, Printer, FileDown, Eye, Pencil, Search, Users, ShieldCheck, X, Plus, Trash2, Calendar, MessageSquare, Check, User as UserIcon, UserCheck, LayoutDashboard, FolderKanban, Users2, Settings, Building2, Flag, FileBarChart2, ExternalLink, Loader2, CreditCard, ChevronDown } from 'lucide-react';
 import { User, ProcessStatus, UserRole, Hierarchy, ServiceUnit, Organization } from '../types';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { SERVICE_MANAGERS } from '../constants';
@@ -341,6 +341,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     selectedServiceIds: [] as string[],
     osValue: undefined as number | undefined,
   });
+  const [adminServiceSearch, setAdminServiceSearch] = useState('');
+  const [adminCollapsedGroups, setAdminCollapsedGroups] = useState<Record<string, boolean>>({});
   const [configSearch, setConfigSearch] = useState('');
   const [configRowsLimit, setConfigRowsLimit] = useState(10);
   const [newAdminOrgId, setNewAdminOrgId] = useState('');
@@ -4518,6 +4520,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                           selectedServiceIds: [],
                           osValue: undefined,
                         }));
+                        setAdminServiceSearch('');
+                        setAdminCollapsedGroups({});
                       }}
                       className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                     >
@@ -4531,49 +4535,76 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                   {newProcessForm.serviceUnit && (
                     <div className="md:col-span-2">
                       <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Serviços</label>
-                      <div className="space-y-4 max-h-80 overflow-y-auto">
-                        {getGroupsByUnit(newProcessForm.serviceUnit).map((group) => (
-                          <div key={group}>
-                            <h4 className="text-xs font-black uppercase tracking-wider text-gray-400 mb-2 sticky top-0 bg-gray-50 py-1">{group}</h4>
-                            <div className="space-y-2">
-                              {getServicesByGroup(newProcessForm.serviceUnit, group).map((svc) => {
-                                const selected = (newProcessForm.selectedServiceIds ?? []).includes(svc.id);
-                                return (
-                                  <label
-                                    key={svc.id}
-                                    className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors border ${
-                                      selected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300'
-                                    }`}
-                                  >
-                                    <div className="flex items-center gap-3">
-                                      <input
-                                        type="checkbox"
-                                        checked={selected}
-                                        onChange={() => {
-                                          setNewProcessForm((prev) => {
-                                            const ids = prev.selectedServiceIds ?? [];
-                                            const next = selected ? ids.filter((i: string) => i !== svc.id) : [...ids, svc.id];
-                                            const total = next.reduce((sum: number, id: string) => {
-                                              const s = getServicesByUnit(prev.serviceUnit!).find((x) => x.id === id);
-                                              return sum + (s?.price ?? 0);
-                                            }, 0);
-                                            return { ...prev, selectedServiceIds: next, osValue: total > 0 ? total : undefined };
-                                          });
-                                        }}
-                                        className="w-4 h-4 accent-blue-600"
-                                      />
-                                      <div>
-                                        <p className="text-sm font-bold text-gray-800">{svc.name}</p>
-                                        <p className="text-xs text-gray-500">{svc.description}</p>
-                                      </div>
-                                    </div>
-                                    <span className="text-sm font-black text-emerald-600">R$ {svc.price.toFixed(2)}</span>
-                                  </label>
-                                );
-                              })}
+                      <div className="relative mb-3">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input
+                          type="text"
+                          value={adminServiceSearch}
+                          onChange={(e) => setAdminServiceSearch(e.target.value)}
+                          placeholder="Pesquisar serviço..."
+                          className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-gray-800 text-sm font-bold placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 outline-none"
+                        />
+                      </div>
+                      <div className="space-y-2 max-h-80 overflow-y-auto">
+                        {getGroupsByUnit(newProcessForm.serviceUnit).map((group) => {
+                          const services = getServicesByGroup(newProcessForm.serviceUnit, group);
+                          const filtered = adminServiceSearch
+                            ? services.filter((s) => s.name.toLowerCase().includes(adminServiceSearch.toLowerCase()))
+                            : services;
+                          if (filtered.length === 0) return null;
+                          const isCollapsed = adminCollapsedGroups[group];
+                          return (
+                            <div key={group} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                              <button
+                                type="button"
+                                onClick={() => setAdminCollapsedGroups((prev) => ({ ...prev, [group]: !prev[group] }))}
+                                className="flex items-center justify-between w-full px-4 py-3 text-xs font-black uppercase tracking-wider text-gray-500 hover:text-gray-700 transition-colors"
+                              >
+                                {group}
+                                <ChevronDown className={`w-4 h-4 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
+                              </button>
+                              {!isCollapsed && (
+                                <div className="px-3 pb-3 space-y-2">
+                                  {filtered.map((svc) => {
+                                    const selected = (newProcessForm.selectedServiceIds ?? []).includes(svc.id);
+                                    return (
+                                      <label
+                                        key={svc.id}
+                                        className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors border ${
+                                          selected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300'
+                                        }`}
+                                      >
+                                        <div className="flex items-center gap-3">
+                                          <input
+                                            type="checkbox"
+                                            checked={selected}
+                                            onChange={() => {
+                                              setNewProcessForm((prev) => {
+                                                const ids = prev.selectedServiceIds ?? [];
+                                                const next = selected ? ids.filter((i: string) => i !== svc.id) : [...ids, svc.id];
+                                                const total = next.reduce((sum: number, id: string) => {
+                                                  const s = getServicesByUnit(prev.serviceUnit!).find((x) => x.id === id);
+                                                  return sum + (s?.price ?? 0);
+                                                }, 0);
+                                                return { ...prev, selectedServiceIds: next, osValue: total > 0 ? total : undefined };
+                                              });
+                                            }}
+                                            className="w-4 h-4 accent-blue-600"
+                                          />
+                                          <div>
+                                            <p className="text-sm font-bold text-gray-800">{svc.name}</p>
+                                            <p className="text-xs text-gray-500">{svc.description}</p>
+                                          </div>
+                                        </div>
+                                        <span className="text-sm font-black text-emerald-600">R$ {svc.price.toFixed(2)}</span>
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              )}
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   )}

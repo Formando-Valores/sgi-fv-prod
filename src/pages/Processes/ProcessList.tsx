@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Search, Eye, FolderKanban, X, AlertCircle, Loader2, Lock } from 'lucide-react';
+import { Plus, Search, Eye, FolderKanban, X, AlertCircle, Loader2, Lock, ChevronDown } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { can } from '../../lib/permissions';
 import {
@@ -42,6 +42,8 @@ const ProcessList: React.FC = () => {
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
   const [customMode, setCustomMode] = useState(false);
   const [customServiceName, setCustomServiceName] = useState('');
+  const [serviceSearch, setServiceSearch] = useState('');
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   const [formData, setFormData] = useState<CreateProcessPayload>({
     titulo: '',
     cliente_nome: '',
@@ -101,6 +103,8 @@ const ProcessList: React.FC = () => {
     setSelectedServiceIds([]);
     setCustomMode(false);
     setCustomServiceName('');
+    setServiceSearch('');
+    setCollapsedGroups({});
     setFormData({ titulo: '', cliente_nome: '', cliente_documento: '', cliente_contato: '', os_value: undefined });
     setFormError('');
     setShowModal(false);
@@ -328,6 +332,8 @@ const ProcessList: React.FC = () => {
                       setSelectedServiceIds([]);
                       setCustomMode(false);
                       setCustomServiceName('');
+                      setServiceSearch('');
+                      setCollapsedGroups({});
                     }}
                     className="w-full px-4 py-3 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold focus:ring-2 focus:ring-blue-500 outline-none"
                   >
@@ -341,40 +347,67 @@ const ProcessList: React.FC = () => {
                 {selectedUnit && availableServices.length > 0 && (
                   <div>
                     <label className="block text-sm font-bold text-slate-300 mb-2">Serviços Disponíveis</label>
-                    <div className="space-y-4 max-h-80 overflow-y-auto">
-                      {getGroupsByUnit(selectedUnit).map((group) => (
-                        <div key={group}>
-                          <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 mb-2 sticky top-0 bg-slate-900 py-1">{group}</h4>
-                          <div className="space-y-2">
-                            {getServicesByGroup(selectedUnit, group).map((svc) => (
-                              <label
-                                key={svc.id}
-                                className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors ${
-                                  selectedServiceIds.includes(svc.id)
-                                    ? 'bg-blue-900/40 border border-blue-700'
-                                    : 'bg-gray-800 border border-slate-700 hover:border-slate-600'
-                                }`}
-                              >
-                                <div className="flex items-center gap-3">
-                                  <input
-                                    type="checkbox"
-                                    checked={selectedServiceIds.includes(svc.id)}
-                                    onChange={() => handleToggleService(svc.id)}
-                                    className="w-4 h-4 accent-blue-500"
-                                  />
-                                  <div>
-                                    <p className="text-sm font-bold text-slate-200">{svc.name}</p>
-                                    <p className="text-xs text-slate-500">{svc.description}</p>
-                                  </div>
-                                </div>
-                                <span className="text-sm font-black text-emerald-400">
-                                  R$ {svc.price.toFixed(2)}
-                                </span>
-                              </label>
-                            ))}
+                    <div className="relative mb-3">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                      <input
+                        type="text"
+                        value={serviceSearch}
+                        onChange={(e) => setServiceSearch(e.target.value)}
+                        placeholder="Pesquisar serviço..."
+                        className="w-full pl-9 pr-4 py-2 bg-gray-900 border border-slate-700 rounded-xl text-white text-sm font-bold placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
+                    </div>
+                    <div className="space-y-2 max-h-80 overflow-y-auto">
+                      {getGroupsByUnit(selectedUnit).map((group) => {
+                        const services = getServicesByGroup(selectedUnit, group);
+                        const filtered = serviceSearch
+                          ? services.filter((s) => s.name.toLowerCase().includes(serviceSearch.toLowerCase()))
+                          : services;
+                        if (filtered.length === 0) return null;
+                        const isCollapsed = collapsedGroups[group];
+                        return (
+                          <div key={group} className="bg-gray-900 border border-slate-800 rounded-xl overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => setCollapsedGroups((prev) => ({ ...prev, [group]: !prev[group] }))}
+                              className="flex items-center justify-between w-full px-4 py-3 text-xs font-black uppercase tracking-wider text-slate-400 hover:text-slate-200 transition-colors"
+                            >
+                              {group}
+                              <ChevronDown className={`w-4 h-4 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
+                            </button>
+                            {!isCollapsed && (
+                              <div className="px-3 pb-3 space-y-2">
+                                {filtered.map((svc) => (
+                                  <label
+                                    key={svc.id}
+                                    className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors ${
+                                      selectedServiceIds.includes(svc.id)
+                                        ? 'bg-blue-900/40 border border-blue-700'
+                                        : 'bg-gray-800 border border-slate-700 hover:border-slate-600'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-3">
+                                      <input
+                                        type="checkbox"
+                                        checked={selectedServiceIds.includes(svc.id)}
+                                        onChange={() => handleToggleService(svc.id)}
+                                        className="w-4 h-4 accent-blue-500"
+                                      />
+                                      <div>
+                                        <p className="text-sm font-bold text-slate-200">{svc.name}</p>
+                                        <p className="text-xs text-slate-500">{svc.description}</p>
+                                      </div>
+                                    </div>
+                                    <span className="text-sm font-black text-emerald-400">
+                                      R$ {svc.price.toFixed(2)}
+                                    </span>
+                                  </label>
+                                ))}
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}
