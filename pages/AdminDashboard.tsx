@@ -4302,7 +4302,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
       {/* Details View Modal */}
       {selectedUser && (
-        <ClientJourneyContainer>
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-white w-full max-w-2xl rounded-3xl border border-gray-100 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
              <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
@@ -4428,7 +4427,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                       </div>
                     </div>
 
-                    {((selectedUser as AdminProcessRow).paymentStatus === 'pending' || (selectedUser as AdminProcessRow).paymentStatus === 'failed' || (selectedUser as AdminProcessRow).paymentStatus === 'canceled') && (
+                    {((selectedUser as AdminProcessRow).paymentStatus == null || (selectedUser as AdminProcessRow).paymentStatus === 'pending' || (selectedUser as AdminProcessRow).paymentStatus === 'failed' || (selectedUser as AdminProcessRow).paymentStatus === 'canceled') && (
                       <div className="pt-4">
                         <button
                           type="button"
@@ -4449,7 +4448,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
              </div>
           </div>
         </div>
-        </ClientJourneyContainer>
       )}
 
       {canCreateProcess && showCreateProcessModal && (
