@@ -26,7 +26,7 @@ import ClientProcessProgressPanel, {
 import ReportsPage from '../src/pages/Reports/ReportsPage';
 import { createCheckoutSession } from '../src/lib/stripe';
 import { getPaymentStatusUi } from '../src/lib/paymentStatus';
-import { getServicesByUnit } from '../src/lib/servicesCatalog';
+import { getServicesByUnit, getGroupsByUnit, getServicesByGroup } from '../src/lib/servicesCatalog';
 
 type AccessLevel = 'Administrador' | 'Usuário Sênior' | 'Usuário Pleno' | 'Operador' | 'Cliente';
 
@@ -4531,42 +4531,49 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                   {newProcessForm.serviceUnit && (
                     <div className="md:col-span-2">
                       <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Serviços</label>
-                      <div className="space-y-2 max-h-60 overflow-y-auto">
-                        {getServicesByUnit(newProcessForm.serviceUnit).map((svc) => {
-                          const selected = (newProcessForm.selectedServiceIds ?? []).includes(svc.id);
-                          return (
-                            <label
-                              key={svc.id}
-                              className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors border ${
-                                selected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300'
-                              }`}
-                            >
-                              <div className="flex items-center gap-3">
-                                <input
-                                  type="checkbox"
-                                  checked={selected}
-                                  onChange={() => {
-                                    setNewProcessForm((prev) => {
-                                      const ids = prev.selectedServiceIds ?? [];
-                                      const next = selected ? ids.filter((i: string) => i !== svc.id) : [...ids, svc.id];
-                                      const total = next.reduce((sum: number, id: string) => {
-                                        const s = getServicesByUnit(prev.serviceUnit!).find((x) => x.id === id);
-                                        return sum + (s?.price ?? 0);
-                                      }, 0);
-                                      return { ...prev, selectedServiceIds: next, osValue: total > 0 ? total : undefined };
-                                    });
-                                  }}
-                                  className="w-4 h-4 accent-blue-600"
-                                />
-                                <div>
-                                  <p className="text-sm font-bold text-gray-800">{svc.name}</p>
-                                  <p className="text-xs text-gray-500">{svc.description}</p>
-                                </div>
-                              </div>
-                              <span className="text-sm font-black text-emerald-600">R$ {svc.price.toFixed(2)}</span>
-                            </label>
-                          );
-                        })}
+                      <div className="space-y-4 max-h-80 overflow-y-auto">
+                        {getGroupsByUnit(newProcessForm.serviceUnit).map((group) => (
+                          <div key={group}>
+                            <h4 className="text-xs font-black uppercase tracking-wider text-gray-400 mb-2 sticky top-0 bg-gray-50 py-1">{group}</h4>
+                            <div className="space-y-2">
+                              {getServicesByGroup(newProcessForm.serviceUnit, group).map((svc) => {
+                                const selected = (newProcessForm.selectedServiceIds ?? []).includes(svc.id);
+                                return (
+                                  <label
+                                    key={svc.id}
+                                    className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors border ${
+                                      selected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-3">
+                                      <input
+                                        type="checkbox"
+                                        checked={selected}
+                                        onChange={() => {
+                                          setNewProcessForm((prev) => {
+                                            const ids = prev.selectedServiceIds ?? [];
+                                            const next = selected ? ids.filter((i: string) => i !== svc.id) : [...ids, svc.id];
+                                            const total = next.reduce((sum: number, id: string) => {
+                                              const s = getServicesByUnit(prev.serviceUnit!).find((x) => x.id === id);
+                                              return sum + (s?.price ?? 0);
+                                            }, 0);
+                                            return { ...prev, selectedServiceIds: next, osValue: total > 0 ? total : undefined };
+                                          });
+                                        }}
+                                        className="w-4 h-4 accent-blue-600"
+                                      />
+                                      <div>
+                                        <p className="text-sm font-bold text-gray-800">{svc.name}</p>
+                                        <p className="text-xs text-gray-500">{svc.description}</p>
+                                      </div>
+                                    </div>
+                                    <span className="text-sm font-black text-emerald-600">R$ {svc.price.toFixed(2)}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   )}

@@ -15,7 +15,7 @@ import {
   PROCESS_STATUS_BADGES,
   getOperationalStatus,
 } from '../../lib/paymentStatus';
-import { getServicesByUnit, CUSTOM_ANALYSIS_FEE } from '../../lib/servicesCatalog';
+import { getServicesByUnit, getGroupsByUnit, getServicesByGroup, CUSTOM_ANALYSIS_FEE } from '../../lib/servicesCatalog';
 import type { ServiceUnit } from '../../../types';
 
 const SERVICE_UNITS: { value: ServiceUnit; label: string }[] = [
@@ -341,32 +341,39 @@ const ProcessList: React.FC = () => {
                 {selectedUnit && availableServices.length > 0 && (
                   <div>
                     <label className="block text-sm font-bold text-slate-300 mb-2">Serviços Disponíveis</label>
-                    <div className="space-y-2 max-h-60 overflow-y-auto">
-                      {availableServices.map((svc) => (
-                        <label
-                          key={svc.id}
-                          className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors ${
-                            selectedServiceIds.includes(svc.id)
-                              ? 'bg-blue-900/40 border border-blue-700'
-                              : 'bg-gray-800 border border-slate-700 hover:border-slate-600'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <input
-                              type="checkbox"
-                              checked={selectedServiceIds.includes(svc.id)}
-                              onChange={() => handleToggleService(svc.id)}
-                              className="w-4 h-4 accent-blue-500"
-                            />
-                            <div>
-                              <p className="text-sm font-bold text-slate-200">{svc.name}</p>
-                              <p className="text-xs text-slate-500">{svc.description}</p>
-                            </div>
+                    <div className="space-y-4 max-h-80 overflow-y-auto">
+                      {getGroupsByUnit(selectedUnit).map((group) => (
+                        <div key={group}>
+                          <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 mb-2 sticky top-0 bg-slate-900 py-1">{group}</h4>
+                          <div className="space-y-2">
+                            {getServicesByGroup(selectedUnit, group).map((svc) => (
+                              <label
+                                key={svc.id}
+                                className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors ${
+                                  selectedServiceIds.includes(svc.id)
+                                    ? 'bg-blue-900/40 border border-blue-700'
+                                    : 'bg-gray-800 border border-slate-700 hover:border-slate-600'
+                                }`}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedServiceIds.includes(svc.id)}
+                                    onChange={() => handleToggleService(svc.id)}
+                                    className="w-4 h-4 accent-blue-500"
+                                  />
+                                  <div>
+                                    <p className="text-sm font-bold text-slate-200">{svc.name}</p>
+                                    <p className="text-xs text-slate-500">{svc.description}</p>
+                                  </div>
+                                </div>
+                                <span className="text-sm font-black text-emerald-400">
+                                  R$ {svc.price.toFixed(2)}
+                                </span>
+                              </label>
+                            ))}
                           </div>
-                          <span className="text-sm font-black text-emerald-400">
-                            R$ {svc.price.toFixed(2)}
-                          </span>
-                        </label>
+                        </div>
                       ))}
                     </div>
                   </div>
