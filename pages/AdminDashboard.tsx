@@ -606,7 +606,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   };
 
   const PROCESS_SELECT_BASE_COLUMNS = 'id,org_id,titulo,protocolo,status,cliente_nome,cliente_documento,cliente_contato,responsavel_user_id,created_at,updated_at,origem_canal,unidade_atendimento,org_nome_solicitado,payment_status,process_status,os_value,services_selected';
-  const PROCESS_SELECT_WITH_OPTIONAL_COLUMNS = 'id,org_id,titulo,protocolo,status,cliente_nome,cliente_documento,cliente_contato,responsavel_user_id,data_prazo,gestor_servico,observacoes,created_at,updated_at,origem_canal,unidade_atendimento,org_nome_solicitado,payment_status,process_status,os_value';
+  const PROCESS_SELECT_WITH_OPTIONAL_COLUMNS = 'id,org_id,titulo,protocolo,status,cliente_nome,cliente_documento,cliente_contato,responsavel_user_id,data_prazo,gestor_servico,observacoes,created_at,updated_at,origem_canal,unidade_atendimento,org_nome_solicitado,payment_status,process_status,os_value,services_selected';
 
   const normalizeProcessOptionalFields = (process: Partial<DbProcess>): DbProcess => ({
     ...(process as DbProcess),
