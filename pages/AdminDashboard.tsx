@@ -331,6 +331,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     clientDocument: '',
     clientContact: '',
     serviceUnit: ServiceUnit.JURIDICO,
+    osValue: undefined as number | undefined,
   });
   const [configSearch, setConfigSearch] = useState('');
   const [configRowsLimit, setConfigRowsLimit] = useState(10);
@@ -1036,6 +1037,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       clientDocument: '',
       clientContact: '',
       serviceUnit: ServiceUnit.JURIDICO,
+      osValue: undefined,
     });
   };
 
@@ -1515,6 +1517,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       origem_canal: 'painel',
       unidade_atendimento: newProcessForm.serviceUnit,
       org_nome_solicitado: selectedOrganization.name,
+      os_value: typeof newProcessForm.osValue === 'number' ? newProcessForm.osValue : null,
     };
 
     const { data: createdProcess, error: processInsertError } = await supabase
@@ -4390,6 +4393,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                       <option value={ServiceUnit.JURIDICO}>Jurídico / Advocacia</option>
                       <option value={ServiceUnit.TECNOLOGICO}>Tecnológico / AI</option>
                     </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Valor da OS (R$)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={newProcessForm.osValue ?? ''}
+                      onChange={(event) => setNewProcessForm((prev) => ({ ...prev, osValue: event.target.value ? Number(event.target.value) : undefined }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="0,00"
+                    />
                   </div>
                 </div>
 
