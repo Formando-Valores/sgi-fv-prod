@@ -4521,7 +4521,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                           osValue: undefined,
                         }));
                         setAdminServiceSearch('');
-                        setAdminCollapsedGroups({});
+                        if (unit) {
+                          setAdminCollapsedGroups(Object.fromEntries(getGroupsByUnit(unit).map(g => [g, true])));
+                        } else {
+                          setAdminCollapsedGroups({});
+                        }
                       }}
                       className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                     >

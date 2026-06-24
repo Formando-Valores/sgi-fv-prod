@@ -328,12 +328,17 @@ const ProcessList: React.FC = () => {
                   <select
                     value={selectedUnit ?? ''}
                     onChange={(e) => {
-                      setSelectedUnit(e.target.value as ServiceUnit || null);
+                      const unit = e.target.value as ServiceUnit || null;
+                      setSelectedUnit(unit);
                       setSelectedServiceIds([]);
                       setCustomMode(false);
                       setCustomServiceName('');
                       setServiceSearch('');
-                      setCollapsedGroups({});
+                      if (unit) {
+                        setCollapsedGroups(Object.fromEntries(getGroupsByUnit(unit).map(g => [g, true])));
+                      } else {
+                        setCollapsedGroups({});
+                      }
                     }}
                     className="w-full px-4 py-3 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold focus:ring-2 focus:ring-blue-500 outline-none"
                   >
