@@ -837,7 +837,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         etapaAtual: buildProcessStage(process),
         financeiro: isExternalRequest ? 'Aguardando validação' : (legacyStatus === ProcessStatus.CONCLUIDO ? 'Quitado' : 'Pendente'),
         prioridade: isExternalRequest ? 'Alta' : (legacyStatus === ProcessStatus.CONCLUIDO ? 'Média' : 'Baixa'),
-        valor: generatedValue,
+        valor: process.os_value != null ? Number(process.os_value) : generatedValue,
         sourceLabel: source ? source.toUpperCase() : 'PAINEL',
         requestedOrganizationName,
         contractedServiceName: sanitizeDisplayValue(process.titulo) || 'Serviço não informado',
@@ -4653,6 +4653,38 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     </div>
                   )}
 
+                  {newProcessForm.serviceUnit && (newProcessForm.selectedServiceIds ?? []).length > 0 && (
+                    <div className="md:col-span-2">
+                      <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Serviços Selecionados</label>
+                      <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
+                        {(newProcessForm.selectedServiceIds ?? []).map((id: string) => {
+                          const services = getServicesByUnit(newProcessForm.serviceUnit!);
+                          const svc = services.find((s) => s.id === id);
+                          if (!svc) return null;
+                          return (
+                            <div key={id} className="flex items-center justify-between px-4 py-3 bg-white">
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-bold text-gray-800 truncate">{svc.name}</p>
+                                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">{svc.group}</p>
+                              </div>
+                              <span className="text-sm font-black text-emerald-600 ml-3">R$ {svc.price.toFixed(2)}</span>
+                            </div>
+                          );
+                        })}
+                        <div className="flex items-center justify-between px-4 py-3 bg-gray-50">
+                          <p className="text-sm font-black text-gray-700 uppercase">Total</p>
+                          <span className="text-base font-black text-emerald-700">
+                            R$ {(newProcessForm.selectedServiceIds ?? []).reduce((sum: number, id: string) => {
+                              const services = getServicesByUnit(newProcessForm.serviceUnit!);
+                              const s = services.find((x) => x.id === id);
+                              return sum + (s?.price ?? 0);
+                            }, 0).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div>
                     <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Valor da OS (R$)</label>
                     <input
@@ -4665,7 +4697,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                       placeholder="0,00"
                     />
                     {newProcessForm.serviceUnit && (newProcessForm.selectedServiceIds ?? []).length > 0 && (
-                      <p className="text-xs text-gray-500 mt-1">Valor calculado com base nos serviços selecionados</p>
+                      <p className="text-xs text-gray-500 mt-1">Valor calculado com base nos serviços selecionados.</p>
                     )}
                   </div>
                 </div>
