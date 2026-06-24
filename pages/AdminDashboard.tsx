@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { LogOut, Printer, FileDown, Eye, Pencil, Search, Users, ShieldCheck, X, Plus, Trash2, Calendar, MessageSquare, Check, User as UserIcon, UserCheck, LayoutDashboard, FolderKanban, Users2, Settings, Building2, Flag, FileBarChart2 } from 'lucide-react';
+import { LogOut, Printer, FileDown, Eye, Pencil, Search, Users, ShieldCheck, X, Plus, Trash2, Calendar, MessageSquare, Check, User as UserIcon, UserCheck, LayoutDashboard, FolderKanban, Users2, Settings, Building2, Flag, FileBarChart2, ExternalLink, Loader2, CreditCard } from 'lucide-react';
 import { User, ProcessStatus, UserRole, Hierarchy, ServiceUnit, Organization } from '../types';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { SERVICE_MANAGERS } from '../constants';
@@ -24,6 +24,8 @@ import ClientProcessProgressPanel, {
   ClientProcessProgressHistoryItem,
 } from '../src/components/dashboard/ClientProcessProgressPanel';
 import ReportsPage from '../src/pages/Reports/ReportsPage';
+import { createCheckoutSession } from '../src/lib/stripe';
+import { getPaymentStatusUi } from '../src/lib/paymentStatus';
 
 type AccessLevel = 'Administrador' | 'Usuário Sênior' | 'Usuário Pleno' | 'Operador' | 'Cliente';
 
@@ -73,6 +75,8 @@ interface AdminProcessRow extends User {
   sourceLabel: string;
   requestedOrganizationName: string;
   contractedServiceName: string;
+  paymentStatus?: string | null;
+  osValue?: number | null;
 }
 
 interface ClientProfileView {
@@ -297,6 +301,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState<AdminProcessRow | User | null>(null);
   const [editingUser, setEditingUser] = useState<AdminProcessRow | User | null>(null);
+  const [redirectingCheckout, setRedirectingCheckout] = useState(false);
   
   // Management tab states
   const [newAdminName, setNewAdminName] = useState('');
@@ -594,8 +599,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     return ProcessStatus.PENDENTE;
   };
 
-  const PROCESS_SELECT_BASE_COLUMNS = 'id,org_id,titulo,protocolo,status,cliente_nome,cliente_documento,cliente_contato,responsavel_user_id,created_at,updated_at,origem_canal,unidade_atendimento,org_nome_solicitado';
-  const PROCESS_SELECT_WITH_OPTIONAL_COLUMNS = 'id,org_id,titulo,protocolo,status,cliente_nome,cliente_documento,cliente_contato,responsavel_user_id,data_prazo,gestor_servico,observacoes,created_at,updated_at,origem_canal,unidade_atendimento,org_nome_solicitado';
+  const PROCESS_SELECT_BASE_COLUMNS = 'id,org_id,titulo,protocolo,status,cliente_nome,cliente_documento,cliente_contato,responsavel_user_id,created_at,updated_at,origem_canal,unidade_atendimento,org_nome_solicitado,payment_status,process_status,os_value';
+  const PROCESS_SELECT_WITH_OPTIONAL_COLUMNS = 'id,org_id,titulo,protocolo,status,cliente_nome,cliente_documento,cliente_contato,responsavel_user_id,data_prazo,gestor_servico,observacoes,created_at,updated_at,origem_canal,unidade_atendimento,org_nome_solicitado,payment_status,process_status,os_value';
 
   const normalizeProcessOptionalFields = (process: Partial<DbProcess>): DbProcess => ({
     ...(process as DbProcess),
@@ -829,6 +834,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         sourceLabel: source ? source.toUpperCase() : 'PAINEL',
         requestedOrganizationName,
         contractedServiceName: sanitizeDisplayValue(process.titulo) || 'Serviço não informado',
+        paymentStatus: process.payment_status ?? null,
+        osValue: process.os_value ?? null,
       };
     }) : fallbackUsersForRows.map((user) => {
       const generatedValue = user.unit === ServiceUnit.ADMINISTRATIVO ? 5200 : 1800;
@@ -1545,6 +1552,38 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     setCreatingProcess(false);
     setShowCreateProcessModal(false);
     resetNewProcessForm();
+  };
+
+  const handleGoToCheckout = async (selected: AdminProcessRow | User) => {
+    const processRow = selected as AdminProcessRow;
+    const amount = Number(processRow.osValue ?? processRow.valor ?? 0);
+    if (amount <= 0) {
+      window.alert('Valor do pagamento não definido para este processo.');
+      return;
+    }
+    setRedirectingCheckout(true);
+    try {
+      const session = await createCheckoutSession({
+        amount: Math.round(amount * 100),
+        currency: 'brl',
+        successUrl: `${window.location.origin}/#/payments/success?processId=${processRow.processRecordId || processRow.id}`,
+        cancelUrl: `${window.location.origin}/#/payments/cancel?processId=${processRow.processRecordId || processRow.id}`,
+        processId: processRow.processRecordId || processRow.id,
+        clientId: currentUser.id,
+        serviceId: '',
+        organizationId: processRow.organizationId,
+        areaId: '',
+        sectorId: '',
+      });
+      if (session.url) {
+        window.location.assign(session.url);
+      }
+    } catch (err) {
+      console.error('Erro ao criar checkout:', err);
+      window.alert('Não foi possível iniciar o pagamento. Tente novamente mais tarde.');
+    } finally {
+      setRedirectingCheckout(false);
+    }
   };
 
   const handleUpdateStatus = async (userId: string, status: ProcessStatus, deadline?: string, notes?: string, serviceManager?: string) => {
@@ -4296,6 +4335,37 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                   <div className="mt-4">
                     <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Observações Internas</label>
                     <p className="font-bold p-4 bg-blue-900/10 border border-blue-900/30 rounded-xl text-blue-200 italic">"{selectedUser.notes}"</p>
+                  </div>
+                )}
+
+                {(selectedUser as AdminProcessRow).paymentStatus && (
+                  <div className="mt-6 pt-6 border-t border-gray-100">
+                    <div className="flex items-center gap-2 mb-4">
+                      <CreditCard className="w-5 h-5 text-emerald-500" />
+                      <h4 className="text-lg font-black uppercase">Pagamento</h4>
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-[10px] font-black text-gray-500 uppercase block mb-1">Status</label>
+                        <span className={`inline-block px-2 py-1 rounded text-[10px] font-bold uppercase text-white ${getPaymentStatusUi((selectedUser as AdminProcessRow).paymentStatus)?.color || 'bg-slate-600'}`}>
+                          {getPaymentStatusUi((selectedUser as AdminProcessRow).paymentStatus)?.label || (selectedUser as AdminProcessRow).paymentStatus}
+                        </span>
+                      </div>
+                      {((selectedUser as AdminProcessRow).paymentStatus === 'pending' || (selectedUser as AdminProcessRow).paymentStatus === 'failed' || (selectedUser as AdminProcessRow).paymentStatus === 'canceled') && (
+                        <button
+                          type="button"
+                          onClick={() => { void handleGoToCheckout(selectedUser); }}
+                          disabled={redirectingCheckout}
+                          className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {redirectingCheckout ? (
+                            <><Loader2 className="h-4 w-4 animate-spin" /> Redirecionando...</>
+                          ) : (
+                            <><ExternalLink className="h-4 w-4" /> Pagar agora</>
+                          )}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
              </div>
