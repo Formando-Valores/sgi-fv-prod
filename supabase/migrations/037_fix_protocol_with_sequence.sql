@@ -1,12 +1,9 @@
 -- ============================================
--- SGI FV - Migration 036: Fix protocol generation concurrency
+-- SGI FV - Migration 037: Protocol generation with sequence
 -- ============================================
--- A funcao generate_protocol() usava SELECT MAX(...)+1
--- que nao e concorrente-safe (duas insercoes simultaneas
--- podiam gerar o mesmo protocolo).
--- 
--- Corrigido: usa sequence + MAX(...)+1 com fallback
--- para garantir unicidade mesmo com dados existentes.
+-- Substitui a logica MAX(...)+1 por uma sequence
+-- garantindo unicidade mesmo com dados existentes.
+-- A sequence e inicializada com o max protocolo + 1.
 -- ============================================
 
 CREATE SEQUENCE IF NOT EXISTS protocol_number_seq START 1;
@@ -17,7 +14,7 @@ DECLARE
   max_seq int;
 BEGIN
   SELECT COALESCE(MAX(
-    CAST(SUBSTRING(protocolo FROM 'SGI-([0-9]+)-([0-9]+)') AS int)
+    CAST(SUBSTRING(protocolo FROM 'SGI-[0-9]+-([0-9]+)') AS int)
   ), 0) + 1 INTO max_seq FROM processes
   WHERE protocolo ~ '^SGI-[0-9]{4}-[0-9]+$';
   PERFORM setval('protocol_number_seq', max_seq, false);
@@ -33,17 +30,14 @@ DECLARE
 BEGIN
   IF NEW.protocolo IS NULL THEN
     year_str := to_char(now(), 'YYYY');
-    -- Tenta usar a sequence (concorrente-safe)
     seq_num := nextval('protocol_number_seq');
     NEW.protocolo := 'SGI-' || year_str || '-' || LPAD(seq_num::text, 4, '0');
-    -- Verifica se ja existe (pode acontecer se a sequence foi recriada)
     IF EXISTS (SELECT 1 FROM processes WHERE protocolo = NEW.protocolo) THEN
-      -- Fallback: MAX + 1 (garante unicidade mesmo com dados existentes)
       SELECT COALESCE(MAX(
         CAST(SUBSTRING(protocolo FROM 'SGI-' || year_str || '-([0-9]+)') AS int)
       ), 0) + 1 INTO max_existing
       FROM processes
-      WHERE protocolo LIKE 'SGI-' || year_str || '-%';
+      WHERE protocolo ~ '^SGI-' || year_str || '-[0-9]+$';
       NEW.protocolo := 'SGI-' || year_str || '-' || LPAD(max_existing::text, 4, '0');
     END IF;
   END IF;
