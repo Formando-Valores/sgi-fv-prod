@@ -1529,7 +1529,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
     const hasOsValue = typeof newProcessForm.osValue === 'number' && newProcessForm.osValue > 0;
 
-    const processPayload = {
+    const processPayload: Record<string, unknown> = {
       org_id: selectedOrganization.id,
       titulo: processTitle,
       status: 'cadastro' as const,
@@ -1542,6 +1542,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       org_nome_solicitado: selectedOrganization.name,
       os_value: typeof newProcessForm.osValue === 'number' ? newProcessForm.osValue : null,
     };
+    if (isClientScope) {
+      processPayload.cliente_user_id = currentUser.id;
+    }
 
     const { data: createdProcess, error: processInsertError } = await supabase
       .from('processes')
@@ -1551,7 +1554,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
     if (processInsertError || !createdProcess) {
       setCreatingProcess(false);
-      setProcessActionFeedback({ type: 'error', message: 'Não foi possível criar o processo manualmente no banco.' });
+      setProcessActionFeedback({ type: 'error', message: `Não foi possível criar o processo: ${processInsertError?.message || processInsertError?.details || 'erro desconhecido'}` });
       return;
     }
 
