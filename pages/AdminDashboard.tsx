@@ -26,6 +26,7 @@ import ClientProcessProgressPanel, {
 import ReportsPage from '../src/pages/Reports/ReportsPage';
 import { createCheckoutSession } from '../src/lib/stripe';
 import { getPaymentStatusUi } from '../src/lib/paymentStatus';
+import { getServicesByUnit } from '../src/lib/servicesCatalog';
 
 type AccessLevel = 'Administrador' | 'Usuário Sênior' | 'Usuário Pleno' | 'Operador' | 'Cliente';
 
@@ -336,7 +337,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     clientName: '',
     clientDocument: '',
     clientContact: '',
-    serviceUnit: ServiceUnit.JURIDICO,
+    serviceUnit: null as ServiceUnit | null,
+    selectedServiceIds: [] as string[],
     osValue: undefined as number | undefined,
   });
   const [configSearch, setConfigSearch] = useState('');
@@ -4508,14 +4510,66 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Tipo</label>
                     <select
                       value={newProcessForm.serviceUnit}
-                      onChange={(event) => setNewProcessForm((prev) => ({ ...prev, serviceUnit: event.target.value as ServiceUnit }))}
+                      onChange={(event) => {
+                        const unit = event.target.value as ServiceUnit;
+                        setNewProcessForm((prev) => ({
+                          ...prev,
+                          serviceUnit: unit,
+                          selectedServiceIds: [],
+                          osValue: undefined,
+                        }));
+                      }}
                       className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                     >
+                      <option value="">Selecione o tipo...</option>
                       <option value={ServiceUnit.ADMINISTRATIVO}>Administrativo</option>
                       <option value={ServiceUnit.JURIDICO}>Jurídico / Advocacia</option>
                       <option value={ServiceUnit.TECNOLOGICO}>Tecnológico / AI</option>
                     </select>
                   </div>
+
+                  {newProcessForm.serviceUnit && (
+                    <div className="md:col-span-2">
+                      <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Serviços</label>
+                      <div className="space-y-2 max-h-60 overflow-y-auto">
+                        {getServicesByUnit(newProcessForm.serviceUnit).map((svc) => {
+                          const selected = (newProcessForm.selectedServiceIds ?? []).includes(svc.id);
+                          return (
+                            <label
+                              key={svc.id}
+                              className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors border ${
+                                selected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <input
+                                  type="checkbox"
+                                  checked={selected}
+                                  onChange={() => {
+                                    setNewProcessForm((prev) => {
+                                      const ids = prev.selectedServiceIds ?? [];
+                                      const next = selected ? ids.filter((i: string) => i !== svc.id) : [...ids, svc.id];
+                                      const total = next.reduce((sum: number, id: string) => {
+                                        const s = getServicesByUnit(prev.serviceUnit!).find((x) => x.id === id);
+                                        return sum + (s?.price ?? 0);
+                                      }, 0);
+                                      return { ...prev, selectedServiceIds: next, osValue: total > 0 ? total : undefined };
+                                    });
+                                  }}
+                                  className="w-4 h-4 accent-blue-600"
+                                />
+                                <div>
+                                  <p className="text-sm font-bold text-gray-800">{svc.name}</p>
+                                  <p className="text-xs text-gray-500">{svc.description}</p>
+                                </div>
+                              </div>
+                              <span className="text-sm font-black text-emerald-600">R$ {svc.price.toFixed(2)}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   <div>
                     <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Valor da OS (R$)</label>
@@ -4528,6 +4582,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                       className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="0,00"
                     />
+                    {newProcessForm.serviceUnit && (newProcessForm.selectedServiceIds ?? []).length > 0 && (
+                      <p className="text-xs text-gray-500 mt-1">Valor calculado com base nos serviços selecionados</p>
+                    )}
                   </div>
                 </div>
 
