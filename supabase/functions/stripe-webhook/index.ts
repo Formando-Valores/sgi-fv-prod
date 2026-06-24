@@ -1,5 +1,5 @@
 import Stripe from 'https://esm.sh/stripe@18.3.0?target=deno';
-import { Client } from 'https://deno.land/x/postgres@v0.19.3/mod.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 type ProcessRecord = {
   id: string;
@@ -20,26 +20,13 @@ const corsHeaders = {
 const jsonResponse = (status: number, body: Record<string, unknown>) =>
   new Response(JSON.stringify(body), {
     status,
-    headers: {
-      ...corsHeaders,
-      'Content-Type': 'application/json',
-    },
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
-
-const getDbConnectionString = () =>
-  Deno.env.get('SUPABASE_DB_URL')
-    ?? Deno.env.get('POSTGRES_URL')
-    ?? Deno.env.get('DATABASE_URL')
-    ?? '';
 
 const hasTruthyMetadata = (value?: string | null) => Boolean(value && value.trim());
 
 const pickProcessServiceId = (process: ProcessRecord) =>
-  process.service_id
-  ?? process.selected_service_id
-  ?? process.servico_id
-  ?? process.service_reference
-  ?? null;
+  process.service_id ?? process.selected_service_id ?? process.servico_id ?? process.service_reference ?? null;
 
 const normalizeStripeId = (value: string | Stripe.PaymentIntent | null) => {
   if (!value) return null;
@@ -67,18 +54,9 @@ const mapEventToAuditCode = (eventType: string) => {
 
 const resolveProcessUpdate = (paymentStatus: 'paid' | 'failed' | 'canceled' | 'refunded') => {
   if (paymentStatus === 'paid') {
-    return {
-      paymentStatus,
-      processStatus: 'liberado',
-      shouldReleaseProcess: true,
-    };
+    return { paymentStatus, processStatus: 'liberado', shouldReleaseProcess: true };
   }
-
-  return {
-    paymentStatus,
-    processStatus: null,
-    shouldReleaseProcess: false,
-  };
+  return { paymentStatus, processStatus: null, shouldReleaseProcess: false };
 };
 
 const validateProcessConsistency = (
@@ -86,18 +64,15 @@ const validateProcessConsistency = (
   metadata: { processId?: string; clientId?: string; serviceId?: string; orgId?: string; organizationId?: string },
 ) => {
   const metadataOrgId = metadata.orgId ?? metadata.organizationId;
-
   if (hasTruthyMetadata(metadataOrgId) && metadataOrgId !== process.org_id) {
     throw new Error('Inconsistência entre orgId do metadata e do processo.');
   }
-
   if (hasTruthyMetadata(metadata.clientId)) {
     const processClientId = process.responsavel_user_id ?? null;
     if (processClientId && processClientId !== metadata.clientId) {
       throw new Error('Inconsistência entre clientId do metadata e do processo.');
     }
   }
-
   if (hasTruthyMetadata(metadata.serviceId)) {
     const processServiceId = pickProcessServiceId(process);
     if (processServiceId && processServiceId !== metadata.serviceId) {
@@ -119,7 +94,6 @@ const logAudit = (
     paymentIntentId: context.paymentIntentId ?? null,
     ...context,
   };
-
   console.log(JSON.stringify(payload));
 };
 
@@ -134,14 +108,15 @@ Deno.serve(async (request) => {
 
   const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY') ?? '';
   const stripeWebhookSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET') ?? '';
-  const dbConnectionString = getDbConnectionString();
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
   if (!stripeSecretKey || !stripeWebhookSecret) {
     return jsonResponse(500, { success: false, error: 'Credenciais Stripe ausentes.' });
   }
 
-  if (!dbConnectionString) {
-    return jsonResponse(500, { success: false, error: 'String de conexão do banco não configurada.' });
+  if (!supabaseUrl || !serviceRoleKey) {
+    return jsonResponse(500, { success: false, error: 'SUPABASE_URL ou SERVICE_ROLE_KEY não configurados.' });
   }
 
   const signature = request.headers.get('stripe-signature');
@@ -166,19 +141,20 @@ Deno.serve(async (request) => {
     return jsonResponse(200, { success: true, ignored: true, eventType: event.type });
   }
 
-  const client = new Client(dbConnectionString);
+  const supabase = createClient(supabaseUrl, serviceRoleKey);
 
   try {
-    await client.connect();
-    await client.queryArray('BEGIN');
+    const { data: existingPayment, error: idemError } = await supabase
+      .from('payments')
+      .select('id')
+      .eq('raw_webhook_event_id', event.id)
+      .maybeSingle();
 
-    const idemCheck = await client.queryObject<{ id: string }>(
-      'SELECT id FROM public.payments WHERE raw_webhook_event_id = $1 LIMIT 1',
-      [event.id],
-    );
+    if (idemError) {
+      throw new Error(`Erro na verificação de idempotência: ${idemError.message}`);
+    }
 
-    if (idemCheck.rows.length > 0) {
-      await client.queryArray('COMMIT');
+    if (existingPayment) {
       return jsonResponse(200, { success: true, duplicated: true, eventId: event.id });
     }
 
@@ -186,7 +162,6 @@ Deno.serve(async (request) => {
     let paymentIntentId: string | null = null;
     let checkoutSessionId: string | null = null;
     const metadata: Record<string, string> = {};
-
     let stripeCustomerId: string | null = null;
 
     if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.expired' || event.type === 'checkout.session.async_payment_failed') {
@@ -218,18 +193,14 @@ Deno.serve(async (request) => {
       throw new Error('processId ausente no metadata do evento Stripe.');
     }
 
-    const processResult = await client.queryObject<ProcessRecord>(
-      `SELECT id, org_id, responsavel_user_id, service_id, selected_service_id, servico_id, service_reference
-         FROM public.processes
-        WHERE id = $1
-        LIMIT 1
-        FOR UPDATE`,
-      [processId],
-    );
+    const { data: process, error: processError } = await supabase
+      .from('processes')
+      .select('id, org_id, responsavel_user_id, service_id, selected_service_id, servico_id, service_reference')
+      .eq('id', processId)
+      .single();
 
-    const process = processResult.rows[0];
-    if (!process) {
-      throw new Error('Processo não encontrado para o processId informado.');
+    if (processError || !process) {
+      throw new Error(processError?.message ?? 'Processo não encontrado para o processId informado.');
     }
 
     validateProcessConsistency(process, {
@@ -248,123 +219,152 @@ Deno.serve(async (request) => {
         ? expectedClientId
         : null;
 
-    const paymentUpdate = await client.queryObject<{ id: string }>(
-      `UPDATE public.payments
-          SET status = $2,
-              payment_provider = 'stripe',
-              paid_at = CASE WHEN $2 = 'paid' THEN COALESCE(paid_at, now()) ELSE paid_at END,
-              stripe_checkout_session_id = COALESCE($3, stripe_checkout_session_id),
-              stripe_payment_intent_id = COALESCE($4, stripe_payment_intent_id),
-              stripe_customer_id = COALESCE($9, stripe_customer_id),
-              raw_webhook_event_id = $5,
-              last_event_type = $6,
-              last_event_at = now(),
-              updated_at = now()
-        WHERE process_id = $1
-          AND ($7::uuid IS NULL OR client_id = $7::uuid)
-        RETURNING id`,
-      [processId, actionableStatus, checkoutSessionId, paymentIntentId, event.id, event.type, validatedClientId, null, stripeCustomerId],
-    );
+    const now = new Date().toISOString();
 
-    if (paymentUpdate.rows.length === 0) {
+    const updateData: Record<string, unknown> = {
+      status: actionableStatus,
+      payment_provider: 'stripe',
+      stripe_checkout_session_id: checkoutSessionId,
+      stripe_payment_intent_id: paymentIntentId,
+      stripe_customer_id: stripeCustomerId,
+      raw_webhook_event_id: event.id,
+      last_event_type: event.type,
+      last_event_at: now,
+      updated_at: now,
+    };
+
+    if (actionableStatus === 'paid') {
+      updateData.paid_at = now;
+    }
+
+    const paymentQuery = supabase
+      .from('payments')
+      .update(updateData)
+      .eq('process_id', processId);
+
+    if (validatedClientId) {
+      paymentQuery.eq('client_id', validatedClientId);
+    }
+
+    const { data: paymentRows, error: paymentUpdateError } = await paymentQuery.select('id');
+
+    if (paymentUpdateError) {
+      throw new Error(`Erro ao atualizar payment: ${paymentUpdateError.message}`);
+    }
+
+    if (!paymentRows || paymentRows.length === 0) {
       throw new Error('Pagamento não encontrado para o processId informado.');
     }
 
     const processUpdate = resolveProcessUpdate(actionableStatus);
 
     if (processUpdate.shouldReleaseProcess) {
-      await client.queryObject(
-        `UPDATE public.processes
-            SET payment_status = $2,
-                process_status = $3,
-                usage_deadline_at = COALESCE(
-                  CASE
-                    WHEN data_prazo IS NOT NULL THEN (data_prazo::timestamp + interval '23 hours 59 minutes 59 seconds')
-                    ELSE NULL
-                  END,
-                  usage_deadline_at,
-                  now() + interval '30 days'
-                ),
-                updated_at = now()
-          WHERE id = $1`,
-        [processId, processUpdate.paymentStatus, processUpdate.processStatus],
-      );
+      const { error: releaseError } = await supabase
+        .from('processes')
+        .update({
+          payment_status: processUpdate.paymentStatus,
+          process_status: processUpdate.processStatus,
+          updated_at: now,
+        })
+        .eq('id', processId);
+
+      if (releaseError) {
+        throw new Error(`Erro ao liberar processo: ${releaseError.message}`);
+      }
     } else {
-      await client.queryObject(
-        `UPDATE public.processes
-            SET payment_status = $2,
-                usage_deadline_at = CASE
-                  WHEN $2 = 'paid' THEN COALESCE(
-                    CASE
-                      WHEN data_prazo IS NOT NULL THEN (data_prazo::timestamp + interval '23 hours 59 minutes 59 seconds')
-                      ELSE NULL
-                    END,
-                    usage_deadline_at,
-                    now() + interval '30 days'
-                  )
-                  ELSE usage_deadline_at
-                END,
-                updated_at = now()
-          WHERE id = $1`,
-        [processId, processUpdate.paymentStatus],
-      );
+      const { error: statusError } = await supabase
+        .from('processes')
+        .update({
+          payment_status: processUpdate.paymentStatus,
+          updated_at: now,
+        })
+        .eq('id', processId);
+
+      if (statusError) {
+        throw new Error(`Erro ao atualizar status do processo: ${statusError.message}`);
+      }
     }
 
     const baseMessage = `Webhook Stripe processado (${event.type}). payment_status=${actionableStatus}.`;
     const detailMessage = `event_id=${event.id}; checkout_session_id=${checkoutSessionId ?? '-'}; payment_intent_id=${paymentIntentId ?? '-'}.`;
 
-    await client.queryObject(
-      `INSERT INTO public.process_events (
-         org_id, process_id, tipo, mensagem,
-         correlation_process_id, correlation_checkout_session_id, correlation_stripe_event_id, event_code
-       )
-       VALUES
-         ($1, $2, 'status_change', $3, $2, $4, $5, 'webhook_received'),
-         ($1, $2, 'status_change', $6, $2, $4, $5, 'webhook_validated'),
-         ($1, $2, 'status_change', $7, $2, $4, $5, $8)`,
-      [
-        process.org_id,
-        processId,
-        `Webhook recebido (${event.type}). stripeEventId=${event.id}.`,
-        checkoutSessionId,
-        event.id,
-        `Webhook validado (${event.type}). stripeEventId=${event.id}.`,
-        `${baseMessage} ${detailMessage}`,
-        mapEventToAuditCode(event.type),
-      ],
-    );
+    const { error: eventsError } = await supabase
+      .from('process_events')
+      .insert([
+        {
+          org_id: process.org_id,
+          process_id: processId,
+          tipo: 'status_change',
+          mensagem: `Webhook recebido (${event.type}). stripeEventId=${event.id}.`,
+          correlation_process_id: processId,
+          correlation_checkout_session_id: checkoutSessionId,
+          correlation_stripe_event_id: event.id,
+          event_code: 'webhook_received',
+        },
+        {
+          org_id: process.org_id,
+          process_id: processId,
+          tipo: 'status_change',
+          mensagem: `Webhook validado (${event.type}). stripeEventId=${event.id}.`,
+          correlation_process_id: processId,
+          correlation_checkout_session_id: checkoutSessionId,
+          correlation_stripe_event_id: event.id,
+          event_code: 'webhook_validated',
+        },
+        {
+          org_id: process.org_id,
+          process_id: processId,
+          tipo: 'status_change',
+          mensagem: `${baseMessage} ${detailMessage}`,
+          correlation_process_id: processId,
+          correlation_checkout_session_id: checkoutSessionId,
+          correlation_stripe_event_id: event.id,
+          event_code: mapEventToAuditCode(event.type),
+        },
+      ]);
+
+    if (eventsError) {
+      logAudit('process_events_insert_failed', { processId, error: eventsError.message });
+    }
 
     if (processUpdate.shouldReleaseProcess) {
-      await client.queryObject(
-        `INSERT INTO public.process_events (
-           org_id, process_id, tipo, mensagem,
-           correlation_process_id, correlation_checkout_session_id, correlation_stripe_event_id, event_code
-         ) VALUES ($1, $2, 'status_change', $3, $2, $4, $5, 'process_released')`,
-        [
-          process.org_id,
-          processId,
-          `Processo liberado após confirmação de pagamento. stripeEventId=${event.id}.`,
-          checkoutSessionId,
-          event.id,
-        ],
-      );
+      const { error: releaseEventError } = await supabase
+        .from('process_events')
+        .insert({
+          org_id: process.org_id,
+          process_id: processId,
+          tipo: 'status_change',
+          mensagem: `Processo liberado após confirmação de pagamento. stripeEventId=${event.id}.`,
+          correlation_process_id: processId,
+          correlation_checkout_session_id: checkoutSessionId,
+          correlation_stripe_event_id: event.id,
+          event_code: 'process_released',
+        });
+
+      if (releaseEventError) {
+        logAudit('release_event_insert_failed', { processId, error: releaseEventError.message });
+      }
     }
 
-    const syncCheck = await client.queryObject<{ process_payment_status: string | null; payment_status: string | null }>(
-      `SELECT pr.payment_status AS process_payment_status, pay.status AS payment_status
-         FROM public.processes pr
-         JOIN public.payments pay ON pay.process_id = pr.id
-        WHERE pr.id = $1
-        LIMIT 1`,
-      [processId],
-    );
+    const { data: syncCheck, error: syncError } = await supabase
+      .from('processes')
+      .select('payment_status, payments!inner(status)')
+      .eq('id', processId)
+      .single();
 
-    const syncRow = syncCheck.rows[0];
-    if (!syncRow || syncRow.process_payment_status !== syncRow.payment_status) {
-      throw new Error('Inconsistência pós-webhook: processes.payment_status diverge de payments.status.');
+    if (syncError) {
+      logAudit('sync_check_failed', { processId, error: syncError.message });
+    } else if (syncCheck) {
+      const processPaymentStatus = syncCheck.payment_status;
+      const paymentStatus = (syncCheck as Record<string, unknown>).payments as Record<string, unknown>;
+      const actualPaymentStatus = typeof paymentStatus === 'object' && paymentStatus !== null
+        ? (paymentStatus as Record<string, unknown>).status
+        : null;
+      if (actualPaymentStatus && processPaymentStatus !== actualPaymentStatus) {
+        logAudit('sync_mismatch', { processId, processPaymentStatus, actualPaymentStatus });
+      }
     }
 
-    await client.queryArray('COMMIT');
     logAudit('webhook_processed', {
       processId,
       eventId: event.id,
@@ -381,11 +381,8 @@ Deno.serve(async (request) => {
       paymentStatus: actionableStatus,
     });
   } catch (error) {
-    await client.queryArray('ROLLBACK').catch(() => undefined);
     const message = error instanceof Error ? error.message : 'Falha ao processar webhook Stripe.';
     logAudit('webhook_processing_failed', { error: message, eventId: event?.id ?? null });
     return jsonResponse(500, { success: false, error: message });
-  } finally {
-    await client.end().catch(() => undefined);
   }
 });
