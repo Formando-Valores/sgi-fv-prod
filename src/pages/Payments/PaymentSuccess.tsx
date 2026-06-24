@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Loader2, CheckCircle2, AlertCircle, RefreshCcw } from 'lucide-react';
 import { supabase } from '../../../supabase';
+import { SUPABASE_EDGE_FUNCTIONS } from '../../lib/supabaseFunctions';
 import { getPaymentStatusUi } from '../../lib/paymentStatus';
 
 type PollState = 'checking' | 'awaiting' | 'confirmed' | 'failed' | 'expired' | 'timeout' | 'not_found' | 'error';
@@ -100,7 +101,7 @@ const PaymentSuccess: React.FC = () => {
       setRetryingCheckout(true);
       setErrorMessage('');
 
-      const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+      const { data, error } = await supabase.functions.invoke(SUPABASE_EDGE_FUNCTIONS.STRIPE_CREATE_CHECKOUT_SESSION, {
         body: { processId },
       });
 

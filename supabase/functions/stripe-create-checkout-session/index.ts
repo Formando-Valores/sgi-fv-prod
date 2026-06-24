@@ -124,6 +124,7 @@ Deno.serve(async (request) => {
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
+      customer_creation: 'always',
       line_items: [
         {
           quantity: 1,
@@ -148,6 +149,8 @@ Deno.serve(async (request) => {
       },
     });
 
+    const stripeCustomerId = typeof session.customer === 'string' ? session.customer : (session.customer as { id?: string } | null)?.id ?? null;
+
     await client.queryObject(
       `INSERT INTO public.payments (
          process_id,
@@ -158,10 +161,11 @@ Deno.serve(async (request) => {
          payment_provider,
          payment_method,
          stripe_checkout_session_id,
+         stripe_customer_id,
          last_event_type,
          last_event_at,
          updated_at
-       ) VALUES ($1, $2, $3, $4, 'pending', 'stripe', 'stripe_checkout', $5, 'checkout.session.created', now(), now())
+       ) VALUES ($1, $2, $3, $4, 'pending', 'stripe', 'stripe_checkout', $5, $6, 'checkout.session.created', now(), now())
        ON CONFLICT (process_id) DO UPDATE
        SET amount = EXCLUDED.amount,
            currency = EXCLUDED.currency,
@@ -169,10 +173,11 @@ Deno.serve(async (request) => {
            payment_provider = 'stripe',
            payment_method = 'stripe_checkout',
            stripe_checkout_session_id = EXCLUDED.stripe_checkout_session_id,
+           stripe_customer_id = COALESCE(EXCLUDED.stripe_customer_id, payments.stripe_customer_id),
            last_event_type = 'checkout.session.created',
            last_event_at = now(),
            updated_at = now()`,
-      [processId, clientId, amount / 100, currency.toUpperCase(), session.id],
+      [processId, clientId, amount / 100, currency.toUpperCase(), session.id, stripeCustomerId],
     );
 
     await client.queryObject(

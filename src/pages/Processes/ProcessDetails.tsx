@@ -5,9 +5,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Activity, Calendar, Landmark, UserCheck, MessageSquare, User as UserIcon, Loader2, AlertCircle, X, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Activity, Calendar, Landmark, UserCheck, MessageSquare, User as UserIcon, Loader2, AlertCircle, X, ChevronRight, ExternalLink, CreditCard } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getProcessById, listProcessEvents, updateProcessStatus, addProcessEvent, listRequiredChecklistDocuments, listProcessAttachments, reviewProcessAttachment, type Process, type ProcessEvent, type ProcessDocumentAttachment, type ProcessDocumentChecklistItem } from '../../lib/processes';
+import { createCheckoutSession } from '../../lib/stripe';
+import { getPaymentStatusUi } from '../../lib/paymentStatus';
 
 const statusSteps = [
   { key: 'cadastro', label: 'CADASTRO', color: 'bg-slate-500' },
@@ -40,6 +42,7 @@ const ProcessDetails: React.FC = () => {
   const [showObsModal, setShowObsModal] = useState(false);
   const [obsText, setObsText] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [redirectingCheckout, setRedirectingCheckout] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -115,6 +118,41 @@ const ProcessDetails: React.FC = () => {
 
   const currentStepIndex = statusSteps.findIndex(s => s.key === process?.status);
   const canReviewDocuments = ['admin', 'pleno', 'senior'].includes((userContext?.hierarchy || '').toLowerCase());
+
+  const handleGoToCheckout = async () => {
+    if (!process || !userContext?.org_id || !userContext?.id) return;
+
+    const amount = Number((process as Record<string, unknown>).amount ?? (process as Record<string, unknown>).os_value ?? 0);
+    if (amount <= 0) {
+      window.alert('Valor do pagamento não definido para este processo.');
+      return;
+    }
+
+    setRedirectingCheckout(true);
+    try {
+      const session = await createCheckoutSession({
+        amount: Math.round(amount * 100),
+        currency: 'brl',
+        successUrl: `${window.location.origin}/#/pagamento/sucesso?processId=${process.id}`,
+        cancelUrl: `${window.location.origin}/#/pagamento/cancelado?processId=${process.id}`,
+        processId: process.id,
+        clientId: userContext.id,
+        serviceId: String((process as Record<string, unknown>).service_id ?? ''),
+        organizationId: userContext.org_id,
+        areaId: String((process as Record<string, unknown>).area_id ?? ''),
+        sectorId: String((process as Record<string, unknown>).sector_id ?? ''),
+      });
+
+      if (session.url) {
+        window.location.assign(session.url);
+      }
+    } catch (err) {
+      console.error('Erro ao criar checkout:', err);
+      window.alert('Não foi possível iniciar o pagamento. Tente novamente mais tarde.');
+    } finally {
+      setRedirectingCheckout(false);
+    }
+  };
 
   const handleReview = async (attachmentId: string, decision: 'approved' | 'rejected' | 'resubmission_requested') => {
     if (!userContext?.org_id || !userContext?.id || !process) return;
@@ -329,6 +367,36 @@ const ProcessDetails: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {process.payment_status && process.payment_status !== 'paid' && process.payment_status !== 'released' && (
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+              <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+                <CreditCard className="text-emerald-500" /> PAGAMENTO
+              </h2>
+              <div className="space-y-3">
+                <div>
+                  <p className="text-slate-500 text-[10px] font-black uppercase">Status</p>
+                  <span className={`inline-block mt-1 px-2 py-1 rounded text-[10px] font-bold uppercase ${getPaymentStatusUi(process.payment_status)?.color || 'bg-slate-700'} text-white`}>
+                    {getPaymentStatusUi(process.payment_status)?.label || process.payment_status}
+                  </span>
+                </div>
+                {(process.payment_status === 'pending' || process.payment_status === 'failed' || process.payment_status === 'canceled') && (
+                  <button
+                    type="button"
+                    onClick={() => { void handleGoToCheckout(); }}
+                    disabled={redirectingCheckout}
+                    className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {redirectingCheckout ? (
+                      <><Loader2 className="h-4 w-4 animate-spin" /> Redirecionando...</>
+                    ) : (
+                      <><ExternalLink className="h-4 w-4" /> Pagar agora</>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
             <h2 className="text-lg font-bold mb-6 flex items-center gap-2">

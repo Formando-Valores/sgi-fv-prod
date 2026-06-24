@@ -187,11 +187,14 @@ Deno.serve(async (request) => {
     let checkoutSessionId: string | null = null;
     const metadata: Record<string, string> = {};
 
+    let stripeCustomerId: string | null = null;
+
     if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.expired' || event.type === 'checkout.session.async_payment_failed') {
       const session = event.data.object as Stripe.Checkout.Session;
       processId = String(session.metadata?.processId ?? '').trim();
       paymentIntentId = normalizeStripeId(session.payment_intent as string | Stripe.PaymentIntent | null);
       checkoutSessionId = session.id;
+      stripeCustomerId = typeof session.customer === 'string' ? session.customer : (session.customer as { id?: string } | null)?.id ?? null;
       Object.assign(metadata, session.metadata ?? {});
     }
 
@@ -252,6 +255,7 @@ Deno.serve(async (request) => {
               paid_at = CASE WHEN $2 = 'paid' THEN COALESCE(paid_at, now()) ELSE paid_at END,
               stripe_checkout_session_id = COALESCE($3, stripe_checkout_session_id),
               stripe_payment_intent_id = COALESCE($4, stripe_payment_intent_id),
+              stripe_customer_id = COALESCE($9, stripe_customer_id),
               raw_webhook_event_id = $5,
               last_event_type = $6,
               last_event_at = now(),
@@ -259,7 +263,7 @@ Deno.serve(async (request) => {
         WHERE process_id = $1
           AND ($7::uuid IS NULL OR client_id = $7::uuid)
         RETURNING id`,
-      [processId, actionableStatus, checkoutSessionId, paymentIntentId, event.id, event.type, validatedClientId],
+      [processId, actionableStatus, checkoutSessionId, paymentIntentId, event.id, event.type, validatedClientId, null, stripeCustomerId],
     );
 
     if (paymentUpdate.rows.length === 0) {
