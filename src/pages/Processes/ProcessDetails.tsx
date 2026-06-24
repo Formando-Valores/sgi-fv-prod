@@ -133,8 +133,8 @@ const ProcessDetails: React.FC = () => {
       const session = await createCheckoutSession({
         amount: Math.round(amount * 100),
         currency: 'brl',
-        successUrl: `${window.location.origin}/#/pagamento/sucesso?processId=${process.id}`,
-        cancelUrl: `${window.location.origin}/#/pagamento/cancelado?processId=${process.id}`,
+        successUrl: `${window.location.origin}/#/payments/success?processId=${process.id}`,
+        cancelUrl: `${window.location.origin}/#/payments/cancel?processId=${process.id}`,
         processId: process.id,
         clientId: userContext.id,
         serviceId: String((process as Record<string, unknown>).service_id ?? ''),
