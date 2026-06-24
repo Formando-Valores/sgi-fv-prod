@@ -1561,11 +1561,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     }
 
     // Set process_status and services_selected after creation
+    let processToAdd = createdProcess;
     if (hasOsValue || servicesSelected) {
       const updates: Record<string, unknown> = {};
       if (hasOsValue) updates.process_status = 'aguardando_pagamento';
       if (servicesSelected) updates.services_selected = servicesSelected;
-      await supabase.from('processes').update(updates).eq('id', createdProcess.id);
+      const { data: updatedProcess } = await supabase
+        .from('processes')
+        .update(updates)
+        .eq('id', createdProcess.id)
+        .select(PROCESS_SELECT_BASE_COLUMNS)
+        .single();
+      if (updatedProcess) {
+        processToAdd = updatedProcess;
+      }
     }
 
     await supabase.from('process_events').insert({
@@ -1576,7 +1585,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       created_by: currentUser.id,
     });
 
-    setDbProcesses((prev) => [normalizeProcessOptionalFields(createdProcess as DbProcess), ...prev]);
+    setDbProcesses((prev) => [normalizeProcessOptionalFields(processToAdd as DbProcess), ...prev]);
     setProcessActionFeedback({ type: 'success', message: 'Processo criado com sucesso e adicionado à lista.' });
     setCreatingProcess(false);
     setShowCreateProcessModal(false);
