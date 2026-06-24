@@ -87,6 +87,33 @@ interface ClientProfileView {
   created_at?: string;
 }
 
+interface NewClientFormState {
+  fullName: string;
+  email: string;
+  phone: string;
+  documentId: string;
+  taxId: string;
+  address: string;
+  country: string;
+  maritalStatus: string;
+  organizationId: string;
+  accessLevel: AccessLevel;
+  grantSystemAccess: boolean;
+}
+
+interface EditClientFormState {
+  fullName: string;
+  email: string;
+  phone: string;
+  documentId: string;
+  taxId: string;
+  address: string;
+  country: string;
+  maritalStatus: string;
+  organizationId: string;
+  accessLevel: AccessLevel;
+}
+
 type ProcessVisualOverrides = Record<
   string,
   {
@@ -2747,6 +2774,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       setSavingClientEdit(false);
     }
   };
+  const handleDeleteClient = async (client: ClientProfileView) => {
+    if (!window.confirm(`Deseja realmente remover ${client.nome} da lista de clientes?`)) return;
+
+    if (client.user_id.startsWith('local-')) {
+      setClientsData((prev) => prev.filter((c) => c.id !== client.id));
+      setUsers((prev) => prev.filter((user) => user.id !== client.user_id));
+      return;
+    }
+
+    const { error: deleteError } = await supabase
+      .from('org_members')
+      .delete()
+      .eq('user_id', client.user_id)
+      .eq('org_id', client.org_id);
+
+    if (deleteError) {
+      alert('Erro ao remover cliente da organização.');
+      return;
+    }
+
+    await fetchClients();
+  };
   const handleCreateOrganization = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setOrgError('');
@@ -3476,14 +3525,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
             </select>
           </div>
 
-          {clientsError && <p className="text-sm text-amber-600 font-bold mb-4">{clientsError}</p>}
-
-          {sectionReadOnly.clientes && (
-            <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">Modo somente leitura para clientes neste escopo.</p>
-          )}
-          <div className="mb-3 flex items-center justify-between text-xs text-gray-500 font-bold">
-            <span>Total encontrado: {clientsData.length}</span>
-            <span>Exibindo: {visibleClients.length}</span>
+          <div className="mb-4 flex items-center justify-between gap-3 flex-wrap">
+            {clientsError && <p className="text-sm text-amber-600 font-bold">{clientsError}</p>}
+            <div className="flex items-center gap-3 text-xs text-gray-500 font-bold ml-auto">
+              <span>Total: {clientsData.length}</span>
+              <span>Exibindo: {visibleClients.length}</span>
+            </div>
+            <button
+              onClick={() => {
+                resetNewClientForm();
+                setShowCreateClientModal(true);
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black uppercase rounded-lg transition-colors"
+            >
+              + Novo Cliente
+            </button>
           </div>
 
           <div className="overflow-x-auto rounded-xl border border-gray-100 bg-gray-50">
@@ -3501,11 +3557,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               <tbody className="divide-y divide-slate-800">
                 {clientsLoading ? (
                   <tr>
-                    <td colSpan={4} className="px-6 py-8 text-center text-gray-500">Carregando membros...</td>
+                    <td colSpan={6} className="px-6 py-8 text-center text-gray-500">Carregando membros...</td>
                   </tr>
                 ) : visibleClients.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-6 py-8 text-center text-gray-500">Nenhum membro encontrado.</td>
+                    <td colSpan={6} className="px-6 py-8 text-center text-gray-500">Nenhum membro encontrado.</td>
                   </tr>
                 ) : visibleClients.map((client) => (
                   <tr key={client.id} className="hover:bg-gray-50">
@@ -3517,6 +3573,27 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     </td>
                     <td className="px-6 py-4 text-gray-600 font-bold">{client.org_name}</td>
                     <td className="px-6 py-4 text-gray-500 font-bold">{client.email}</td>
+                    <td className="px-6 py-4 text-gray-400 text-[10px] font-bold uppercase">
+                      {client.source === 'local_manual' ? 'Manual' : client.source === 'org_members+profiles' ? 'Sistema' : 'Sistema'}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() => handleStartEditClient(client)}
+                          className="p-2 bg-gray-100 hover:bg-gray-200 rounded-md text-gray-500 hover:text-white transition-colors"
+                          title="Editar cliente"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteClient(client)}
+                          className="p-2 bg-red-900/20 hover:bg-red-900/40 rounded-md text-red-500 transition-colors"
+                          title="Remover cliente"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
