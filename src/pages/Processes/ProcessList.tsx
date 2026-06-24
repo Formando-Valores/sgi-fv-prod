@@ -1,9 +1,4 @@
-/**
- * SGI FV - Process List Page
- * List of all processes with search and filters
- */
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Plus, Search, Eye, FolderKanban, X, AlertCircle, Loader2, Lock } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -20,6 +15,14 @@ import {
   PROCESS_STATUS_BADGES,
   getOperationalStatus,
 } from '../../lib/paymentStatus';
+import { getServicesByUnit, CUSTOM_ANALYSIS_FEE } from '../../lib/servicesCatalog';
+import type { ServiceUnit } from '../../../types';
+
+const SERVICE_UNITS: { value: ServiceUnit; label: string }[] = [
+  { value: 'ADMINISTRATIVO', label: 'Administrativo' },
+  { value: 'JURÍDICO / ADVOCACIA', label: 'Jurídico / Advocacia' },
+  { value: 'TECNOLÓGICO / AI', label: 'Tecnológico / AI' },
+];
 
 const ProcessList: React.FC = () => {
   const { userContext } = useAuth();
@@ -30,10 +33,15 @@ const ProcessList: React.FC = () => {
   const [processes, setProcesses] = useState<Process[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  
+
   // Modal state
   const [showModal, setShowModal] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [step, setStep] = useState<1 | 2>(1);
+  const [selectedUnit, setSelectedUnit] = useState<ServiceUnit | null>(null);
+  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
+  const [customMode, setCustomMode] = useState(false);
+  const [customServiceName, setCustomServiceName] = useState('');
   const [formData, setFormData] = useState<CreateProcessPayload>({
     titulo: '',
     cliente_nome: '',
@@ -42,6 +50,23 @@ const ProcessList: React.FC = () => {
     os_value: undefined
   });
   const [formError, setFormError] = useState('');
+
+  const availableServices = useMemo(() => {
+    if (!selectedUnit) return [];
+    return getServicesByUnit(selectedUnit);
+  }, [selectedUnit]);
+
+  const totalValue = useMemo(() => {
+    let total = 0;
+    for (const id of selectedServiceIds) {
+      const svc = availableServices.find((s) => s.id === id);
+      if (svc) total += svc.price;
+    }
+    if (customMode && customServiceName.trim()) {
+      total += CUSTOM_ANALYSIS_FEE;
+    }
+    return total;
+  }, [availableServices, selectedServiceIds, customMode, customServiceName]);
 
   useEffect(() => {
     loadProcesses();
@@ -54,7 +79,7 @@ const ProcessList: React.FC = () => {
       setLoading(false);
       return;
     }
-    
+
     setLoading(true);
     setError('');
     try {
@@ -66,14 +91,53 @@ const ProcessList: React.FC = () => {
       console.error('Error loading processes:', err);
       setError('Erro ao carregar processos. Verifique se as migrações foram executadas.');
     } finally {
-      setLoading(false); // ALWAYS set loading to false
+      setLoading(false);
     }
+  };
+
+  const resetModal = () => {
+    setStep(1);
+    setSelectedUnit(null);
+    setSelectedServiceIds([]);
+    setCustomMode(false);
+    setCustomServiceName('');
+    setFormData({ titulo: '', cliente_nome: '', cliente_documento: '', cliente_contato: '', os_value: undefined });
+    setFormError('');
+    setShowModal(false);
+  };
+
+  const handleToggleService = (id: string) => {
+    setSelectedServiceIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleContinue = () => {
+    if (!selectedUnit) {
+      setFormError('Selecione um tipo de serviço.');
+      return;
+    }
+    if (selectedServiceIds.length === 0 && !customMode) {
+      setFormError('Selecione ao menos um serviço ou informe um serviço customizado.');
+      return;
+    }
+    if (customMode && !customServiceName.trim()) {
+      setFormError('Informe o nome do serviço customizado.');
+      return;
+    }
+    setFormData((prev) => ({
+      ...prev,
+      os_value: totalValue > 0 ? totalValue : undefined,
+      unidade_atendimento: selectedUnit,
+    }));
+    setStep(2);
+    setFormError('');
   };
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userContext?.org_id || !userContext?.id) return;
-    
+
     if (!formData.titulo.trim()) {
       setFormError('Título é obrigatório');
       return;
@@ -89,8 +153,7 @@ const ProcessList: React.FC = () => {
         cliente_user_id: isClient ? userContext.id : undefined,
       };
       const newProcess = await createProcess(userContext.org_id, payload, userContext.id);
-      setShowModal(false);
-      setFormData({ titulo: '', cliente_nome: '', cliente_documento: '', cliente_contato: '', os_value: undefined });
+      resetModal();
       navigate(`/processos/${newProcess.id}`);
     } catch (err) {
       console.error('Error creating process:', err);
@@ -130,7 +193,7 @@ const ProcessList: React.FC = () => {
         </div>
         {canCreateProcess && (
           <button
-            onClick={() => setShowModal(true)}
+            onClick={() => { resetModal(); setShowModal(true); }}
             className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl flex items-center gap-2 transition-colors shadow-lg"
           >
             <Plus className="w-5 h-5" /> Novo Processo
@@ -166,7 +229,6 @@ const ProcessList: React.FC = () => {
           <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
         </div>
       ) : filteredProcesses.length === 0 ? (
-        /* Empty State */
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center">
           <FolderKanban className="w-16 h-16 text-slate-700 mx-auto mb-4" />
           <h3 className="text-lg font-bold text-slate-400 mb-2">
@@ -177,7 +239,6 @@ const ProcessList: React.FC = () => {
           </p>
         </div>
       ) : (
-        /* Table */
         <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
@@ -248,97 +309,233 @@ const ProcessList: React.FC = () => {
       {/* Create Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-slate-800">
-              <h2 className="text-lg font-bold text-white">Novo Processo</h2>
-              <button onClick={() => setShowModal(false)} className="text-slate-500 hover:text-white">
+              <h2 className="text-lg font-bold text-white">{step === 1 ? 'Novo Processo - Serviços' : 'Novo Processo - Dados'}</h2>
+              <button onClick={resetModal} className="text-slate-500 hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <form onSubmit={handleCreate} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-slate-300 mb-2">Título *</label>
-                <input
-                  type="text"
-                  value={formData.titulo}
-                  onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none"
-                  placeholder="Título do processo"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-slate-300 mb-2">Nome do Cliente</label>
-                <input
-                  type="text"
-                  value={formData.cliente_nome}
-                  onChange={(e) => setFormData({ ...formData, cliente_nome: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none"
-                  placeholder="Nome do cliente"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-slate-300 mb-2">Documento (CPF/CNPJ)</label>
-                <input
-                  type="text"
-                  value={formData.cliente_documento}
-                  onChange={(e) => setFormData({ ...formData, cliente_documento: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none"
-                  placeholder="000.000.000-00"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-slate-300 mb-2">Valor da OS (R$)</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.os_value ?? ''}
-                  onChange={(e) => setFormData({ ...formData, os_value: e.target.value ? Number(e.target.value) : undefined })}
-                  className="w-full px-4 py-3 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none"
-                  placeholder="0,00"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-slate-300 mb-2">Contato</label>
-                <input
-                  type="text"
-                  value={formData.cliente_contato}
-                  onChange={(e) => setFormData({ ...formData, cliente_contato: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none"
-                  placeholder="Telefone ou email"
-                />
-              </div>
-              {formError && (
-                <div className="flex items-center gap-2 p-3 bg-red-900/30 border border-red-800 rounded-lg">
-                  <AlertCircle className="w-4 h-4 text-red-400" />
-                  <p className="text-red-200 text-sm font-bold">{formError}</p>
+
+            {step === 1 ? (
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-300 mb-2">Tipo de Serviço *</label>
+                  <select
+                    value={selectedUnit ?? ''}
+                    onChange={(e) => {
+                      setSelectedUnit(e.target.value as ServiceUnit || null);
+                      setSelectedServiceIds([]);
+                      setCustomMode(false);
+                      setCustomServiceName('');
+                    }}
+                    className="w-full px-4 py-3 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                  >
+                    <option value="">Selecione o tipo...</option>
+                    {SERVICE_UNITS.map((u) => (
+                      <option key={u.value} value={u.value}>{u.label}</option>
+                    ))}
+                  </select>
                 </div>
-              )}
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={creating}
-                  className="flex-1 py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
-                >
-                  {creating ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Criando...
-                    </>
-                  ) : (
-                    'Criar Processo'
+
+                {selectedUnit && availableServices.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-bold text-slate-300 mb-2">Serviços Disponíveis</label>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {availableServices.map((svc) => (
+                        <label
+                          key={svc.id}
+                          className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors ${
+                            selectedServiceIds.includes(svc.id)
+                              ? 'bg-blue-900/40 border border-blue-700'
+                              : 'bg-gray-800 border border-slate-700 hover:border-slate-600'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="checkbox"
+                              checked={selectedServiceIds.includes(svc.id)}
+                              onChange={() => handleToggleService(svc.id)}
+                              className="w-4 h-4 accent-blue-500"
+                            />
+                            <div>
+                              <p className="text-sm font-bold text-slate-200">{svc.name}</p>
+                              <p className="text-xs text-slate-500">{svc.description}</p>
+                            </div>
+                          </div>
+                          <span className="text-sm font-black text-emerald-400">
+                            R$ {svc.price.toFixed(2)}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={customMode}
+                      onChange={() => {
+                        setCustomMode(!customMode);
+                        if (!customMode) setCustomServiceName('');
+                      }}
+                      className="w-4 h-4 accent-blue-500"
+                    />
+                    <span className="text-sm font-bold text-slate-300">Não encontrei meu serviço na lista</span>
+                  </label>
+                  {customMode && (
+                    <div className="mt-2 p-3 bg-amber-900/20 border border-amber-700 rounded-xl">
+                      <p className="text-xs text-amber-300 mb-2 font-bold">
+                        Informe o serviço desejado. Uma taxa de análise de <span className="text-white">R$ {CUSTOM_ANALYSIS_FEE.toFixed(2)}</span> será aplicada.
+                        O valor real será apresentado em um novo processo após a análise.
+                      </p>
+                      <input
+                        type="text"
+                        value={customServiceName}
+                        onChange={(e) => setCustomServiceName(e.target.value)}
+                        placeholder="Descreva o serviço desejado..."
+                        className="w-full px-4 py-3 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                      />
+                    </div>
                   )}
-                </button>
+                </div>
+
+                {totalValue > 0 && (
+                  <div className="p-4 bg-slate-800 rounded-xl text-right">
+                    <p className="text-xs text-slate-400 font-bold">VALOR TOTAL</p>
+                    <p className="text-2xl font-black text-emerald-400">R$ {totalValue.toFixed(2)}</p>
+                  </div>
+                )}
+
+                {formError && (
+                  <div className="flex items-center gap-2 p-3 bg-red-900/30 border border-red-800 rounded-lg">
+                    <AlertCircle className="w-4 h-4 text-red-400" />
+                    <p className="text-red-200 text-sm font-bold">{formError}</p>
+                  </div>
+                )}
+
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={resetModal}
+                    className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleContinue}
+                    className="flex-1 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-colors"
+                  >
+                    Continuar
+                  </button>
+                </div>
               </div>
-            </form>
+            ) : (
+              <form onSubmit={handleCreate} className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-300 mb-2">Título *</label>
+                  <input
+                    type="text"
+                    value={formData.titulo}
+                    onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none"
+                    placeholder="Título do processo"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-300 mb-2">Nome do Cliente</label>
+                  <input
+                    type="text"
+                    value={formData.cliente_nome}
+                    onChange={(e) => setFormData({ ...formData, cliente_nome: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none"
+                    placeholder="Nome do cliente"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-300 mb-2">Documento (CPF/CNPJ)</label>
+                  <input
+                    type="text"
+                    value={formData.cliente_documento}
+                    onChange={(e) => setFormData({ ...formData, cliente_documento: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none"
+                    placeholder="000.000.000-00"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-300 mb-2">Valor da OS (R$)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formData.os_value ?? ''}
+                    onChange={(e) => setFormData({ ...formData, os_value: e.target.value ? Number(e.target.value) : undefined })}
+                    className="w-full px-4 py-3 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none"
+                    placeholder="0,00"
+                    readOnly
+                  />
+                  <p className="text-xs text-slate-500 mt-1">Valor calculado com base nos serviços selecionados. Pode ser ajustado manualmente.</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-300 mb-2">Contato</label>
+                  <input
+                    type="text"
+                    value={formData.cliente_contato}
+                    onChange={(e) => setFormData({ ...formData, cliente_contato: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none"
+                    placeholder="Telefone ou email"
+                  />
+                </div>
+
+                {selectedUnit && (
+                  <div className="p-3 bg-slate-800 rounded-xl">
+                    <p className="text-xs text-slate-400 font-bold">Tipo: {SERVICE_UNITS.find(u => u.value === selectedUnit)?.label}</p>
+                    <p className="text-lg font-black text-emerald-400 mt-1">R$ {(formData.os_value ?? 0).toFixed(2)}</p>
+                    <button
+                      type="button"
+                      onClick={() => setStep(1)}
+                      className="text-xs text-blue-400 hover:text-blue-300 font-bold mt-1"
+                    >
+                      Alterar serviços
+                    </button>
+                  </div>
+                )}
+
+                {formError && (
+                  <div className="flex items-center gap-2 p-3 bg-red-900/30 border border-red-800 rounded-lg">
+                    <AlertCircle className="w-4 h-4 text-red-400" />
+                    <p className="text-red-200 text-sm font-bold">{formError}</p>
+                  </div>
+                )}
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setStep(1)}
+                    className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl transition-colors"
+                  >
+                    Voltar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={creating}
+                    className="flex-1 py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+                  >
+                    {creating ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Criando...
+                      </>
+                    ) : (
+                      'Criar Processo'
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

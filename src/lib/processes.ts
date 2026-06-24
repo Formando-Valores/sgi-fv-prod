@@ -744,6 +744,8 @@ export async function createProcess(
       cliente_contato: payload.cliente_contato || null,
       responsavel_user_id: payload.responsavel_user_id || null,
       cliente_user_id: payload.cliente_user_id || null,
+      unidade_atendimento: payload.unidade_atendimento || null,
+      origem_canal: payload.origem_canal || null,
       os_value: typeof payload.os_value === 'number' ? payload.os_value : null
     })
     .select()
