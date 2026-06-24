@@ -82,7 +82,13 @@ const ProcessList: React.FC = () => {
     setCreating(true);
     setFormError('');
     try {
-      const newProcess = await createProcess(userContext.org_id, formData, userContext.id);
+      const isClient = !can('view_all', 'processos', userContext);
+      const payload = {
+        ...formData,
+        responsavel_user_id: isClient ? userContext.id : formData.responsavel_user_id,
+        cliente_user_id: isClient ? userContext.id : undefined,
+      };
+      const newProcess = await createProcess(userContext.org_id, payload, userContext.id);
       setShowModal(false);
       setFormData({ titulo: '', cliente_nome: '', cliente_documento: '', cliente_contato: '', os_value: undefined });
       navigate(`/processos/${newProcess.id}`);

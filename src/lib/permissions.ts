@@ -180,7 +180,7 @@ const PERMISSION_MATRIX_BY_HIERARCHY: Record<SystemHierarchy, PermissionMatrix> 
     modules: ['dashboard', 'processos', 'financeiro', 'relatorios'],
     actionsByScope: {
       dashboard: ['view_own'],
-      processos: ['view_own', 'update'],
+      processos: ['view_own', 'create', 'update'],
       financeiro: ['view_own', 'update'],
       relatorios: ['view_own', 'update'],
     },
