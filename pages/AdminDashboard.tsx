@@ -342,7 +342,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     osValue: undefined as number | undefined,
   });
   const [adminServiceSearch, setAdminServiceSearch] = useState('');
-  const [adminCollapsedGroups, setAdminCollapsedGroups] = useState<Record<string, boolean>>({});
+  const [adminExpandedGroups, setAdminExpandedGroups] = useState<Record<string, boolean>>({});
   const [configSearch, setConfigSearch] = useState('');
   const [configRowsLimit, setConfigRowsLimit] = useState(10);
   const [newAdminOrgId, setNewAdminOrgId] = useState('');
@@ -4521,11 +4521,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                           osValue: undefined,
                         }));
                         setAdminServiceSearch('');
-                        if (unit) {
-                          setAdminCollapsedGroups(Object.fromEntries(getGroupsByUnit(unit).map(g => [g, true])));
-                        } else {
-                          setAdminCollapsedGroups({});
-                        }
+                        setAdminExpandedGroups({});
                       }}
                       className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                     >
@@ -4556,12 +4552,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                             ? services.filter((s) => s.name.toLowerCase().includes(adminServiceSearch.toLowerCase()))
                             : services;
                           if (filtered.length === 0) return null;
-                          const isCollapsed = adminCollapsedGroups[group];
+                          const isCollapsed = !adminExpandedGroups[group];
                           return (
                             <div key={group} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
                               <button
                                 type="button"
-                                onClick={() => setAdminCollapsedGroups((prev) => ({ ...prev, [group]: !prev[group] }))}
+                                onClick={() => setAdminExpandedGroups((prev) => {
+                                  if (prev[group]) { const { [group]: _, ...rest } = prev; return rest; }
+                                  return { ...prev, [group]: true };
+                                })}
                                 className="flex items-center justify-between w-full px-4 py-3 text-xs font-black uppercase tracking-wider text-gray-500 hover:text-gray-700 transition-colors"
                               >
                                 {group}

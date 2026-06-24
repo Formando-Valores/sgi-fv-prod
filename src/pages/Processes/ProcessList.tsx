@@ -43,7 +43,7 @@ const ProcessList: React.FC = () => {
   const [customMode, setCustomMode] = useState(false);
   const [customServiceName, setCustomServiceName] = useState('');
   const [serviceSearch, setServiceSearch] = useState('');
-  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [formData, setFormData] = useState<CreateProcessPayload>({
     titulo: '',
     cliente_nome: '',
@@ -104,7 +104,7 @@ const ProcessList: React.FC = () => {
     setCustomMode(false);
     setCustomServiceName('');
     setServiceSearch('');
-    setCollapsedGroups({});
+    setExpandedGroups({});
     setFormData({ titulo: '', cliente_nome: '', cliente_documento: '', cliente_contato: '', os_value: undefined });
     setFormError('');
     setShowModal(false);
@@ -328,17 +328,12 @@ const ProcessList: React.FC = () => {
                   <select
                     value={selectedUnit ?? ''}
                     onChange={(e) => {
-                      const unit = e.target.value as ServiceUnit || null;
-                      setSelectedUnit(unit);
+                      setSelectedUnit(e.target.value as ServiceUnit || null);
                       setSelectedServiceIds([]);
                       setCustomMode(false);
                       setCustomServiceName('');
                       setServiceSearch('');
-                      if (unit) {
-                        setCollapsedGroups(Object.fromEntries(getGroupsByUnit(unit).map(g => [g, true])));
-                      } else {
-                        setCollapsedGroups({});
-                      }
+                      setExpandedGroups({});
                     }}
                     className="w-full px-4 py-3 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold focus:ring-2 focus:ring-blue-500 outline-none"
                   >
@@ -369,12 +364,15 @@ const ProcessList: React.FC = () => {
                           ? services.filter((s) => s.name.toLowerCase().includes(serviceSearch.toLowerCase()))
                           : services;
                         if (filtered.length === 0) return null;
-                        const isCollapsed = collapsedGroups[group];
+                        const isCollapsed = !expandedGroups[group];
                         return (
                           <div key={group} className="bg-gray-900 border border-slate-800 rounded-xl overflow-hidden">
                             <button
                               type="button"
-                              onClick={() => setCollapsedGroups((prev) => ({ ...prev, [group]: !prev[group] }))}
+                              onClick={() => setExpandedGroups((prev) => {
+                                if (prev[group]) { const { [group]: _, ...rest } = prev; return rest; }
+                                return { ...prev, [group]: true };
+                              })}
                               className="flex items-center justify-between w-full px-4 py-3 text-xs font-black uppercase tracking-wider text-slate-400 hover:text-slate-200 transition-colors"
                             >
                               {group}
