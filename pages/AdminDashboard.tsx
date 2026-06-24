@@ -78,6 +78,7 @@ interface AdminProcessRow extends User {
   contractedServiceName: string;
   paymentStatus?: string | null;
   osValue?: number | null;
+  servicesSelected?: { id: string; name: string; price: number; group: string }[] | null;
 }
 
 interface ClientProfileView {
@@ -604,7 +605,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     return ProcessStatus.PENDENTE;
   };
 
-  const PROCESS_SELECT_BASE_COLUMNS = 'id,org_id,titulo,protocolo,status,cliente_nome,cliente_documento,cliente_contato,responsavel_user_id,created_at,updated_at,origem_canal,unidade_atendimento,org_nome_solicitado,payment_status,process_status,os_value';
+  const PROCESS_SELECT_BASE_COLUMNS = 'id,org_id,titulo,protocolo,status,cliente_nome,cliente_documento,cliente_contato,responsavel_user_id,created_at,updated_at,origem_canal,unidade_atendimento,org_nome_solicitado,payment_status,process_status,os_value,services_selected';
   const PROCESS_SELECT_WITH_OPTIONAL_COLUMNS = 'id,org_id,titulo,protocolo,status,cliente_nome,cliente_documento,cliente_contato,responsavel_user_id,data_prazo,gestor_servico,observacoes,created_at,updated_at,origem_canal,unidade_atendimento,org_nome_solicitado,payment_status,process_status,os_value';
 
   const normalizeProcessOptionalFields = (process: Partial<DbProcess>): DbProcess => ({
@@ -842,6 +843,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         contractedServiceName: sanitizeDisplayValue(process.titulo) || 'Serviço não informado',
         paymentStatus: process.payment_status ?? null,
         osValue: process.os_value ?? null,
+        servicesSelected: (process.services_selected as AdminProcessRow['servicesSelected']) ?? null,
       };
     }) : fallbackUsersForRows.map((user) => {
       const generatedValue = user.unit === ServiceUnit.ADMINISTRATIVO ? 5200 : 1800;
@@ -4398,49 +4400,68 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                 {/* Financeiro */}
                 {selectedUserTab === 'financeiro' && (
                   <div className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="p-5 bg-gray-50 border border-gray-200 rounded-xl">
-                        <label className="text-[10px] font-black text-gray-500 uppercase block mb-1">Valor da OS</label>
-                        <p className="text-2xl font-black text-gray-900">
-                          {(selectedUser as AdminProcessRow).osValue != null
-                            ? `R$ ${Number((selectedUser as AdminProcessRow).osValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-                            : '-'}
-                        </p>
+                    <div className="p-5 bg-emerald-50 border border-emerald-200 rounded-xl">
+                      <label className="text-[10px] font-black text-emerald-700 uppercase block mb-1">Resumo do Pagamento</label>
+                      <p className="text-3xl font-black text-emerald-700">
+                        {(selectedUser as AdminProcessRow).osValue != null
+                          ? `R$ ${Number((selectedUser as AdminProcessRow).osValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                          : '-'}
+                      </p>
+                    </div>
+
+                    {(selectedUser as AdminProcessRow).servicesSelected && (selectedUser as AdminProcessRow).servicesSelected!.length > 0 && (
+                      <div>
+                        <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Serviços Contratados</label>
+                        <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
+                          {(selectedUser as AdminProcessRow).servicesSelected!.map((svc, idx) => (
+                            <div key={idx} className="flex items-center justify-between px-4 py-3 bg-white">
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-bold text-gray-800 truncate">{svc.name}</p>
+                                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">{svc.group}</p>
+                              </div>
+                              <span className="text-sm font-black text-gray-700 ml-3">R$ {svc.price.toFixed(2)}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                      <div className="p-5 bg-gray-50 border border-gray-200 rounded-xl">
+                    )}
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl">
                         <label className="text-[10px] font-black text-gray-500 uppercase block mb-1">Tipo de Serviço</label>
-                        <p className="text-xl font-black text-gray-900">{(selectedUser as AdminProcessRow).processType || '-'}</p>
+                        <p className="text-lg font-black text-gray-900">{(selectedUser as AdminProcessRow).processType || '-'}</p>
                       </div>
-                      <div className="p-5 bg-gray-50 border border-gray-200 rounded-xl">
+                      <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl">
                         <label className="text-[10px] font-black text-gray-500 uppercase block mb-1">Unidade de Atendimento</label>
-                        <p className="text-xl font-black text-gray-900">{selectedUser.unit}</p>
+                        <p className="text-lg font-black text-gray-900">{selectedUser.unit}</p>
                       </div>
-                      <div className="p-5 bg-gray-50 border border-gray-200 rounded-xl">
+                      <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl">
                         <label className="text-[10px] font-black text-gray-500 uppercase block mb-1">Status do Pagamento</label>
                         {(selectedUser as AdminProcessRow).paymentStatus ? (
                           <span className={`inline-block px-3 py-1 rounded text-xs font-bold uppercase text-white ${getPaymentStatusUi((selectedUser as AdminProcessRow).paymentStatus)?.color || 'bg-slate-600'}`}>
                             {getPaymentStatusUi((selectedUser as AdminProcessRow).paymentStatus)?.label || (selectedUser as AdminProcessRow).paymentStatus}
                           </span>
                         ) : (
-                          <p className="text-xl font-black text-gray-400">-</p>
+                          <p className="text-lg font-black text-gray-400">Pendente</p>
                         )}
                       </div>
                     </div>
 
                     {((selectedUser as AdminProcessRow).paymentStatus == null || (selectedUser as AdminProcessRow).paymentStatus === 'pending' || (selectedUser as AdminProcessRow).paymentStatus === 'failed' || (selectedUser as AdminProcessRow).paymentStatus === 'canceled') && (
-                      <div className="pt-4">
+                      <div>
                         <button
                           type="button"
                           onClick={() => { void handleGoToCheckout(selectedUser); }}
                           disabled={redirectingCheckout}
-                          className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-4 text-base font-bold text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60 shadow-lg"
+                          className="w-full inline-flex items-center justify-center gap-3 rounded-xl bg-emerald-600 px-6 py-4 text-base font-bold text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60 shadow-lg"
                         >
                           {redirectingCheckout ? (
-                            <><Loader2 className="h-5 w-5 animate-spin" /> Redirecionando...</>
+                            <><Loader2 className="h-5 w-5 animate-spin" /> Redirecionando para pagamento...</>
                           ) : (
-                            <><ExternalLink className="h-5 w-5" /> Pagar agora</>
+                            <><CreditCard className="h-5 w-5" /> Pagar agora — R$ {Number((selectedUser as AdminProcessRow).osValue ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</>
                           )}
                         </button>
+                        <p className="text-xs text-gray-500 text-center mt-2">Pagamento processado via Stripe com segurança</p>
                       </div>
                     )}
                   </div>
