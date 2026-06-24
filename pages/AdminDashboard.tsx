@@ -300,6 +300,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [activeTab, setActiveTab] = useState<'users' | 'management'>('users');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState<AdminProcessRow | User | null>(null);
+  const [selectedUserTab, setSelectedUserTab] = useState<'cadastral' | 'financeiro'>('cadastral');
   const [editingUser, setEditingUser] = useState<AdminProcessRow | User | null>(null);
   const [redirectingCheckout, setRedirectingCheckout] = useState(false);
   
@@ -4284,88 +4285,139 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                  <X className="w-5 h-5" />
                </button>
              </div>
-             <div className="p-6 sm:p-8 overflow-y-auto">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
-                  <div className="space-y-4 min-w-0">
-                    <div>
-                      <label className="text-[10px] font-black text-gray-500 uppercase">Nome Completo</label>
-                      <p className="text-lg font-black break-words">{selectedUser.name}</p>
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-black text-gray-500 uppercase">E-mail</label>
-                      <p className="font-bold text-blue-400 break-all leading-snug">{selectedUser.email}</p>
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-black text-gray-500 uppercase">Documento / NIF-CPF</label>
-                      <p className="font-bold break-words">{selectedUser.documentId} / {selectedUser.taxId}</p>
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-black text-gray-500 uppercase">Estado Civil / País</label>
-                      <p className="font-bold break-words">{selectedUser.maritalStatus} - {selectedUser.country}</p>
-                    </div>
-                  </div>
-                  <div className="space-y-4 min-w-0">
-                    <div>
-                      <label className="text-[10px] font-black text-gray-500 uppercase">Protocolo SGI</label>
-                      <p className="text-lg font-black text-emerald-400 break-words">{selectedUser.protocol}</p>
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-black text-gray-500 uppercase">Título do processo</label>
-                      <p className="font-bold break-words">{sanitizeDisplayValue((selectedUser as AdminProcessRow).contractedServiceName) || 'Não informado'}</p>
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-black text-gray-500 uppercase">Unidade Atendimento</label>
-                      <p className="font-bold text-blue-300 break-words leading-snug">{selectedUser.unit}</p>
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-black text-gray-500 uppercase">Processo Judicial</label>
-                      <p className="font-bold break-words">{selectedUser.processNumber || 'NÃO INFORMADO'}</p>
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-black text-gray-500 uppercase">Status Atual</label>
-                      <p className="font-black text-orange-500 uppercase">{selectedUser.status}</p>
-                    </div>
-                  </div>
+              <div className="p-6 sm:p-8 overflow-y-auto">
+                {/* Sub-aba navigation */}
+                <div className="flex gap-1 mb-6 border-b border-gray-200">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedUserTab('cadastral')}
+                    className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-t-lg transition-colors ${
+                      selectedUserTab === 'cadastral'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    Dados Cadastrais
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedUserTab('financeiro')}
+                    className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-t-lg transition-colors ${
+                      selectedUserTab === 'financeiro'
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    Financeiro
+                  </button>
                 </div>
-                <div className="mt-8 pt-6 border-t border-gray-100">
-                  <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Endereço Completo</label>
-                  <p className="font-semibold p-4 bg-gray-50 border border-gray-200 rounded-xl">{selectedUser.address}</p>
-                </div>
-                {selectedUser.notes && (
-                  <div className="mt-4">
-                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Observações Internas</label>
-                    <p className="font-bold p-4 bg-blue-900/10 border border-blue-900/30 rounded-xl text-blue-200 italic">"{selectedUser.notes}"</p>
-                  </div>
+
+                {/* Dados Cadastrais */}
+                {selectedUserTab === 'cadastral' && (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+                      <div className="space-y-4 min-w-0">
+                        <div>
+                          <label className="text-[10px] font-black text-gray-500 uppercase">Nome Completo</label>
+                          <p className="text-lg font-black break-words">{selectedUser.name}</p>
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-black text-gray-500 uppercase">E-mail</label>
+                          <p className="font-bold text-blue-400 break-all leading-snug">{selectedUser.email}</p>
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-black text-gray-500 uppercase">Documento / NIF-CPF</label>
+                          <p className="font-bold break-words">{selectedUser.documentId} / {selectedUser.taxId}</p>
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-black text-gray-500 uppercase">Estado Civil / País</label>
+                          <p className="font-bold break-words">{selectedUser.maritalStatus} - {selectedUser.country}</p>
+                        </div>
+                      </div>
+                      <div className="space-y-4 min-w-0">
+                        <div>
+                          <label className="text-[10px] font-black text-gray-500 uppercase">Protocolo SGI</label>
+                          <p className="text-lg font-black text-emerald-400 break-words">{selectedUser.protocol}</p>
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-black text-gray-500 uppercase">Título do processo</label>
+                          <p className="font-bold break-words">{sanitizeDisplayValue((selectedUser as AdminProcessRow).contractedServiceName) || 'Não informado'}</p>
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-black text-gray-500 uppercase">Unidade Atendimento</label>
+                          <p className="font-bold text-blue-300 break-words leading-snug">{selectedUser.unit}</p>
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-black text-gray-500 uppercase">Processo Judicial</label>
+                          <p className="font-bold break-words">{selectedUser.processNumber || 'NÃO INFORMADO'}</p>
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-black text-gray-500 uppercase">Status Atual</label>
+                          <p className="font-black text-orange-500 uppercase">{selectedUser.status}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-8 pt-6 border-t border-gray-100">
+                      <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Endereço Completo</label>
+                      <p className="font-semibold p-4 bg-gray-50 border border-gray-200 rounded-xl">{selectedUser.address}</p>
+                    </div>
+                    {selectedUser.notes && (
+                      <div className="mt-4">
+                        <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Observações Internas</label>
+                        <p className="font-bold p-4 bg-blue-900/10 border border-blue-900/30 rounded-xl text-blue-200 italic">"{selectedUser.notes}"</p>
+                      </div>
+                    )}
+                  </>
                 )}
 
-                {(selectedUser as AdminProcessRow).paymentStatus && (
-                  <div className="mt-6 pt-6 border-t border-gray-100">
-                    <div className="flex items-center gap-2 mb-4">
-                      <CreditCard className="w-5 h-5 text-emerald-500" />
-                      <h4 className="text-lg font-black uppercase">Pagamento</h4>
-                    </div>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-[10px] font-black text-gray-500 uppercase block mb-1">Status</label>
-                        <span className={`inline-block px-2 py-1 rounded text-[10px] font-bold uppercase text-white ${getPaymentStatusUi((selectedUser as AdminProcessRow).paymentStatus)?.color || 'bg-slate-600'}`}>
-                          {getPaymentStatusUi((selectedUser as AdminProcessRow).paymentStatus)?.label || (selectedUser as AdminProcessRow).paymentStatus}
-                        </span>
+                {/* Financeiro */}
+                {selectedUserTab === 'financeiro' && (
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="p-5 bg-gray-50 border border-gray-200 rounded-xl">
+                        <label className="text-[10px] font-black text-gray-500 uppercase block mb-1">Valor da OS</label>
+                        <p className="text-2xl font-black text-gray-900">
+                          {(selectedUser as AdminProcessRow).osValue != null
+                            ? `R$ ${Number((selectedUser as AdminProcessRow).osValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                            : '-'}
+                        </p>
                       </div>
-                      {((selectedUser as AdminProcessRow).paymentStatus === 'pending' || (selectedUser as AdminProcessRow).paymentStatus === 'failed' || (selectedUser as AdminProcessRow).paymentStatus === 'canceled') && (
+                      <div className="p-5 bg-gray-50 border border-gray-200 rounded-xl">
+                        <label className="text-[10px] font-black text-gray-500 uppercase block mb-1">Tipo de Serviço</label>
+                        <p className="text-xl font-black text-gray-900">{(selectedUser as AdminProcessRow).processType || '-'}</p>
+                      </div>
+                      <div className="p-5 bg-gray-50 border border-gray-200 rounded-xl">
+                        <label className="text-[10px] font-black text-gray-500 uppercase block mb-1">Unidade de Atendimento</label>
+                        <p className="text-xl font-black text-gray-900">{selectedUser.unit}</p>
+                      </div>
+                      <div className="p-5 bg-gray-50 border border-gray-200 rounded-xl">
+                        <label className="text-[10px] font-black text-gray-500 uppercase block mb-1">Status do Pagamento</label>
+                        {(selectedUser as AdminProcessRow).paymentStatus ? (
+                          <span className={`inline-block px-3 py-1 rounded text-xs font-bold uppercase text-white ${getPaymentStatusUi((selectedUser as AdminProcessRow).paymentStatus)?.color || 'bg-slate-600'}`}>
+                            {getPaymentStatusUi((selectedUser as AdminProcessRow).paymentStatus)?.label || (selectedUser as AdminProcessRow).paymentStatus}
+                          </span>
+                        ) : (
+                          <p className="text-xl font-black text-gray-400">-</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {((selectedUser as AdminProcessRow).paymentStatus === 'pending' || (selectedUser as AdminProcessRow).paymentStatus === 'failed' || (selectedUser as AdminProcessRow).paymentStatus === 'canceled') && (
+                      <div className="pt-4">
                         <button
                           type="button"
                           onClick={() => { void handleGoToCheckout(selectedUser); }}
                           disabled={redirectingCheckout}
-                          className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-4 text-base font-bold text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60 shadow-lg"
                         >
                           {redirectingCheckout ? (
-                            <><Loader2 className="h-4 w-4 animate-spin" /> Redirecionando...</>
+                            <><Loader2 className="h-5 w-5 animate-spin" /> Redirecionando...</>
                           ) : (
-                            <><ExternalLink className="h-4 w-4" /> Pagar agora</>
+                            <><ExternalLink className="h-5 w-5" /> Pagar agora</>
                           )}
                         </button>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 )}
              </div>
