@@ -2389,7 +2389,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const userIds = Array.from(new Set(scopedMembers.map((member) => member.user_id)));
     const { data: profileRows, error: profileError } = await supabase
       .from('profiles')
-      .select('id,nome_completo,nome,email,created_at')
+      .select('id,nome_completo,email,created_at')
       .in('id', userIds);
 
     if (profileError) {
@@ -2399,14 +2399,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       setClientsError('');
     }
 
-    const profileMap = new Map(((profileRows || []) as Array<{ id: string; nome_completo?: string | null; nome?: string | null; email?: string | null; created_at?: string | null }>).map((row) => [row.id, row]));
+    const profileMap = new Map(((profileRows || []) as Array<{ id: string; nome_completo?: string | null; email?: string | null; created_at?: string | null }>).map((row) => [row.id, row]));
 
     const normalizedClients: ClientProfileView[] = scopedMembers.map((member) => {
       const profile = profileMap.get(member.user_id);
       const email = profile?.email || 'sem-email@nao-informado';
       const nome =
         profile?.nome_completo ||
-        profile?.nome ||
         (email !== 'sem-email@nao-informado' ? String(email).split('@')[0] : `Usuário ${member.user_id.slice(0, 8)}`);
 
       return {
