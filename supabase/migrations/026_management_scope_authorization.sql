@@ -54,22 +54,26 @@ $$;
 GRANT EXECUTE ON FUNCTION public.can_manage_entity(uuid) TO authenticated;
 
 DROP POLICY IF EXISTS "Admins can update processes" ON public.processes;
+DROP POLICY IF EXISTS "Scoped roles can manage processes" ON public.processes;
 CREATE POLICY "Scoped roles can manage processes"
   ON public.processes FOR UPDATE
   USING (public.can_manage_entity(org_id))
   WITH CHECK (public.can_manage_entity(org_id));
 
 DROP POLICY IF EXISTS "Admins can delete processes" ON public.processes;
+DROP POLICY IF EXISTS "Scoped roles can delete processes" ON public.processes;
 CREATE POLICY "Scoped roles can delete processes"
   ON public.processes FOR DELETE
   USING (public.can_manage_entity(org_id));
 
 DROP POLICY IF EXISTS "Admins can insert process events" ON public.process_events;
+DROP POLICY IF EXISTS "Scoped roles can insert process events" ON public.process_events;
 CREATE POLICY "Scoped roles can insert process events"
   ON public.process_events FOR INSERT
   WITH CHECK (public.can_manage_entity(org_id));
 
 DROP POLICY IF EXISTS "Admins can update process events" ON public.process_events;
+DROP POLICY IF EXISTS "Scoped roles can update process events" ON public.process_events;
 CREATE POLICY "Scoped roles can update process events"
   ON public.process_events FOR UPDATE
   USING (public.can_manage_entity(org_id))

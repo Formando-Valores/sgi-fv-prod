@@ -15,6 +15,7 @@ DROP POLICY IF EXISTS "Default org admins can delete organizations" ON organizat
 -- Recria sem tocar na tabela organizations (somente org_members)
 -- Evita recursão e mantém governança para admins/owners.
 
+DROP POLICY IF EXISTS "Org admins can view all organizations" ON organizations;
 CREATE POLICY "Org admins can view all organizations"
   ON organizations FOR SELECT
   USING (
@@ -26,6 +27,7 @@ CREATE POLICY "Org admins can view all organizations"
     )
   );
 
+DROP POLICY IF EXISTS "Org admins can update organizations" ON organizations;
 CREATE POLICY "Org admins can update organizations"
   ON organizations FOR UPDATE
   USING (
@@ -45,6 +47,7 @@ CREATE POLICY "Org admins can update organizations"
     )
   );
 
+DROP POLICY IF EXISTS "Org admins can delete organizations" ON organizations;
 CREATE POLICY "Org admins can delete organizations"
   ON organizations FOR DELETE
   USING (

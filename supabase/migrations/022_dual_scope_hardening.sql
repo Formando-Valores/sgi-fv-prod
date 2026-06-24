@@ -42,6 +42,7 @@ CREATE POLICY "Scoped users can view organizations"
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Users can view profiles in their org" ON public.profiles;
+DROP POLICY IF EXISTS "Scoped users can view profiles in org" ON public.profiles;
 CREATE POLICY "Scoped users can view profiles in org"
   ON public.profiles FOR SELECT
   USING (

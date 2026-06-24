@@ -115,13 +115,17 @@ const ACCESS_LEVELS: AccessLevel[] = ['Administrador', 'Usuário Sênior', 'Usu�
 const mapOrgRoleToAccessLevel = (role: string | null | undefined): AccessLevel => {
   if (!role) return 'Cliente';
   if (role === 'owner' || role === 'admin') return 'Administrador';
-  if (role === 'staff') return 'Usuário Pleno';
+  if (role === 'senior') return 'Usuário Sênior';
+  if (role === 'pleno' || role === 'staff') return 'Usuário Pleno';
+  if (role === 'operador') return 'Operador';
   return 'Cliente';
 };
 
-const mapAccessLevelToOrgRole = (level: AccessLevel): 'admin' | 'staff' | 'client' => {
+const mapAccessLevelToOrgRole = (level: AccessLevel): string => {
   if (level === 'Administrador') return 'admin';
-  if (level === 'Usuário Sênior' || level === 'Usuário Pleno' || level === 'Operador') return 'staff';
+  if (level === 'Usuário Sênior') return 'senior';
+  if (level === 'Usuário Pleno') return 'pleno';
+  if (level === 'Operador') return 'operador';
   return 'client';
 };
 
@@ -159,8 +163,8 @@ const resolveAccessLevel = (role: string | null | undefined): AccessLevel => {
   const normalized = sanitizeDisplayValue(role).toLowerCase();
 
   if (normalized === 'administrador' || normalized === 'admin' || normalized === 'owner') return 'Administrador';
-  if (normalized === 'usuário sênior' || normalized === 'usuario senior') return 'Usuário Sênior';
-  if (normalized === 'usuário pleno' || normalized === 'usuario pleno' || normalized === 'staff') return 'Usuário Pleno';
+  if (normalized === 'usuário sênior' || normalized === 'usuario senior' || normalized === 'senior') return 'Usuário Sênior';
+  if (normalized === 'usuário pleno' || normalized === 'usuario pleno' || normalized === 'pleno' || normalized === 'staff') return 'Usuário Pleno';
   if (normalized === 'operador') return 'Operador';
   if (normalized === 'cliente' || normalized === 'client') return 'Cliente';
 
@@ -2033,7 +2037,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       }
     }
 
-    await supabase
+    const { error: profileUpdateError } = await supabase
       .from('profiles')
       .update({
         nome_completo: sanitizeDisplayValue(newAdminName),
@@ -2042,6 +2046,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         org_id: newAdminOrgId,
       })
       .eq('id', targetUserId);
+
+    if (profileUpdateError) {
+      console.warn('handleCreateUser: profiles.update() falhou —', profileUpdateError.message);
+    }
 
     setUsers((prev) => {
       const found = prev.find((user) => user.id === targetUserId || user.email === normalizedEmail);
