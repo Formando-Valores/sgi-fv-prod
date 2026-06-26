@@ -1,6 +1,6 @@
 import React from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { supabase } from '../../supabase';
+import { supabase } from '../../../supabase';
 import { Download, CheckCircle, ArrowLeft } from 'lucide-react';
 
 const CertificatePage: React.FC = () => {
