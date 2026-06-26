@@ -1,4 +1,4 @@
-import { supabase } from '../supabase';
+import { supabase } from '../../supabase';
 import type { ServiceUnit } from '../../types';
 
 export type ProfessionalAccount = {
