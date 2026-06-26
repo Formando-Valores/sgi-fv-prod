@@ -19,6 +19,7 @@ import PasswordRecovery from './pages/PasswordRecovery';
 import UnifiedDashboard from './src/pages/UnifiedDashboard';
 import PaymentSuccess from './src/pages/Payments/PaymentSuccess';
 import PaymentCancel from './src/pages/Payments/PaymentCancel';
+import CertificatePage from './src/pages/Certificate/CertificatePage';
 import { ProcessStatus, ServiceUnit, User, UserRole } from './types';
 import { supabase } from './supabase';
 import { getAllowedModules, resolvePermissions } from './src/lib/permissions';
@@ -294,6 +295,7 @@ const RootApp: React.FC = () => {
           <Route path="/relatorios" element={renderUnifiedSectionRoute('relatorios')} />
           <Route path="/payments/success" element={<PaymentSuccess />} />
           <Route path="/payments/cancel" element={<PaymentCancel />} />
+          <Route path="/certificate" element={<CertificatePage />} />
           <Route path="*" element={authBootstrapping ? authLoadingScreen : <Navigate to="/login" />} />
         </Routes>
       </div>

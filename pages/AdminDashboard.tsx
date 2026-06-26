@@ -24,6 +24,7 @@ import ClientProcessProgressPanel, {
   ClientProcessProgressHistoryItem,
 } from '../src/components/dashboard/ClientProcessProgressPanel';
 import ReportsPage from '../src/pages/Reports/ReportsPage';
+import IbanManagementSection from '../src/components/dashboard/blocks/IbanManagementSection';
 import { createCheckoutSession } from '../src/lib/stripe';
 import { getPaymentStatusUi } from '../src/lib/paymentStatus';
 import { getServicesByUnit, getGroupsByUnit, getServicesByGroup, SERVICE_CATALOG, calcAssociationFees, type AssociationFeeItem } from '../src/lib/servicesCatalog';
@@ -301,7 +302,7 @@ interface AdminDashboardProps {
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, setUsers, onLogout, section = 'dashboard', blocks }) => {
-  const [activeTab, setActiveTab] = useState<'users' | 'management'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'management' | 'iban'>('users');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState<AdminProcessRow | User | null>(null);
   const [selectedUserTab, setSelectedUserTab] = useState<'cadastral' | 'financeiro'>('cadastral');
@@ -3313,6 +3314,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           Gestão de Acessos
           {activeTab === 'management' && <div className="absolute bottom-0 left-0 w-full h-1 bg-blue-500 rounded-t-full"></div>}
         </button>
+        <button 
+          onClick={() => setActiveTab('iban')}
+          className={`pb-4 px-2 font-black uppercase text-xs tracking-widest transition-all relative ${activeTab === 'iban' ? 'text-blue-500' : 'text-gray-500'}`}
+        >
+          IBAN Profissionais
+          {activeTab === 'iban' && <div className="absolute bottom-0 left-0 w-full h-1 bg-blue-500 rounded-t-full"></div>}
+        </button>
           </div>
         </>
       )}
@@ -3865,6 +3873,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
             </table>
           </div>
         </div>
+      ) : currentSection === 'configuracoes' && activeTab === 'iban' ? (
+        <IbanManagementSection currentUser={currentUser} />
       ) : currentSection === 'configuracoes' ? (
         /* Management Tab Content */
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

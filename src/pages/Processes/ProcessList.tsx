@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Search, Eye, FolderKanban, X, AlertCircle, Loader2, Lock, ChevronDown } from 'lucide-react';
+import { Plus, Search, Eye, FolderKanban, X, AlertCircle, Loader2, Lock, ChevronDown, Upload, Check } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { can } from '../../lib/permissions';
 import {
@@ -16,6 +16,7 @@ import {
   getOperationalStatus,
 } from '../../lib/paymentStatus';
 import { getServicesByUnit, getGroupsByUnit, getServicesByGroup, CUSTOM_ANALYSIS_FEE, calcAssociationFees, type AssociationFeeItem } from '../../lib/servicesCatalog';
+import { uploadPaymentProof } from '../../lib/paymentProofs';
 import type { ServiceUnit } from '../../../types';
 
 const SERVICE_UNITS: { value: ServiceUnit; label: string }[] = [
@@ -53,6 +54,9 @@ const ProcessList: React.FC = () => {
     association_fees: undefined
   });
   const [formError, setFormError] = useState('');
+  const [uploadingProofFor, setUploadingProofFor] = useState<string | null>(null);
+  const [proofUploadFeedback, setProofUploadFeedback] = useState<{ processId: string; message: string; type: 'success' | 'error' } | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const availableServices = useMemo(() => {
     if (!selectedUnit) return [];
@@ -308,6 +312,57 @@ const ProcessList: React.FC = () => {
                           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-wide bg-amber-900/30 text-amber-300 border border-amber-700">
                             <Lock className="w-3 h-3" />
                             Ações bloqueadas
+                          </span>
+                        )}
+                        {(process.payment_status == null || process.payment_status === 'pending' || process.payment_status === 'failed' || process.payment_status === 'rejected') && (
+                          <>
+                            <input
+                              type="file"
+                              ref={fileInputRef}
+                              accept="image/*,application/pdf"
+                              className="hidden"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                setUploadingProofFor(process.id);
+                                const { error } = await uploadPaymentProof(process.id, userContext?.id || '', file);
+                                setUploadingProofFor(null);
+                                if (fileInputRef.current) fileInputRef.current.value = '';
+                                if (error) {
+                                  setProofUploadFeedback({ processId: process.id, message: error, type: 'error' });
+                                } else {
+                                  setProofUploadFeedback({ processId: process.id, message: 'Comprovante enviado! Aguardando validação.', type: 'success' });
+                                  setProcesses((prev) => prev.map((p) => p.id === process.id ? { ...p, payment_status: 'pending_validation' as any } : p));
+                                }
+                                setTimeout(() => setProofUploadFeedback(null), 4000);
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => fileInputRef.current?.click()}
+                              disabled={uploadingProofFor === process.id}
+                              className="p-2 bg-emerald-800 hover:bg-emerald-700 rounded-lg text-emerald-300 inline-flex disabled:opacity-60"
+                              title="Enviar comprovante de pagamento"
+                            >
+                              {uploadingProofFor === process.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                            </button>
+                          </>
+                        )}
+                        {process.payment_status === 'pending_validation' && (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-wide bg-amber-900/30 text-amber-300 border border-amber-700">
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            Validando
+                          </span>
+                        )}
+                        {(process.payment_status === 'validated' || process.payment_status === 'accepted') && (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-wide bg-emerald-900/30 text-emerald-300 border border-emerald-700">
+                            <Check className="w-3 h-3" />
+                            Pago
+                          </span>
+                        )}
+                        {proofUploadFeedback && proofUploadFeedback.processId === process.id && (
+                          <span className={`text-[10px] font-bold ${proofUploadFeedback.type === 'success' ? 'text-emerald-400' : 'text-red-400'}`}>
+                            {proofUploadFeedback.message}
                           </span>
                         )}
                         <Link
