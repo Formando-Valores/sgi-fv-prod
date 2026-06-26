@@ -15,7 +15,7 @@ import {
   PROCESS_STATUS_BADGES,
   getOperationalStatus,
 } from '../../lib/paymentStatus';
-import { getServicesByUnit, getGroupsByUnit, getServicesByGroup, CUSTOM_ANALYSIS_FEE } from '../../lib/servicesCatalog';
+import { getServicesByUnit, getGroupsByUnit, getServicesByGroup, CUSTOM_ANALYSIS_FEE, calcAssociationFees, type AssociationFeeItem } from '../../lib/servicesCatalog';
 import type { ServiceUnit } from '../../../types';
 
 const SERVICE_UNITS: { value: ServiceUnit; label: string }[] = [
@@ -49,7 +49,8 @@ const ProcessList: React.FC = () => {
     cliente_nome: '',
     cliente_documento: '',
     cliente_contato: '',
-    os_value: undefined
+    os_value: undefined,
+    association_fees: undefined
   });
   const [formError, setFormError] = useState('');
 
@@ -105,7 +106,7 @@ const ProcessList: React.FC = () => {
     setCustomServiceName('');
     setServiceSearch('');
     setExpandedGroups({});
-    setFormData({ titulo: '', cliente_nome: '', cliente_documento: '', cliente_contato: '', os_value: undefined });
+    setFormData({ titulo: '', cliente_nome: '', cliente_documento: '', cliente_contato: '', os_value: undefined, association_fees: undefined });
     setFormError('');
     setShowModal(false);
   };
@@ -129,11 +130,17 @@ const ProcessList: React.FC = () => {
       setFormError('Informe o nome do serviço customizado.');
       return;
     }
-    setFormData((prev) => ({
-      ...prev,
-      os_value: totalValue > 0 ? totalValue : undefined,
-      unidade_atendimento: selectedUnit,
-    }));
+    setFormData((prev) => {
+      const servicesTotal = totalValue;
+      const fees = servicesTotal > 0 ? calcAssociationFees(servicesTotal) : [];
+      const feesTotal = fees.reduce((sum, f) => sum + f.price, 0);
+      return {
+        ...prev,
+        os_value: servicesTotal + feesTotal > 0 ? servicesTotal + feesTotal : undefined,
+        association_fees: fees.length > 0 ? fees : undefined,
+        unidade_atendimento: selectedUnit,
+      };
+    });
     setStep(2);
     setFormError('');
   };
@@ -154,11 +161,16 @@ const ProcessList: React.FC = () => {
       const selectedServices = customMode && customServiceName.trim()
         ? [...availableServices.filter(s => selectedServiceIds.includes(s.id)), { id: 'custom', name: customServiceName.trim(), price: CUSTOM_ANALYSIS_FEE, group: 'Outros' }]
         : availableServices.filter(s => selectedServiceIds.includes(s.id));
+      const servicesTotal = selectedServices.reduce((sum, s) => sum + s.price, 0);
+      const associationFees = selectedServices.length > 0 ? calcAssociationFees(servicesTotal) : [];
+      const feesTotal = associationFees.reduce((sum, f) => sum + f.price, 0);
       const payload = {
         ...formData,
         responsavel_user_id: isClient ? userContext.id : formData.responsavel_user_id,
         cliente_user_id: isClient ? userContext.id : undefined,
         services_selected: selectedServices,
+        association_fees: associationFees.length > 0 ? associationFees : undefined,
+        os_value: servicesTotal + feesTotal > 0 ? servicesTotal + feesTotal : undefined,
       };
       const newProcess = await createProcess(userContext.org_id, payload, userContext.id);
       resetModal();
@@ -550,6 +562,29 @@ const ProcessList: React.FC = () => {
                     >
                       Alterar serviços
                     </button>
+                  </div>
+                )}
+
+                {formData.association_fees && formData.association_fees.length > 0 && (
+                  <div>
+                    <label className="text-[10px] font-black text-amber-400 uppercase block mb-2">Taxas Associativas</label>
+                    <div className="divide-y divide-amber-800/50 border border-amber-700/50 rounded-xl overflow-hidden">
+                      {formData.association_fees.map((fee) => (
+                        <div key={fee.type} className="flex items-center justify-between px-4 py-3 bg-amber-900/20">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-bold text-amber-200 truncate">{fee.name}</p>
+                            <p className="text-[10px] font-semibold text-amber-400 uppercase tracking-wider">Associação</p>
+                          </div>
+                          <span className="text-sm font-black text-amber-300 ml-3">R$ {fee.price.toFixed(2)}</span>
+                        </div>
+                      ))}
+                      <div className="flex items-center justify-between px-4 py-3 bg-amber-900/40">
+                        <p className="text-sm font-black text-amber-200 uppercase">Total Geral</p>
+                        <span className="text-base font-black text-amber-200">
+                          R$ {((formData.os_value ?? 0)).toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 )}
 

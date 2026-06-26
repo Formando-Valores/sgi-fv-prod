@@ -20,6 +20,11 @@ export const PAYMENT_STATUS_BADGES: Record<string, { label: string; color: strin
   refunded: { label: 'Estornado', color: 'bg-orange-700' },
   canceled: { label: 'Cancelado', color: 'bg-slate-700' },
   released: { label: 'Liberado', color: 'bg-cyan-700' },
+  processing: { label: 'Processando', color: 'bg-blue-600' },
+  pending_validation: { label: 'Aguardando Validação', color: 'bg-amber-600' },
+  validated: { label: 'Validado', color: 'bg-teal-600' },
+  accepted: { label: 'Aceito', color: 'bg-emerald-600' },
+  rejected: { label: 'Rejeitado', color: 'bg-red-800' },
 };
 
 export const getOperationalStatus = (process: Process) => process.process_status || process.status;
@@ -35,7 +40,7 @@ export const getPaymentStatusLabel = (status?: string | null) => {
 };
 
 
-export type PaymentStatusValue = 'pending' | 'paid' | 'failed' | 'refunded' | 'canceled' | 'released';
+export type PaymentStatusValue = 'pending' | 'paid' | 'failed' | 'refunded' | 'canceled' | 'released' | 'processing' | 'pending_validation' | 'validated' | 'accepted' | 'rejected';
 
 export const resolvePaymentStatus = (
   source: { payment_status?: string | null; status?: string | null } | null | undefined,

@@ -11,6 +11,37 @@ export type CatalogService = {
 
 export const CUSTOM_ANALYSIS_FEE = 280;
 
+// Taxas Associativas (valores em BRL, convertidos de EUR a taxa ~6.0)
+export const ASSOCIATION_ANNUAL_FEE = 150;   // 25€ * 6
+export const ASSOCIATION_CONVENIO_01_FEE = 30;   // 5€ * 6
+export const ASSOCIATION_CONVENIO_02_FEE = 300;  // 50€ * 6
+export const ASSOCIATION_CONVENIO_THRESHOLD = 1800; // 300€ * 6 - acima disso aplica Convenio 02, abaixo Convenio 01
+
+export type AssociationFeeItem = {
+  type: 'annual' | 'convenio';
+  name: string;
+  price: number;
+  destination: 'association';
+};
+
+/**
+ * Calcula as taxas associativas com base no valor total dos servicos selecionados.
+ * - Taxa Anual: sempre aplicada (25€)
+ * - Se total servicos < 300€ (R$ 1.800): Convenio 01 (5€)
+ * - Se total servicos >= 300€ (R$ 1.800): Convenio 02 (50€)
+ */
+export function calcAssociationFees(servicesTotal: number): AssociationFeeItem[] {
+  const fees: AssociationFeeItem[] = [
+    { type: 'annual', name: 'Taxa Associativa Anual', price: ASSOCIATION_ANNUAL_FEE, destination: 'association' },
+  ];
+  if (servicesTotal < ASSOCIATION_CONVENIO_THRESHOLD) {
+    fees.push({ type: 'convenio', name: 'Convênio 01', price: ASSOCIATION_CONVENIO_01_FEE, destination: 'association' });
+  } else {
+    fees.push({ type: 'convenio', name: 'Convênio 02', price: ASSOCIATION_CONVENIO_02_FEE, destination: 'association' });
+  }
+  return fees;
+}
+
 export const SERVICE_CATALOG: CatalogService[] = [
   // ── ADMINISTRATIVO ─ Serviços Avulsos ──
   { id: 'adm-1', name: 'Consulta Oral/Online', group: 'Serviços Avulsos', description: 'Honorário mínimo: €50', unit: 'ADMINISTRATIVO' as ServiceUnit, price: 300 },

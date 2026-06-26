@@ -1,6 +1,6 @@
 
-import React, { useEffect, useState } from 'react';
-import { LogOut, Printer, FileDown, Eye, Pencil, Search, Users, ShieldCheck, X, Plus, Trash2, Calendar, MessageSquare, Check, User as UserIcon, UserCheck, LayoutDashboard, FolderKanban, Users2, Settings, Building2, Flag, FileBarChart2, ExternalLink, Loader2, CreditCard, ChevronDown } from 'lucide-react';
+import React, { useEffect, useState, useRef } from 'react';
+import { LogOut, Printer, FileDown, Eye, Pencil, Search, Users, ShieldCheck, X, Plus, Trash2, Calendar, MessageSquare, Check, User as UserIcon, UserCheck, LayoutDashboard, FolderKanban, Users2, Settings, Building2, Flag, FileBarChart2, ExternalLink, Loader2, CreditCard, ChevronDown, Upload } from 'lucide-react';
 import { User, ProcessStatus, UserRole, Hierarchy, ServiceUnit, Organization } from '../types';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { SERVICE_MANAGERS } from '../constants';
@@ -26,7 +26,8 @@ import ClientProcessProgressPanel, {
 import ReportsPage from '../src/pages/Reports/ReportsPage';
 import { createCheckoutSession } from '../src/lib/stripe';
 import { getPaymentStatusUi } from '../src/lib/paymentStatus';
-import { getServicesByUnit, getGroupsByUnit, getServicesByGroup, SERVICE_CATALOG } from '../src/lib/servicesCatalog';
+import { getServicesByUnit, getGroupsByUnit, getServicesByGroup, SERVICE_CATALOG, calcAssociationFees, type AssociationFeeItem } from '../src/lib/servicesCatalog';
+import { uploadPaymentProof, validatePaymentProof, getPaymentProofs, type PaymentProof } from '../src/lib/paymentProofs';
 
 type AccessLevel = 'Administrador' | 'Usuário Sênior' | 'Usuário Pleno' | 'Operador' | 'Cliente';
 
@@ -79,6 +80,7 @@ interface AdminProcessRow extends User {
   paymentStatus?: string | null;
   osValue?: number | null;
   servicesSelected?: { id: string; name: string; price: number; group: string }[] | null;
+  associationFees?: AssociationFeeItem[] | null;
 }
 
 interface ClientProfileView {
@@ -305,6 +307,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [selectedUserTab, setSelectedUserTab] = useState<'cadastral' | 'financeiro'>('cadastral');
   const [editingUser, setEditingUser] = useState<AdminProcessRow | User | null>(null);
   const [redirectingCheckout, setRedirectingCheckout] = useState(false);
+  const [uploadingProof, setUploadingProof] = useState(false);
+  const [validatingProof, setValidatingProof] = useState(false);
+  const [paymentProofs, setPaymentProofs] = useState<PaymentProof[]>([]);
   
   // Management tab states
   const [newAdminName, setNewAdminName] = useState('');
@@ -591,6 +596,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     applyProcessQuickPreset(detectedPreset);
   }, [currentSection, location.search]);
 
+  useEffect(() => {
+    if (selectedUserTab === 'financeiro' && selectedUser) {
+      void fetchPaymentProofsForSelected();
+    }
+  }, [selectedUserTab, selectedUser]);
+
   const filteredUsers = users.filter(u => 
     u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     u.protocol.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -605,8 +616,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     return ProcessStatus.PENDENTE;
   };
 
-  const PROCESS_SELECT_BASE_COLUMNS = 'id,org_id,titulo,protocolo,status,cliente_nome,cliente_documento,cliente_contato,responsavel_user_id,created_at,updated_at,origem_canal,unidade_atendimento,org_nome_solicitado,payment_status,process_status,os_value,services_selected';
-  const PROCESS_SELECT_WITH_OPTIONAL_COLUMNS = 'id,org_id,titulo,protocolo,status,cliente_nome,cliente_documento,cliente_contato,responsavel_user_id,data_prazo,gestor_servico,observacoes,created_at,updated_at,origem_canal,unidade_atendimento,org_nome_solicitado,payment_status,process_status,os_value,services_selected';
+  const PROCESS_SELECT_BASE_COLUMNS = 'id,org_id,titulo,protocolo,status,cliente_nome,cliente_documento,cliente_contato,responsavel_user_id,created_at,updated_at,origem_canal,unidade_atendimento,org_nome_solicitado,payment_status,process_status,os_value,services_selected,association_fees';
+  const PROCESS_SELECT_WITH_OPTIONAL_COLUMNS = 'id,org_id,titulo,protocolo,status,cliente_nome,cliente_documento,cliente_contato,responsavel_user_id,data_prazo,gestor_servico,observacoes,created_at,updated_at,origem_canal,unidade_atendimento,org_nome_solicitado,payment_status,process_status,os_value,services_selected,association_fees';
 
   const normalizeProcessOptionalFields = (process: Partial<DbProcess>): DbProcess => ({
     ...(process as DbProcess),
@@ -614,6 +625,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     gestor_servico: process.gestor_servico ?? null,
     observacoes: process.observacoes ?? null,
     services_selected: (process as Record<string, unknown>).services_selected ?? null,
+    association_fees: (process as Record<string, unknown>).association_fees ?? null,
   });
 
   const hasMissingOptionalProcessColumns = (error: unknown): boolean => {
@@ -844,6 +856,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         paymentStatus: process.payment_status ?? null,
         osValue: process.os_value ?? null,
         servicesSelected: (process.services_selected as AdminProcessRow['servicesSelected']) ?? null,
+        associationFees: (process.association_fees as AdminProcessRow['associationFees']) ?? null,
       };
     }) : fallbackUsersForRows.map((user) => {
       const generatedValue = user.unit === ServiceUnit.ADMINISTRATIVO ? 5200 : 1800;
@@ -1529,6 +1542,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         }).filter(Boolean)
       : null;
 
+    const servicesTotal = (servicesSelected ?? []).reduce((sum: number, s: any) => sum + (s?.price ?? 0), 0);
+    const associationFees = servicesSelected && servicesSelected.length > 0 ? calcAssociationFees(servicesTotal) : null;
+    const feesTotal = (associationFees ?? []).reduce((sum: number, f: AssociationFeeItem) => sum + f.price, 0);
+    const totalOsValue = servicesTotal + feesTotal;
+
     const hasOsValue = typeof newProcessForm.osValue === 'number' && newProcessForm.osValue > 0;
 
     const processPayload: Record<string, unknown> = {
@@ -1542,7 +1560,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       origem_canal: 'painel',
       unidade_atendimento: newProcessForm.serviceUnit,
       org_nome_solicitado: selectedOrganization.name,
-      os_value: typeof newProcessForm.osValue === 'number' ? newProcessForm.osValue : null,
+      os_value: totalOsValue > 0 ? totalOsValue : null,
     };
     if (isClientScope) {
       processPayload.cliente_user_id = currentUser.id;
@@ -1562,10 +1580,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
     // Set process_status and services_selected after creation
     let processToAdd = createdProcess;
-    if (hasOsValue || servicesSelected) {
+    if (hasOsValue || servicesSelected || associationFees) {
       const updates: Record<string, unknown> = {};
       if (hasOsValue) updates.process_status = 'aguardando_pagamento';
       if (servicesSelected) updates.services_selected = servicesSelected;
+      if (associationFees) updates.association_fees = associationFees;
       const { data: updatedProcess } = await supabase
         .from('processes')
         .update(updates)
@@ -1622,6 +1641,52 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     } finally {
       setRedirectingCheckout(false);
     }
+  };
+
+  const fetchPaymentProofsForSelected = async () => {
+    if (!selectedUser) return;
+    const processId = (selectedUser as AdminProcessRow).processRecordId || selectedUser.id;
+    const proofs = await getPaymentProofs(processId);
+    setPaymentProofs(proofs);
+  };
+
+  const handleUploadProof = async (file: File, amount?: number) => {
+    if (!selectedUser) return;
+    const processId = (selectedUser as AdminProcessRow).processRecordId || selectedUser.id;
+    setUploadingProof(true);
+    const { proof, error } = await uploadPaymentProof(processId, currentUser.id, file, amount);
+    setUploadingProof(false);
+    if (error) {
+      window.alert(error);
+      return;
+    }
+    await fetchPaymentProofsForSelected();
+    // Refresh local state to reflect new payment_status
+    setDbProcesses((prev) => prev.map((p) => {
+      if (p.id === processId) {
+        return { ...p, payment_status: 'pending_validation' as const };
+      }
+      return p;
+    }));
+  };
+
+  const handleValidateProof = async (proofId: string, processId: string, status: 'validated' | 'rejected') => {
+    setValidatingProof(true);
+    const { error } = await validatePaymentProof(proofId, processId, status, currentUser.id);
+    setValidatingProof(false);
+    if (error) {
+      window.alert(error);
+      return;
+    }
+    await fetchPaymentProofsForSelected();
+    // Refresh local state
+    const newPaymentStatus = status === 'validated' ? 'validated' as const : 'rejected' as const;
+    setDbProcesses((prev) => prev.map((p) => {
+      if (p.id === processId) {
+        return { ...p, payment_status: newPaymentStatus };
+      }
+      return p;
+    }));
   };
 
   const handleUpdateStatus = async (userId: string, status: ProcessStatus, deadline?: string, notes?: string, serviceManager?: string) => {
@@ -2964,6 +3029,46 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
     setOrgSuccess(`Organização ${organization.name} excluída com sucesso.`);
     await refreshOrganizations();
+  };
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingForProcess, setUploadingForProcess] = useState<string | null>(null);
+
+  const PaymentProofUploadButton = ({ processRow }: { processRow: AdminProcessRow }) => {
+    const pid = processRow.processRecordId || processRow.id;
+    const isUploading = uploadingProof && uploadingForProcess === pid;
+
+    return (
+      <div>
+        <input
+          type="file"
+          ref={fileInputRef}
+          accept="image/*,application/pdf"
+          className="hidden"
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            setUploadingForProcess(pid);
+            await handleUploadProof(file);
+            setUploadingForProcess(null);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isUploading}
+          className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-blue-500 disabled:opacity-60"
+        >
+          {isUploading ? (
+            <><Loader2 className="h-4 w-4 animate-spin" /> Enviando...</>
+          ) : (
+            <><Upload className="h-4 w-4" /> Enviar Comprovante de Pagamento</>
+          )}
+        </button>
+        <p className="text-xs text-gray-500 text-center mt-1">Aceito: imagem ou PDF</p>
+      </div>
+    );
   };
 
   return (
@@ -4435,6 +4540,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                       </div>
                     )}
 
+                    {(selectedUser as AdminProcessRow).associationFees && (selectedUser as AdminProcessRow).associationFees!.length > 0 && (
+                      <div>
+                        <label className="text-[10px] font-black text-amber-700 uppercase block mb-2">Taxas Associativas</label>
+                        <div className="divide-y divide-amber-100 border border-amber-200 rounded-xl overflow-hidden">
+                          {(selectedUser as AdminProcessRow).associationFees!.map((fee, idx) => (
+                            <div key={idx} className="flex items-center justify-between px-4 py-3 bg-amber-50">
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-bold text-amber-900 truncate">{fee.name}</p>
+                                <p className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider">Associação</p>
+                              </div>
+                              <span className="text-sm font-black text-amber-700 ml-3">R$ {fee.price.toFixed(2)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl">
                         <label className="text-[10px] font-black text-gray-500 uppercase block mb-1">Tipo de Serviço</label>
@@ -4456,8 +4578,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                       </div>
                     </div>
 
+                    {/* Stripe payment button */}
                     {((selectedUser as AdminProcessRow).paymentStatus == null || (selectedUser as AdminProcessRow).paymentStatus === 'pending' || (selectedUser as AdminProcessRow).paymentStatus === 'failed' || (selectedUser as AdminProcessRow).paymentStatus === 'canceled') && (
-                      <div>
+                      <div className="space-y-3">
                         <button
                           type="button"
                           onClick={() => { void handleGoToCheckout(selectedUser); }}
@@ -4470,7 +4593,137 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                             <><CreditCard className="h-5 w-5" /> Pagar agora — R$ {Number((selectedUser as AdminProcessRow).osValue ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</>
                           )}
                         </button>
-                        <p className="text-xs text-gray-500 text-center mt-2">Pagamento processado via Stripe com segurança</p>
+                        <p className="text-xs text-gray-500 text-center">Pagamento processado via Stripe com segurança</p>
+
+                        {/* Payment proof upload for clients */}
+                        {(isClientScope) && (
+                          <PaymentProofUploadButton
+                            processRow={selectedUser as AdminProcessRow}
+                            uploadingProof={uploadingProof}
+                            onUpload={handleUploadProof}
+                          />
+                        )}
+                      </div>
+                    )}
+
+                    {/* Pending validation - waiting for admin approval */}
+                    {(selectedUser as AdminProcessRow).paymentStatus === 'pending_validation' && (
+                      <div className="space-y-4">
+                        <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-center">
+                          <p className="font-bold text-amber-800">
+                            {isClientScope
+                              ? 'Comprovante enviado! Aguardando validação.'
+                              : 'Cliente enviou comprovante. Valide abaixo.'}
+                          </p>
+                        </div>
+
+                        {/* Show payment proofs */}
+                        {paymentProofs.length > 0 && (
+                          <div>
+                            <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Comprovantes Enviados</label>
+                            <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
+                              {paymentProofs.map((proof) => (
+                                <div key={proof.id} className="flex items-center justify-between px-4 py-3 bg-white">
+                                  <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-bold text-gray-800 truncate">{proof.file_name || 'Comprovante'}</p>
+                                    {proof.amount && (
+                                      <p className="text-[10px] font-semibold text-gray-500">Valor: R$ {proof.amount.toFixed(2)}</p>
+                                    )}
+                                    {proof.notes && <p className="text-[10px] text-gray-500 mt-1">{proof.notes}</p>}
+                                  </div>
+                                  <a
+                                    href={proof.file_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs font-bold text-blue-600 hover:text-blue-800 ml-3 underline"
+                                  >
+                                    Ver arquivo
+                                  </a>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Admin validation buttons */}
+                        {!isClientScope && (
+                          <div className="flex gap-3">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const pid = (selectedUser as AdminProcessRow).processRecordId || selectedUser.id;
+                                const proofId = paymentProofs[0]?.id;
+                                if (proofId) void handleValidateProof(proofId, pid, 'validated');
+                              }}
+                              disabled={validatingProof || paymentProofs.length === 0}
+                              className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-emerald-500 disabled:opacity-60"
+                            >
+                              {validatingProof ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                              Validar Pagamento
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const pid = (selectedUser as AdminProcessRow).processRecordId || selectedUser.id;
+                                const proofId = paymentProofs[0]?.id;
+                                if (proofId) void handleValidateProof(proofId, pid, 'rejected');
+                              }}
+                              disabled={validatingProof || paymentProofs.length === 0}
+                              className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-red-500 disabled:opacity-60"
+                            >
+                              <X className="h-4 w-4" />
+                              Rejeitar
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Client sees resend option if rejected */}
+                        {isClientScope && paymentProofs[0]?.status === 'rejected' && (
+                          <PaymentProofUploadButton
+                            processRow={selectedUser as AdminProcessRow}
+                            uploadingProof={uploadingProof}
+                            onUpload={handleUploadProof}
+                          />
+                        )}
+                      </div>
+                    )}
+
+                    {/* Validated/accepted */}
+                    {((selectedUser as AdminProcessRow).paymentStatus === 'validated' || (selectedUser as AdminProcessRow).paymentStatus === 'accepted') && (
+                      <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
+                        <Check className="h-8 w-8 text-emerald-600 mx-auto mb-2" />
+                        <p className="font-bold text-emerald-800 text-lg">Pagamento Validado</p>
+                        <p className="text-sm text-emerald-600 mt-1">Certificado de Filiação disponível para download.</p>
+                      </div>
+                    )}
+
+                    {/* Rejected */}
+                    {(selectedUser as AdminProcessRow).paymentStatus === 'rejected' && (
+                      <div className="space-y-3">
+                        <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-center">
+                          <p className="font-bold text-red-800">Comprovante rejeitado</p>
+                          <p className="text-sm text-red-600 mt-1">Envie um novo comprovante válido.</p>
+                        </div>
+                        {isClientScope && (
+                          <PaymentProofUploadButton
+                            processRow={selectedUser as AdminProcessRow}
+                            uploadingProof={uploadingProof}
+                            onUpload={handleUploadProof}
+                          />
+                        )}
+                      </div>
+                    )}
+
+                    {/* Download certificate link when paid/validated */}
+                    {((selectedUser as AdminProcessRow).paymentStatus === 'paid' || (selectedUser as AdminProcessRow).paymentStatus === 'validated' || (selectedUser as AdminProcessRow).paymentStatus === 'accepted') && (
+                      <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-xl text-center">
+                        <a
+                          href={`/#/certificate?processId=${(selectedUser as AdminProcessRow).processRecordId || selectedUser.id}`}
+                          className="inline-flex items-center gap-2 text-sm font-bold text-blue-700 hover:text-blue-900 underline"
+                        >
+                          <FileDown className="h-4 w-4" />
+                          Baixar Certificado de Filiação
+                        </a>
                       </div>
                     )}
                   </div>
@@ -4635,11 +4888,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                                               setNewProcessForm((prev) => {
                                                 const ids = prev.selectedServiceIds ?? [];
                                                 const next = selected ? ids.filter((i: string) => i !== svc.id) : [...ids, svc.id];
-                                                const total = next.reduce((sum: number, id: string) => {
+                                                const svcTotal = next.reduce((sum: number, id: string) => {
                                                   const s = getServicesByUnit(prev.serviceUnit!).find((x) => x.id === id);
                                                   return sum + (s?.price ?? 0);
                                                 }, 0);
-                                                return { ...prev, selectedServiceIds: next, osValue: total > 0 ? total : undefined };
+                                                const fees = svcTotal > 0 ? calcAssociationFees(svcTotal) : [];
+                                                const feesTotal = fees.reduce((s, f) => s + f.price, 0);
+                                                return { ...prev, selectedServiceIds: next, osValue: svcTotal + feesTotal > 0 ? svcTotal + feesTotal : undefined };
                                               });
                                             }}
                                             className="w-4 h-4 accent-blue-600"
@@ -4663,34 +4918,68 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                   )}
 
                   {newProcessForm.serviceUnit && (newProcessForm.selectedServiceIds ?? []).length > 0 && (
-                    <div className="md:col-span-2">
-                      <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Serviços Selecionados</label>
-                      <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
-                        {(newProcessForm.selectedServiceIds ?? []).map((id: string) => {
-                          const services = getServicesByUnit(newProcessForm.serviceUnit!);
-                          const svc = services.find((s) => s.id === id);
-                          if (!svc) return null;
-                          return (
-                            <div key={id} className="flex items-center justify-between px-4 py-3 bg-white">
-                              <div className="min-w-0 flex-1">
-                                <p className="text-sm font-bold text-gray-800 truncate">{svc.name}</p>
-                                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">{svc.group}</p>
+                    <div className="md:col-span-2 space-y-3">
+                      <div>
+                        <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Serviços Selecionados</label>
+                        <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
+                          {(newProcessForm.selectedServiceIds ?? []).map((id: string) => {
+                            const services = getServicesByUnit(newProcessForm.serviceUnit!);
+                            const svc = services.find((s) => s.id === id);
+                            if (!svc) return null;
+                            return (
+                              <div key={id} className="flex items-center justify-between px-4 py-3 bg-white">
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-sm font-bold text-gray-800 truncate">{svc.name}</p>
+                                  <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">{svc.group}</p>
+                                </div>
+                                <span className="text-sm font-black text-emerald-600 ml-3">R$ {svc.price.toFixed(2)}</span>
                               </div>
-                              <span className="text-sm font-black text-emerald-600 ml-3">R$ {svc.price.toFixed(2)}</span>
-                            </div>
-                          );
-                        })}
-                        <div className="flex items-center justify-between px-4 py-3 bg-gray-50">
-                          <p className="text-sm font-black text-gray-700 uppercase">Total</p>
-                          <span className="text-base font-black text-emerald-700">
-                            R$ {(newProcessForm.selectedServiceIds ?? []).reduce((sum: number, id: string) => {
-                              const services = getServicesByUnit(newProcessForm.serviceUnit!);
-                              const s = services.find((x) => x.id === id);
-                              return sum + (s?.price ?? 0);
-                            }, 0).toFixed(2)}
-                          </span>
+                            );
+                          })}
+                          <div className="flex items-center justify-between px-4 py-3 bg-gray-50">
+                            <p className="text-sm font-black text-gray-700 uppercase">Subtotal Serviços</p>
+                            <span className="text-base font-black text-emerald-700">
+                              R$ {(newProcessForm.selectedServiceIds ?? []).reduce((sum: number, id: string) => {
+                                const servicesList = getServicesByUnit(newProcessForm.serviceUnit!);
+                                const s = servicesList.find((x) => x.id === id);
+                                return sum + (s?.price ?? 0);
+                              }, 0).toFixed(2)}
+                            </span>
+                          </div>
                         </div>
                       </div>
+
+                      {(() => {
+                        const svcTotal = (newProcessForm.selectedServiceIds ?? []).reduce((sum: number, id: string) => {
+                          const servicesList = getServicesByUnit(newProcessForm.serviceUnit!);
+                          const s = servicesList.find((x) => x.id === id);
+                          return sum + (s?.price ?? 0);
+                        }, 0);
+                        const fees = calcAssociationFees(svcTotal);
+                        if (!fees.length) return null;
+                        return (
+                          <div>
+                            <label className="text-[10px] font-black text-amber-700 uppercase block mb-2">Taxas Associativas</label>
+                            <div className="divide-y divide-amber-100 border border-amber-200 rounded-xl overflow-hidden">
+                              {fees.map((fee) => (
+                                <div key={fee.type} className="flex items-center justify-between px-4 py-3 bg-amber-50">
+                                  <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-bold text-amber-900 truncate">{fee.name}</p>
+                                    <p className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider">Associação</p>
+                                  </div>
+                                  <span className="text-sm font-black text-amber-700 ml-3">R$ {fee.price.toFixed(2)}</span>
+                                </div>
+                              ))}
+                              <div className="flex items-center justify-between px-4 py-3 bg-amber-100">
+                                <p className="text-sm font-black text-amber-900 uppercase">Total Geral</p>
+                                <span className="text-base font-black text-amber-900">
+                                  R$ {(svcTotal + fees.reduce((s, f) => s + f.price, 0)).toFixed(2)}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
 

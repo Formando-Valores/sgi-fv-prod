@@ -246,7 +246,8 @@ export interface Process {
   unidade_atendimento?: string | null;
   org_nome_solicitado?: string | null;
   services_selected?: { id: string; name: string; price: number; group: string }[] | null;
-  payment_status?: 'pending' | 'paid' | 'failed' | 'refunded' | 'canceled' | 'released' | null;
+  association_fees?: { type: string; name: string; price: number; destination: string }[] | null;
+  payment_status?: 'pending' | 'paid' | 'failed' | 'refunded' | 'canceled' | 'released' | 'processing' | 'pending_validation' | 'validated' | 'accepted' | 'rejected' | null;
   process_status?:
     | 'aguardando_pagamento'
     | 'draft'
@@ -377,6 +378,7 @@ export interface CreateProcessPayload {
   org_nome_solicitado?: string;
   os_value?: number;
   services_selected?: { id: string; name: string; price: number; group: string }[];
+  association_fees?: { type: string; name: string; price: number; destination: string }[];
 }
 
 /**
@@ -766,13 +768,16 @@ export async function createProcess(
 
   log('Process created successfully, id:', process.id);
 
-  // Set process_status & services_selected after creation to avoid RLS/column issues
+  // Set process_status & services_selected & association_fees after creation to avoid RLS/column issues
   const updateFields: Record<string, any> = {};
   if (hasOsValue) {
     updateFields.process_status = 'aguardando_pagamento';
   }
   if (payload.services_selected?.length) {
     updateFields.services_selected = payload.services_selected;
+  }
+  if (payload.association_fees?.length) {
+    updateFields.association_fees = payload.association_fees;
   }
   if (Object.keys(updateFields).length > 0) {
     await supabase.from('processes').update(updateFields).eq('id', process.id);
