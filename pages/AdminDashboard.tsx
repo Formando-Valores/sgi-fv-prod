@@ -3734,7 +3734,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                       <div className="rounded-xl border border-gray-100 bg-white p-3">
                         <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Financeiro</p>
                         <p className="mt-1">
-                          <Badge variant="warning" className="text-xs px-2.5 py-1">{process.financeiro}</Badge>
+                          {(() => {
+                            const paymentUi = getPaymentStatusUi(process.paymentStatus);
+                            return paymentUi ? (
+                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${paymentUi.color} text-white text-xs px-2.5 py-1`}>
+                                {paymentUi.label}
+                              </span>
+                            ) : (
+                              <Badge variant="warning" className="text-xs px-2.5 py-1">{process.financeiro}</Badge>
+                            );
+                          })()}
                         </p>
                       </div>
                       <div className="rounded-xl border border-gray-100 bg-white p-3">
