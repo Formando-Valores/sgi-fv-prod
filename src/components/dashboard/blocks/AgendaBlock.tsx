@@ -11,8 +11,8 @@ import {
 import type { ScheduleSlot } from '../../../lib/professionalSchedules';
 
 const TIME_SLOTS_BR = ['09:00','09:30','10:00','10:30','11:00','11:30','12:00','12:30','13:00','13:30','14:00','14:30'];
-const WEEKDAY_NAMES = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex'];
-const WEEKDAY_NAMES_FULL = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+const WEEKDAY_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+const WEEKDAY_FULL = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
 type SlotInfo = {
@@ -59,7 +59,7 @@ const AgendaBlock: React.FC = () => {
       if (dow >= 1 && dow <= 5) days.push(d);
     } else if (view === 'week') {
       const mon = new Date(referenceDate);
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < 7; i++) {
         const d = new Date(mon);
         d.setDate(mon.getDate() + i);
         days.push(d);
@@ -191,7 +191,7 @@ const AgendaBlock: React.FC = () => {
   const renderTitle = () => {
     if (view === 'day') {
       const d = referenceDate;
-      return `${WEEKDAY_NAMES_FULL[d.getDay()]}, ${d.getDate()} de ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+      return `${WEEKDAY_FULL[d.getDay()]}, ${d.getDate()} de ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
     }
     if (view === 'week') {
       const mon = referenceDate;
@@ -266,7 +266,7 @@ const AgendaBlock: React.FC = () => {
                 <th className="sticky left-0 bg-white z-10 p-2 text-left font-black text-gray-500 uppercase tracking-wider min-w-[60px]">Horário</th>
                 {days.map((d, i) => (
                   <th key={i} className="p-2 text-center font-black text-gray-500 uppercase tracking-wider min-w-[100px]">
-                    <div>{view === 'day' ? '' : WEEKDAY_NAMES[d.getDay() - 1]}</div>
+                    <div>{view === 'day' ? '' : WEEKDAY_SHORT[d.getDay()]}</div>
                     <div className="text-sm text-gray-800">{d.getDate()}/{d.getMonth() + 1}</div>
                   </th>
                 ))}
