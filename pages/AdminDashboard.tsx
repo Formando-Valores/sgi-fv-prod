@@ -1836,6 +1836,34 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       }
     }
 
+    if (processRecordId && serviceManagerChanged && normalizedServiceManager) {
+      try {
+        const { data: profProfile } = await supabase
+          .from('profiles')
+          .select('id, email, nome_completo')
+          .eq('nome_completo', normalizedServiceManager)
+          .maybeSingle();
+
+        if (profProfile?.email) {
+          const currentProc = currentEditingUser as AdminProcessRow | null;
+          await supabase.functions.invoke(SUPABASE_EDGE_FUNCTIONS.NOTIFY_PROCESS_ASSIGNMENT, {
+            body: {
+              email: profProfile.email,
+              professionalName: profProfile.nome_completo || normalizedServiceManager,
+              processProtocol: currentProc?.protocol || '',
+              processTitle: currentProc?.name || currentProc?.title || '',
+              clientName: currentProc?.cliente_nome || currentProc?.name || '',
+              clientContact: currentProc?.cliente_contato || '',
+              deadline: currentProc?.deadline || '',
+              notes: normalizedNotes || '',
+            },
+          });
+        }
+      } catch (notifyErr) {
+        console.warn('[notify] falha ao notificar profissional', notifyErr);
+      }
+    }
+
     let profileUpdateError = '';
     if (profileUserId) {
       const { error } = await supabase
