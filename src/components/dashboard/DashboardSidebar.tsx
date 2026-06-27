@@ -1,5 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
+import { LogOut } from 'lucide-react';
 
 type SidebarLink = {
   to: string;
@@ -11,12 +12,13 @@ interface DashboardSidebarProps {
   sidebarOpen: boolean;
   onNavigate: () => void;
   onSelectSection?: (section: string) => void;
+  onLogout?: () => void;
   userName: string;
   hierarchyLabel: string;
   links: SidebarLink[];
 }
 
-const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ sidebarOpen, onNavigate, onSelectSection, userName, hierarchyLabel, links }) => {
+const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ sidebarOpen, onNavigate, onSelectSection, onLogout, userName, hierarchyLabel, links }) => {
   return (
     <aside
       className={`fixed lg:static inset-y-0 left-0 z-50 lg:z-auto w-72 shrink-0 bg-white border border-gray-100 rounded-r-2xl lg:rounded-2xl p-5 h-full lg:h-fit transition-transform duration-300 shadow-sm ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
@@ -45,6 +47,15 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ sidebarOpen, onNavi
             <span className="font-bold">{item.label}</span>
           </NavLink>
         ))}
+
+        <button
+          type="button"
+          onClick={() => { onLogout?.(); onNavigate(); }}
+          className="flex items-center gap-3 px-4 py-3 rounded-xl border border-gray-100 text-red-500 hover:bg-red-50 hover:border-red-100 transition-all w-full font-bold"
+        >
+          <LogOut className="w-4 h-4" />
+          <span>Sair</span>
+        </button>
       </nav>
     </aside>
   );

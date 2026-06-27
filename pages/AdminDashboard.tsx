@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState, useRef } from 'react';
-import { LogOut, Printer, FileDown, Eye, Pencil, Search, Users, ShieldCheck, X, Plus, Trash2, Calendar, MessageSquare, Check, User as UserIcon, UserCheck, LayoutDashboard, FolderKanban, Users2, Settings, Building2, Flag, FileBarChart2, ExternalLink, Loader2, CreditCard, ChevronDown, Upload } from 'lucide-react';
+import { Eye, Pencil, Search, Users, ShieldCheck, X, Plus, Trash2, Calendar, MessageSquare, Check, User as UserIcon, UserCheck, LayoutDashboard, FolderKanban, Users2, Settings, Building2, Flag, FileBarChart2, ExternalLink, Loader2, CreditCard, ChevronDown, Upload, FileDown } from 'lucide-react';
 import { User, ProcessStatus, UserRole, Hierarchy, ServiceUnit, Organization } from '../types';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { SERVICE_MANAGERS } from '../constants';
@@ -250,6 +250,7 @@ const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({
         sidebarOpen={sidebarOpen}
         onNavigate={() => setSidebarOpen(false)}
         onSelectSection={onSelectSection}
+        onLogout={onLogout}
         userName={currentUserName}
         hierarchyLabel={hierarchyLabel}
         links={sidebarLinks}
@@ -259,28 +260,6 @@ const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({
       <DashboardTopbar
         title={<><ShieldCheck className="text-blue-500" /> SGI FV - PAINEL ADMINISTRATIVO</>}
         subtitle={`Bem-vindo, ${currentUserName}`}
-        actions={(
-          <div className="flex gap-2">
-            <Button
-              onClick={onPrint}
-              title="Clique para Imprimir Documento"
-              variant="secondary"
-              className="flex items-center gap-2 text-xs font-bold uppercase"
-            >
-              <Printer className="w-4 h-4" /> Imprimir
-            </Button>
-            <Button
-              onClick={onPrint}
-              title="Clique para Salvar como PDF"
-              className="flex items-center gap-2 text-xs font-bold uppercase"
-            >
-              <FileDown className="w-4 h-4" /> Gerar PDF
-            </Button>
-            <Button onClick={onLogout} variant="danger" className="flex items-center gap-2 text-xs font-bold uppercase">
-              <LogOut className="w-4 h-4" /> Sair
-            </Button>
-          </div>
-        )}
       />
     )}
   >
