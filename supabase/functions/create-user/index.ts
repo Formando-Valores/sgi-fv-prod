@@ -22,7 +22,43 @@ Deno.serve(async (request) => {
   }
 
   try {
-    const { email, password, name, role, org_id, unit } = await request.json();
+    const { email, password, name, role, org_id, unit, action } = await request.json();
+
+    // --- DELETE action: remove auth user and cascade ---
+    if (action === 'delete') {
+      if (!email) {
+        return jsonResponse(400, { error: 'Email é obrigatório para exclusão.' });
+      }
+      const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+      const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+      if (!supabaseUrl || !serviceRoleKey) {
+        return jsonResponse(500, { error: 'Erro de configuração do servidor.' });
+      }
+      const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
+
+      // Find user in auth
+      const { data: usersList } = await adminClient.auth.admin.listUsers();
+      const user = usersList?.users?.find(u => u.email === email);
+      if (user) {
+        const { error: deleteAuthError } = await adminClient.auth.admin.deleteUser(user.id);
+        if (deleteAuthError) {
+          return jsonResponse(400, { error: `Erro ao excluir auth user: ${deleteAuthError.message}` });
+        }
+      }
+
+      // Delete profile (in case auth user was already gone)
+      const { error: deleteProfileError } = await adminClient
+        .from('profiles')
+        .delete()
+        .eq('email', email);
+      if (deleteProfileError) {
+        console.warn('[create-user] delete profile warning:', deleteProfileError.message);
+      }
+
+      return jsonResponse(200, { success: true, message: `Usuário ${email} excluído.` });
+    }
 
     if (!email || !password || !name || !org_id) {
       return jsonResponse(400, { error: 'Campos obrigatórios: email, password, name, org_id.' });
