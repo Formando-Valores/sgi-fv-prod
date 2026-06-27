@@ -54,6 +54,7 @@ Deno.serve(async (request) => {
   const email = String(payload.email ?? '').trim().toLowerCase();
   const fullName = String(payload.fullName ?? '').trim();
   const loginUrl = String(payload.loginUrl ?? '').trim();
+  const paymentUrl = String(payload.paymentUrl ?? '').trim();
   const source = String(payload.source ?? 'cadastro interno').trim();
   const profile = String(payload.profile ?? 'USUÁRIO OPERADOR').trim();
   const temporaryPassword = String(payload.temporaryPassword ?? '').trim();
@@ -70,6 +71,7 @@ Deno.serve(async (request) => {
     email,
     fullName,
     loginUrl,
+    paymentUrl: paymentUrl || undefined,
     source,
     profile,
     temporaryPassword,

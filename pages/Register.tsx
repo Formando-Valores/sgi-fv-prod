@@ -12,6 +12,7 @@ import { isSupabaseConfigured, supabase } from '../supabase';
 import { buildOrganizationErrorMessage, loadOrganizations } from '../organizationRepository';
 import { SUPABASE_EDGE_FUNCTIONS } from '../src/lib/supabaseFunctions';
 import { ASSOCIATION_ANNUAL_FEE, calcAssociationFees } from '../src/lib/servicesCatalog';
+import { createCheckoutSession } from '../src/lib/stripe';
 
 interface RegisterProps {
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
@@ -298,9 +299,10 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
         setCurrentUser(newUser);
 
         // Auto-cria processo de filiacao para pagamento da taxa anual
+        let membershipProcessId: string | null = null;
         try {
           const membershipFees = calcAssociationFees(0, 'membership');
-          await supabase.from('processes').insert({
+          const { data: processData } = await supabase.from('processes').insert({
             org_id: formData.organizationId,
             titulo: `Filiação - ${formData.name}`,
             status: 'cadastro',
@@ -313,13 +315,35 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
             os_value: ASSOCIATION_ANNUAL_FEE,
             process_status: 'aguardando_pagamento',
             association_fees: membershipFees,
-          });
+          }).select('id').single();
+          membershipProcessId = processData?.id ?? null;
         } catch (membershipProcessErr) {
           console.warn('[register] erro ao criar processo de filiação automática', membershipProcessErr);
         }
 
+        let paymentUrl = '';
+        if (membershipProcessId) {
+          try {
+            const session = await createCheckoutSession({
+              amount: ASSOCIATION_ANNUAL_FEE * 100,
+              currency: 'brl',
+              successUrl: `${window.location.origin}/#/payments/success?processId=${membershipProcessId}`,
+              cancelUrl: `${window.location.origin}/#/payments/cancel?processId=${membershipProcessId}`,
+              processId: membershipProcessId,
+              clientId: data.user.id,
+              serviceId: '',
+              organizationId: formData.organizationId,
+              areaId: '',
+              sectorId: '',
+            });
+            paymentUrl = session.url || '';
+          } catch (checkoutErr) {
+            console.warn('[register] erro ao criar checkout session para email', checkoutErr);
+          }
+        }
+
         const loginUrl = `${window.location.origin}${window.location.pathname.includes('#') ? '' : '/#/login'}`;
-        const credentialPayload = {
+        const credentialPayload: Record<string, string> = {
           email: formData.email,
           fullName: formData.name,
           source: 'cadastro interno',
@@ -327,6 +351,9 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
           temporaryPassword: formData.password,
           loginUrl,
         };
+        if (paymentUrl) {
+          credentialPayload.paymentUrl = paymentUrl;
+        }
 
         const { data: credentialEmailData, error: credentialEmailError } = await supabase.functions.invoke(
           SUPABASE_EDGE_FUNCTIONS.SEND_ACCESS_CREDENTIALS,

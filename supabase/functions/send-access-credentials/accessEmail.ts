@@ -2,6 +2,7 @@ export type AccessEmailPayload = {
   email: string;
   fullName?: string;
   loginUrl?: string;
+  paymentUrl?: string;
   source?: string;
   profile?: string;
   temporaryPassword?: string;
@@ -46,6 +47,7 @@ export async function sendAccessCredentialsEmail(payload: AccessEmailPayload) {
 
   const recipientName = payload.fullName?.trim() || 'cliente';
   const loginUrl = payload.loginUrl?.trim() || 'https://sgi-fv-prod.vercel.app/#/login';
+  const paymentUrl = payload.paymentUrl?.trim();
   const profileLabel = payload.profile?.trim() || 'USUÁRIO OPERADOR';
   const temporaryPassword = payload.temporaryPassword?.trim() || 'Definida no momento do cadastro';
 
@@ -66,6 +68,14 @@ export async function sendAccessCredentialsEmail(payload: AccessEmailPayload) {
     '👉 Acesse o sistema:',
     '',
     loginUrl,
+    ...(paymentUrl ? [
+      '',
+      '💳 Pagar taxa de filiação:',
+      '',
+      paymentUrl,
+      '',
+      'Efetue o pagamento da contribuição associativa inicial de 30€ para confirmar seu status de associado. Guarde o comprovante para futura validação.',
+    ] : []),
     '',
     '- No sistema você poderá:',
     '',
