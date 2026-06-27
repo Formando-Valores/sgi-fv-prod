@@ -99,7 +99,7 @@ async function resolveProcessQueryScope(
   const normalizedProfileRole = String(profileData?.role || '').trim().toLowerCase();
   const isGlobalAdmin = GLOBAL_ADMIN_ROLE_VALUES.has(normalizedProfileRole);
   const normalizedOrgId = orgId ? String(orgId).trim() : '';
-  const resolvedOrgId = normalizedOrgId || null;
+  const resolvedOrgId = isGlobalAdmin ? null : (normalizedOrgId || null);
 
   if (!isGlobalAdmin && !resolvedOrgId) {
     logError(`[${moduleName}] blocked: org_id is mandatory for non-global profile.`, {

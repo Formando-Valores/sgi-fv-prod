@@ -1364,7 +1364,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       .select(PROCESS_SELECT_WITH_OPTIONAL_COLUMNS)
       .order('created_at', { ascending: false });
 
-    if (normalizedOrgId) {
+    if (normalizedOrgId && !hasGlobalScope) {
       queryWithOptionalColumns.eq('org_id', normalizedOrgId);
     }
 
@@ -1407,7 +1407,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         .select(PROCESS_SELECT_BASE_COLUMNS)
         .order('created_at', { ascending: false });
 
-      if (normalizedOrgId) {
+      if (normalizedOrgId && !hasGlobalScope) {
         fallbackQuery.eq('org_id', normalizedOrgId);
       }
 
