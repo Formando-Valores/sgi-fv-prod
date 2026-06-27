@@ -39,67 +39,107 @@ Deno.serve(async (request) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // 1. Create auth user
-    const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { nome_completo: name, name },
-    });
+    // --- Determine user_id: reuse existing or create new auth user ---
+    let userId: string;
 
-    if (authError || !authData.user) {
-      return jsonResponse(400, { error: `Erro ao criar usuário no Auth: ${authError?.message || 'desconhecido'}` });
+    // 1. Check if profile already exists for this email
+    const { data: existingProfile } = await adminClient
+      .from('profiles')
+      .select('id')
+      .eq('email', email)
+      .maybeSingle();
+
+    if (existingProfile?.id) {
+      userId = existingProfile.id;
+    } else {
+      // 2. Try to create auth user
+      const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { nome_completo: name, name },
+      });
+
+      if (authError) {
+        // If "already registered", try to find the existing user
+        if (authError.message?.toLowerCase().includes('already registered')) {
+          const { data: usersList } = await adminClient.auth.admin.listUsers();
+          const found = usersList?.users?.find(u => u.email === email);
+          if (found) {
+            userId = found.id;
+          } else {
+            return jsonResponse(400, { error: `Usuário já existe mas não foi possível localizá-lo: ${authError.message}` });
+          }
+        } else {
+          return jsonResponse(400, { error: `Erro ao criar usuário no Auth: ${authError.message}` });
+        }
+      } else if (authData?.user) {
+        userId = authData.user.id;
+      } else {
+        return jsonResponse(500, { error: 'Erro inesperado ao criar usuário no Auth.' });
+      }
     }
 
-    const userId = authData.user.id;
     const normalizedRole = role === 'Administrador' ? 'admin' : 'cliente';
 
-    // 2. Create profile
-    const { error: profileError } = await adminClient.from('profiles').insert({
-      id: userId,
-      email,
-      nome_completo: name,
-      name,
-      role: normalizedRole,
-      org_id,
-    });
+    // 3. Upsert profile (insert if new, update if exists)
+    const { error: profileError } = await adminClient
+      .from('profiles')
+      .upsert({
+        id: userId,
+        email,
+        nome_completo: name,
+        name,
+        role: normalizedRole,
+        org_id,
+      }, { onConflict: 'id' });
 
     if (profileError) {
-      // Cleanup auth user if profile fails
-      await adminClient.auth.admin.deleteUser(userId).catch(() => {});
-      return jsonResponse(400, { error: `Erro ao criar perfil: ${profileError.message}` });
+      return jsonResponse(400, { error: `Erro ao salvar perfil: ${profileError.message}` });
     }
 
-    // 3. Create org_members link
+    // 4. Upsert org_members link
     const orgRole = role === 'Administrador' ? 'admin' : 'member';
-    const { error: memberError } = await adminClient.from('org_members').insert({
-      org_id,
-      user_id: userId,
-      role: orgRole,
-    });
+    const { error: memberError } = await adminClient
+      .from('org_members')
+      .upsert({
+        org_id,
+        user_id: userId,
+        role: orgRole,
+      }, { onConflict: 'org_id,user_id' });
 
     if (memberError) {
-      // Non-fatal: profile already created, user can still login
-      console.warn('[create-user] org_members insert failed:', memberError.message);
+      console.warn('[create-user] org_members upsert failed:', memberError.message);
     }
 
-    // 4. Auto-create membership process (annual fee)
-    const { data: processData, error: processError } = await adminClient.from('processes').insert({
-      org_id,
-      titulo: `Filiação - ${name}`,
-      status: 'cadastro',
-      cliente_user_id: userId,
-      cliente_nome: name,
-      origem_canal: 'painel',
-      os_value: 180,
-      process_status: 'aguardando_pagamento',
-      association_fees: [
-        { type: 'annual', name: 'Taxa Associativa Anual', price: 180, destination: 'association' },
-      ],
-    }).select('id').single();
+    // 5. Auto-create membership process only if one doesn't already exist
+    const { data: existingProcess } = await adminClient
+      .from('processes')
+      .select('id')
+      .eq('cliente_user_id', userId)
+      .eq('titulo', `Filiação - ${name}`)
+      .maybeSingle();
 
-    if (processError) {
-      console.warn('[create-user] auto-membership process failed:', processError.message);
+    if (!existingProcess) {
+      const { error: processError } = await adminClient
+        .from('processes')
+        .insert({
+          org_id,
+          titulo: `Filiação - ${name}`,
+          status: 'cadastro',
+          cliente_user_id: userId,
+          cliente_nome: name,
+          origem_canal: 'painel',
+          os_value: 180,
+          process_status: 'aguardando_pagamento',
+          association_fees: [
+            { type: 'annual', name: 'Taxa Associativa Anual', price: 180, destination: 'association' },
+          ],
+        });
+
+      if (processError) {
+        console.warn('[create-user] auto-membership process failed:', processError.message);
+      }
     }
 
     return jsonResponse(200, {

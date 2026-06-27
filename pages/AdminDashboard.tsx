@@ -2167,12 +2167,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       return;
     }
 
-    if (!targetUserId && !existingProfile?.id) {
-      // User not found in profiles — try creating via edge function
-      if (!newAdminPassword) {
-        alert('Usuário não encontrado no sistema. Informe uma senha para criar um novo cadastro.');
-        return;
-      }
+    // If password is provided, use the edge function (idempotent — handles both create and update)
+    if (newAdminPassword) {
       const supabaseUrl = String(import.meta.env.VITE_SUPABASE_URL ?? '').trim();
       const anonKey = String(import.meta.env.VITE_SUPABASE_ANON_KEY ?? '').trim();
       if (!supabaseUrl || !anonKey) {
@@ -2207,6 +2203,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         alert(`Erro ao comunicar com o servidor: ${fetchErr?.message || 'desconhecido'}`);
         return;
       }
+    } else if (!targetUserId && !existingProfile?.id) {
+      alert('Usuário não encontrado no sistema. Informe uma senha para criar um novo cadastro.');
+      return;
     }
 
     targetUserId = targetUserId || existingProfile?.id || null;
