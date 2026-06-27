@@ -98,11 +98,34 @@ async function resolveProcessQueryScope(
 
   const normalizedProfileRole = String(profileData?.role || '').trim().toLowerCase();
   const isGlobalAdmin = GLOBAL_ADMIN_ROLE_VALUES.has(normalizedProfileRole);
-  const normalizedOrgId = orgId ? String(orgId).trim() : '';
-  const resolvedOrgId = isGlobalAdmin ? null : (normalizedOrgId || null);
 
-  if (!isGlobalAdmin && !resolvedOrgId) {
-    logError(`[${moduleName}] blocked: org_id is mandatory for non-global profile.`, {
+  const { data: defaultMembershipRows, error: defaultOrgError } = await supabase
+    .from('org_members')
+    .select('org_id,role,organizations:org_id(slug,name)')
+    .eq('user_id', actorUserId)
+    .in('role', ['owner', 'admin']);
+
+  let isDefaultOrgAdmin = false;
+  if (!defaultOrgError && defaultMembershipRows) {
+    const rows = defaultMembershipRows as Array<{
+      role?: string | null;
+      organizations?: { slug?: string | null; name?: string | null } | null;
+    }>;
+    isDefaultOrgAdmin = rows.some((row) => {
+      const org = row.organizations;
+      const slug = String(org?.slug || '').toLowerCase();
+      const name = String(org?.name || '');
+      return slug === 'default' || name.toLowerCase().includes('padr');
+    });
+  } else if (defaultOrgError) {
+    logError(`[${moduleName}] failed to resolve default org membership:`, defaultOrgError);
+  }
+
+  const normalizedOrgId = orgId ? String(orgId).trim() : '';
+  const resolvedOrgId = isDefaultOrgAdmin ? null : (normalizedOrgId || null);
+
+  if (!isDefaultOrgAdmin && !resolvedOrgId) {
+    logError(`[${moduleName}] blocked: org_id is mandatory for non-default-org profile.`, {
       actorUserId,
       actorProfileRole: normalizedProfileRole || null,
       orgId,
