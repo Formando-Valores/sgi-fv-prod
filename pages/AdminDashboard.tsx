@@ -2167,6 +2167,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       return;
     }
 
+    if (existingProfile?.id && !editingMemberUserId) {
+      alert(`O email ${normalizedEmail} já possui cadastro. O usuário será vinculado à organização atual.`);
+    }
+
     // If password is provided, use the edge function (idempotent — handles both create and update)
     if (newAdminPassword) {
       const supabaseUrl = String(import.meta.env.VITE_SUPABASE_URL ?? '').trim();
