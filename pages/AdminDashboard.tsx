@@ -29,6 +29,7 @@ import { createCheckoutSession } from '../src/lib/stripe';
 import { getPaymentStatusUi } from '../src/lib/paymentStatus';
 import { getServicesByUnit, getGroupsByUnit, getServicesByGroup, SERVICE_CATALOG, calcAssociationFees, type AssociationFeeItem } from '../src/lib/servicesCatalog';
 import { uploadPaymentProof, validatePaymentProof, getPaymentProofs, type PaymentProof } from '../src/lib/paymentProofs';
+import { uploadProcessDocument, listProcessDocuments, reviewProcessDocument, deleteProcessDocument, type ProcessDocument } from '../src/lib/processDocuments';
 import { SUPABASE_EDGE_FUNCTIONS } from '../src/lib/supabaseFunctions';
 
 type AccessLevel = 'Administrador' | 'Usuário Sênior' | 'Usuário Pleno' | 'Operador' | 'Cliente';
@@ -306,7 +307,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [activeTab, setActiveTab] = useState<'users' | 'management' | 'iban'>('users');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState<AdminProcessRow | User | null>(null);
-  const [selectedUserTab, setSelectedUserTab] = useState<'cadastral' | 'financeiro'>('cadastral');
+  const [selectedUserTab, setSelectedUserTab] = useState<'cadastral' | 'financeiro' | 'documentos'>('cadastral');
   const [editingUser, setEditingUser] = useState<AdminProcessRow | User | null>(null);
   const [redirectingCheckout, setRedirectingCheckout] = useState(false);
   const [uploadingProof, setUploadingProof] = useState(false);
@@ -363,6 +364,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   
   // User creation loading overlay
   const [userCreationStatus, setUserCreationStatus] = useState<string | null>(null);
+
+  // Documentos tab state
+  const [processDocuments, setProcessDocuments] = useState<ProcessDocument[]>([]);
+  const [processDocumentsLoading, setProcessDocumentsLoading] = useState(false);
+  const [uploadingDocument, setUploadingDocument] = useState(false);
+  const [reviewingDocumentId, setReviewingDocumentId] = useState<string | null>(null);
+
   const [clientsData, setClientsData] = useState<ClientProfileView[]>([]);
   const [clientsLoading, setClientsLoading] = useState(false);
   const [clientsError, setClientsError] = useState('');
@@ -2344,6 +2352,35 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const loadProcessDocuments = async () => {
+    if (!selectedUser?.id) return;
+    setProcessDocumentsLoading(true);
+    const docs = await listProcessDocuments(selectedUser.id);
+    setProcessDocuments(docs);
+    setProcessDocumentsLoading(false);
+  };
+
+  const handleDocumentReview = async (docId: string, decision: 'approved' | 'rejected' | 'resubmission_requested') => {
+    if (!selectedUser?.id || !userContext?.id) return;
+    setReviewingDocumentId(docId);
+    await reviewProcessDocument(docId, decision, userContext.id);
+    setReviewingDocumentId(null);
+    await loadProcessDocuments();
+  };
+
+  const handleUploadDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedUser || !userContext?.id) return;
+    const processId = (selectedUser as AdminProcessRow).processRecordId || selectedUser.id;
+    const orgId = userContext.org_id;
+    if (!orgId || !processId) return;
+    setUploadingDocument(true);
+    await uploadProcessDocument(orgId, processId, userContext.id, file);
+    setUploadingDocument(false);
+    if (e.target) e.target.value = '';
+    await loadProcessDocuments();
   };
 
   const refreshOrganizations = async () => {
@@ -4460,6 +4497,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                   >
                     Financeiro
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => { setSelectedUserTab('documentos'); loadProcessDocuments(); }}
+                    className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-t-lg transition-colors ${
+                      selectedUserTab === 'documentos'
+                        ? 'bg-violet-600 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    Documentos
+                  </button>
                 </div>
 
                 {/* Dados Cadastrais */}
@@ -4763,6 +4811,116 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                           <FileDown className="h-4 w-4" />
                           Baixar Certificado de Filiação
                         </a>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {selectedUserTab === 'documentos' && (
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-black uppercase text-gray-800">Documentos do Processo</h3>
+                      <label className={`inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-bold text-white transition-colors cursor-pointer ${uploadingDocument ? 'bg-violet-400' : 'bg-violet-600 hover:bg-violet-500'}`}>
+                        {uploadingDocument ? (
+                          <><Loader2 className="h-4 w-4 animate-spin" /> Enviando…</>
+                        ) : (
+                          <><Upload className="h-4 w-4" /> Adicionar Documento</>
+                        )}
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt"
+                          onChange={handleUploadDocument}
+                          disabled={uploadingDocument}
+                        />
+                      </label>
+                    </div>
+
+                    {processDocumentsLoading ? (
+                      <div className="flex items-center justify-center py-12">
+                        <Loader2 className="h-8 w-8 animate-spin text-violet-600" />
+                      </div>
+                    ) : processDocuments.length === 0 ? (
+                      <div className="text-center py-12 text-gray-500">
+                        <p className="font-bold">Nenhum documento anexado.</p>
+                        <p className="text-sm mt-1">Clique em "Adicionar Documento" para enviar um arquivo.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {processDocuments.map((doc) => (
+                          <div key={doc.id} className="border border-gray-200 rounded-xl p-4 flex items-start justify-between gap-4">
+                            <div className="min-w-0 flex-1">
+                              <p className="font-bold text-gray-800 break-words">{doc.document_name}</p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className={`inline-block text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                                  doc.validation_status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
+                                  doc.validation_status === 'rejected' ? 'bg-red-100 text-red-700' :
+                                  doc.validation_status === 'resubmission_requested' ? 'bg-amber-100 text-amber-700' :
+                                  'bg-gray-100 text-gray-600'
+                                }`}>
+                                  {doc.validation_status === 'approved' ? 'Aprovado' :
+                                   doc.validation_status === 'rejected' ? 'Rejeitado' :
+                                   doc.validation_status === 'resubmission_requested' ? 'Reenvio solicitado' :
+                                   'Pendente'}
+                                </span>
+                                <span className="text-xs text-gray-400">
+                                  {new Date(doc.created_at).toLocaleString('pt-BR')}
+                                </span>
+                              </div>
+                              {doc.pending_reason && (
+                                <p className="text-xs text-gray-500 mt-1">{doc.pending_reason}</p>
+                              )}
+                              {doc.review_notes && (
+                                <p className="text-xs text-amber-600 mt-1 font-semibold">Parecer: {doc.review_notes}</p>
+                              )}
+                              {doc.file_path && (
+                                <a href={doc.file_path} target="_blank" rel="noopener noreferrer"
+                                   className="text-xs text-blue-600 hover:text-blue-800 font-bold mt-1 inline-block">
+                                  Visualizar arquivo →
+                                </a>
+                              )}
+                            </div>
+                            {!isClientScope && doc.validation_status === 'pending' && (
+                              <div className="flex gap-2 flex-shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDocumentReview(doc.id, 'approved')}
+                                  disabled={reviewingDocumentId === doc.id}
+                                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white text-xs font-bold rounded-lg transition-colors"
+                                >
+                                  {reviewingDocumentId === doc.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Aprovar'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDocumentReview(doc.id, 'rejected')}
+                                  disabled={reviewingDocumentId === doc.id}
+                                  className="px-3 py-1.5 bg-red-600 hover:bg-red-500 disabled:opacity-60 text-white text-xs font-bold rounded-lg transition-colors"
+                                >
+                                  Rejeitar
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDocumentReview(doc.id, 'resubmission_requested')}
+                                  disabled={reviewingDocumentId === doc.id}
+                                  className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-60 text-white text-xs font-bold rounded-lg transition-colors"
+                                >
+                                  Solicitar Reenvio
+                                </button>
+                              </div>
+                            )}
+                            {doc.validation_status === 'rejected' && !isClientScope && (
+                              <div className="flex gap-2 flex-shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDocumentReview(doc.id, 'resubmission_requested')}
+                                  className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-lg transition-colors"
+                                >
+                                  Solicitar Reenvio
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
