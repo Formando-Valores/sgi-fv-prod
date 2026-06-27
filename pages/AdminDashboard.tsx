@@ -318,8 +318,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [newAdminEmail, setNewAdminEmail] = useState('');
   const [newAdminPassword, setNewAdminPassword] = useState('');
   const [newAccessLevel, setNewAccessLevel] = useState<AccessLevel>('Usuário Sênior');
-  const [newAdminHierarchy, setNewAdminHierarchy] = useState<Hierarchy>(Hierarchy.FULL);
-  const [editingHierarchyUser, setEditingHierarchyUser] = useState<User | null>(null);
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [organizationName, setOrganizationName] = useState('');
@@ -2273,7 +2272,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       if (found) {
         return prev.map((user) =>
           user.id === found.id
-            ? { ...user, name: sanitizeDisplayValue(newAdminName) || user.name, role, hierarchy: newAdminHierarchy, organizationId: newAdminOrgId, organizationName: selectedOrgName }
+            ? { ...user, name: sanitizeDisplayValue(newAdminName) || user.name, role, hierarchy: Hierarchy.FULL, organizationId: newAdminOrgId, organizationName: selectedOrgName }
             : user
         );
       }
@@ -2283,7 +2282,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         name: sanitizeDisplayValue(newAdminName) || 'Usuário',
         email: normalizedEmail || '-',
         role,
-        hierarchy: newAdminHierarchy,
+        hierarchy: Hierarchy.FULL,
         documentId: '---',
         taxId: '---',
         address: '---',
@@ -2309,20 +2308,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     setEditingMemberUserId(null);
     await fetchOrgMembers();
     alert(membershipWarning || 'Membro cadastrado/atualizado com sucesso.');
-  };
-
-  const handleUpdateHierarchy = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!editingHierarchyUser) return;
-    
-    const fd = new FormData(e.currentTarget);
-    const hierarchy = fd.get('hierarchy') as Hierarchy;
-    const name = fd.get('admin_name') as string;
-
-    setUsers(prev => prev.map(u => 
-      u.id === editingHierarchyUser.id ? { ...u, hierarchy, name } : u
-    ));
-    setEditingHierarchyUser(null);
   };
 
   const handleDeleteUser = (id: string) => {
@@ -3985,25 +3970,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                       ))}
                     </select>
                     <p className="text-[11px] text-gray-500 mt-2">Instituição atual selecionada: {organizations.find((org) => org.id === newAdminOrgId)?.name || 'Organização Padrão'}</p>
-                 </div>
-                 <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Hierarquia / Nível</label>
-                    <div className="space-y-2 mt-2">
-                      <label className="flex items-center gap-2 text-sm text-gray-700 font-bold">
-                        <input type="radio" name="new_hierarchy_radio" className="w-4 h-4 accent-blue-500" checked={newAdminHierarchy === Hierarchy.FULL} onChange={() => setNewAdminHierarchy(Hierarchy.FULL)} />
-                        Alteração e Edição
-                      </label>
-                      <label className="flex items-center gap-2 text-sm text-gray-700 font-bold">
-                        <input type="radio" name="new_hierarchy_radio" className="w-4 h-4 accent-blue-500" checked={newAdminHierarchy === Hierarchy.STATUS_ONLY} onChange={() => setNewAdminHierarchy(Hierarchy.STATUS_ONLY)} />
-                        Somente Alteração
-                      </label>
-                      <label className="flex items-center gap-2 text-sm text-gray-700 font-bold">
-                        <input type="radio" name="new_hierarchy_radio" className="w-4 h-4 accent-blue-500" checked={newAdminHierarchy === Hierarchy.NOTES_ONLY} onChange={() => setNewAdminHierarchy(Hierarchy.NOTES_ONLY)} />
-                        Somente Anotações
-                      </label>
-                    </div>
-                 </div>
-                 <button type="submit" className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg uppercase text-xs tracking-widest mt-4 shadow-lg active:scale-95 transition-transform">
+                  </div>
+                  <button type="submit" className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg uppercase text-xs tracking-widest mt-4 shadow-lg active:scale-95 transition-transform">
                     {editingMemberUserId ? 'Atualizar / Definir' : 'Cadastrar / Definir'}
                  </button>
               </form>
@@ -4427,55 +4395,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                 </div>
               </form>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Hierarchy Edit Modal */}
-      {editingHierarchyUser && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="bg-white w-full max-w-md rounded-3xl border border-gray-100 shadow-2xl overflow-hidden">
-             <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-               <h3 className="text-xl font-black uppercase">Editar Gestor</h3>
-               <button onClick={() => setEditingHierarchyUser(null)} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full">
-                 <X className="w-5 h-5" />
-               </button>
-             </div>
-             <div className="p-8">
-                <form onSubmit={handleUpdateHierarchy}>
-                  <p className="text-gray-500 text-sm mb-6">Alterando dados para <strong>{editingHierarchyUser.email}</strong></p>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-[10px] font-black text-gray-500 uppercase block mb-1">Nome de Usuário</label>
-                      <input 
-                        required
-                        name="admin_name"
-                        type="text"
-                        defaultValue={editingHierarchyUser.name}
-                        className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500 mb-4" 
-                      />
-                    </div>
-
-                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-1">Hierarquia / Nível</label>
-                    {Object.values(Hierarchy).map(h => (
-                      <label key={h} className="flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-xl cursor-pointer hover:border-blue-500 transition-colors">
-                        <input 
-                          type="radio" 
-                          name="hierarchy" 
-                          value={h} 
-                          defaultChecked={editingHierarchyUser.hierarchy === h} 
-                          className="w-5 h-5 accent-blue-500" 
-                        />
-                        <span className="font-bold text-gray-700">{h}</span>
-                      </label>
-                    ))}
-                    <button type="submit" className="w-full py-5 bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-widest rounded-2xl shadow-xl mt-4">
-                      Confirmar Alteração
-                    </button>
-                  </div>
-                </form>
-             </div>
           </div>
         </div>
       )}
