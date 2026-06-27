@@ -103,28 +103,19 @@ export async function deleteScheduleSlots(
 export async function getProfessionals(): Promise<
   { id: string; nome_completo: string; email: string }[]
 > {
-  const { data: members, error } = await supabase
-    .from('org_members')
-    .select('user_id, profiles!inner(id,nome_completo,email)')
-    .not('role', 'in', '("client")');
+  const { data: profiles, error } = await supabase
+    .from('profiles')
+    .select('id, nome_completo, email')
+    .neq('role', 'CLIENT');
 
   if (error) {
     console.error('[professionalSchedules] getProfessionals error:', error);
     return [];
   }
 
-  const result: { id: string; nome_completo: string; email: string }[] = [];
-  const seen = new Set<string>();
-  for (const row of members || []) {
-    const profile = row.profiles as unknown as { id: string; nome_completo?: string; email?: string };
-    if (profile?.id && !seen.has(profile.id)) {
-      seen.add(profile.id);
-      result.push({
-        id: profile.id,
-        nome_completo: profile.nome_completo || profile.email || 'Sem nome',
-        email: profile.email || '',
-      });
-    }
-  }
-  return result;
+  return (profiles || []).map((p) => ({
+    id: p.id,
+    nome_completo: p.nome_completo || p.email || 'Sem nome',
+    email: p.email || '',
+  }));
 }
