@@ -347,6 +347,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     serviceUnit: null as ServiceUnit | null,
     selectedServiceIds: [] as string[],
     osValue: undefined as number | undefined,
+    donation: 0 as number,
   });
   const [adminServiceSearch, setAdminServiceSearch] = useState('');
   const [adminExpandedGroups, setAdminExpandedGroups] = useState<Record<string, boolean>>({});
@@ -1067,6 +1068,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       clientContact: '',
       serviceUnit: ServiceUnit.JURIDICO,
       osValue: undefined,
+      donation: 0,
     });
   };
 
@@ -1544,9 +1546,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       : null;
 
     const servicesTotal = (servicesSelected ?? []).reduce((sum: number, s: any) => sum + (s?.price ?? 0), 0);
-    const associationFees = servicesSelected && servicesSelected.length > 0 ? calcAssociationFees(servicesTotal) : null;
-    const feesTotal = (associationFees ?? []).reduce((sum: number, f: AssociationFeeItem) => sum + f.price, 0);
-    const totalOsValue = servicesTotal + feesTotal;
+    const associationFees = servicesSelected && servicesSelected.length > 0 ? calcAssociationFees(servicesTotal) : [];
+    const doacaoFee = newProcessForm.donation > 0 ? { type: 'doacao' as const, name: 'Doação Voluntária', price: newProcessForm.donation, destination: 'association' as const } : null;
+    const allFees = doacaoFee ? [...(associationFees ?? []), doacaoFee] : associationFees;
+    const totalOsValue = hasOsValue ? newProcessForm.osValue! : (servicesTotal + newProcessForm.donation);
 
     const hasOsValue = typeof newProcessForm.osValue === 'number' && newProcessForm.osValue > 0;
 
@@ -1581,11 +1584,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
     // Set process_status and services_selected after creation
     let processToAdd = createdProcess;
-    if (hasOsValue || servicesSelected || associationFees) {
+    if (hasOsValue || servicesSelected || allFees) {
       const updates: Record<string, unknown> = {};
       if (hasOsValue) updates.process_status = 'aguardando_pagamento';
       if (servicesSelected) updates.services_selected = servicesSelected;
-      if (associationFees) updates.association_fees = associationFees;
+      if (allFees) updates.association_fees = allFees;
       const { data: updatedProcess } = await supabase
         .from('processes')
         .update(updates)
@@ -4550,22 +4553,52 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                       </div>
                     )}
 
-                    {(selectedUser as AdminProcessRow).associationFees && (selectedUser as AdminProcessRow).associationFees!.length > 0 && (
-                      <div>
-                        <label className="text-[10px] font-black text-amber-700 uppercase block mb-2">Taxas Associativas</label>
-                        <div className="divide-y divide-amber-100 border border-amber-200 rounded-xl overflow-hidden">
-                          {(selectedUser as AdminProcessRow).associationFees!.map((fee, idx) => (
-                            <div key={idx} className="flex items-center justify-between px-4 py-3 bg-amber-50">
-                              <div className="min-w-0 flex-1">
-                                <p className="text-sm font-bold text-amber-900 truncate">{fee.name}</p>
-                                <p className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider">Associação</p>
-                              </div>
-                              <span className="text-sm font-black text-amber-700 ml-3">R$ {fee.price.toFixed(2)}</span>
+                    {(selectedUser as AdminProcessRow).associationFees && (selectedUser as AdminProcessRow).associationFees!.length > 0 && (() => {
+                      const allFees = (selectedUser as AdminProcessRow).associationFees!;
+                      const svcTotal = (selectedUser as AdminProcessRow).osValue ?? 0;
+                      const servicosTotal = svcTotal - (allFees.find(f => f.type === 'doacao')?.price ?? 0);
+                      const convenioFees = allFees.filter(f => f.type === 'convenio');
+                      const doacaoFee = allFees.find(f => f.type === 'doacao');
+                      const convenioTotal = convenioFees.reduce((s, f) => s + f.price, 0);
+                      const profissionalNet = servicosTotal - convenioTotal;
+                      return (
+                        <div>
+                          <label className="text-[10px] font-black text-amber-700 uppercase block mb-2">Taxas Associativas</label>
+                          <div className="divide-y divide-amber-100 border border-amber-200 rounded-xl overflow-hidden">
+                            <div className="flex items-center justify-between px-4 py-3 bg-blue-50">
+                              <p className="text-sm font-bold text-blue-800">Valor Bruto dos Serviços</p>
+                              <span className="text-sm font-black text-blue-800">R$ {servicosTotal.toFixed(2)}</span>
                             </div>
-                          ))}
+                            {convenioFees.map((fee, idx) => (
+                              <div key={idx} className="flex items-center justify-between px-4 py-3 bg-amber-50">
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-sm font-bold text-amber-900 truncate">{fee.name}</p>
+                                  <p className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider">Associação</p>
+                                </div>
+                                <span className="text-sm font-black text-amber-700 ml-3">- R$ {fee.price.toFixed(2)}</span>
+                              </div>
+                            ))}
+                            {doacaoFee && (
+                              <div className="flex items-center justify-between px-4 py-3 bg-purple-50">
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-sm font-bold text-purple-900 truncate">{doacaoFee.name}</p>
+                                  <p className="text-[10px] font-semibold text-purple-600 uppercase tracking-wider">Associação</p>
+                                </div>
+                                <span className="text-sm font-black text-purple-700 ml-3">+ R$ {doacaoFee.price.toFixed(2)}</span>
+                              </div>
+                            )}
+                            <div className="flex items-center justify-between px-4 py-3 bg-emerald-50">
+                              <p className="text-sm font-bold text-emerald-800">Valor Líquido ao Profissional</p>
+                              <span className="text-base font-black text-emerald-700">R$ {Math.max(0, profissionalNet).toFixed(2)}</span>
+                            </div>
+                            <div className="flex items-center justify-between px-4 py-3 bg-amber-100">
+                              <p className="text-sm font-black text-amber-900 uppercase">Total a Pagar</p>
+                              <span className="text-base font-black text-amber-900">R$ {svcTotal.toFixed(2)}</span>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl">
@@ -4903,8 +4936,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                                                   return sum + (s?.price ?? 0);
                                                 }, 0);
                                                 const fees = svcTotal > 0 ? calcAssociationFees(svcTotal) : [];
-                                                const feesTotal = fees.reduce((s, f) => s + f.price, 0);
-                                                return { ...prev, selectedServiceIds: next, osValue: svcTotal + feesTotal > 0 ? svcTotal + feesTotal : undefined };
+                                                return { ...prev, selectedServiceIds: next, osValue: svcTotal > 0 ? svcTotal : undefined };
                                               });
                                             }}
                                             className="w-4 h-4 accent-blue-600"
@@ -4966,25 +4998,44 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                           return sum + (s?.price ?? 0);
                         }, 0);
                         const fees = calcAssociationFees(svcTotal);
-                        if (!fees.length) return null;
+                        const doacaoFee = newProcessForm.donation > 0 ? { type: 'doacao' as const, name: 'Doação Voluntária', price: newProcessForm.donation, destination: 'association' as const } : null;
+                        const allFees = doacaoFee ? [...fees, doacaoFee] : fees;
+                        const convenioTotal = fees.reduce((s, f) => s + f.price, 0);
+                        const profissionalNet = svcTotal - convenioTotal;
+                        if (!allFees.length) return null;
                         return (
                           <div>
                             <label className="text-[10px] font-black text-amber-700 uppercase block mb-2">Taxas Associativas</label>
                             <div className="divide-y divide-amber-100 border border-amber-200 rounded-xl overflow-hidden">
+                              <div className="flex items-center justify-between px-4 py-3 bg-blue-50">
+                                <p className="text-sm font-bold text-blue-800">Valor Bruto dos Serviços</p>
+                                <span className="text-sm font-black text-blue-800">R$ {svcTotal.toFixed(2)}</span>
+                              </div>
                               {fees.map((fee) => (
                                 <div key={fee.type} className="flex items-center justify-between px-4 py-3 bg-amber-50">
                                   <div className="min-w-0 flex-1">
                                     <p className="text-sm font-bold text-amber-900 truncate">{fee.name}</p>
                                     <p className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider">Associação</p>
                                   </div>
-                                  <span className="text-sm font-black text-amber-700 ml-3">R$ {fee.price.toFixed(2)}</span>
+                                  <span className="text-sm font-black text-amber-700 ml-3">- R$ {fee.price.toFixed(2)}</span>
                                 </div>
                               ))}
+                              {doacaoFee && (
+                                <div className="flex items-center justify-between px-4 py-3 bg-purple-50">
+                                  <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-bold text-purple-900 truncate">{doacaoFee.name}</p>
+                                    <p className="text-[10px] font-semibold text-purple-600 uppercase tracking-wider">Associação</p>
+                                  </div>
+                                  <span className="text-sm font-black text-purple-700 ml-3">+ R$ {doacaoFee.price.toFixed(2)}</span>
+                                </div>
+                              )}
+                              <div className="flex items-center justify-between px-4 py-3 bg-emerald-50">
+                                <p className="text-sm font-bold text-emerald-800">Valor Líquido ao Profissional</p>
+                                <span className="text-base font-black text-emerald-700">R$ {Math.max(0, profissionalNet).toFixed(2)}</span>
+                              </div>
                               <div className="flex items-center justify-between px-4 py-3 bg-amber-100">
-                                <p className="text-sm font-black text-amber-900 uppercase">Total Geral</p>
-                                <span className="text-base font-black text-amber-900">
-                                  R$ {(svcTotal + fees.reduce((s, f) => s + f.price, 0)).toFixed(2)}
-                                </span>
+                                <p className="text-sm font-black text-amber-900 uppercase">Total a Pagar</p>
+                                <span className="text-base font-black text-amber-900">R$ {(svcTotal + newProcessForm.donation).toFixed(2)}</span>
                               </div>
                             </div>
                           </div>
@@ -5007,6 +5058,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     {newProcessForm.serviceUnit && (newProcessForm.selectedServiceIds ?? []).length > 0 && (
                       <p className="text-xs text-gray-500 mt-1">Valor calculado com base nos serviços selecionados.</p>
                     )}
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-black text-purple-600 uppercase block mb-2">Doação Voluntária (R$) <span className="text-[10px] font-normal text-gray-400">— valor extra para associação</span></label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={newProcessForm.donation || ''}
+                      onChange={(event) => setNewProcessForm((prev) => ({ ...prev, donation: event.target.value ? Number(event.target.value) : 0 }))}
+                      className="w-full bg-purple-50 border border-purple-200 rounded-xl p-4 text-purple-800 font-semibold outline-none focus:ring-2 focus:ring-purple-500"
+                      placeholder="0,00"
+                    />
                   </div>
                 </div>
 

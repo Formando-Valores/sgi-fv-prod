@@ -11,6 +11,7 @@ import { ServiceUnit, ProcessStatus, User, UserRole, Organization } from '../typ
 import { isSupabaseConfigured, supabase } from '../supabase';
 import { buildOrganizationErrorMessage, loadOrganizations } from '../organizationRepository';
 import { SUPABASE_EDGE_FUNCTIONS } from '../src/lib/supabaseFunctions';
+import { ASSOCIATION_ANNUAL_FEE, calcAssociationFees } from '../src/lib/servicesCatalog';
 
 interface RegisterProps {
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
@@ -295,6 +296,27 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
 
         setUsers((prev) => [...prev, newUser]);
         setCurrentUser(newUser);
+
+        // Auto-cria processo de filiacao para pagamento da taxa anual
+        try {
+          const membershipFees = calcAssociationFees(0, 'membership');
+          await supabase.from('processes').insert({
+            org_id: formData.organizationId,
+            titulo: `Filiação - ${formData.name}`,
+            status: 'cadastro',
+            cliente_user_id: data.user.id,
+            cliente_nome: formData.name,
+            cliente_documento: formData.documentId || null,
+            cliente_contato: formData.phone || null,
+            unidade_atendimento: formData.unit,
+            origem_canal: 'cadastro',
+            os_value: ASSOCIATION_ANNUAL_FEE,
+            process_status: 'aguardando_pagamento',
+            association_fees: membershipFees,
+          });
+        } catch (membershipProcessErr) {
+          console.warn('[register] erro ao criar processo de filiação automática', membershipProcessErr);
+        }
 
         const loginUrl = `${window.location.origin}${window.location.pathname.includes('#') ? '' : '/#/login'}`;
         const credentialPayload = {

@@ -45,6 +45,7 @@ const ProcessList: React.FC = () => {
   const [customServiceName, setCustomServiceName] = useState('');
   const [serviceSearch, setServiceSearch] = useState('');
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const [donation, setDonation] = useState(0);
   const [formData, setFormData] = useState<CreateProcessPayload>({
     titulo: '',
     cliente_nome: '',
@@ -137,11 +138,12 @@ const ProcessList: React.FC = () => {
     setFormData((prev) => {
       const servicesTotal = totalValue;
       const fees = servicesTotal > 0 ? calcAssociationFees(servicesTotal) : [];
-      const feesTotal = fees.reduce((sum, f) => sum + f.price, 0);
+      const doacao = donation > 0 ? { type: 'doacao' as const, name: 'Doação Voluntária', price: donation, destination: 'association' as const } : null;
+      const allFees = doacao ? [...fees, doacao] : fees;
       return {
         ...prev,
-        os_value: servicesTotal + feesTotal > 0 ? servicesTotal + feesTotal : undefined,
-        association_fees: fees.length > 0 ? fees : undefined,
+        os_value: servicesTotal + donation > 0 ? servicesTotal + donation : undefined,
+        association_fees: allFees.length > 0 ? allFees : undefined,
         unidade_atendimento: selectedUnit,
       };
     });
@@ -167,14 +169,15 @@ const ProcessList: React.FC = () => {
         : availableServices.filter(s => selectedServiceIds.includes(s.id));
       const servicesTotal = selectedServices.reduce((sum, s) => sum + s.price, 0);
       const associationFees = selectedServices.length > 0 ? calcAssociationFees(servicesTotal) : [];
-      const feesTotal = associationFees.reduce((sum, f) => sum + f.price, 0);
+      const doacao = donation > 0 ? { type: 'doacao' as const, name: 'Doação Voluntária', price: donation, destination: 'association' as const } : null;
+      const allFees = doacao ? [...associationFees, doacao] : associationFees;
       const payload = {
         ...formData,
         responsavel_user_id: isClient ? userContext.id : formData.responsavel_user_id,
         cliente_user_id: isClient ? userContext.id : undefined,
         services_selected: selectedServices,
-        association_fees: associationFees.length > 0 ? associationFees : undefined,
-        os_value: servicesTotal + feesTotal > 0 ? servicesTotal + feesTotal : undefined,
+        association_fees: allFees.length > 0 ? allFees : undefined,
+        os_value: servicesTotal + donation > 0 ? servicesTotal + donation : undefined,
       };
       const newProcess = await createProcess(userContext.org_id, payload, userContext.id);
       resetModal();
@@ -308,46 +311,47 @@ const ProcessList: React.FC = () => {
                     <td className="px-6 py-4 text-slate-400 font-bold">{formatDate(process.created_at)}</td>
                     <td className="px-6 py-4 text-right">
                       <div className="inline-flex items-center gap-2">
-                        {process.process_status === 'aguardando_pagamento' && (
+                        {process.process_status === 'aguardando_pagamento' && (process.payment_status == null || process.payment_status === 'pending' || process.payment_status === 'failed' || process.payment_status === 'rejected') && (
                           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-wide bg-amber-900/30 text-amber-300 border border-amber-700">
                             <Lock className="w-3 h-3" />
-                            Ações bloqueadas
+                            Aguardando pagamento
                           </span>
                         )}
-                        {(process.payment_status == null || process.payment_status === 'pending' || process.payment_status === 'failed' || process.payment_status === 'rejected') && (
-                          <>
-                            <input
-                              type="file"
-                              ref={fileInputRef}
-                              accept="image/*,application/pdf"
-                              className="hidden"
-                              onChange={async (e) => {
-                                const file = e.target.files?.[0];
-                                if (!file) return;
-                                setUploadingProofFor(process.id);
-                                const { error } = await uploadPaymentProof(process.id, userContext?.id || '', file);
-                                setUploadingProofFor(null);
-                                if (fileInputRef.current) fileInputRef.current.value = '';
-                                if (error) {
-                                  setProofUploadFeedback({ processId: process.id, message: error, type: 'error' });
-                                } else {
-                                  setProofUploadFeedback({ processId: process.id, message: 'Comprovante enviado! Aguardando validação.', type: 'success' });
-                                  setProcesses((prev) => prev.map((p) => p.id === process.id ? { ...p, payment_status: 'pending_validation' as any } : p));
-                                }
-                                setTimeout(() => setProofUploadFeedback(null), 4000);
-                              }}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => fileInputRef.current?.click()}
-                              disabled={uploadingProofFor === process.id}
-                              className="p-2 bg-emerald-800 hover:bg-emerald-700 rounded-lg text-emerald-300 inline-flex disabled:opacity-60"
-                              title="Enviar comprovante de pagamento"
-                            >
-                              {uploadingProofFor === process.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                            </button>
-                          </>
-                        )}
+                        {process.process_status === 'aguardando_pagamento' && (process.payment_status == null || process.payment_status === 'pending' || process.payment_status === 'failed' || process.payment_status === 'rejected') && (() => {
+                          const uploadId = `proof-upload-${process.id}`;
+                          return (
+                            <>
+                              <input
+                                type="file"
+                                id={uploadId}
+                                accept="image/*,application/pdf"
+                                className="hidden"
+                                onChange={async (e) => {
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+                                  setUploadingProofFor(process.id);
+                                  const { error } = await uploadPaymentProof(process.id, userContext?.id || '', file);
+                                  setUploadingProofFor(null);
+                                  if (e.target) e.target.value = '';
+                                  if (error) {
+                                    setProofUploadFeedback({ processId: process.id, message: error, type: 'error' });
+                                  } else {
+                                    setProofUploadFeedback({ processId: process.id, message: 'Comprovante enviado! Aguardando validação.', type: 'success' });
+                                    setProcesses((prev) => prev.map((p) => p.id === process.id ? { ...p, payment_status: 'pending_validation' as any } : p));
+                                  }
+                                  setTimeout(() => setProofUploadFeedback(null), 4000);
+                                }}
+                              />
+                              <label
+                                htmlFor={uploadId}
+                                className={`p-2 bg-emerald-800 hover:bg-emerald-700 rounded-lg text-emerald-300 inline-flex cursor-pointer disabled:opacity-60 ${uploadingProofFor === process.id ? 'opacity-60 pointer-events-none' : ''}`}
+                                title="Enviar comprovante de pagamento"
+                              >
+                                {uploadingProofFor === process.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                              </label>
+                            </>
+                          );
+                        })()}
                         {process.payment_status === 'pending_validation' && (
                           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-wide bg-amber-900/30 text-amber-300 border border-amber-700">
                             <Loader2 className="w-3 h-3 animate-spin" />
@@ -596,6 +600,33 @@ const ProcessList: React.FC = () => {
                   <p className="text-xs text-slate-500 mt-1">Valor calculado com base nos serviços selecionados. Pode ser ajustado manualmente.</p>
                 </div>
                 <div>
+                  <label className="block text-sm font-bold text-slate-300 mb-2">Doação Voluntária (R$) <span className="text-xs text-slate-500 font-normal">— valor extra para a associação</span></label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={donation || ''}
+                    onChange={(e) => {
+                      const val = e.target.value ? Number(e.target.value) : 0;
+                      setDonation(val);
+                      // Recalculate os_value and fees when donation changes
+                      setFormData((prev) => {
+                        const servicesTotal = totalValue;
+                        const fees = servicesTotal > 0 ? calcAssociationFees(servicesTotal) : [];
+                        const doacao = val > 0 ? { type: 'doacao' as const, name: 'Doação Voluntária', price: val, destination: 'association' as const } : null;
+                        const allFees = doacao ? [...fees, doacao] : fees;
+                        return {
+                          ...prev,
+                          os_value: servicesTotal + val > 0 ? servicesTotal + val : undefined,
+                          association_fees: allFees.length > 0 ? allFees : undefined,
+                        };
+                      });
+                    }}
+                    className="w-full px-4 py-3 bg-purple-950/30 border border-purple-700/50 rounded-xl text-white font-bold placeholder:text-slate-600 focus:ring-2 focus:ring-purple-500 outline-none"
+                    placeholder="0,00"
+                  />
+                </div>
+                <div>
                   <label className="block text-sm font-bold text-slate-300 mb-2">Contato</label>
                   <input
                     type="text"
@@ -620,28 +651,53 @@ const ProcessList: React.FC = () => {
                   </div>
                 )}
 
-                {formData.association_fees && formData.association_fees.length > 0 && (
-                  <div>
-                    <label className="text-[10px] font-black text-amber-400 uppercase block mb-2">Taxas Associativas</label>
-                    <div className="divide-y divide-amber-800/50 border border-amber-700/50 rounded-xl overflow-hidden">
-                      {formData.association_fees.map((fee) => (
-                        <div key={fee.type} className="flex items-center justify-between px-4 py-3 bg-amber-900/20">
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-bold text-amber-200 truncate">{fee.name}</p>
-                            <p className="text-[10px] font-semibold text-amber-400 uppercase tracking-wider">Associação</p>
-                          </div>
-                          <span className="text-sm font-black text-amber-300 ml-3">R$ {fee.price.toFixed(2)}</span>
+                {formData.association_fees && formData.association_fees.length > 0 && (() => {
+                  const allFees = formData.association_fees!;
+                  const feesTotal = allFees.reduce((s, f) => s + f.price, 0);
+                  const svcTotal = formData.os_value ?? 0;
+                  const servicosTotal = svcTotal - (allFees.find(f => f.type === 'doacao')?.price ?? 0);
+                  const convenioFees = allFees.filter(f => f.type === 'convenio');
+                  const doacaoFee = allFees.find(f => f.type === 'doacao');
+                  const convenioTotal = convenioFees.reduce((s, f) => s + f.price, 0);
+                  const profissionalNet = servicosTotal - convenioTotal;
+                  return (
+                    <div>
+                      <label className="text-[10px] font-black text-amber-400 uppercase block mb-2">Taxas Associativas</label>
+                      <div className="divide-y divide-amber-800/50 border border-amber-700/50 rounded-xl overflow-hidden">
+                        <div className="flex items-center justify-between px-4 py-3 bg-slate-800/40">
+                          <p className="text-sm font-bold text-slate-200">Valor Bruto dos Serviços</p>
+                          <span className="text-sm font-black text-white">R$ {servicosTotal.toFixed(2)}</span>
                         </div>
-                      ))}
-                      <div className="flex items-center justify-between px-4 py-3 bg-amber-900/40">
-                        <p className="text-sm font-black text-amber-200 uppercase">Total Geral</p>
-                        <span className="text-base font-black text-amber-200">
-                          R$ {((formData.os_value ?? 0)).toFixed(2)}
-                        </span>
+                        {convenioFees.map((fee) => (
+                          <div key={fee.type} className="flex items-center justify-between px-4 py-3 bg-amber-900/20">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-bold text-amber-200 truncate">{fee.name}</p>
+                              <p className="text-[10px] font-semibold text-amber-400 uppercase tracking-wider">Associação</p>
+                            </div>
+                            <span className="text-sm font-black text-amber-300 ml-3">- R$ {fee.price.toFixed(2)}</span>
+                          </div>
+                        ))}
+                        {doacaoFee && (
+                          <div className="flex items-center justify-between px-4 py-3 bg-purple-900/20">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-bold text-purple-200 truncate">{doacaoFee.name}</p>
+                              <p className="text-[10px] font-semibold text-purple-400 uppercase tracking-wider">Associação</p>
+                            </div>
+                            <span className="text-sm font-black text-purple-300 ml-3">+ R$ {doacaoFee.price.toFixed(2)}</span>
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between px-4 py-3 bg-emerald-900/30">
+                          <p className="text-sm font-bold text-emerald-200">Valor Líquido ao Profissional</p>
+                          <span className="text-base font-black text-emerald-300">R$ {Math.max(0, profissionalNet).toFixed(2)}</span>
+                        </div>
+                        <div className="flex items-center justify-between px-4 py-3 bg-amber-900/40">
+                          <p className="text-sm font-black text-amber-200 uppercase">Total a Pagar</p>
+                          <span className="text-base font-black text-amber-200">R$ {svcTotal.toFixed(2)}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {formError && (
                   <div className="flex items-center gap-2 p-3 bg-red-900/30 border border-red-800 rounded-lg">

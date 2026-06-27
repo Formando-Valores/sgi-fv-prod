@@ -12,34 +12,52 @@ export type CatalogService = {
 export const CUSTOM_ANALYSIS_FEE = 280;
 
 // Taxas Associativas (valores em BRL, convertidos de EUR a taxa ~6.0)
-export const ASSOCIATION_ANNUAL_FEE = 150;   // 25€ * 6
-export const ASSOCIATION_CONVENIO_01_FEE = 30;   // 5€ * 6
-export const ASSOCIATION_CONVENIO_02_FEE = 300;  // 50€ * 6
-export const ASSOCIATION_CONVENIO_THRESHOLD = 1800; // 300€ * 6 - acima disso aplica Convenio 02, abaixo Convenio 01
+export const ASSOCIATION_ANNUAL_FEE = 180;   // 30€ * 6
+export const ASSOCIATION_CONVENIO_01_FEE = 60;    // 10€ * 6, ate 100€
+export const ASSOCIATION_CONVENIO_02_FEE = 150;   // 25€ * 6, de 101€ a 300€
+export const ASSOCIATION_CONVENIO_03_FEE = 300;   // 50€ * 6, de 301€ a 700€
+export const ASSOCIATION_CONVENIO_04_FEE = 450;   // 75€ * 6, de 701€ a 2000€ ou mais
+export const ASSOCIATION_CONVENIO_THRESHOLD_01 = 600;   // 100€ * 6
+export const ASSOCIATION_CONVENIO_THRESHOLD_02 = 1800;  // 300€ * 6
+export const ASSOCIATION_CONVENIO_THRESHOLD_03 = 4200;  // 700€ * 6
 
 export type AssociationFeeItem = {
-  type: 'annual' | 'convenio';
+  type: 'annual' | 'convenio' | 'doacao';
   name: string;
   price: number;
   destination: 'association';
 };
 
 /**
- * Calcula as taxas associativas com base no valor total dos servicos selecionados.
- * - Taxa Anual: sempre aplicada (25€)
- * - Se total servicos < 300€ (R$ 1.800): Convenio 01 (5€)
- * - Se total servicos >= 300€ (R$ 1.800): Convenio 02 (50€)
+ * Calcula as taxas associativas.
+ * - membership: apenas Taxa Anual (30€) — para filiacao
+ * - service: apenas Convenio conforme faixa de valor dos servicos
  */
-export function calcAssociationFees(servicesTotal: number): AssociationFeeItem[] {
-  const fees: AssociationFeeItem[] = [
-    { type: 'annual', name: 'Taxa Associativa Anual', price: ASSOCIATION_ANNUAL_FEE, destination: 'association' },
-  ];
-  if (servicesTotal < ASSOCIATION_CONVENIO_THRESHOLD) {
-    fees.push({ type: 'convenio', name: 'Convênio 01', price: ASSOCIATION_CONVENIO_01_FEE, destination: 'association' });
-  } else {
-    fees.push({ type: 'convenio', name: 'Convênio 02', price: ASSOCIATION_CONVENIO_02_FEE, destination: 'association' });
+export function calcAssociationFees(servicesTotal: number, context: 'membership' | 'service' = 'service'): AssociationFeeItem[] {
+  if (context === 'membership') {
+    return [
+      { type: 'annual', name: 'Taxa Associativa Anual', price: ASSOCIATION_ANNUAL_FEE, destination: 'association' },
+    ];
   }
-  return fees;
+  // Service context: convenio fee conforme faixas
+  if (servicesTotal <= ASSOCIATION_CONVENIO_THRESHOLD_01) {
+    return [{ type: 'convenio', name: 'Convênio 01 (até €100)', price: ASSOCIATION_CONVENIO_01_FEE, destination: 'association' }];
+  }
+  if (servicesTotal <= ASSOCIATION_CONVENIO_THRESHOLD_02) {
+    return [{ type: 'convenio', name: 'Convênio 02 (€101 a €300)', price: ASSOCIATION_CONVENIO_02_FEE, destination: 'association' }];
+  }
+  if (servicesTotal <= ASSOCIATION_CONVENIO_THRESHOLD_03) {
+    return [{ type: 'convenio', name: 'Convênio 03 (€301 a €700)', price: ASSOCIATION_CONVENIO_03_FEE, destination: 'association' }];
+  }
+  return [{ type: 'convenio', name: 'Convênio 04 (€701 ou mais)', price: ASSOCIATION_CONVENIO_04_FEE, destination: 'association' }];
+}
+
+/**
+ * Retorna o valor liquido ao profissional apos deduzir as taxas associativas.
+ * (venda casada: o preco do servico ja inclui a taxa, que e deduzida do repasse)
+ */
+export function calcProfessionalNet(servicesTotal: number, fees: AssociationFeeItem[]): number {
+  return servicesTotal - fees.reduce((sum, f) => sum + f.price, 0);
 }
 
 export const SERVICE_CATALOG: CatalogService[] = [
