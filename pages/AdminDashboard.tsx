@@ -2202,6 +2202,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           return;
         }
         targetUserId = result.user_id;
+        if (result.process_warning) {
+          alert(`Atenção: ${result.process_warning}`);
+        }
         setNewAdminPassword('');
       } catch (fetchErr: any) {
         alert(`Erro ao comunicar com o servidor: ${fetchErr?.message || 'desconhecido'}`);

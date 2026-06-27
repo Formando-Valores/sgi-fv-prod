@@ -120,6 +120,8 @@ Deno.serve(async (request) => {
       .eq('titulo', `Filiação - ${name}`)
       .maybeSingle();
 
+    let processWarning: string | undefined;
+
     if (!existingProcess) {
       const { error: processError } = await adminClient
         .from('processes')
@@ -138,16 +140,20 @@ Deno.serve(async (request) => {
         });
 
       if (processError) {
-        console.warn('[create-user] auto-membership process failed:', processError.message);
+        processWarning = `Processo de pagamento da taxa não foi criado: ${processError.message}`;
       }
     }
 
-    return jsonResponse(200, {
+    const result: Record<string, unknown> = {
       success: true,
       user_id: userId,
       email,
       name,
-    });
+    };
+    if (processWarning) {
+      result.process_warning = processWarning;
+    }
+    return jsonResponse(200, result);
 
   } catch (err) {
     return jsonResponse(500, { error: `Erro interno: ${err instanceof Error ? err.message : 'desconhecido'}` });
