@@ -1,19 +1,25 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Loader2, Check, X } from 'lucide-react';
-import { supabase } from '../../../../supabase';
+import { ChevronLeft, ChevronRight, Loader2, Check, X, Briefcase } from 'lucide-react';
 import {
   listProfessionalSchedules,
   upsertScheduleSlots,
   deleteScheduleSlots,
+  toggleSlotProcessLink,
   getProfessionals,
+  getProcessesForProfessional,
 } from '../../../lib/professionalSchedules';
 import type { ScheduleSlot } from '../../../lib/professionalSchedules';
 
 const TIME_SLOTS_BR = ['09:00','09:30','10:00','10:30','11:00','11:30','12:00','12:30','13:00','13:30','14:00','14:30'];
-const TIME_SLOTS_PT = ['13:00','13:30','14:00','14:30','15:00','15:30','16:00','16:30','17:00','17:30','18:00','18:30'];
 const WEEKDAYS = [1, 2, 3, 4, 5];
 const WEEKDAY_NAMES = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex'];
 const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+type SlotInfo = {
+  process_id?: string | null;
+  protocolo?: string | null;
+  cliente_nome?: string | null;
+};
 
 const AgendaBlock: React.FC = () => {
   const now = new Date();
@@ -21,10 +27,13 @@ const AgendaBlock: React.FC = () => {
   const [month, setMonth] = useState(now.getMonth());
   const [professionals, setProfessionals] = useState<{ id: string; nome_completo: string }[]>([]);
   const [selectedProf, setSelectedProf] = useState<string>('');
-  const [schedules, setSchedules] = useState<Set<string>>(new Set());
+  const [scheduleMap, setScheduleMap] = useState<Map<string, SlotInfo>>(new Map());
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [toggling, setToggling] = useState<string | null>(null);
+  const [saving, setSaving] = useState<string | null>(null);
+
+  const [linkModal, setLinkModal] = useState<{ date: string; time: string } | null>(null);
+  const [availableProcesses, setAvailableProcesses] = useState<{ id: string; protocolo: string; cliente_nome: string }[]>([]);
+  const [linking, setLinking] = useState(false);
 
   const selectedTimeSlots = TIME_SLOTS_BR;
 
@@ -42,7 +51,6 @@ const AgendaBlock: React.FC = () => {
   }, [year, month]);
 
   const formatDate = (d: Date) => d.toISOString().split('T')[0];
-
   const key = (date: string, time: string) => `${date}|${time}`;
 
   useEffect(() => {
@@ -60,37 +68,74 @@ const AgendaBlock: React.FC = () => {
     const endDate = formatDate(days[days.length - 1]);
 
     listProfessionalSchedules(selectedProf, startDate, endDate).then((slots) => {
-      const set_ = new Set<string>();
-      slots.forEach((s) => set_.add(key(s.date, s.start_time)));
-      setSchedules(set_);
+      const map_ = new Map<string, SlotInfo>();
+      slots.forEach((s) => map_.set(key(s.date, s.start_time), {
+        process_id: s.process_id,
+        protocolo: s.protocolo,
+        cliente_nome: s.cliente_nome,
+      }));
+      setScheduleMap(map_);
       setLoading(false);
     });
   }, [selectedProf, year, month, getDaysInMonth]);
 
-  const toggleSlot = async (date: string, time: string) => {
+  const handleSlotClick = async (date: string, time: string) => {
     if (!selectedProf) return;
     const k = key(date, time);
-    const isAvailable = schedules.has(k);
-    setToggling(k);
-    setSaving(true);
+    const slot = scheduleMap.get(k);
 
-    let ok: boolean;
-    if (isAvailable) {
-      ok = await deleteScheduleSlots(selectedProf, [{ date, start_time: time }]);
+    if (slot?.process_id) {
+      setSaving(k);
+      const ok = await toggleSlotProcessLink(selectedProf, date, time, null);
+      if (ok) {
+        setScheduleMap((prev) => {
+          const next = new Map(prev);
+          if (next.has(k)) next.set(k, {});
+          else next.delete(k);
+          return next;
+        });
+      }
+      setSaving(null);
+    } else if (scheduleMap.has(k)) {
+      const procs = await getProcessesForProfessional(selectedProf);
+      const unlinked = procs.filter((p) => {
+        for (const [, v] of scheduleMap) {
+          if (v.process_id === p.id) return false;
+        }
+        return true;
+      });
+      setAvailableProcesses(unlinked);
+      setLinkModal({ date, time });
     } else {
-      ok = await upsertScheduleSlots(selectedProf, [{ date, start_time: time }]);
+      setSaving(k);
+      const ok = await upsertScheduleSlots(selectedProf, [{ date, start_time: time }]);
+      if (ok) {
+        setScheduleMap((prev) => {
+          const next = new Map(prev);
+          next.set(k, {});
+          return next;
+        });
+      }
+      setSaving(null);
     }
+  };
 
+  const confirmLink = async (processId: string) => {
+    if (!linkModal || !selectedProf) return;
+    setLinking(true);
+    const ok = await toggleSlotProcessLink(selectedProf, linkModal.date, linkModal.time, processId);
     if (ok) {
-      setSchedules((prev) => {
-        const next = new Set(prev);
-        if (isAvailable) next.delete(k);
-        else next.add(k);
+      const k = key(linkModal.date, linkModal.time);
+      const proc = availableProcesses.find((p) => p.id === processId);
+      setScheduleMap((prev) => {
+        const next = new Map(prev);
+        next.set(k, { process_id: processId, protocolo: proc?.protocolo, cliente_nome: proc?.cliente_nome });
         return next;
       });
     }
-    setSaving(false);
-    setToggling(null);
+    setLinking(false);
+    setLinkModal(null);
+    setAvailableProcesses([]);
   };
 
   const prevMonth = () => {
@@ -145,7 +190,7 @@ const AgendaBlock: React.FC = () => {
               <tr>
                 <th className="sticky left-0 bg-white z-10 p-2 text-left font-black text-gray-500 uppercase tracking-wider min-w-[60px]">Horário</th>
                 {days.map((d, i) => (
-                  <th key={i} className="p-2 text-center font-black text-gray-500 uppercase tracking-wider min-w-[80px]">
+                  <th key={i} className="p-2 text-center font-black text-gray-500 uppercase tracking-wider min-w-[100px]">
                     <div>{WEEKDAY_NAMES[d.getDay() - 1]}</div>
                     <div className="text-sm text-gray-800">{d.getDate()}</div>
                   </th>
@@ -159,26 +204,38 @@ const AgendaBlock: React.FC = () => {
                   {days.map((d, i) => {
                     const dateStr = formatDate(d);
                     const k = key(dateStr, time);
-                    const isAvailable = schedules.has(k);
-                    const isToggling = toggling === k;
+                    const slot = scheduleMap.get(k);
+                    const isSaving = saving === k;
+
+                    let bgClass = 'bg-gray-50 hover:bg-gray-100';
+                    let content: React.ReactNode = <X className="h-3 w-3 text-gray-300" />;
+                    let title = 'Indisponível';
+
+                    if (slot?.process_id) {
+                      bgClass = 'bg-sky-100 hover:bg-sky-200';
+                      content = (
+                        <span className="text-[10px] font-bold text-sky-800 leading-tight truncate max-w-[90px] block">
+                          {slot.protocolo || 'Processo'}
+                        </span>
+                      );
+                      title = `${slot.protocolo || 'Processo'} — ${slot.cliente_nome || ''}`;
+                    } else if (scheduleMap.has(k)) {
+                      bgClass = 'bg-emerald-100 hover:bg-emerald-200';
+                      content = <Check className="h-3 w-3 text-emerald-600" />;
+                      title = 'Disponível (clique para vincular processo)';
+                    }
+
                     return (
                       <td key={i} className="p-1">
                         <button
-                          onClick={() => toggleSlot(dateStr, time)}
-                          disabled={saving && isToggling}
-                          className={`w-full h-8 rounded-lg flex items-center justify-center transition-all text-xs font-bold ${
-                            isAvailable
-                              ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                              : 'bg-gray-50 text-gray-300 hover:bg-gray-100'
-                          } ${isToggling ? 'opacity-50' : ''}`}
+                          onClick={() => handleSlotClick(dateStr, time)}
+                          disabled={!!saving}
+                          title={title}
+                          className={`w-full h-10 rounded-lg flex items-center justify-center transition-all ${bgClass} ${isSaving ? 'opacity-50' : ''}`}
                         >
-                          {isToggling ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : isAvailable ? (
-                            <Check className="h-3 w-3" />
-                          ) : (
-                            <X className="h-3 w-3" />
-                          )}
+                          {isSaving ? (
+                            <Loader2 className="h-3 w-3 animate-spin text-gray-500" />
+                          ) : content}
                         </button>
                       </td>
                     );
@@ -191,10 +248,52 @@ const AgendaBlock: React.FC = () => {
       )}
 
       <div className="mt-4 flex items-center gap-4 text-xs text-gray-500">
-        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-emerald-100 inline-block" /> Disponível</span>
+        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-emerald-100 inline-block border border-emerald-300" /> Disponível</span>
+        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-sky-100 inline-block border border-sky-300" /> Com processo</span>
         <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-gray-50 inline-block border border-gray-200" /> Indisponível</span>
-        <span className="text-gray-400">| Clique no horário para alternar disponibilidade</span>
+        <span className="text-gray-400">| Clique para alternar</span>
       </div>
+
+      {linkModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => { if (!linking) setLinkModal(null); }}>
+          <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-black uppercase tracking-wider mb-4">Vincular Processo</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Horário: <strong>{linkModal.date}</strong> às <strong>{linkModal.time}</strong>
+            </p>
+            {availableProcesses.length === 0 ? (
+              <p className="text-sm text-gray-500 mb-4">Nenhum processo disponível para este profissional.</p>
+            ) : (
+              <div className="space-y-2 max-h-60 overflow-y-auto mb-4">
+                {availableProcesses.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => confirmLink(p.id)}
+                    disabled={linking}
+                    className="w-full text-left p-3 rounded-xl border border-gray-200 hover:border-sky-300 hover:bg-sky-50 transition-all flex items-center gap-3 disabled:opacity-50"
+                  >
+                    <Briefcase className="h-4 w-4 text-sky-600 flex-shrink-0" />
+                    <div>
+                      <div className="font-bold text-sm text-gray-800">{p.protocolo}</div>
+                      <div className="text-xs text-gray-500">{p.cliente_nome}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="flex justify-end gap-2">
+              {linking && <Loader2 className="h-4 w-4 animate-spin text-sky-600" />}
+              <button
+                onClick={() => setLinkModal(null)}
+                disabled={linking}
+                className="px-4 py-2 text-sm font-bold rounded-lg bg-gray-100 hover:bg-gray-200 transition-all disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
