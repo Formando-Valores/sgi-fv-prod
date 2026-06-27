@@ -360,6 +360,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [membersError, setMembersError] = useState('');
   const [memberActionFeedback, setMemberActionFeedback] = useState<{ type: 'success' | 'warning' | 'error'; message: string } | null>(null);
   const [editingMemberUserId, setEditingMemberUserId] = useState<string | null>(null);
+  
+  // User creation loading overlay
+  const [userCreationStatus, setUserCreationStatus] = useState<string | null>(null);
   const [clientsData, setClientsData] = useState<ClientProfileView[]>([]);
   const [clientsLoading, setClientsLoading] = useState(false);
   const [clientsError, setClientsError] = useState('');
@@ -2148,6 +2151,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const normalizedEmail = sanitizeDisplayValue(newAdminEmail);
     const shouldLookupProfileByEmail = !targetUserId && normalizedEmail && normalizedEmail !== '-';
 
+    setUserCreationStatus('Verificando email...');
+
     let existingProfile: { id?: string; email?: string | null } | null = null;
     let profileLookupError: { message?: string } | null = null;
 
@@ -2163,6 +2168,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     }
 
     if (profileLookupError) {
+      setUserCreationStatus(null);
       alert('Erro ao buscar usuário no banco. Tente novamente.');
       return;
     }
@@ -2176,9 +2182,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       const supabaseUrl = String(import.meta.env.VITE_SUPABASE_URL ?? '').trim();
       const anonKey = String(import.meta.env.VITE_SUPABASE_ANON_KEY ?? '').trim();
       if (!supabaseUrl || !anonKey) {
+        setUserCreationStatus(null);
         alert('Erro de configuração do ambiente.');
         return;
       }
+      setUserCreationStatus('Criando conta no sistema…');
       try {
         const response = await fetch(`${supabaseUrl}/functions/v1/${SUPABASE_EDGE_FUNCTIONS.CREATE_USER}`, {
           method: 'POST',
@@ -2198,6 +2206,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         });
         const result = await response.json();
         if (!response.ok) {
+          setUserCreationStatus(null);
           alert(`Erro ao criar usuário: ${result.error || 'desconhecido'}`);
           return;
         }
@@ -2207,10 +2216,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         }
         setNewAdminPassword('');
       } catch (fetchErr: any) {
+        setUserCreationStatus(null);
         alert(`Erro ao comunicar com o servidor: ${fetchErr?.message || 'desconhecido'}`);
         return;
       }
     } else if (!targetUserId && !existingProfile?.id) {
+      setUserCreationStatus(null);
       alert('Usuário não encontrado no sistema. Informe uma senha para criar um novo cadastro.');
       return;
     }
@@ -2218,9 +2229,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     targetUserId = targetUserId || existingProfile?.id || null;
 
     if (!targetUserId) {
+      setUserCreationStatus(null);
       alert('Não foi possível identificar o usuário selecionado para atualização.');
       return;
     }
+
+    setUserCreationStatus('Vinculando à organização…');
 
     const orgRole = mapAccessLevelToOrgRole(newAccessLevel);
 
@@ -2252,10 +2266,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       if (isPermissionError) {
         membershipWarning = 'Nível atualizado no perfil, mas o vínculo em org_members foi bloqueado por permissão.';
       } else {
+        setUserCreationStatus(null);
         alert('Erro ao salvar vínculo na tabela org_members.');
         return;
       }
     }
+
+    setUserCreationStatus('Atualizando perfil…');
 
     const { error: profileUpdateError } = await supabase
       .from('profiles')
@@ -2270,6 +2287,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     if (profileUpdateError) {
       console.warn('handleCreateUser: profiles.update() falhou —', profileUpdateError.message);
     }
+
+    setUserCreationStatus('Finalizando…');
 
     setUsers((prev) => {
       const found = prev.find((user) => user.id === targetUserId || user.email === normalizedEmail);
@@ -2312,6 +2331,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     setNewAdminOrgId(selectedOrg.id);
     setNewAccessLevel('Usuário Sênior');
     setEditingMemberUserId(null);
+    setUserCreationStatus(null);
     await fetchOrgMembers();
     alert(membershipWarning || 'Membro cadastrado/atualizado com sucesso.');
   };
@@ -5345,6 +5365,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                   </div>
                 </form>
              </div>
+          </div>
+        </div>
+      )}
+
+      {userCreationStatus && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
+        }}>
+          <div style={{
+            backgroundColor: 'white', borderRadius: 24, padding: '40px 48px',
+            boxShadow: '0 24px 64px rgba(0,0,0,0.25)', textAlign: 'center',
+            maxWidth: 400, width: '90%',
+          }}>
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-200 border-t-blue-600 mx-auto mb-5" />
+            <p style={{ color: '#1f2937', fontWeight: 700, fontSize: 15, margin: 0 }}>
+              {userCreationStatus}
+            </p>
           </div>
         </div>
       )}
