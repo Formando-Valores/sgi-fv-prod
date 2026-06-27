@@ -555,9 +555,15 @@ const ProcessList: React.FC = () => {
             ) : (
               <form onSubmit={handleCreate} className="p-6 space-y-4">
                 <div>
-                  <label className="block text-sm font-bold text-slate-300 mb-2">Título *</label>
+                  <label className="block text-sm font-bold text-slate-300 mb-2">
+                    Título *
+                    <span className={`ml-2 text-[10px] font-normal ${formData.titulo.length >= 90 ? 'text-red-400' : 'text-slate-500'}`}>
+                      {formData.titulo.length}/100
+                    </span>
+                  </label>
                   <input
                     type="text"
+                    maxLength={100}
                     value={formData.titulo}
                     onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
                     className="w-full px-4 py-3 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none"
@@ -566,9 +572,15 @@ const ProcessList: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-slate-300 mb-2">Nome do Cliente</label>
+                  <label className="block text-sm font-bold text-slate-300 mb-2">
+                    Nome do Cliente
+                    <span className={`ml-2 text-[10px] font-normal ${formData.cliente_nome.length >= 90 ? 'text-red-400' : 'text-slate-500'}`}>
+                      {formData.cliente_nome.length}/100
+                    </span>
+                  </label>
                   <input
                     type="text"
+                    maxLength={100}
                     value={formData.cliente_nome}
                     onChange={(e) => setFormData({ ...formData, cliente_nome: e.target.value })}
                     className="w-full px-4 py-3 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none"

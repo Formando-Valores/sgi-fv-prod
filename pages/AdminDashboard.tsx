@@ -4943,9 +4943,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                   </div>
 
                   <div className="md:col-span-2">
-                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Título do processo</label>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">
+                      Título do processo
+                      <span className={`ml-2 text-[10px] font-normal ${newProcessForm.title.length >= 90 ? 'text-red-500' : 'text-gray-400'}`}>
+                        {newProcessForm.title.length}/100
+                      </span>
+                    </label>
                     <input
                       type="text"
+                      maxLength={100}
                       value={newProcessForm.title}
                       onChange={(event) => setNewProcessForm((prev) => ({ ...prev, title: event.target.value }))}
                       className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
@@ -4954,9 +4960,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Cliente</label>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">
+                      Cliente
+                      <span className={`ml-2 text-[10px] font-normal ${newProcessForm.clientName.length >= 90 ? 'text-red-500' : 'text-gray-400'}`}>
+                        {newProcessForm.clientName.length}/100
+                      </span>
+                    </label>
                     <input
                       type="text"
+                      maxLength={100}
                       value={newProcessForm.clientName}
                       onChange={(event) => setNewProcessForm((prev) => ({ ...prev, clientName: event.target.value }))}
                       className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
