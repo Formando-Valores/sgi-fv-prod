@@ -295,103 +295,6 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
           organizationName: selectedOrganization?.name,
         };
 
-        setUsers((prev) => [...prev, newUser]);
-        setCurrentUser(newUser);
-
-        // Auto-cria processo de filiacao para pagamento da taxa anual
-        let membershipProcessId: string | null = null;
-        try {
-          const membershipFees = calcAssociationFees(0, 'membership');
-          const { data: processData } = await supabase.from('processes').insert({
-            org_id: formData.organizationId,
-            titulo: `Filiação - ${formData.name}`,
-            status: 'cadastro',
-            cliente_user_id: data.user.id,
-            cliente_nome: formData.name,
-            cliente_documento: formData.documentId || null,
-            cliente_contato: formData.phone || null,
-            unidade_atendimento: formData.unit,
-            origem_canal: 'cadastro',
-            os_value: ASSOCIATION_ANNUAL_FEE,
-            process_status: 'aguardando_pagamento',
-            association_fees: membershipFees,
-          }).select('id').single();
-          membershipProcessId = processData?.id ?? null;
-        } catch (membershipProcessErr) {
-          console.warn('[register] erro ao criar processo de filiação automática', membershipProcessErr);
-        }
-
-        let paymentUrl = '';
-        if (membershipProcessId) {
-          try {
-            const session = await createCheckoutSession({
-              amount: ASSOCIATION_ANNUAL_FEE * 100,
-              currency: 'brl',
-              successUrl: `${window.location.origin}/#/payments/success?processId=${membershipProcessId}`,
-              cancelUrl: `${window.location.origin}/#/payments/cancel?processId=${membershipProcessId}`,
-              processId: membershipProcessId,
-              clientId: data.user.id,
-              serviceId: '',
-              organizationId: formData.organizationId,
-              areaId: '',
-              sectorId: '',
-            });
-            paymentUrl = session.url || '';
-          } catch (checkoutErr) {
-            console.warn('[register] erro ao criar checkout session para email', checkoutErr);
-          }
-        }
-
-        const loginUrl = `${window.location.origin}${window.location.pathname.includes('#') ? '' : '/#/login'}`;
-        const credentialPayload: Record<string, string> = {
-          email: formData.email,
-          fullName: formData.name,
-          source: 'cadastro interno',
-          profile: 'USUÁRIO OPERADOR',
-          temporaryPassword: formData.password,
-          loginUrl,
-        };
-        if (paymentUrl) {
-          credentialPayload.paymentUrl = paymentUrl;
-        }
-
-        const { data: credentialEmailData, error: credentialEmailError } = await supabase.functions.invoke(
-          SUPABASE_EDGE_FUNCTIONS.SEND_ACCESS_CREDENTIALS,
-          { body: credentialPayload }
-        );
-
-        if (credentialEmailError || credentialEmailData?.success === false) {
-          console.warn('[register] envio via supabase.functions.invoke falhou, tentando fallback HTTP direto', {
-            credentialEmailError,
-            credentialEmailData,
-          });
-
-          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-          const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-          if (supabaseUrl && supabaseAnonKey) {
-            const fallbackResponse = await fetch(`${supabaseUrl}/functions/v1/${SUPABASE_EDGE_FUNCTIONS.SEND_ACCESS_CREDENTIALS}`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'apikey': supabaseAnonKey,
-                'Authorization': `Bearer ${supabaseAnonKey}`,
-              },
-              body: JSON.stringify(credentialPayload),
-            });
-
-            if (!fallbackResponse.ok) {
-              const fallbackBody = await fallbackResponse.text();
-              console.warn('[register] fallback HTTP direto também falhou', {
-                status: fallbackResponse.status,
-                body: fallbackBody,
-              });
-            }
-          } else {
-            console.warn('[register] fallback HTTP não executado: VITE_SUPABASE_URL/VITE_SUPABASE_ANON_KEY ausentes');
-          }
-        }
-
         setSuccess(true);
         setTimeout(() => goToRoute('/login'), 1200);
       }
@@ -407,11 +310,12 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gray-50">
         <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-[0_16px_34px_rgba(15,23,42,0.08)] border border-gray-100 text-center">
-          <div className="w-16 h-16 bg-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CheckCircle2 className="w-8 h-8 text-white" />
+          <div className="w-16 h-16 bg-amber-500 rounded-full flex items-center justify-center mx-auto mb-4">
+            <ShieldCheck className="w-8 h-8 text-white" />
           </div>
-          <h2 className="text-xl font-bold text-gray-800 mb-2">Conta Criada!</h2>
-          <p className="text-gray-500">Redirecionando para o login...</p>
+          <h2 className="text-xl font-bold text-gray-800 mb-2">Cadastro Enviado!</h2>
+          <p className="text-gray-500 text-sm">Seu cadastro foi enviado para aprovação. Você receberá um e-mail quando for aprovado.</p>
+          <p className="text-gray-400 text-xs mt-2">Redirecionando para o login...</p>
         </div>
       </div>
     );
