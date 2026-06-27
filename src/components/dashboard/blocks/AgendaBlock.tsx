@@ -11,8 +11,8 @@ import {
 import type { ScheduleSlot } from '../../../lib/professionalSchedules';
 
 const TIME_SLOTS_BR = ['09:00','09:30','10:00','10:30','11:00','11:30','12:00','12:30','13:00','13:30','14:00','14:30'];
-const WEEKDAYS = [1, 2, 3, 4, 5];
 const WEEKDAY_NAMES = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex'];
+const WEEKDAY_NAMES_FULL = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
 type SlotInfo = {
@@ -21,10 +21,18 @@ type SlotInfo = {
   cliente_nome?: string | null;
 };
 
+type ViewMode = 'day' | 'week' | 'month';
+
+function getMondayOfWeek(d: Date) {
+  const date = new Date(d);
+  const day = date.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  date.setDate(date.getDate() + diff);
+  return date;
+}
+
 const AgendaBlock: React.FC = () => {
   const now = new Date();
-  const [year, setYear] = useState(now.getFullYear());
-  const [month, setMonth] = useState(now.getMonth());
   const [professionals, setProfessionals] = useState<{ id: string; nome_completo: string }[]>([]);
   const [selectedProf, setSelectedProf] = useState<string>('');
   const [scheduleMap, setScheduleMap] = useState<Map<string, SlotInfo>>(new Map());
@@ -35,23 +43,37 @@ const AgendaBlock: React.FC = () => {
   const [availableProcesses, setAvailableProcesses] = useState<{ id: string; protocolo: string; cliente_nome: string }[]>([]);
   const [linking, setLinking] = useState(false);
 
-  const selectedTimeSlots = TIME_SLOTS_BR;
+  const [view, setView] = useState<ViewMode>('week');
+  const [referenceDate, setReferenceDate] = useState<Date>(getMondayOfWeek(now));
 
-  const getDaysInMonth = useCallback(() => {
-    const days: Date[] = [];
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    for (let d = firstDay; d <= lastDay; d.setDate(d.getDate() + 1)) {
-      const dayOfWeek = d.getDay();
-      if (dayOfWeek >= 1 && dayOfWeek <= 5) {
-        days.push(new Date(d));
-      }
-    }
-    return days;
-  }, [year, month]);
+  const selectedTimeSlots = TIME_SLOTS_BR;
 
   const formatDate = (d: Date) => d.toISOString().split('T')[0];
   const key = (date: string, time: string) => `${date}|${time}`;
+
+  const getDays = useCallback(() => {
+    const days: Date[] = [];
+    if (view === 'day') {
+      const d = new Date(referenceDate);
+      const dow = d.getDay();
+      if (dow >= 1 && dow <= 5) days.push(d);
+    } else if (view === 'week') {
+      const mon = new Date(referenceDate);
+      for (let i = 0; i < 5; i++) {
+        const d = new Date(mon);
+        d.setDate(mon.getDate() + i);
+        days.push(d);
+      }
+    } else {
+      const firstDay = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 1);
+      const lastDay = new Date(referenceDate.getFullYear(), referenceDate.getMonth() + 1, 0);
+      for (let d = new Date(firstDay); d <= lastDay; d.setDate(d.getDate() + 1)) {
+        const dow = d.getDay();
+        if (dow >= 1 && dow <= 5) days.push(new Date(d));
+      }
+    }
+    return days;
+  }, [view, referenceDate]);
 
   useEffect(() => {
     getProfessionals().then((list) => {
@@ -63,7 +85,8 @@ const AgendaBlock: React.FC = () => {
   useEffect(() => {
     if (!selectedProf) return;
     setLoading(true);
-    const days = getDaysInMonth();
+    const days = getDays();
+    if (days.length === 0) { setLoading(false); setScheduleMap(new Map()); return; }
     const startDate = formatDate(days[0]);
     const endDate = formatDate(days[days.length - 1]);
 
@@ -77,7 +100,7 @@ const AgendaBlock: React.FC = () => {
       setScheduleMap(map_);
       setLoading(false);
     });
-  }, [selectedProf, year, month, getDaysInMonth]);
+  }, [selectedProf, view, referenceDate, getDays]);
 
   const handleSlotClick = async (date: string, time: string) => {
     if (!selectedProf) return;
@@ -138,23 +161,67 @@ const AgendaBlock: React.FC = () => {
     setAvailableProcesses([]);
   };
 
-  const prevMonth = () => {
-    if (month === 0) { setYear((y) => y - 1); setMonth(11); }
-    else setMonth((m) => m - 1);
+  const navigate = (dir: -1 | 1) => {
+    const d = new Date(referenceDate);
+    if (view === 'day') {
+      d.setDate(d.getDate() + dir);
+    } else if (view === 'week') {
+      d.setDate(d.getDate() + 7 * dir);
+    } else {
+      d.setMonth(d.getMonth() + dir);
+    }
+    setReferenceDate(d);
   };
 
-  const nextMonth = () => {
-    if (month === 11) { setYear((y) => y + 1); setMonth(0); }
-    else setMonth((m) => m + 1);
+  const goToday = () => {
+    const today = new Date();
+    if (view === 'week') setReferenceDate(getMondayOfWeek(today));
+    else if (view === 'day') setReferenceDate(today);
+    else setReferenceDate(today);
   };
 
-  const days = getDaysInMonth();
+  const handleViewChange = (newView: ViewMode) => {
+    const today = new Date();
+    if (newView === 'week') setReferenceDate(getMondayOfWeek(today));
+    else if (newView === 'day') setReferenceDate(today);
+    else setReferenceDate(today);
+    setView(newView);
+  };
+
+  const renderTitle = () => {
+    if (view === 'day') {
+      const d = referenceDate;
+      return `${WEEKDAY_NAMES_FULL[d.getDay()]}, ${d.getDate()} de ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+    }
+    if (view === 'week') {
+      const mon = referenceDate;
+      const sun = new Date(mon);
+      sun.setDate(mon.getDate() + 6);
+      return `Semana de ${mon.getDate()} ${MONTHS[mon.getMonth()]} a ${sun.getDate()} ${MONTHS[sun.getMonth()]} ${mon.getFullYear()}`;
+    }
+    return `${MONTHS[referenceDate.getMonth()]} ${referenceDate.getFullYear()}`;
+  };
+
+  const days = getDays();
 
   return (
     <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <h2 className="text-lg font-black uppercase tracking-wider">Agenda de Trabalho</h2>
         <div className="flex items-center gap-3">
+          <div className="flex bg-gray-100 rounded-lg p-0.5 text-xs font-bold">
+            {(['day', 'week', 'month'] as ViewMode[]).map((v) => (
+              <button
+                key={v}
+                onClick={() => handleViewChange(v)}
+                className={`px-3 py-1.5 rounded-md transition-all uppercase tracking-wider ${
+                  view === v ? 'bg-white shadow text-gray-800' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {v === 'day' ? 'Dia' : v === 'week' ? 'Semana' : 'Mês'}
+              </button>
+            ))}
+          </div>
           <select
             value={selectedProf}
             onChange={(e) => setSelectedProf(e.target.value)}
@@ -166,14 +233,20 @@ const AgendaBlock: React.FC = () => {
             ))}
           </select>
           <div className="flex items-center gap-1">
-            <button onClick={prevMonth} className="p-2 rounded-lg hover:bg-gray-100">
+            <button onClick={() => navigate(-1)} className="p-2 rounded-lg hover:bg-gray-100">
               <ChevronLeft className="h-5 w-5" />
             </button>
-            <span className="font-bold text-sm min-w-[160px] text-center">
-              {MONTHS[month]} {year}
+            <span className="font-bold text-sm min-w-[180px] text-center whitespace-nowrap">
+              {renderTitle()}
             </span>
-            <button onClick={nextMonth} className="p-2 rounded-lg hover:bg-gray-100">
+            <button onClick={() => navigate(1)} className="p-2 rounded-lg hover:bg-gray-100">
               <ChevronRight className="h-5 w-5" />
+            </button>
+            <button
+              onClick={goToday}
+              className="ml-1 px-3 py-1.5 text-xs font-bold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all"
+            >
+              Hoje
             </button>
           </div>
         </div>
@@ -183,6 +256,8 @@ const AgendaBlock: React.FC = () => {
         <p className="text-gray-500 text-center py-12 font-semibold">Selecione um profissional para ver a agenda.</p>
       ) : loading ? (
         <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>
+      ) : days.length === 0 ? (
+        <p className="text-gray-500 text-center py-12 font-semibold">Nenhum dia útil neste período.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-xs">
@@ -191,8 +266,8 @@ const AgendaBlock: React.FC = () => {
                 <th className="sticky left-0 bg-white z-10 p-2 text-left font-black text-gray-500 uppercase tracking-wider min-w-[60px]">Horário</th>
                 {days.map((d, i) => (
                   <th key={i} className="p-2 text-center font-black text-gray-500 uppercase tracking-wider min-w-[100px]">
-                    <div>{WEEKDAY_NAMES[d.getDay() - 1]}</div>
-                    <div className="text-sm text-gray-800">{d.getDate()}</div>
+                    <div>{view === 'day' ? '' : WEEKDAY_NAMES[d.getDay() - 1]}</div>
+                    <div className="text-sm text-gray-800">{d.getDate()}/{d.getMonth() + 1}</div>
                   </th>
                 ))}
               </tr>
@@ -251,7 +326,6 @@ const AgendaBlock: React.FC = () => {
         <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-emerald-100 inline-block border border-emerald-300" /> Disponível</span>
         <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-sky-100 inline-block border border-sky-300" /> Com processo</span>
         <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-gray-50 inline-block border border-gray-200" /> Indisponível</span>
-        <span className="text-gray-400">| Clique para alternar</span>
       </div>
 
       {linkModal && (
