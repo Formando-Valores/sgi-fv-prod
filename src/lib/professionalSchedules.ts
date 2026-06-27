@@ -103,13 +103,35 @@ export async function deleteScheduleSlots(
 export async function getProfessionals(): Promise<
   { id: string; nome_completo: string; email: string }[]
 > {
-  const { data: profiles, error } = await supabase
-    .from('profiles')
-    .select('id, nome_completo, email')
-    .neq('role', 'CLIENT');
+  const { data: defaultOrg } = await supabase
+    .from('organizations')
+    .select('id')
+    .eq('slug', 'default')
+    .single();
+
+  if (!defaultOrg) return [];
+
+  const { data: members, error } = await supabase
+    .from('org_members')
+    .select('user_id')
+    .eq('org_id', defaultOrg.id)
+    .neq('role', 'client');
 
   if (error) {
     console.error('[professionalSchedules] getProfessionals error:', error);
+    return [];
+  }
+
+  const userIds = [...new Set((members || []).map((m) => m.user_id))];
+  if (userIds.length === 0) return [];
+
+  const { data: profiles, error: profileError } = await supabase
+    .from('profiles')
+    .select('id, nome_completo, email')
+    .in('id', userIds);
+
+  if (profileError) {
+    console.error('[professionalSchedules] getProfessionals profile error:', profileError);
     return [];
   }
 
