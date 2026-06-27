@@ -1,0 +1,10 @@
+{
+  "recommendations": [
+    "sst-dev.opencode-v2"
+  ],
+  "unwantedRecommendations": [
+    "sst-dev.opencode",
+    "bascodes.opencode-inofficial",
+    "tanishqkancharla.opencode-vscode"
+  ]
+}

@@ -2,7 +2,7 @@ import type { CapabilityMap, OrgRole, User, UserContext } from '../../types';
 
 export type SystemHierarchy = 'admin' | 'senior' | 'pleno' | 'operador' | 'cliente';
 
-export type PermissionModule = 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes' | 'financeiro' | 'relatorios';
+export type PermissionModule = 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes' | 'financeiro' | 'relatorios' | 'agenda';
 export type PermissionAction = 'view' | 'view_own' | 'view_all' | 'create' | 'update' | 'delete' | 'manage';
 export type PermissionScope = PermissionModule;
 
@@ -136,7 +136,7 @@ const CAPABILITIES_BY_HIERARCHY: Record<SystemHierarchy, PermissionCapabilities>
 
 const PERMISSION_MATRIX_BY_HIERARCHY: Record<SystemHierarchy, PermissionMatrix> = {
   admin: {
-    modules: ['dashboard', 'processos', 'clientes', 'configuracoes', 'organizacoes', 'financeiro', 'relatorios'],
+    modules: ['dashboard', 'processos', 'clientes', 'configuracoes', 'organizacoes', 'financeiro', 'relatorios', 'agenda'],
     actionsByScope: {
       dashboard: ['view', 'view_all'],
       processos: ['view', 'view_all', 'create', 'update', 'delete', 'manage'],
@@ -145,6 +145,7 @@ const PERMISSION_MATRIX_BY_HIERARCHY: Record<SystemHierarchy, PermissionMatrix> 
       organizacoes: ['view', 'view_all', 'create', 'update', 'delete', 'manage'],
       financeiro: ['view', 'view_all', 'manage'],
       relatorios: ['view', 'view_all'],
+      agenda: ['view', 'view_all', 'manage'],
     },
   },
   senior: {

@@ -20,6 +20,7 @@ import ProcessesBlock from '../src/components/dashboard/blocks/ProcessesBlock';
 import ClientsBlock from '../src/components/dashboard/blocks/ClientsBlock';
 import OrganizationsBlock from '../src/components/dashboard/blocks/OrganizationsBlock';
 import ClientJourneyBlock from '../src/components/dashboard/blocks/ClientJourneyBlock';
+import AgendaBlock from '../src/components/dashboard/blocks/AgendaBlock';
 import ClientProcessProgressPanel, {
   ClientProcessProgressHistoryItem,
 } from '../src/components/dashboard/ClientProcessProgressPanel';
@@ -423,7 +424,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
   const location = useLocation();
   const navigate = useNavigate();
-  const validSections = ['dashboard', 'processos', 'clientes', 'configuracoes', 'organizacoes', 'relatorios'] as const;
+  const validSections = ['dashboard', 'processos', 'clientes', 'configuracoes', 'organizacoes', 'relatorios', 'agenda'] as const;
   type DashboardSection = typeof validSections[number];
   type DashboardPresetFilter =
     | 'usuarios_cadastrados'
@@ -508,6 +509,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     configuracoes: !can('manage', 'configuracoes', permissionSubject),
     organizacoes: !can('manage', 'organizacoes', permissionSubject),
     relatorios: !can('view_all', 'relatorios', permissionSubject),
+    agenda: !can('manage', 'agenda', permissionSubject),
   } as const;
 
   const sidebarLinks = [
@@ -517,15 +519,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     { to: '/dashboard/configuracoes', label: 'Configurações', icon: Settings, visible: allowedModules.includes('configuracoes') },
     { to: '/dashboard/organizacoes', label: 'Organizações', icon: Building2, visible: allowedModules.includes('organizacoes') },
     { to: '/dashboard/relatorios', label: 'Relatórios', icon: FileBarChart2, visible: allowedModules.includes('relatorios') },
+    { to: '/dashboard/agenda', label: 'Agenda', icon: Calendar, visible: allowedModules.includes('agenda') },
   ].filter((item) => item.visible);
 
-  const sectionModuleMap: Partial<Record<DashboardSection, 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes' | 'relatorios'>> = {
+  const sectionModuleMap: Partial<Record<DashboardSection, 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes' | 'relatorios' | 'agenda'>> = {
     dashboard: 'dashboard',
     processos: 'processos',
     clientes: 'clientes',
     configuracoes: 'configuracoes',
     organizacoes: 'organizacoes',
     relatorios: 'relatorios',
+    agenda: 'agenda',
   };
 
   const canAccessSection = (sectionName: DashboardSection) => {
@@ -4121,6 +4125,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                 </table>
               </div>
            </div>
+        </div>
+      ) : currentSection === 'agenda' ? (
+        <div className="max-w-full bg-white border border-gray-100 rounded-2xl shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
+          <AgendaBlock />
         </div>
       ) : null}
 
