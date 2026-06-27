@@ -29,6 +29,7 @@ import { createCheckoutSession } from '../src/lib/stripe';
 import { getPaymentStatusUi } from '../src/lib/paymentStatus';
 import { getServicesByUnit, getGroupsByUnit, getServicesByGroup, SERVICE_CATALOG, calcAssociationFees, type AssociationFeeItem } from '../src/lib/servicesCatalog';
 import { uploadPaymentProof, validatePaymentProof, getPaymentProofs, type PaymentProof } from '../src/lib/paymentProofs';
+import { SUPABASE_EDGE_FUNCTIONS } from '../src/lib/supabaseFunctions';
 
 type AccessLevel = 'Administrador' | 'Usuário Sênior' | 'Usuário Pleno' | 'Operador' | 'Cliente';
 
@@ -315,6 +316,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   // Management tab states
   const [newAdminName, setNewAdminName] = useState('');
   const [newAdminEmail, setNewAdminEmail] = useState('');
+  const [newAdminPassword, setNewAdminPassword] = useState('');
   const [newAccessLevel, setNewAccessLevel] = useState<AccessLevel>('Usuário Sênior');
   const [newAdminHierarchy, setNewAdminHierarchy] = useState<Hierarchy>(Hierarchy.FULL);
   const [editingHierarchyUser, setEditingHierarchyUser] = useState<User | null>(null);
@@ -2167,8 +2169,45 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     }
 
     if (!targetUserId && !existingProfile?.id) {
-      alert('Não foi possível vincular este usuário à organização porque o ID não está válido no Auth. Peça para o usuário concluir cadastro/login no Supabase e tente novamente.');
-      return;
+      // User not found in profiles — try creating via edge function
+      if (!newAdminPassword) {
+        alert('Usuário não encontrado no sistema. Informe uma senha para criar um novo cadastro.');
+        return;
+      }
+      const supabaseUrl = String(import.meta.env.VITE_SUPABASE_URL ?? '').trim();
+      const anonKey = String(import.meta.env.VITE_SUPABASE_ANON_KEY ?? '').trim();
+      if (!supabaseUrl || !anonKey) {
+        alert('Erro de configuração do ambiente.');
+        return;
+      }
+      try {
+        const response = await fetch(`${supabaseUrl}/functions/v1/${SUPABASE_EDGE_FUNCTIONS.CREATE_USER}`, {
+          method: 'POST',
+          headers: {
+            apikey: anonKey,
+            Authorization: `Bearer ${anonKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: normalizedEmail,
+            password: newAdminPassword,
+            name: sanitizeDisplayValue(newAdminName),
+            role: newAccessLevel,
+            org_id: newAdminOrgId,
+            unit: ServiceUnit.ADMINISTRATIVO,
+          }),
+        });
+        const result = await response.json();
+        if (!response.ok) {
+          alert(`Erro ao criar usuário: ${result.error || 'desconhecido'}`);
+          return;
+        }
+        targetUserId = result.user_id;
+        setNewAdminPassword('');
+      } catch (fetchErr: any) {
+        alert(`Erro ao comunicar com o servidor: ${fetchErr?.message || 'desconhecido'}`);
+        return;
+      }
     }
 
     targetUserId = targetUserId || existingProfile?.id || null;
@@ -2264,6 +2303,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
     setNewAdminEmail('');
     setNewAdminName('');
+    setNewAdminPassword('');
     setNewAdminOrgId(selectedOrg.id);
     setNewAccessLevel('Usuário Sênior');
     setEditingMemberUserId(null);
@@ -3897,17 +3937,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                       className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold" 
                     />
                  </div>
-                 <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase block mb-1">E-mail</label>
-                    <input 
-                      required
-                      type="email"
-                      placeholder="admin@sgi.com"
-                      value={newAdminEmail}
-                      onChange={e => setNewAdminEmail(e.target.value)}
-                      className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold" 
-                    />
-                 </div>
+                  <div>
+                     <label className="text-xs font-bold text-gray-500 uppercase block mb-1">E-mail</label>
+                     <input 
+                       required
+                       type="email"
+                       placeholder="admin@sgi.com"
+                       value={newAdminEmail}
+                       onChange={e => setNewAdminEmail(e.target.value)}
+                       className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold" 
+                     />
+                  </div>
+                  <div>
+                     <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Senha <span className="text-[10px] font-normal text-gray-400">(obrigatório se o usuário não existir)</span></label>
+                     <input 
+                       type="password"
+                       placeholder="mín. 6 caracteres"
+                       value={newAdminPassword}
+                       onChange={e => setNewAdminPassword(e.target.value)}
+                       className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold" 
+                     />
+                     <p className="text-[11px] text-gray-400 mt-1">Se o e-mail já estiver cadastrado, a senha será ignorada.</p>
+                  </div>
                  <div>
                     <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Perfil de Acesso</label>
                     <select
