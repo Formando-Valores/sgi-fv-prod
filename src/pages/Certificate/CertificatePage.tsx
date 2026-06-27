@@ -22,9 +22,17 @@ const CertificatePage: React.FC = () => {
       return;
     }
     const fetchData = async () => {
+      const { data: authUser } = await supabase.auth.getUser();
+      if (!authUser?.user) {
+        setError('Faça login no sistema para acessar o certificado.');
+        setLoading(false);
+        return;
+      }
+      const currentUserId = authUser.user.id;
+
       const { data: process, error: err } = await supabase
         .from('processes')
-        .select('cliente_nome, protocolo, created_at, services_selected')
+        .select('cliente_nome, protocolo, created_at, services_selected, cliente_user_id, org_id')
         .eq('id', processId)
         .single();
 
@@ -32,6 +40,22 @@ const CertificatePage: React.FC = () => {
         setError('Processo não encontrado.');
         setLoading(false);
         return;
+      }
+
+      if (process.cliente_user_id !== currentUserId) {
+        const { data: membership } = await supabase
+          .from('org_members')
+          .select('role')
+          .eq('user_id', currentUserId)
+          .eq('org_id', process.org_id)
+          .in('role', ['owner', 'admin'])
+          .maybeSingle();
+
+        if (!membership) {
+          setError('Você não tem permissão para acessar este certificado.');
+          setLoading(false);
+          return;
+        }
       }
 
       const servicos = (process.services_selected as any[]) || [];
