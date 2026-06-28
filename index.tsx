@@ -188,6 +188,11 @@ async function bootstrap() {
       )
     );
 
+    // Registra service worker para PWA
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+
     console.log('[MAIN] ✅ root.render() called successfully');
     console.log('[MAIN] 🎉 Application render initiated!');
     console.log('='.repeat(60));
