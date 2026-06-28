@@ -23,6 +23,7 @@ import CertificatePage from './src/pages/Certificate/CertificatePage';
 import { ProcessStatus, ServiceUnit, User, UserRole } from './types';
 import { supabase } from './supabase';
 import { getAllowedModules, resolvePermissions } from './src/lib/permissions';
+import { ToastProvider } from './src/contexts/ToastContext';
 
 const RootApp: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -277,6 +278,7 @@ const RootApp: React.FC = () => {
   return (
     <HashRouter>
       <div className="min-h-screen bg-gray-50 text-gray-800 font-['Inter',sans-serif]">
+        <ToastProvider>
         <Routes>
           <Route
             path="/login"
@@ -298,6 +300,7 @@ const RootApp: React.FC = () => {
           <Route path="/certificate" element={<CertificatePage />} />
           <Route path="*" element={authBootstrapping ? authLoadingScreen : <Navigate to="/login" />} />
         </Routes>
+        </ToastProvider>
       </div>
     </HashRouter>
   );

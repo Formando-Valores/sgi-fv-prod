@@ -28,6 +28,7 @@ import ReportsPage from '../src/pages/Reports/ReportsPage';
 import IbanManagementSection from '../src/components/dashboard/blocks/IbanManagementSection';
 import ServicesSection from '../src/components/dashboard/blocks/ServicesSection';
 import CommunicationBlock from '../src/components/dashboard/blocks/CommunicationBlock';
+import { useToast } from '../src/contexts/ToastContext';
 import { createCheckoutSession } from '../src/lib/stripe';
 import { getPaymentStatusUi } from '../src/lib/paymentStatus';
 import { getServicesByUnit, getGroupsByUnit, getServicesByGroup, SERVICE_CATALOG, calcAssociationFees, ASSOCIATION_ANNUAL_FEE, type AssociationFeeItem } from '../src/lib/servicesCatalog';
@@ -303,6 +304,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [newAccessLevel, setNewAccessLevel] = useState<AccessLevel>('Usuário Sênior');
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { showToast } = useToast();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [organizationName, setOrganizationName] = useState('');
   const [organizationIsActive, setOrganizationIsActive] = useState(true);
@@ -321,7 +323,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [showCreateProcessModal, setShowCreateProcessModal] = useState(false);
   const [creatingProcess, setCreatingProcess] = useState(false);
   const [processVisualOverrides, setProcessVisualOverrides] = useState<ProcessVisualOverrides>({});
-  const [processActionFeedback, setProcessActionFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [newProcessForm, setNewProcessForm] = useState({
     organizationId: '',
     title: '',
@@ -341,7 +342,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [orgMembers, setOrgMembers] = useState<OrgMemberView[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
   const [membersError, setMembersError] = useState('');
-  const [memberActionFeedback, setMemberActionFeedback] = useState<{ type: 'success' | 'warning' | 'error'; message: string } | null>(null);
   const [editingMemberUserId, setEditingMemberUserId] = useState<string | null>(null);
   
   // User creation loading overlay
@@ -1505,27 +1505,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
   const handleCreateProcess = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setProcessActionFeedback(null);
-
     const selectedOrganization = organizations.find((organization) => organization.id === newProcessForm.organizationId);
 
     if (!selectedOrganization) {
-      setProcessActionFeedback({ type: 'error', message: 'Selecione uma organização válida para criar o processo.' });
+      showToast({ type: 'error', message: 'Selecione uma organização válida para criar o processo.' });
       return;
     }
 
     const { allowedOrgIds, hasGlobalScope, error: scopeError } = await resolveOrganizationScope();
     if (scopeError) {
-      setProcessActionFeedback({ type: 'error', message: 'Não foi possível validar o escopo da organização.' });
+      showToast({ type: 'error', message: 'Não foi possível validar o escopo da organização.' });
       return;
     }
     if (!hasGlobalScope && !allowedOrgIds.has(selectedOrganization.id)) {
-      setProcessActionFeedback({ type: 'error', message: 'Você não possui permissão para criar processo nesta organização.' });
+      showToast({ type: 'error', message: 'Você não possui permissão para criar processo nesta organização.' });
       return;
     }
 
     if (!sanitizeDisplayValue(newProcessForm.clientName)) {
-      setProcessActionFeedback({ type: 'error', message: 'Informe o nome do cliente para criar o processo.' });
+      showToast({ type: 'error', message: 'Informe o nome do cliente para criar o processo.' });
       return;
     }
 
@@ -1576,7 +1574,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
     if (processInsertError || !createdProcess) {
       setCreatingProcess(false);
-      setProcessActionFeedback({ type: 'error', message: `Não foi possível criar o processo: ${processInsertError?.message || processInsertError?.details || 'erro desconhecido'}` });
+      showToast({ type: 'error', message: `Não foi possível criar o processo: ${processInsertError?.message || processInsertError?.details || 'erro desconhecido'}` });
       return;
     }
 
@@ -1607,7 +1605,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     });
 
     setDbProcesses((prev) => [normalizeProcessOptionalFields(processToAdd as DbProcess), ...prev]);
-    setProcessActionFeedback({ type: 'success', message: 'Processo criado com sucesso e adicionado à lista.' });
+    showToast({ type: 'success', message: 'Processo criado com sucesso e adicionado à lista.' });
     setCreatingProcess(false);
     setShowCreateProcessModal(false);
     resetNewProcessForm();
@@ -1915,15 +1913,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const confirmed = window.confirm(`Deseja realmente excluir o processo ${process.protocol}? Esta ação não pode ser desfeita.`);
     if (!confirmed) return;
 
-    setProcessActionFeedback(null);
-
     const { error: deleteEventsError } = await supabase
       .from('process_events')
       .delete()
       .eq('process_id', processId);
 
     if (deleteEventsError) {
-      setProcessActionFeedback({ type: 'error', message: 'Não foi possível excluir os eventos do processo.' });
+      showToast({ type: 'error', message: 'Não foi possível excluir os eventos do processo.' });
       return;
     }
 
@@ -1933,7 +1929,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       .eq('id', processId);
 
     if (deleteProcessError) {
-      setProcessActionFeedback({ type: 'error', message: 'Não foi possível excluir o processo selecionado.' });
+      showToast({ type: 'error', message: 'Não foi possível excluir o processo selecionado.' });
       return;
     }
 
@@ -1945,7 +1941,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       setSelectedUser(null);
     }
 
-    setProcessActionFeedback({ type: 'success', message: `Processo ${process.protocol} excluído com sucesso.` });
+    showToast({ type: 'success', message: `Processo ${process.protocol} excluído com sucesso.` });
   };
 
   const fetchOrgMembers = async () => {
@@ -2454,7 +2450,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
   const handleDeleteMember = async (member: OrgMemberView) => {
     if (!window.confirm('Deseja realmente remover este membro da organização?')) return;
-    setMemberActionFeedback(null);
     const fallbackEmail = sanitizeDisplayValue(member.email) || 'sem-email';
 
     const { data: profileBeforeDelete } = await supabase
@@ -2479,10 +2474,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       .maybeSingle();
 
     if (!existingProfile && !existingMembership) {
-      setMemberActionFeedback({
-        type: 'warning',
-        message: `O usuário ${memberEmail} já não possui cadastro no banco. A listagem foi atualizada.`,
-      });
+      showToast({ type: 'warning', message: `O usuário ${memberEmail} já não possui cadastro no banco. A listagem foi atualizada.` });
       await fetchOrgMembers();
       return;
     }
@@ -2527,7 +2519,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
       if (!profileStillExistsAfterRpc && !membershipStillExistsAfterRpc) {
         setUsers((prev) => prev.filter((user) => user.id !== member.user_id));
-        setMemberActionFeedback({ type: 'success', message: `Usuário ${memberEmail} excluído com sucesso do sistema.` });
+        showToast({ type: 'success', message: `Usuário ${memberEmail} excluído com sucesso do sistema.` });
         await fetchOrgMembers();
         return;
       }
@@ -2539,7 +2531,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       .eq('user_id', member.user_id);
 
     if (orgMemberDeleteError) {
-      setMemberActionFeedback({ type: 'error', message: `Erro ao remover vínculos de organização para ${memberEmail}.` });
+      showToast({ type: 'error', message: `Erro ao remover vínculos de organização para ${memberEmail}.` });
       alert('Erro ao remover vínculo na organização.');
       return;
     }
@@ -2562,18 +2554,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         errorMessage.includes('not allowed');
 
       if (isPermissionError) {
-        setMemberActionFeedback({
-          type: 'warning',
-          message:
-            `Vínculo removido, mas o perfil de ${memberEmail} não pôde ser excluído por permissão no Supabase. ` +
-            'Isso indica RLS/policies sem DELETE em profiles para seu usuário atual.',
-        });
+        showToast({ type: 'warning', message: `Vínculo removido, mas o perfil de ${memberEmail} não pôde ser excluído por permissão no Supabase.` });
         alert('Vínculo removido, mas não foi possível excluir o perfil por permissão. Verifique políticas do Supabase para exclusão completa.');
       } else {
-        setMemberActionFeedback({
-          type: 'error',
-          message: `Vínculo removido, mas houve erro ao excluir o perfil de ${memberEmail} no banco.`,
-        });
+        showToast({ type: 'error', message: `Vínculo removido, mas houve erro ao excluir o perfil de ${memberEmail} no banco.` });
         alert('Vínculo removido, mas houve erro ao excluir o perfil no banco.');
       }
 
@@ -2604,18 +2588,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       .maybeSingle();
 
     if (profileStillExists || membershipStillExists) {
-      setMemberActionFeedback({
-        type: 'warning',
-        message: rpcMissingFunction
-          ? `Exclusão definitiva indisponível para ${memberEmail}: a função RPC delete_user_completely não está publicada neste banco. Aplique a migration 006_hard_delete_user.sql no Supabase para remover também auth.users.`
-          : `A exclusão de ${memberEmail} não foi concluída totalmente. Ainda existe cadastro no banco.`,
-      });
+      showToast({ type: 'warning', message: rpcMissingFunction
+        ? `Exclusão definitiva indisponível para ${memberEmail}: a função RPC delete_user_completely não está publicada neste banco.`
+        : `A exclusão de ${memberEmail} não foi concluída totalmente. Ainda existe cadastro no banco.` });
       await fetchOrgMembers();
       return;
     }
 
     setUsers((prev) => prev.filter((user) => user.id !== member.user_id));
-    setMemberActionFeedback({ type: 'success', message: `Usuário ${memberEmail} excluído com sucesso do sistema.` });
+    showToast({ type: 'success', message: `Usuário ${memberEmail} excluído com sucesso do sistema.` });
 
     await fetchOrgMembers();
   };
@@ -3586,7 +3567,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                   type="button"
                   onClick={() => {
                     resetNewProcessForm();
-                    setProcessActionFeedback(null);
                     setShowCreateProcessModal(true);
                   }}
                   className="inline-flex items-center gap-2 shrink-0 px-4 py-2 rounded-lg border border-blue-100 bg-blue-50 text-blue-600 font-semibold hover:bg-blue-100 transition-colors"
@@ -3688,16 +3668,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           {processesError && (
             <div className="mb-4 rounded-2xl border border-amber-700/60 bg-amber-900/20 px-4 py-3 text-sm font-bold text-amber-200">
               {processesError}
-            </div>
-          )}
-
-          {processActionFeedback && (
-            <div className={`mb-4 rounded-2xl px-4 py-3 text-sm font-bold ${
-              processActionFeedback.type === 'success'
-                ? 'border border-emerald-700/60 bg-emerald-900/20 text-emerald-200'
-                : 'border border-red-700/60 bg-red-900/20 text-red-200'
-            }`}>
-              {processActionFeedback.message}
             </div>
           )}
 
@@ -4118,19 +4088,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                 </div>
               </div>
               {membersError && <p className="px-4 pt-3 text-sm text-red-400 font-bold">{membersError}</p>}
-              {memberActionFeedback && (
-                <p
-                  className={`px-4 pt-3 text-sm font-bold ${
-                    memberActionFeedback.type === 'success'
-                      ? 'text-emerald-400'
-                      : memberActionFeedback.type === 'warning'
-                        ? 'text-amber-400'
-                        : 'text-red-400'
-                  }`}
-                >
-                  {memberActionFeedback.message}
-                </p>
-              )}
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead>
@@ -5054,7 +5011,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               <button
                 onClick={() => {
                   setShowCreateProcessModal(false);
-                  setProcessActionFeedback(null);
                 }}
                 className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full"
               >
@@ -5366,7 +5322,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     type="button"
                     onClick={() => {
                       setShowCreateProcessModal(false);
-                      setProcessActionFeedback(null);
                     }}
                     className="px-5 py-3 rounded-xl border border-gray-200 text-gray-700 font-bold hover:bg-gray-100 transition-colors"
                   >
