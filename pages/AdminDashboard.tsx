@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState, useRef } from 'react';
-import { Eye, Pencil, Search, Users, ShieldCheck, X, Plus, Trash2, Calendar, MessageSquare, Check, User as UserIcon, UserCheck, LayoutDashboard, FolderKanban, Users2, Settings, Building2, Flag, FileBarChart2, ExternalLink, Loader2, CreditCard, ChevronDown, Upload, FileDown } from 'lucide-react';
+import { Eye, Pencil, Search, Users, ShieldCheck, X, Plus, Trash2, Calendar, MessageSquare, Check, User as UserIcon, UserCheck, LayoutDashboard, FolderKanban, Users2, Settings, Building2, Flag, FileBarChart2, ExternalLink, Loader2, CreditCard, ChevronDown, Upload, FileDown, Mail } from 'lucide-react';
 import { User, ProcessStatus, UserRole, Hierarchy, ServiceUnit, Organization } from '../types';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { SERVICE_MANAGERS } from '../constants';
@@ -351,6 +351,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [processDocumentsLoading, setProcessDocumentsLoading] = useState(false);
   const [uploadingDocument, setUploadingDocument] = useState(false);
   const [reviewingDocumentId, setReviewingDocumentId] = useState<string | null>(null);
+  const [resendingCertificate, setResendingCertificate] = useState(false);
 
   const [clientsData, setClientsData] = useState<ClientProfileView[]>([]);
   const [clientsLoading, setClientsLoading] = useState(false);
@@ -2393,6 +2394,27 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     setUploadingDocument(false);
     if (e.target) e.target.value = '';
     await loadProcessDocuments();
+  };
+
+  const handleResendCertificate = async () => {
+    if (!selectedUser) return;
+    const processId = (selectedUser as AdminProcessRow).processRecordId || selectedUser.id;
+    setResendingCertificate(true);
+    try {
+      const response = await supabase.functions.invoke(
+        SUPABASE_EDGE_FUNCTIONS.SEND_CERTIFICATE,
+        { body: { processId } }
+      );
+      if (response.error) {
+        alert(`Erro ao reenviar certificado: ${response.error.message || 'desconhecido'}`);
+      } else {
+        alert('Certificado reenviado por e-mail com sucesso!');
+      }
+    } catch (err: any) {
+      alert(`Erro ao reenviar certificado: ${err?.message || 'desconhecido'}`);
+    } finally {
+      setResendingCertificate(false);
+    }
   };
 
   const refreshOrganizations = async () => {
@@ -4837,16 +4859,52 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                       </div>
                     )}
 
-                    {/* Download certificate link when paid/validated */}
+                    {/* Certificate section when paid/validated */}
                     {((selectedUser as AdminProcessRow).paymentStatus === 'paid' || (selectedUser as AdminProcessRow).paymentStatus === 'validated' || (selectedUser as AdminProcessRow).paymentStatus === 'accepted') && (
-                      <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-xl text-center">
-                        <a
-                          href={`/#/certificate?processId=${(selectedUser as AdminProcessRow).processRecordId || selectedUser.id}`}
-                          className="inline-flex items-center gap-2 text-sm font-bold text-blue-700 hover:text-blue-900 underline"
-                        >
-                          <FileDown className="h-4 w-4" />
-                          Baixar Certificado de Filiação
-                        </a>
+                      <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="text-sm font-black uppercase text-blue-800">Certificado de Filiação</h4>
+                          <a
+                            href={`/#/certificate?processId=${(selectedUser as AdminProcessRow).processRecordId || selectedUser.id}`}
+                            className="inline-flex items-center gap-1 text-xs font-bold text-blue-700 hover:text-blue-900 underline"
+                          >
+                            <FileDown className="h-3 w-3" />
+                            Baixar
+                          </a>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleResendCertificate}
+                            disabled={resendingCertificate}
+                            className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-bold rounded-lg transition-all"
+                          >
+                            {resendingCertificate ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Mail className="h-3 w-3" />
+                            )}
+                            Reenviar por Email
+                          </button>
+                          <label className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg cursor-pointer transition-all">
+                            <Upload className="h-3 w-3" />
+                            Upload Manual
+                            <input
+                              type="file"
+                              className="hidden"
+                              accept="application/pdf,image/*"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file || !selectedUser || !userContext?.id) return;
+                                const processId = (selectedUser as AdminProcessRow).processRecordId || selectedUser.id;
+                                const orgId = userContext.org_id;
+                                if (!orgId || !processId) return;
+                                await uploadProcessDocument(orgId, processId, userContext.id, file, 'Certificado - Upload Manual');
+                                if (e.target) e.target.value = '';
+                                await loadProcessDocuments();
+                              }}
+                            />
+                          </label>
+                        </div>
                       </div>
                     )}
                   </div>

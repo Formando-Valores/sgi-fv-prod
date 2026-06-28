@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Activity, Calendar, Landmark, UserCheck, MessageSquare, User as UserIcon, Loader2, AlertCircle, X, ChevronRight, ExternalLink, CreditCard, MessageCircle } from 'lucide-react';
+import { ArrowLeft, Activity, Calendar, Landmark, UserCheck, MessageSquare, User as UserIcon, Loader2, AlertCircle, X, ChevronRight, ExternalLink, CreditCard, MessageCircle, FileDown } from 'lucide-react';
 import CommunicationBlock from '../../components/dashboard/blocks/CommunicationBlock';
 import { useAuth } from '../../contexts/AuthContext';
 import { getProcessById, listProcessEvents, updateProcessStatus, addProcessEvent, listRequiredChecklistDocuments, listProcessAttachments, reviewProcessAttachment, type Process, type ProcessEvent, type ProcessDocumentAttachment, type ProcessDocumentChecklistItem } from '../../lib/processes';
@@ -429,6 +429,22 @@ const ProcessDetails: React.FC = () => {
                   </button>
                 )}
               </div>
+            </div>
+          )}
+
+          {(process.payment_status === 'paid' || process.payment_status === 'released') && (
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+              <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+                <FileDown className="text-emerald-500" /> CERTIFICADO
+              </h2>
+              <p className="text-sm text-slate-400 mb-4">Sua filiação foi confirmada. Acesse seu certificado oficial.</p>
+              <a
+                href={`/#/certificate?processId=${process.id}`}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-emerald-500"
+              >
+                <FileDown className="h-4 w-4" />
+                Baixar Certificado de Filiação
+              </a>
             </div>
           )}
 

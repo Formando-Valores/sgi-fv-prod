@@ -344,6 +344,29 @@ Deno.serve(async (request) => {
       if (releaseEventError) {
         logAudit('release_event_insert_failed', { processId, error: releaseEventError.message });
       }
+
+      // Send certificate email automatically
+      try {
+        const sendUrl = `${supabaseUrl}/functions/v1/send-certificate`;
+        const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+        if (anonKey) {
+          const certResponse = await fetch(sendUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              apikey: anonKey,
+              Authorization: `Bearer ${anonKey}`,
+            },
+            body: JSON.stringify({ processId }),
+          });
+          const certResult = await certResponse.json();
+          if (!certResult.success) {
+            logAudit('certificate_send_failed', { processId, error: certResult.error });
+          }
+        }
+      } catch (certErr) {
+        logAudit('certificate_send_error', { processId, error: String(certErr) });
+      }
     }
 
     const { data: syncCheck, error: syncError } = await supabase

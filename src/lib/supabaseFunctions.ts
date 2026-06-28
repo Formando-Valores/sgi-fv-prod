@@ -7,6 +7,7 @@ export const SUPABASE_EDGE_FUNCTIONS = {
   SEND_ACCESS_CREDENTIALS: 'send-access-credentials',
   NOTIFY_PROCESS_ASSIGNMENT: 'notify-process-assignment',
   NOTIFY_PENDING_REGISTRATION: 'notify-pending-registration',
+  SEND_CERTIFICATE: 'send-certificate',
   STRIPE_CREATE_CHECKOUT_SESSION: 'stripe-create-checkout-session',
   STRIPE_CREATE_CUSTOMER_PORTAL_SESSION: 'stripe-create-customer-portal-session',
   STRIPE_RECONCILIATION: 'stripe-reconciliation',
