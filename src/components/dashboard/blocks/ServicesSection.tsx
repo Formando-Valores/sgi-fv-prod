@@ -250,7 +250,7 @@ const ServicesSection: React.FC<Props> = () => {
                       <span className="text-[10px] font-black text-gray-500">{svc.unit}</span>
                     </td>
                     <td className="px-4 py-3 text-gray-500">{svc.group || '-'}</td>
-                    <td className="px-4 py-3 text-right font-mono text-gray-700">€ {svc.price.toFixed(2)}</td>
+                    <td className="px-4 py-3 text-right font-mono text-gray-700 whitespace-nowrap">€ {svc.price.toFixed(2)}</td>
                     <td className="px-4 py-3 text-center">
                       <span className={`inline-block w-2 h-2 rounded-full ${svc.active ? 'bg-emerald-500' : 'bg-red-500'}`} />
                     </td>
