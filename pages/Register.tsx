@@ -6,13 +6,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, Eye, EyeOff, ShieldCheck } from 'lucide-react';
-import { CONSENT_TEXT_VERSION, COUNTRIES } from '../constants';
+import { CONSENT_TEXT_VERSION, COUNTRIES, ADMIN_CREDENTIALS } from '../constants';
 import { ServiceUnit, ProcessStatus, User, UserRole, Organization } from '../types';
 import { isSupabaseConfigured, supabase } from '../supabase';
 import { buildOrganizationErrorMessage, loadOrganizations } from '../organizationRepository';
 import { SUPABASE_EDGE_FUNCTIONS } from '../src/lib/supabaseFunctions';
-import { ASSOCIATION_ANNUAL_FEE, calcAssociationFees } from '../src/lib/servicesCatalog';
-import { createCheckoutSession } from '../src/lib/stripe';
 
 interface RegisterProps {
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
@@ -294,6 +292,13 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
           organizationId: formData.organizationId,
           organizationName: selectedOrganization?.name,
         };
+
+        // Notifica admins sobre novo cadastro pendente
+        for (const adminEmail of ADMIN_CREDENTIALS) {
+          supabase.functions.invoke(SUPABASE_EDGE_FUNCTIONS.NOTIFY_PENDING_REGISTRATION, {
+            body: { adminEmail, userName: formData.name, userEmail: formData.email },
+          }).catch(() => {});
+        }
 
         setSuccess(true);
         setTimeout(() => goToRoute('/login'), 1200);
