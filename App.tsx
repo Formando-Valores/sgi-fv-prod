@@ -55,8 +55,8 @@ const RootApp: React.FC = () => {
         const mappedUsers: User[] = profiles.map(profile => {
           const member = memberByUserId.get(profile.id);
           const isAdmin = member?.role === 'admin' || member?.role === 'owner';
-          const orgValue = member?.organizations;
-          const orgName = Array.isArray(orgValue) ? orgValue[0]?.name : orgValue?.name || null;
+          const orgRaw = member?.organizations as { name?: string } | { name?: string }[] | null;
+          const orgName = Array.isArray(orgRaw) ? orgRaw[0]?.name : orgRaw?.name || null;
 
           return {
             id: profile.id,
