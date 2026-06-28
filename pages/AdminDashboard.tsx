@@ -3361,28 +3361,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               <table className="min-w-full text-sm">
                 <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
                   <tr>
-                    <th className="px-4 py-3 text-left">Protocolo</th>
-                    <th className="px-4 py-3 text-left">OS</th>
-                    <th className="px-4 py-3 text-left">Serviço</th>
-                    <th className="px-4 py-3 text-left">Status</th>
-                    <th className="px-4 py-3 text-left">Abertura</th>
-                    <th className="px-4 py-3 text-left">Setor responsável</th>
-                    <th className="px-4 py-3 text-left">Ação</th>
+                <th className="px-3 sm:px-4 py-2 sm:py-3 text-left">Protocolo</th>
+                <th className="px-3 sm:px-4 py-2 sm:py-3 text-left">OS</th>
+                <th className="px-3 sm:px-4 py-2 sm:py-3 text-left">Serviço</th>
+                <th className="px-3 sm:px-4 py-2 sm:py-3 text-left">Status</th>
+                <th className="px-3 sm:px-4 py-2 sm:py-3 text-left">Abertura</th>
+                <th className="px-3 sm:px-4 py-2 sm:py-3 text-left">Setor responsável</th>
+                <th className="px-3 sm:px-4 py-2 sm:py-3 text-left">Ação</th>
                   </tr>
                 </thead>
                 <tbody>
                   {dashboardRecentRows.map((process) => (
                     <tr key={process.id} className="border-t border-gray-100">
-                      <td className="px-4 py-3 font-bold text-gray-800">{process.protocol}</td>
-                      <td className="px-4 py-3 text-gray-600">{process.processRecordId}</td>
-                      <td className="px-4 py-3 text-gray-700">{process.processType}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-3 sm:px-4 py-2 sm:py-3 font-bold text-gray-800">{process.protocol}</td>
+                      <td className="px-3 sm:px-4 py-2 sm:py-3 text-gray-600">{process.processRecordId}</td>
+                      <td className="px-3 sm:px-4 py-2 sm:py-3 text-gray-700">{process.processType}</td>
+                      <td className="px-3 sm:px-4 py-2 sm:py-3">
                         <Badge variant={statusBadgeVariant(process.status)} className="text-xs px-2 py-1">{process.status}</Badge>
                       </td>
-                      <td className="px-4 py-3 text-gray-600">{process.startDate}</td>
-                      <td className="px-4 py-3 text-gray-600">{process.serviceManager || 'Não definido'}</td>
-                      <td className="px-4 py-3">
-                        <button onClick={() => setSelectedUser(process)} className="text-blue-600 font-bold text-xs">
+                      <td className="px-3 sm:px-4 py-2 sm:py-3 text-gray-600">{process.startDate}</td>
+                      <td className="px-3 sm:px-4 py-2 sm:py-3 text-gray-600">{process.serviceManager || 'Não definido'}</td>
+                      <td className="px-3 sm:px-4 py-2 sm:py-3">
+                        <button onClick={() => setSelectedUser(process)} className="text-blue-600 font-bold text-xs whitespace-nowrap">
                           Abrir acompanhamento
                         </button>
                       </td>
@@ -3390,7 +3390,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                   ))}
                   {dashboardRecentRows.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="px-4 py-6 text-center text-gray-500 font-semibold">
+                      <td colSpan={7} className="px-3 sm:px-4 py-4 sm:py-6 text-center text-gray-500 font-semibold">
                         Nenhum processo encontrado.
                       </td>
                     </tr>
@@ -3849,38 +3849,38 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           <div className="overflow-x-auto rounded-xl border border-gray-100 bg-gray-50">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="bg-gray-50 text-gray-500 uppercase text-[10px] font-black tracking-widest">
-                  <th className="px-6 py-4">Usuário</th>
-                  <th className="px-6 py-4">Nível</th>
-                  <th className="px-6 py-4">Organização</th>
-                  <th className="px-6 py-4">Email</th>
-                  <th className="px-6 py-4">Origem</th>
-                  <th className="px-6 py-4 text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800">
-                {clientsLoading ? (
-                  <tr>
-                    <td colSpan={6} className="px-6 py-8 text-center text-gray-500">Carregando membros...</td>
+              <tr className="bg-gray-50 text-gray-500 uppercase text-[10px] font-black tracking-widest">
+                <th className="px-3 sm:px-6 py-2 sm:py-4">Usuário</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-4">Nível</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-4">Organização</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-4">Email</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-4">Origem</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-4 text-right">Ações</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800">
+              {clientsLoading ? (
+                <tr>
+                  <td colSpan={6} className="px-3 sm:px-6 py-4 sm:py-8 text-center text-gray-500">Carregando membros...</td>
                   </tr>
                 ) : visibleClients.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-8 text-center text-gray-500">Nenhum membro encontrado.</td>
+                    <td colSpan={6} className="px-3 sm:px-6 py-4 sm:py-8 text-center text-gray-500">Nenhum membro encontrado.</td>
                   </tr>
                 ) : visibleClients.map((client) => (
                   <tr key={client.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 font-bold text-gray-800">{client.nome}</td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 font-bold text-gray-800">{client.nome}</td>
+                    <td className="px-3 sm:px-6 py-2 sm:py-4">
                       <span className="text-[10px] font-black text-blue-400 uppercase border border-blue-900/50 bg-blue-900/10 px-2 py-0.5 rounded">
                         {client.accessLevel}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-gray-600 font-bold">{client.org_name}</td>
-                    <td className="px-6 py-4 text-gray-500 font-bold">{client.email}</td>
-                    <td className="px-6 py-4 text-gray-400 text-[10px] font-bold uppercase">
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-600 font-bold whitespace-nowrap">{client.org_name}</td>
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-500 font-bold">{client.email}</td>
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-400 text-[10px] font-bold uppercase whitespace-nowrap">
                       {client.source === 'local_manual' ? 'Manual' : client.source === 'org_members+profiles' ? 'Sistema' : 'Sistema'}
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-right whitespace-nowrap">
                       <div className="flex justify-end gap-2">
                         <button
                           onClick={() => handleStartEditClient(client)}
@@ -3935,23 +3935,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="bg-gray-50 text-gray-500 uppercase text-[10px] font-black tracking-widest">
-                  <th className="px-6 py-4">Nome Completo</th>
-                  <th className="px-6 py-4">Telefone+DDD+País</th>
-                  <th className="px-6 py-4">Protocolo SGI</th>
-                  <th className="px-6 py-4">Status do Processo</th>
-                  <th className="px-6 py-4">Última Alteração</th>
-                  <th className="px-6 py-4 text-right">Ações</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-4">Nome Completo</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-4">Telefone+DDD+País</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-4">Protocolo SGI</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-4">Status do Processo</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-4">Última Alteração</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-4 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800">
                 {filteredUsers.map(user => (
                   <tr key={user.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 font-bold text-gray-700">{user.name}</td>
-                    <td className="px-6 py-4 text-gray-500 font-bold">{user.phone} ({user.country})</td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 font-bold text-gray-700">{user.name}</td>
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-500 font-bold whitespace-nowrap">{user.phone} ({user.country})</td>
+                    <td className="px-3 sm:px-6 py-2 sm:py-4">
                       <span className="bg-blue-900/30 text-blue-400 px-2 py-1 rounded-md text-[10px] font-black">{user.protocol}</span>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 sm:px-6 py-2 sm:py-4">
                       <span className={`px-3 py-1 rounded-full text-[10px] font-black text-white ${
                         user.status === ProcessStatus.PENDENTE ? 'bg-gray-200 text-gray-700' :
                         user.status === ProcessStatus.TRIAGEM ? 'bg-yellow-600' :
@@ -3960,10 +3960,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                         {user.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-gray-500 text-[10px] font-bold">
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-500 text-[10px] font-bold whitespace-nowrap">
                        {user.lastUpdate || user.registrationDate}
                     </td>
-                    <td className="px-6 py-4 text-right no-print">
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-right whitespace-nowrap no-print">
                       <div className="flex justify-end gap-2">
                         <button 
                           onClick={() => setSelectedUser(user)}
@@ -4092,30 +4092,30 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                 <table className="w-full text-left text-sm">
                   <thead>
                     <tr className="bg-gray-50 text-gray-500 uppercase text-[10px] font-black tracking-widest">
-                      <th className="px-6 py-4">Usuário</th>
-                      <th className="px-6 py-4">Nível de Acesso</th>
-                      <th className="px-6 py-4">Instituição</th>
-                      <th className="px-6 py-4 text-right">Ações</th>
+                      <th className="px-3 sm:px-6 py-2 sm:py-4">Usuário</th>
+                      <th className="px-3 sm:px-6 py-2 sm:py-4">Nível de Acesso</th>
+                      <th className="px-3 sm:px-6 py-2 sm:py-4">Instituição</th>
+                      <th className="px-3 sm:px-6 py-2 sm:py-4 text-right">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800">
                     {membersLoading ? (
                       <tr>
-                        <td colSpan={4} className="px-6 py-8 text-center text-gray-500">Carregando membros...</td>
+                        <td colSpan={4} className="px-3 sm:px-6 py-4 sm:py-8 text-center text-gray-500">Carregando membros...</td>
                       </tr>
                     ) : managementUsers.map(u => (
                       <tr key={`${u.user_id}-${u.org_id}`} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 font-bold flex flex-col">
+                        <td className="px-3 sm:px-6 py-2 sm:py-4 font-bold flex flex-col">
                            <span>{u.name}</span>
                            <span className="text-[10px] text-gray-500">{u.email}</span>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-3 sm:px-6 py-2 sm:py-4">
                           <span className="text-[10px] font-black text-blue-400 uppercase border border-blue-900/50 bg-blue-900/10 px-2 py-0.5 rounded">
                             {u.accessLevel.toUpperCase()}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-gray-600 font-bold">{u.org_name || 'Organização Padrão'}</td>
-                        <td className="px-6 py-4 text-right">
+                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-600 font-bold whitespace-nowrap">{u.org_name || 'Organização Padrão'}</td>
+                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-right whitespace-nowrap">
                            <div className="flex justify-end gap-2">
                               <button 
                                 onClick={() => {

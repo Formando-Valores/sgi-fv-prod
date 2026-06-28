@@ -160,29 +160,29 @@ const IbanManagementSection: React.FC<Props> = ({ currentUser }) => {
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="bg-gray-50 text-gray-500 uppercase text-[10px] font-black tracking-widest">
-                  <th className="px-4 py-3">Nome</th>
-                  <th className="px-4 py-3">Documento</th>
-                  <th className="px-4 py-3">IBAN</th>
-                  <th className="px-4 py-3">Unidade</th>
-                  <th className="px-4 py-3">Ativo</th>
-                  <th className="px-4 py-3 text-right">Ações</th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3">Nome</th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3">Documento</th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3">IBAN</th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3">Unidade</th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3">Ativo</th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {accounts.map((acc) => (
                   <tr key={acc.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 font-bold text-gray-700">{acc.full_name}</td>
-                    <td className="px-4 py-3 text-gray-500">{acc.document || '-'}</td>
-                    <td className="px-4 py-3 font-mono text-gray-700">{acc.iban}</td>
-                    <td className="px-4 py-3">
-                      <span className="text-[10px] font-black text-gray-500">
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 font-bold text-gray-700">{acc.full_name}</td>
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-gray-500">{acc.document || '-'}</td>
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 font-mono text-gray-700 whitespace-nowrap">{acc.iban}</td>
+                    <td className="px-3 sm:px-4 py-2 sm:py-3">
+                      <span className="text-[10px] font-black text-gray-500 whitespace-nowrap">
                         {acc.service_unit === 'ADMINISTRATIVO' ? 'ADM' : acc.service_unit === 'JURÍDICO / ADVOCACIA' ? 'JUR' : 'TEC'}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 sm:px-4 py-2 sm:py-3">
                       <span className={`inline-block w-2 h-2 rounded-full ${acc.is_active ? 'bg-emerald-500' : 'bg-red-500'}`} />
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-right whitespace-nowrap">
                       <button
                         onClick={() => handleDelete(acc.id)}
                         className="p-1.5 bg-red-100 hover:bg-red-200 rounded-md text-red-600"

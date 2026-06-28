@@ -234,27 +234,27 @@ const ServicesSection: React.FC<Props> = () => {
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="bg-gray-50 text-gray-500 uppercase text-[10px] font-black tracking-widest">
-                  <th className="px-4 py-3">Nome</th>
-                  <th className="px-4 py-3">Unidade</th>
-                  <th className="px-4 py-3">Grupo</th>
-                  <th className="px-4 py-3 text-right">Preço (€)</th>
-                  <th className="px-4 py-3 text-center">Ativo</th>
-                  <th className="px-4 py-3 text-right">Ações</th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3">Nome</th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3">Unidade</th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3">Grupo</th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-right">Preço (€)</th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-center">Ativo</th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {filtered.map((svc) => (
                   <tr key={svc.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 font-bold text-gray-700">{svc.name}</td>
-                    <td className="px-4 py-3">
-                      <span className="text-[10px] font-black text-gray-500">{svc.unit}</span>
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 font-bold text-gray-700">{svc.name}</td>
+                    <td className="px-3 sm:px-4 py-2 sm:py-3">
+                      <span className="text-[10px] font-black text-gray-500 whitespace-nowrap">{svc.unit}</span>
                     </td>
-                    <td className="px-4 py-3 text-gray-500">{svc.group || '-'}</td>
-                    <td className="px-4 py-3 text-right font-mono text-gray-700 whitespace-nowrap">€ {svc.price.toFixed(2)}</td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-gray-500">{svc.group || '-'}</td>
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-right font-mono text-gray-700 whitespace-nowrap">€ {svc.price.toFixed(2)}</td>
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-center">
                       <span className={`inline-block w-2 h-2 rounded-full ${svc.active ? 'bg-emerald-500' : 'bg-red-500'}`} />
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-right whitespace-nowrap">
                       <div className="flex justify-end gap-1">
                         <button
                           onClick={() => handleEdit(svc)}
