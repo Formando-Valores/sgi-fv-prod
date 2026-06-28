@@ -26,6 +26,7 @@ import ClientProcessProgressPanel, {
 } from '../src/components/dashboard/ClientProcessProgressPanel';
 import ReportsPage from '../src/pages/Reports/ReportsPage';
 import IbanManagementSection from '../src/components/dashboard/blocks/IbanManagementSection';
+import CommunicationBlock from '../src/components/dashboard/blocks/CommunicationBlock';
 import { createCheckoutSession } from '../src/lib/stripe';
 import { getPaymentStatusUi } from '../src/lib/paymentStatus';
 import { getServicesByUnit, getGroupsByUnit, getServicesByGroup, SERVICE_CATALOG, calcAssociationFees, ASSOCIATION_ANNUAL_FEE, type AssociationFeeItem } from '../src/lib/servicesCatalog';
@@ -287,7 +288,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [activeTab, setActiveTab] = useState<'users' | 'management' | 'iban' | 'pendentes'>('users');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState<AdminProcessRow | User | null>(null);
-  const [selectedUserTab, setSelectedUserTab] = useState<'cadastral' | 'financeiro' | 'documentos'>('cadastral');
+  const [selectedUserTab, setSelectedUserTab] = useState<'cadastral' | 'financeiro' | 'documentos' | 'comunicacao'>('cadastral');
   const [editingUser, setEditingUser] = useState<AdminProcessRow | User | null>(null);
   const [redirectingCheckout, setRedirectingCheckout] = useState(false);
   const [uploadingProof, setUploadingProof] = useState(false);
@@ -4544,6 +4545,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                   >
                     Documentos
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedUserTab('comunicacao')}
+                    className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-t-lg transition-colors ${
+                      selectedUserTab === 'comunicacao'
+                        ? 'bg-sky-600 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    Comunicação
+                  </button>
                 </div>
 
                 {/* Dados Cadastrais */}
@@ -4959,6 +4971,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                         ))}
                       </div>
                     )}
+                  </div>
+                )}
+
+                {selectedUserTab === 'comunicacao' && selectedUser && (
+                  <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
+                    <div className="p-4 border-b border-gray-100 bg-gray-50">
+                      <h3 className="text-sm font-black uppercase text-gray-700">Comunicação do Processo</h3>
+                    </div>
+                    <CommunicationBlock
+                      processId={(selectedUser as AdminProcessRow).processRecordId || selectedUser.id}
+                      currentUserId={currentUser.id}
+                    />
                   </div>
                 )}
              </div>
