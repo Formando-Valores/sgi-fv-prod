@@ -1,5 +1,43 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="64" fill="#1e3a5f"/>
-  <text x="256" y="280" text-anchor="middle" font-family="Arial, sans-serif" font-size="200" font-weight="bold" fill="#ffffff">FV</text>
-  <text x="256" y="380" text-anchor="middle" font-family="Arial, sans-serif" font-size="40" fill="#93c5fd">SGI</text>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1e3a5f"/>
+      <stop offset="100%" stop-color="#0f1f33"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+    <linearGradient id="shield" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0%" stop-color="#1e40af"/>
+      <stop offset="100%" stop-color="#1e3a5f"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Fundo arredondado -->
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+
+  <!-- Escudo -->
+  <path d="M256 80 L400 160 L400 280 Q400 380 256 440 Q112 380 112 280 L112 160 Z"
+        fill="url(#shield)" stroke="url(#gold)" stroke-width="6" opacity="0.9"/>
+
+  <!-- Faixa dourada superior -->
+  <path d="M160 180 L352 180 L352 200 L160 200 Z" fill="url(#gold)" opacity="0.8"/>
+
+  <!-- F -->
+  <text x="230" y="310" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="160" font-weight="bold" fill="#ffffff" letter-spacing="-5">F</text>
+  <!-- V -->
+  <text x="290" y="310" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="130" font-weight="bold" fill="url(#gold)" letter-spacing="-5" transform="translate(0, -5)">V</text>
+
+  <!-- Linha decorativa abaixo das letras -->
+  <line x1="170" y1="340" x2="342" y2="340" stroke="url(#gold)" stroke-width="2" opacity="0.5"/>
+
+  <!-- SGI - texto pequeno -->
+  <text x="256" y="395" text-anchor="middle" font-family="Arial, sans-serif" font-size="36" font-weight="bold" fill="#93c5fd" letter-spacing="8">SGI</text>
+
+  <!-- Círculos decorativos -->
+  <circle cx="120" cy="120" r="8" fill="url(#gold)" opacity="0.3"/>
+  <circle cx="392" cy="120" r="8" fill="url(#gold)" opacity="0.3"/>
+  <circle cx="120" cy="392" r="6" fill="url(#gold)" opacity="0.2"/>
+  <circle cx="392" cy="392" r="6" fill="url(#gold)" opacity="0.2"/>
 </svg>
