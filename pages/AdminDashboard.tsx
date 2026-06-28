@@ -259,7 +259,7 @@ const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({
     )}
     topbar={(
       <DashboardTopbar
-        title={<><ShieldCheck className="text-blue-500" /> SGI FV - PAINEL ADMINISTRATIVO</>}
+        title={<><img src="/icons/icon.svg" alt="SGI FV" className="h-8 w-8 inline-block" /> SGI FV - PAINEL ADMINISTRATIVO</>}
         subtitle={`Bem-vindo, ${currentUserName}`}
       />
     )}
