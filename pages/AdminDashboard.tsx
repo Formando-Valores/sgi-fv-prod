@@ -246,7 +246,6 @@ const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({
 }) => (
   <DashboardShell
     sidebarOpen={sidebarOpen}
-    onOpenSidebar={() => setSidebarOpen(true)}
     onCloseSidebar={() => setSidebarOpen(false)}
     sidebar={(
       <DashboardSidebar
@@ -261,8 +260,9 @@ const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({
     )}
     topbar={(
       <DashboardTopbar
-        title={<><img src="/icons/icon.svg" alt="SGI FV" className="h-8 w-8 inline-block" /> SGI FV - PAINEL ADMINISTRATIVO</>}
+        title={<><img src="/icons/icon.svg" alt="SGI FV" className="h-6 w-6 sm:h-8 sm:w-8 inline-block" /> SGI FV - PAINEL ADMINISTRATIVO</>}
         subtitle={`Bem-vindo, ${currentUserName}`}
+        onOpenSidebar={() => setSidebarOpen(true)}
       />
     )}
   >

@@ -41,10 +41,10 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ sidebarOpen, onNavi
               onSelectSection?.(sectionFromPath);
               onNavigate();
             }}
-            className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${isActive ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-white text-gray-600 border-gray-100 hover:bg-gray-50'}`}
+            className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-xl border transition-all min-w-0 ${isActive ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-white text-gray-600 border-gray-100 hover:bg-gray-50'}`}
           >
             <item.icon className="w-4 h-4" />
-            <span className="font-bold">{item.label}</span>
+            <span className="font-bold truncate">{item.label}</span>
           </NavLink>
         ))}
 
