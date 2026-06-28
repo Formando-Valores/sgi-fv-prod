@@ -285,7 +285,7 @@ interface AdminDashboardProps {
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, setUsers, onLogout, section = 'dashboard', blocks }) => {
-  const [activeTab, setActiveTab] = useState<'users' | 'management' | 'iban' | 'pendentes'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'management' | 'iban'>('users');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState<AdminProcessRow | User | null>(null);
   const [selectedUserTab, setSelectedUserTab] = useState<'cadastral' | 'financeiro' | 'documentos' | 'comunicacao'>('cadastral');
@@ -3844,13 +3844,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
             >
               + Novo Cliente
         </button>
-        <button 
-          onClick={() => setActiveTab('pendentes')}
-          className={`pb-4 px-2 font-black uppercase text-xs tracking-widest transition-all relative ${activeTab === 'pendentes' ? 'text-blue-500' : 'text-gray-500'}`}
-        >
-          Pendentes
-          {activeTab === 'pendentes' && <div className="absolute bottom-0 left-0 w-full h-1 bg-blue-500 rounded-t-full"></div>}
-        </button>
           </div>
 
           <div className="overflow-x-auto rounded-xl border border-gray-100 bg-gray-50">
@@ -3994,11 +3987,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         </div>
       ) : currentSection === 'configuracoes' && activeTab === 'iban' ? (
         <IbanManagementSection currentUser={currentUser} />
-      ) : currentSection === 'configuracoes' && activeTab === 'pendentes' ? (
-        <PendingApprovals
-          currentUser={currentUser}
-          onSuccess={() => setActiveTab('users')}
-        />
       ) : currentSection === 'configuracoes' ? (
         /* Management Tab Content */
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -5622,197 +5610,4 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 };
 
 // Pending Approvals Component
-const PendingApprovals: React.FC<{
-  currentUser: User;
-  onSuccess: () => void;
-}> = ({ currentUser, onSuccess }) => {
-  const [pending, setPending] = useState<{ id: string; nome_completo: string; email: string; created_at: string }[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [approving, setApproving] = useState<string | null>(null);
-  const [error, setError] = useState('');
-
-  const loadPending = async () => {
-    setLoading(true);
-    const { data: defaultOrg } = await supabase
-      .from('organizations')
-      .select('id')
-      .eq('slug', 'default')
-      .single();
-
-    if (!defaultOrg) { setLoading(false); return; }
-
-    const { data: members } = await supabase
-      .from('org_members')
-      .select('user_id, created_at')
-      .eq('org_id', defaultOrg.id)
-      .eq('role', 'client');
-
-    if (!members) { setLoading(false); return; }
-
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id, nome_completo, email')
-      .in('id', members.map(m => m.user_id));
-
-    if (!profiles) { setLoading(false); return; }
-
-    const { data: existingMemberships } = await supabase
-      .from('processes')
-      .select('cliente_user_id')
-      .ilike('titulo', 'Filiação - %')
-      .in('cliente_user_id', profiles.map(p => p.id));
-
-    const approvedIds = new Set((existingMemberships || []).map(p => p.cliente_user_id));
-
-    const pendingList = profiles
-      .filter(p => !approvedIds.has(p.id))
-      .map(p => ({
-        id: p.id,
-        nome_completo: p.nome_completo || 'Sem nome',
-        email: p.email || '',
-        created_at: members.find(m => m.user_id === p.id)?.created_at || '',
-      }))
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-    setPending(pendingList);
-    setLoading(false);
-  };
-
-  useEffect(() => { loadPending(); }, []);
-
-  const handleApprove = async (profileId: string) => {
-    setApproving(profileId);
-    setError('');
-    const profile = pending.find(p => p.id === profileId);
-    if (!profile) { setApproving(null); return; }
-
-    try {
-      const { data: defaultOrg } = await supabase
-        .from('organizations')
-        .select('id')
-        .eq('slug', 'default')
-        .single();
-      if (!defaultOrg) throw new Error('Organização padrão não encontrada');
-
-      const membershipFees = calcAssociationFees(0, 'membership');
-      const { data: processData, error: processErr } = await supabase
-        .from('processes')
-        .insert({
-          org_id: defaultOrg.id,
-          titulo: `Filiação - ${profile.nome_completo}`,
-          status: 'cadastro',
-          cliente_user_id: profileId,
-          cliente_nome: profile.nome_completo,
-          origem_canal: 'aprovacao_admin',
-          os_value: ASSOCIATION_ANNUAL_FEE,
-          process_status: 'aguardando_pagamento',
-          association_fees: membershipFees,
-        })
-        .select('id')
-        .single();
-
-      if (processErr || !processData) throw new Error('Erro ao criar processo de filiação');
-
-      let paymentUrl = '';
-      try {
-        const session = await createCheckoutSession({
-          amount: ASSOCIATION_ANNUAL_FEE * 100,
-          currency: 'brl',
-          successUrl: `${window.location.origin}/#/payments/success?processId=${processData.id}`,
-          cancelUrl: `${window.location.origin}/#/payments/cancel?processId=${processData.id}`,
-          processId: processData.id,
-          clientId: profileId,
-          serviceId: '',
-          organizationId: defaultOrg.id,
-          areaId: '',
-          sectorId: '',
-        });
-        paymentUrl = session.url || '';
-      } catch (stripeErr) {
-        console.warn('[approve] erro ao criar checkout session', stripeErr);
-      }
-
-      const loginUrl = `${window.location.origin}${window.location.pathname.includes('#') ? '' : '/#/login'}`;
-      const credentialPayload: Record<string, string> = {
-        email: profile.email,
-        fullName: profile.nome_completo,
-        source: 'aprovacao_admin',
-        profile: 'USUÁRIO OPERADOR',
-        temporaryPassword: '********',
-        loginUrl,
-      };
-      if (paymentUrl) credentialPayload.paymentUrl = paymentUrl;
-
-      await supabase.functions.invoke(
-        SUPABASE_EDGE_FUNCTIONS.SEND_ACCESS_CREDENTIALS,
-        { body: credentialPayload }
-      );
-
-      setPending(prev => prev.filter(p => p.id !== profileId));
-    } catch (err: any) {
-      setError(err.message || 'Erro ao aprovar cadastro');
-    } finally {
-      setApproving(null);
-    }
-  };
-
-  if (loading) return <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>;
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-black uppercase tracking-wider">Cadastros Pendentes de Aprovação</h3>
-        <span className="text-sm font-bold text-gray-500">{pending.length} pendente(s)</span>
-      </div>
-
-      {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm font-bold">{error}</div>
-      )}
-
-      {pending.length === 0 ? (
-        <div className="bg-white border border-gray-100 rounded-2xl p-12 text-center">
-          <UserCheck className="h-12 w-12 text-emerald-400 mx-auto mb-4" />
-          <p className="text-gray-500 font-semibold">Nenhum cadastro pendente de aprovação.</p>
-        </div>
-      ) : (
-        <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="text-left p-4 font-black text-gray-500 uppercase tracking-wider text-xs">Nome</th>
-                <th className="text-left p-4 font-black text-gray-500 uppercase tracking-wider text-xs">Email</th>
-                <th className="text-left p-4 font-black text-gray-500 uppercase tracking-wider text-xs">Data Cadastro</th>
-                <th className="text-right p-4 font-black text-gray-500 uppercase tracking-wider text-xs">Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pending.map((p) => (
-                <tr key={p.id} className="border-b border-gray-50 hover:bg-gray-50 transition-all">
-                  <td className="p-4 font-bold text-gray-800">{p.nome_completo}</td>
-                  <td className="p-4 text-gray-500">{p.email}</td>
-                  <td className="p-4 text-gray-500">{new Date(p.created_at).toLocaleDateString('pt-BR')}</td>
-                  <td className="p-4 text-right">
-                    <button
-                      onClick={() => handleApprove(p.id)}
-                      disabled={approving === p.id}
-                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs uppercase tracking-wider transition-all disabled:opacity-50 inline-flex items-center gap-2"
-                    >
-                      {approving === p.id ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <Check className="h-3 w-3" />
-                      )}
-                      Aprovar
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-};
-
 export default AdminDashboard;

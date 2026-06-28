@@ -5,7 +5,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Activity, Calendar, Landmark, UserCheck, MessageSquare, User as UserIcon, Loader2, AlertCircle, X, ChevronRight, ExternalLink, CreditCard } from 'lucide-react';
+import { ArrowLeft, Activity, Calendar, Landmark, UserCheck, MessageSquare, User as UserIcon, Loader2, AlertCircle, X, ChevronRight, ExternalLink, CreditCard, MessageCircle } from 'lucide-react';
+import CommunicationBlock from '../../components/dashboard/blocks/CommunicationBlock';
 import { useAuth } from '../../contexts/AuthContext';
 import { getProcessById, listProcessEvents, updateProcessStatus, addProcessEvent, listRequiredChecklistDocuments, listProcessAttachments, reviewProcessAttachment, type Process, type ProcessEvent, type ProcessDocumentAttachment, type ProcessDocumentChecklistItem } from '../../lib/processes';
 import { createCheckoutSession } from '../../lib/stripe';
@@ -341,6 +342,14 @@ const ProcessDetails: React.FC = () => {
                 ))}
               </div>
             )}
+          </div>
+
+          {/* Communication Section */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+            <h2 className="text-lg font-bold p-6 pb-0 flex items-center gap-2">
+              <MessageCircle className="text-cyan-500" /> COMUNICAÇÃO
+            </h2>
+            <CommunicationBlock processId={process.id} currentUserId={userContext.id} dark />
           </div>
         </section>
 

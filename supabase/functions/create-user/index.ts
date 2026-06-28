@@ -157,9 +157,10 @@ Deno.serve(async (request) => {
       .maybeSingle();
 
     let processWarning: string | undefined;
+    let processId: string | undefined;
 
     if (!existingProcess) {
-      const { error: processError } = await adminClient
+      const { data: newProcess, error: processError } = await adminClient
         .from('processes')
         .insert({
           org_id,
@@ -173,10 +174,82 @@ Deno.serve(async (request) => {
           association_fees: [
             { type: 'annual', name: 'Taxa Associativa Anual', price: 180, destination: 'association' },
           ],
-        });
+        })
+        .select('id')
+        .single();
 
       if (processError) {
         processWarning = `Processo de pagamento da taxa não foi criado: ${processError.message}`;
+      } else {
+        processId = newProcess?.id;
+      }
+    } else {
+      processId = existingProcess.id;
+    }
+
+    // 6. Create Stripe checkout session and send credentials email
+    if (processId) {
+      const appUrl = Deno.env.get('APP_URL') ?? Deno.env.get('SITE_URL') ?? '';
+      const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+
+      if (appUrl && supabaseAnonKey) {
+        const successUrl = `${appUrl}/#/payments/success?processId=${processId}`;
+        const cancelUrl = `${appUrl}/#/payments/cancel?processId=${processId}`;
+
+        let paymentUrl = '';
+        try {
+          const stripeResponse = await fetch(
+            `${supabaseUrl}/functions/v1/stripe-create-checkout-session`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                apikey: supabaseAnonKey,
+                Authorization: `Bearer ${supabaseAnonKey}`,
+              },
+              body: JSON.stringify({
+                amount: 18000,
+                currency: 'brl',
+                successUrl,
+                cancelUrl,
+                processId,
+                clientId: userId,
+                serviceId: '',
+                organizationId: org_id,
+                areaId: '',
+                sectorId: '',
+              }),
+            }
+          );
+          const stripeResult = await stripeResponse.json();
+          if (stripeResult.url) paymentUrl = stripeResult.url;
+        } catch {
+          console.warn('[create-user] erro ao criar checkout session');
+        }
+
+        try {
+          await fetch(
+            `${supabaseUrl}/functions/v1/send-access-credentials`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                apikey: supabaseAnonKey,
+              },
+              body: JSON.stringify({
+                email,
+                fullName: name,
+                source: 'cadastro_admin',
+                profile: normalizedRole === 'admin' ? 'ADMINISTRADOR' : 'CLIENTE',
+                temporaryPassword: password,
+                loginUrl: `${appUrl}/#/login`,
+                ...(paymentUrl ? { paymentUrl } : {}),
+              }),
+            }
+          );
+        } catch {
+          console.warn('[create-user] erro ao enviar email de credenciais');
+        }
       }
     }
 

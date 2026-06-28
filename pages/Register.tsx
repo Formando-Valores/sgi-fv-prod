@@ -5,12 +5,14 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, Eye, EyeOff, ShieldCheck } from 'lucide-react';
-import { CONSENT_TEXT_VERSION, COUNTRIES, ADMIN_CREDENTIALS } from '../constants';
+import { ArrowLeft, CheckCircle2, Eye, EyeOff, ShieldCheck, ExternalLink } from 'lucide-react';
+import { CONSENT_TEXT_VERSION, COUNTRIES } from '../constants';
 import { ServiceUnit, ProcessStatus, User, UserRole, Organization } from '../types';
 import { isSupabaseConfigured, supabase } from '../supabase';
 import { buildOrganizationErrorMessage, loadOrganizations } from '../organizationRepository';
 import { SUPABASE_EDGE_FUNCTIONS } from '../src/lib/supabaseFunctions';
+import { calcAssociationFees, ASSOCIATION_ANNUAL_FEE } from '../src/lib/servicesCatalog';
+import { createCheckoutSession } from '../src/lib/stripe';
 
 interface RegisterProps {
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
@@ -293,15 +295,67 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
           organizationName: selectedOrganization?.name,
         };
 
-        // Notifica admins sobre novo cadastro pendente
-        for (const adminEmail of ADMIN_CREDENTIALS) {
-          supabase.functions.invoke(SUPABASE_EDGE_FUNCTIONS.NOTIFY_PENDING_REGISTRATION, {
-            body: { adminEmail, userName: formData.name, userEmail: formData.email },
-          }).catch(() => {});
+        // Cria processo de filiação automaticamente
+        const membershipFees = calcAssociationFees(0, 'membership');
+        const { data: processData, error: processErr } = await supabase
+          .from('processes')
+          .insert({
+            org_id: formData.organizationId,
+            titulo: `Filiação - ${formData.name}`,
+            status: 'cadastro',
+            cliente_user_id: data.user.id,
+            cliente_nome: formData.name,
+            origem_canal: 'registro_direto',
+            os_value: ASSOCIATION_ANNUAL_FEE,
+            process_status: 'aguardando_pagamento',
+            association_fees: membershipFees,
+          })
+          .select('id')
+          .single();
+
+        let paymentUrl = '';
+        if (processErr) {
+          console.error('[register] erro ao criar processo', processErr);
+        } else {
+          // Cria sessão Stripe
+          try {
+            const session = await createCheckoutSession({
+              amount: ASSOCIATION_ANNUAL_FEE * 100,
+              currency: 'brl',
+              successUrl: `${window.location.origin}/#/payments/success?processId=${processData.id}`,
+              cancelUrl: `${window.location.origin}/#/payments/cancel?processId=${processData.id}`,
+              processId: processData.id,
+              clientId: data.user.id,
+              serviceId: '',
+              organizationId: formData.organizationId,
+              areaId: '',
+              sectorId: '',
+            });
+            paymentUrl = session.url || '';
+          } catch (stripeErr) {
+            console.warn('[register] erro ao criar checkout session', stripeErr);
+          }
+
+          // Envia email com credenciais e link de pagamento
+          const loginUrl = `${window.location.origin}/#/login`;
+          supabase.functions.invoke(
+            SUPABASE_EDGE_FUNCTIONS.SEND_ACCESS_CREDENTIALS,
+            {
+              body: {
+                email: formData.email,
+                fullName: formData.name,
+                source: 'registro_direto',
+                profile: 'CLIENTE',
+                temporaryPassword: formData.password ? formData.password : '********',
+                loginUrl,
+                ...(paymentUrl ? { paymentUrl } : {}),
+              },
+            }
+          ).catch(() => {});
         }
 
         setSuccess(true);
-        setTimeout(() => goToRoute('/login'), 1200);
+        setTimeout(() => goToRoute('/login'), 5000);
       }
     } catch (err) {
       console.error('[register] erro inesperado', err);
@@ -318,9 +372,9 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
           <div className="w-16 h-16 bg-amber-500 rounded-full flex items-center justify-center mx-auto mb-4">
             <ShieldCheck className="w-8 h-8 text-white" />
           </div>
-          <h2 className="text-xl font-bold text-gray-800 mb-2">Cadastro Enviado!</h2>
-          <p className="text-gray-500 text-sm">Seu cadastro foi enviado para aprovação. Você receberá um e-mail quando for aprovado.</p>
-          <p className="text-gray-400 text-xs mt-2">Redirecionando para o login...</p>
+          <h2 className="text-xl font-bold text-gray-800 mb-2">Cadastro Realizado!</h2>
+          <p className="text-gray-500 text-sm">Sua conta foi criada com sucesso. Verifique seu e-mail para acessar o sistema e realizar o pagamento da taxa associativa.</p>
+          <p className="text-gray-400 text-xs mt-2">Redirecionando para o login em 5 segundos...</p>
         </div>
       </div>
     );
