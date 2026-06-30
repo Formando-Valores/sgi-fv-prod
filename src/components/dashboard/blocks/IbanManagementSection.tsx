@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Trash2, Loader2, Check, X } from 'lucide-react';
+import { Plus, Trash2, Loader2, Check, X, Building2 } from 'lucide-react';
 import Skeleton, { TableSkeleton } from '../../ui/Skeleton';
+import EmptyState from '../../ui/EmptyState';
 import { listProfessionalAccounts, upsertProfessionalAccount, deleteProfessionalAccount, type ProfessionalAccount } from '../../../lib/professionalAccounts';
 import { ServiceUnit } from '../../../../types';
 
@@ -155,7 +156,7 @@ const IbanManagementSection: React.FC<Props> = ({ currentUser }) => {
         {loading ? (
           <TableSkeleton rows={4} cols={6} />
         ) : accounts.length === 0 ? (
-          <p className="text-gray-500">Nenhuma conta cadastrada.</p>
+          <EmptyState icon={Building2} title="Nenhuma conta cadastrada" description="Adicione contas IBAN para os profissionais no formulário ao lado." />
         ) : (
           <>
             <div className="hidden md:block overflow-x-auto">

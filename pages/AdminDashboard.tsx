@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState, useRef } from 'react';
-import { Eye, Pencil, Search, Users, ShieldCheck, X, Plus, Trash2, Calendar, MessageSquare, Check, User as UserIcon, UserCheck, LayoutDashboard, FolderKanban, Users2, Settings, Building2, Flag, FileBarChart2, ExternalLink, Loader2, CreditCard, ChevronDown, Upload, FileDown, Mail } from 'lucide-react';
+import { Eye, Pencil, Search, Users, ShieldCheck, X, Plus, Trash2, Calendar, MessageSquare, Check, User as UserIcon, UserCheck, LayoutDashboard, FolderKanban, Users2, Settings, Building2, Flag, FileBarChart2, ExternalLink, Loader2, CreditCard, ChevronDown, Upload, FileDown, Mail, Inbox, SearchX } from 'lucide-react';
 import { User, ProcessStatus, UserRole, Hierarchy, ServiceUnit, Organization } from '../types';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { SERVICE_MANAGERS } from '../constants';
@@ -10,6 +10,7 @@ import type { Process as DbProcess } from '../src/lib/processes';
 import Card from '../src/components/ui/Card';
 import Badge from '../src/components/ui/Badge';
 import Skeleton, { TableSkeleton, CardSkeleton } from '../src/components/ui/Skeleton';
+import EmptyState from '../src/components/ui/EmptyState';
 import Button from '../src/components/ui/Button';
 import DashboardShell from '../src/components/dashboard/DashboardShell';
 import DashboardSidebar from '../src/components/dashboard/DashboardSidebar';
@@ -3358,61 +3359,61 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                 Ver todos os processos
               </button>
             </div>
-            <div className="hidden md:block overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
-                  <tr>
-                <th className="px-3 sm:px-4 py-2 sm:py-3 text-left">Protocolo</th>
-                <th className="px-3 sm:px-4 py-2 sm:py-3 text-left">OS</th>
-                <th className="px-3 sm:px-4 py-2 sm:py-3 text-left">Serviço</th>
-                <th className="px-3 sm:px-4 py-2 sm:py-3 text-left">Status</th>
-                <th className="px-3 sm:px-4 py-2 sm:py-3 text-left">Abertura</th>
-                <th className="px-3 sm:px-4 py-2 sm:py-3 text-left">Setor responsável</th>
-                <th className="px-3 sm:px-4 py-2 sm:py-3 text-left">Ação</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {dashboardRecentRows.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="px-3 sm:px-4 py-4 sm:py-6 text-center text-gray-500 font-semibold">Nenhum processo encontrado.</td>
-                    </tr>
-                  ) : dashboardRecentRows.map((process) => (
-                    <tr key={process.id} className="border-t border-gray-100">
-                      <td className="px-3 sm:px-4 py-2 sm:py-3 font-bold text-gray-800">{process.protocol}</td>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3 text-gray-600">{process.processRecordId}</td>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3 text-gray-700">{process.processType}</td>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3"><Badge variant={statusBadgeVariant(process.status)} className="text-xs px-2 py-1">{process.status}</Badge></td>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3 text-gray-600">{process.startDate}</td>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3 text-gray-600">{process.serviceManager || 'Não definido'}</td>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3">
-                        <button onClick={() => setSelectedUser(process)} className="text-blue-600 font-bold text-xs whitespace-nowrap">Abrir acompanhamento</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="block md:hidden space-y-3">
-              {dashboardRecentRows.length === 0 ? (
-                <p className="text-center text-gray-500 font-semibold py-4">Nenhum processo encontrado.</p>
-              ) : dashboardRecentRows.map((process) => (
-                <div key={process.id} className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
-                  <div className="flex items-start justify-between mb-2">
-                    <div>
-                      <p className="font-bold text-gray-800 text-sm">{process.protocol}</p>
-                      <span className="text-[10px] font-black text-gray-500 inline-block mt-1">{process.processType}</span>
-                    </div>
-                    <Badge variant={statusBadgeVariant(process.status)} className="text-xs px-2 py-1 shrink-0">{process.status}</Badge>
-                  </div>
-                  <div className="space-y-1 text-xs text-gray-600">
-                    <p><span className="font-semibold text-gray-400">OS:</span> {process.processRecordId}</p>
-                    <p><span className="font-semibold text-gray-400">Abertura:</span> {process.startDate}</p>
-                    <p><span className="font-semibold text-gray-400">Setor:</span> {process.serviceManager || 'Não definido'}</p>
-                  </div>
-                  <button onClick={() => setSelectedUser(process)} className="mt-3 text-blue-600 font-bold text-xs">Abrir acompanhamento</button>
+            {dashboardRecentRows.length === 0 ? (
+              <EmptyState icon={Inbox} title="Nenhum processo encontrado" description="Ainda não há processos cadastrados no sistema." />
+            ) : (
+              <>
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                      <tr>
+                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-left">Protocolo</th>
+                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-left">OS</th>
+                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-left">Serviço</th>
+                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-left">Status</th>
+                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-left">Abertura</th>
+                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-left">Setor responsável</th>
+                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-left">Ação</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dashboardRecentRows.map((process) => (
+                        <tr key={process.id} className="border-t border-gray-100">
+                          <td className="px-3 sm:px-4 py-2 sm:py-3 font-bold text-gray-800">{process.protocol}</td>
+                          <td className="px-3 sm:px-4 py-2 sm:py-3 text-gray-600">{process.processRecordId}</td>
+                          <td className="px-3 sm:px-4 py-2 sm:py-3 text-gray-700">{process.processType}</td>
+                          <td className="px-3 sm:px-4 py-2 sm:py-3"><Badge variant={statusBadgeVariant(process.status)} className="text-xs px-2 py-1">{process.status}</Badge></td>
+                          <td className="px-3 sm:px-4 py-2 sm:py-3 text-gray-600">{process.startDate}</td>
+                          <td className="px-3 sm:px-4 py-2 sm:py-3 text-gray-600">{process.serviceManager || 'Não definido'}</td>
+                          <td className="px-3 sm:px-4 py-2 sm:py-3">
+                            <button onClick={() => setSelectedUser(process)} className="text-blue-600 font-bold text-xs whitespace-nowrap">Abrir acompanhamento</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              ))}
-            </div>
+                <div className="block md:hidden space-y-3">
+                  {dashboardRecentRows.map((process) => (
+                    <div key={process.id} className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <p className="font-bold text-gray-800 text-sm">{process.protocol}</p>
+                          <span className="text-[10px] font-black text-gray-500 inline-block mt-1">{process.processType}</span>
+                        </div>
+                        <Badge variant={statusBadgeVariant(process.status)} className="text-xs px-2 py-1 shrink-0">{process.status}</Badge>
+                      </div>
+                      <div className="space-y-1 text-xs text-gray-600">
+                        <p><span className="font-semibold text-gray-400">OS:</span> {process.processRecordId}</p>
+                        <p><span className="font-semibold text-gray-400">Abertura:</span> {process.startDate}</p>
+                        <p><span className="font-semibold text-gray-400">Setor:</span> {process.serviceManager || 'Não definido'}</p>
+                      </div>
+                      <button onClick={() => setSelectedUser(process)} className="mt-3 text-blue-600 font-bold text-xs">Abrir acompanhamento</button>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </article>
         </section>
         </OverviewContainer>
@@ -3558,7 +3559,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                 );
               })}
               {organizations.length === 0 && (
-                <p className="text-gray-500 text-sm">Nenhuma organização cadastrada ainda.</p>
+                <div className="col-span-full flex flex-col items-center py-12 text-center">
+                  <Building2 className="w-10 h-10 text-gray-300 mb-3" />
+                  <p className="text-sm font-bold text-gray-500">Nenhuma organização cadastrada</p>
+                  <p className="text-xs text-gray-400 mt-1">Crie sua primeira organização no formulário ao lado.</p>
+                </div>
               )}
             </div>
           </div>
@@ -3716,8 +3721,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
             <div className="p-4 sm:p-6 space-y-4 bg-gray-50/70">
               {visibleProcessRows.length === 0 ? (
-                <div className="rounded-xl border border-gray-200 bg-white px-4 py-10 text-center text-gray-500 font-semibold">
-                  Nenhum processo encontrado para os filtros selecionados.
+                <div className="rounded-xl border border-gray-200 bg-white px-4 py-10 text-center">
+                  <SearchX className="w-8 h-8 text-gray-300 mx-auto mb-3" />
+                  <p className="text-sm font-bold text-gray-500">Nenhum resultado encontrado</p>
+                  <p className="text-xs text-gray-400 mt-1">Tente ajustar os filtros ou o termo da busca.</p>
                 </div>
               ) : visibleProcessRows.map((process) => (
                 <article
@@ -3865,7 +3872,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           {clientsLoading ? (
             <div className="rounded-xl border border-gray-100 bg-gray-50 p-6"><TableSkeleton rows={4} cols={6} /></div>
           ) : visibleClients.length === 0 ? (
-            <div className="rounded-xl border border-gray-100 bg-gray-50 p-6 text-center text-gray-500">Nenhum membro encontrado.</div>
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-6 text-center">
+              <Users className="w-8 h-8 text-gray-300 mx-auto mb-3" />
+              <p className="text-sm font-bold text-gray-500">Nenhum membro encontrado</p>
+              <p className="text-xs text-gray-400 mt-1">Nenhum cliente ou usuário corresponde aos critérios atuais.</p>
+            </div>
           ) : (
             <>
               <div className="hidden md:block overflow-x-auto rounded-xl border border-gray-100 bg-gray-50">
@@ -3954,108 +3965,89 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
             </div>
           </div>
 
-          {/* Mobile card view */}
-          <div className="block md:hidden space-y-3">
-            {filteredUsers.length === 0 ? (
-              <p className="text-center text-gray-500 py-8">Nenhum usuário encontrado.</p>
-            ) : filteredUsers.map(user => (
-              <div key={user.id} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
-                <div className="flex items-start justify-between mb-2">
-                  <p className="font-bold text-gray-800 text-sm truncate flex-1">{user.name}</p>
-                  <span className={`ml-2 px-3 py-1 rounded-full text-[10px] font-black text-white shrink-0 ${
-                    user.status === ProcessStatus.PENDENTE ? 'bg-gray-200 text-gray-700' :
-                    user.status === ProcessStatus.TRIAGEM ? 'bg-yellow-600' :
-                    user.status === ProcessStatus.ANALISE ? 'bg-orange-600' : 'bg-emerald-600'
-                  }`}>
-                    {user.status}
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div>
-                    <p className="text-[10px] font-black text-gray-500 uppercase">Telefone</p>
-                    <p className="font-bold text-gray-700 truncate">{user.phone} ({user.country})</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-black text-gray-500 uppercase">Protocolo</p>
-                    <span className="bg-blue-900/30 text-blue-400 px-2 py-0.5 rounded-md text-[10px] font-black">{user.protocol}</span>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-black text-gray-500 uppercase">Última Alteração</p>
-                    <p className="font-bold text-gray-600 truncate">{user.lastUpdate || user.registrationDate}</p>
-                  </div>
-                </div>
-                <div className="flex justify-end gap-2 mt-3 pt-3 border-t border-gray-100">
-                  <button
-                    onClick={() => setSelectedUser(user)}
-                    className="p-1.5 bg-gray-100 hover:bg-gray-200 rounded-md text-gray-600"
-                  >
-                    <Eye className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setEditingUser(user)}
-                    className="p-1.5 bg-blue-900/30 hover:bg-blue-900/50 rounded-md text-blue-400"
-                  >
-                    <Pencil className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Desktop table view */}
-          <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="bg-gray-50 text-gray-500 uppercase text-[10px] font-black tracking-widest">
-                  <th className="px-3 sm:px-6 py-2 sm:py-4">Nome Completo</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-4">Telefone+DDD+País</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-4">Protocolo SGI</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-4">Status do Processo</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-4">Última Alteração</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-4 text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800">
+          {filteredUsers.length === 0 ? (
+            <div className="py-12 text-center">
+              <SearchX className="w-8 h-8 text-gray-300 mx-auto mb-3" />
+              <p className="text-sm font-bold text-gray-500">Nenhum usuário encontrado</p>
+              <p className="text-xs text-gray-400 mt-1">Tente alterar o termo da busca.</p>
+            </div>
+          ) : (
+            <>
+              <div className="block md:hidden space-y-3">
                 {filteredUsers.map(user => (
-                  <tr key={user.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-3 sm:px-6 py-2 sm:py-4 font-bold text-gray-700">{user.name}</td>
-                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-500 font-bold whitespace-nowrap">{user.phone} ({user.country})</td>
-                    <td className="px-3 sm:px-6 py-2 sm:py-4">
-                      <span className="bg-blue-900/30 text-blue-400 px-2 py-1 rounded-md text-[10px] font-black">{user.protocol}</span>
-                    </td>
-                    <td className="px-3 sm:px-6 py-2 sm:py-4">
-                      <span className={`px-3 py-1 rounded-full text-[10px] font-black text-white ${
+                  <div key={user.id} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
+                    <div className="flex items-start justify-between mb-2">
+                      <p className="font-bold text-gray-800 text-sm truncate flex-1">{user.name}</p>
+                      <span className={`ml-2 px-3 py-1 rounded-full text-[10px] font-black text-white shrink-0 ${
                         user.status === ProcessStatus.PENDENTE ? 'bg-gray-200 text-gray-700' :
                         user.status === ProcessStatus.TRIAGEM ? 'bg-yellow-600' :
                         user.status === ProcessStatus.ANALISE ? 'bg-orange-600' : 'bg-emerald-600'
                       }`}>
                         {user.status}
                       </span>
-                    </td>
-                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-500 text-[10px] font-bold whitespace-nowrap">
-                       {user.lastUpdate || user.registrationDate}
-                    </td>
-                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-right whitespace-nowrap no-print">
-                      <div className="flex justify-end gap-2">
-                        <button 
-                          onClick={() => setSelectedUser(user)}
-                          className="p-1.5 bg-gray-100 hover:bg-gray-200 rounded-md text-gray-600"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => setEditingUser(user)}
-                          className="p-1.5 bg-blue-900/30 hover:bg-blue-900/50 rounded-md text-blue-400"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <p className="text-[10px] font-black text-gray-500 uppercase">Telefone</p>
+                        <p className="font-bold text-gray-700 truncate">{user.phone} ({user.country})</p>
                       </div>
-                    </td>
-                  </tr>
+                      <div>
+                        <p className="text-[10px] font-black text-gray-500 uppercase">Protocolo</p>
+                        <span className="bg-blue-900/30 text-blue-400 px-2 py-0.5 rounded-md text-[10px] font-black">{user.protocol}</span>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black text-gray-500 uppercase">Última Alteração</p>
+                        <p className="font-bold text-gray-600 truncate">{user.lastUpdate || user.registrationDate}</p>
+                      </div>
+                    </div>
+                    <div className="flex justify-end gap-2 mt-3 pt-3 border-t border-gray-100">
+                      <button onClick={() => setSelectedUser(user)} className="p-1.5 bg-gray-100 hover:bg-gray-200 rounded-md text-gray-600"><Eye className="w-4 h-4" /></button>
+                      <button onClick={() => setEditingUser(user)} className="p-1.5 bg-blue-900/30 hover:bg-blue-900/50 rounded-md text-blue-400"><Pencil className="w-4 h-4" /></button>
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </div>
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 text-gray-500 uppercase text-[10px] font-black tracking-widest">
+                      <th className="px-3 sm:px-6 py-2 sm:py-4">Nome Completo</th>
+                      <th className="px-3 sm:px-6 py-2 sm:py-4">Telefone+DDD+País</th>
+                      <th className="px-3 sm:px-6 py-2 sm:py-4">Protocolo SGI</th>
+                      <th className="px-3 sm:px-6 py-2 sm:py-4">Status do Processo</th>
+                      <th className="px-3 sm:px-6 py-2 sm:py-4">Última Alteração</th>
+                      <th className="px-3 sm:px-6 py-2 sm:py-4 text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800">
+                    {filteredUsers.map(user => (
+                      <tr key={user.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-3 sm:px-6 py-2 sm:py-4 font-bold text-gray-700">{user.name}</td>
+                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-500 font-bold whitespace-nowrap">{user.phone} ({user.country})</td>
+                        <td className="px-3 sm:px-6 py-2 sm:py-4"><span className="bg-blue-900/30 text-blue-400 px-2 py-1 rounded-md text-[10px] font-black">{user.protocol}</span></td>
+                        <td className="px-3 sm:px-6 py-2 sm:py-4">
+                          <span className={`px-3 py-1 rounded-full text-[10px] font-black text-white ${
+                            user.status === ProcessStatus.PENDENTE ? 'bg-gray-200 text-gray-700' :
+                            user.status === ProcessStatus.TRIAGEM ? 'bg-yellow-600' :
+                            user.status === ProcessStatus.ANALISE ? 'bg-orange-600' : 'bg-emerald-600'
+                          }`}>
+                            {user.status}
+                          </span>
+                        </td>
+                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-500 text-[10px] font-bold whitespace-nowrap">{user.lastUpdate || user.registrationDate}</td>
+                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-right whitespace-nowrap no-print">
+                          <div className="flex justify-end gap-2">
+                            <button onClick={() => setSelectedUser(user)} className="p-1.5 bg-gray-100 hover:bg-gray-200 rounded-md text-gray-600"><Eye className="w-4 h-4" /></button>
+                            <button onClick={() => setEditingUser(user)} className="p-1.5 bg-blue-900/30 hover:bg-blue-900/50 rounded-md text-blue-400"><Pencil className="w-4 h-4" /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </div>
       ) : currentSection === 'configuracoes' && activeTab === 'iban' ? (
         <IbanManagementSection currentUser={currentUser} />
@@ -4164,7 +4156,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               {membersLoading ? (
                 <div className="p-8"><TableSkeleton rows={4} cols={4} /></div>
               ) : managementUsers.length === 0 ? (
-                <p className="px-4 py-8 text-center text-gray-500">Nenhum membro encontrado.</p>
+                <div className="py-12 text-center">
+                  <Users className="w-8 h-8 text-gray-300 mx-auto mb-3" />
+                  <p className="text-sm font-bold text-gray-500">Nenhum membro encontrado</p>
+                  <p className="text-xs text-gray-400 mt-1">Cadastre novos membros usando o formulário ao lado.</p>
+                </div>
               ) : (
                 <>
                   {/* Mobile card view */}

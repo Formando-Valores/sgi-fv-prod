@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Trash2, Pencil, Loader2, Check, X, Search, ChevronDown, XCircle } from 'lucide-react';
+import { Plus, Trash2, Pencil, Loader2, Check, X, Search, ChevronDown, XCircle, Package } from 'lucide-react';
 import Skeleton, { TableSkeleton } from '../../ui/Skeleton';
+import EmptyState from '../../ui/EmptyState';
 import {
   loadServicesCatalog,
   createService,
@@ -161,7 +162,7 @@ const ServicesSection: React.FC<Props> = () => {
         {loading ? (
           <TableSkeleton rows={4} cols={6} />
         ) : filtered.length === 0 ? (
-          <p className="text-gray-500">Nenhum serviço encontrado.</p>
+          <EmptyState icon={Package} title="Nenhum serviço encontrado" description="Nenhum serviço corresponde à sua busca." />
         ) : (
           <div className="space-y-4">
             {Object.values(ServiceUnit).map((unit) => {
