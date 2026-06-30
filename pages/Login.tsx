@@ -363,9 +363,10 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
 
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gray-50">
-      <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+    <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gradient-to-br from-gray-50 to-blue-50/30">
+      <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-[0_8px_30px_-4px_rgba(0,0,0,0.08)] border border-gray-100">
         <div className="mb-8 text-center">
+          <img src="/icons/icon.svg" alt="SGI FV" className="h-12 w-12 mx-auto mb-3" />
           <h1 className="text-2xl font-bold tracking-wider text-gray-800">SGI FV</h1>
           <p className="text-gray-500 font-semibold uppercase text-xs mt-1">Formando Valores</p>
         </div>
@@ -509,19 +510,19 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
           )}
         </form>
 
-        <div className="mt-8 pt-6 border-t border-gray-200 text-center">
-          <p className="text-gray-500 text-sm mb-4">Ainda não possui acesso?</p>
+        <div className="mt-8 pt-6 border-t border-gray-100 text-center">
+          <p className="text-gray-400 text-sm mb-4">Ainda não possui acesso?</p>
           <Link
             to="/register"
-            className="inline-block px-6 py-2 border-2 border-gray-300 hover:border-gray-400 text-gray-700 font-bold rounded-full transition-all"
+            className="inline-block w-full py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-bold rounded-xl transition-all shadow-md hover:shadow-lg active:scale-[0.98]"
           >
-            REGISTRE-SE AGORA
+            CRIAR CONTA
           </Link>
         </div>
       </div>
       
-      <p className="mt-8 text-gray-500 text-[10px] uppercase tracking-tighter">
-        © 2026 SGI FV - Sistema de Gestão Integrada
+      <p className="mt-8 text-gray-400 text-[10px] uppercase tracking-tighter">
+        © 2026 SGI FV — Sistema de Gestão Integrada
       </p>
     </div>
   );

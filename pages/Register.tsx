@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, Eye, EyeOff, ShieldCheck, ExternalLink } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, ShieldCheck, ExternalLink } from 'lucide-react';
 import { CONSENT_TEXT_VERSION, COUNTRIES } from '../constants';
 import { ServiceUnit, ProcessStatus, User, UserRole, Organization } from '../types';
 import { isSupabaseConfigured, supabase } from '../supabase';
@@ -45,7 +45,7 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+
 
   const inputClass = 'w-full p-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500';
   const privacyPolicyUrl = import.meta.env.VITE_PRIVACY_POLICY_URL || 'https://example.com/politica-de-privacidade';
@@ -367,23 +367,27 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
 
   if (success) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gray-50">
-        <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-[0_16px_34px_rgba(15,23,42,0.08)] border border-gray-100 text-center">
-          <div className="w-16 h-16 bg-amber-500 rounded-full flex items-center justify-center mx-auto mb-4">
+      <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gradient-to-br from-gray-50 to-emerald-50/30">
+        <div className="w-full max-w-md bg-white p-8 sm:p-10 rounded-2xl shadow-[0_8px_30px_-4px_rgba(0,0,0,0.08)] border border-gray-100 text-center">
+          <div className="w-16 h-16 bg-emerald-500 rounded-full flex items-center justify-center mx-auto mb-5 shadow-lg shadow-emerald-200">
             <ShieldCheck className="w-8 h-8 text-white" />
           </div>
-          <h2 className="text-xl font-bold text-gray-800 mb-2">Cadastro Realizado!</h2>
-          <p className="text-gray-500 text-sm">Sua conta foi criada com sucesso. Verifique seu e-mail para acessar o sistema e realizar o pagamento da taxa associativa.</p>
-          <p className="text-gray-400 text-xs mt-2">Redirecionando para o login em 5 segundos...</p>
+          <h2 className="text-xl font-bold text-gray-800 mb-3">Cadastro Realizado!</h2>
+          <p className="text-gray-500 text-sm leading-relaxed">Sua conta foi criada com sucesso. Enviamos um e-mail com as instruções de acesso e o link para realizar o pagamento da taxa associativa.</p>
+          <div className="mt-6 p-4 bg-blue-50 border border-blue-100 rounded-xl">
+            <p className="text-xs text-blue-700 font-semibold">📧 Verifique sua caixa de entrada e também a pasta de spam.</p>
+          </div>
+          <p className="text-gray-400 text-xs mt-6">Redirecionando para o login em 5 segundos...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gray-50">
-      <div className="w-full max-w-4xl bg-white p-4 sm:p-8 rounded-2xl shadow-[0_16px_34px_rgba(15,23,42,0.08)] border border-gray-100">
+    <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gradient-to-br from-gray-50 to-blue-50/30">
+      <div className="w-full max-w-4xl bg-white p-4 sm:p-8 rounded-2xl shadow-[0_8px_30px_-4px_rgba(0,0,0,0.08)] border border-gray-100">
         <div className="mb-8 text-center">
+          <img src="/icons/icon.svg" alt="SGI FV" className="h-12 w-12 mx-auto mb-3" />
           <h1 className="text-2xl font-bold tracking-wider text-gray-800">SGI FV</h1>
           <p className="text-gray-500 font-semibold uppercase text-xs mt-1">Criar Nova Conta</p>
         </div>
@@ -576,7 +580,7 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
               <button 
                 type="button"
                 disabled={isLoading}
-                className="w-full py-5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl uppercase tracking-widest transition-all shadow-xl flex items-center justify-center gap-3"
+                className="w-full py-5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 disabled:cursor-not-allowed text-white font-bold rounded-xl uppercase tracking-widest transition-all shadow-xl flex items-center justify-center gap-3 active:scale-[0.98]"
                 onClick={handleRegister}
               >
                 {isLoading ? (
@@ -585,10 +589,7 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
                     <span>Finalizando cadastro...</span>
                   </>
                 ) : (
-                  <>
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                    <span>Cadastrar</span>
-                  </>
+                  <span>Cadastrar</span>
                 )}
               </button>
             </div>
