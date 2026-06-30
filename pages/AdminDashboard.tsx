@@ -9,6 +9,7 @@ import { supabase } from '../supabase';
 import type { Process as DbProcess } from '../src/lib/processes';
 import Card from '../src/components/ui/Card';
 import Badge from '../src/components/ui/Badge';
+import Skeleton, { TableSkeleton, CardSkeleton } from '../src/components/ui/Skeleton';
 import Button from '../src/components/ui/Button';
 import DashboardShell from '../src/components/dashboard/DashboardShell';
 import DashboardSidebar from '../src/components/dashboard/DashboardSidebar';
@@ -3862,7 +3863,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
           {/* Loading/empty states (shared) */}
           {clientsLoading ? (
-            <div className="rounded-xl border border-gray-100 bg-gray-50 p-6 text-center text-gray-500">Carregando membros...</div>
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-6"><TableSkeleton rows={4} cols={6} /></div>
           ) : visibleClients.length === 0 ? (
             <div className="rounded-xl border border-gray-100 bg-gray-50 p-6 text-center text-gray-500">Nenhum membro encontrado.</div>
           ) : (
@@ -4161,7 +4162,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               {membersError && <p className="px-4 pt-3 text-sm text-red-400 font-bold">{membersError}</p>}
 
               {membersLoading ? (
-                <p className="px-4 py-8 text-center text-gray-500">Carregando membros...</p>
+                <div className="p-8"><TableSkeleton rows={4} cols={4} /></div>
               ) : managementUsers.length === 0 ? (
                 <p className="px-4 py-8 text-center text-gray-500">Nenhum membro encontrado.</p>
               ) : (
@@ -5707,7 +5708,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     </div>
 
                     {editingProfileLoading && (
-                      <p className="text-sm font-bold text-gray-500">Carregando dados completos do cadastro...</p>
+                      <div className="space-y-4 p-4"><Skeleton className="h-8 w-1/3" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-2/3" /></div>
                     )}
                     {editingProfileError && (
                       <p className="text-sm font-bold text-amber-300">{editingProfileError}</p>

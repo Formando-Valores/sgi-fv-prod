@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Plus, Trash2, Loader2, Check, X } from 'lucide-react';
+import Skeleton, { TableSkeleton } from '../../ui/Skeleton';
 import { listProfessionalAccounts, upsertProfessionalAccount, deleteProfessionalAccount, type ProfessionalAccount } from '../../../lib/professionalAccounts';
 import { ServiceUnit } from '../../../../types';
 
@@ -152,7 +153,7 @@ const IbanManagementSection: React.FC<Props> = ({ currentUser }) => {
       <div className="lg:col-span-2 bg-white border border-gray-100 rounded-2xl p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
         <h3 className="text-lg font-bold mb-6">Contas Cadastradas</h3>
         {loading ? (
-          <p className="text-gray-500"><Loader2 className="h-4 w-4 animate-spin inline mr-2" /> Carregando...</p>
+          <TableSkeleton rows={4} cols={6} />
         ) : accounts.length === 0 ? (
           <p className="text-gray-500">Nenhuma conta cadastrada.</p>
         ) : (

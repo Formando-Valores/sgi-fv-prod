@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Plus, Trash2, Pencil, Loader2, Check, X, Search, ChevronDown, XCircle } from 'lucide-react';
+import Skeleton, { TableSkeleton } from '../../ui/Skeleton';
 import {
   loadServicesCatalog,
   createService,
@@ -158,7 +159,7 @@ const ServicesSection: React.FC<Props> = () => {
           </div>
         </div>
         {loading ? (
-          <p className="text-gray-500"><Loader2 className="h-4 w-4 animate-spin inline mr-2" /> Carregando...</p>
+          <TableSkeleton rows={4} cols={6} />
         ) : filtered.length === 0 ? (
           <p className="text-gray-500">Nenhum serviço encontrado.</p>
         ) : (

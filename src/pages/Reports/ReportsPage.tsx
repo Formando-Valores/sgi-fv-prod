@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, Download, FileText, Search } from 'lucide-react';
 import { listReportActivities, type ReportFilters, type ReportRow } from '../../lib/reports';
 import { listPendingPaymentsForReconciliation, type PendingPaymentRow } from '../../lib/paymentsReconciliation';
+import { TableSkeleton } from '../../components/ui/Skeleton';
 
 interface ReportsPageProps {
   defaultOrgId?: string | null;
@@ -296,7 +297,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ defaultOrgId, operationalOnly
       <div className="rounded-2xl border border-gray-100 bg-white shadow-sm">
         {error && <div className="p-3 text-sm text-red-600">{error}</div>}
         {loading ? (
-          <div className="p-4 text-sm text-gray-500">Carregando...</div>
+          <div className="p-4"><TableSkeleton rows={5} cols={8} /></div>
         ) : (
           <>
             <div className="hidden md:block overflow-x-auto">
