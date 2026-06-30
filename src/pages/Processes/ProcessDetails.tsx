@@ -196,21 +196,21 @@ const ProcessDetails: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Back Button */}
-      <div className="flex items-center gap-4 no-print">
+      <div className="flex items-start sm:items-center gap-3 sm:gap-4 no-print">
         <Link
           to="/processos"
-          className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 transition-colors"
+          className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 transition-colors shrink-0"
         >
           <ArrowLeft className="w-5 h-5" />
         </Link>
-        <div>
-          <h1 className="text-xl font-black text-white tracking-tighter">
+        <div className="min-w-0">
+          <h1 className="text-lg sm:text-xl font-black text-white tracking-tighter truncate">
             {process.protocolo || `Processo #${process.id.slice(0,8)}`}
           </h1>
-          <div className="flex items-center gap-4 mt-1">
-            <p className="text-slate-400 text-xs font-bold uppercase">{formatDateTime(process.created_at)}</p>
-            <span className="w-1 h-1 bg-slate-700 rounded-full"></span>
-            <p className="text-slate-200 text-sm font-bold">{process.titulo}</p>
+          <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-1">
+            <p className="text-slate-400 text-[10px] sm:text-xs font-bold uppercase whitespace-nowrap">{formatDateTime(process.created_at)}</p>
+            <span className="w-1 h-1 bg-slate-700 rounded-full shrink-0"></span>
+            <p className="text-slate-200 text-xs sm:text-sm font-bold truncate">{process.titulo}</p>
           </div>
         </div>
       </div>
@@ -218,9 +218,9 @@ const ProcessDetails: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Status Section */}
         <section className="lg:col-span-2 space-y-6">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
-            <div className="flex items-center justify-between mb-8">
-              <h2 className="text-lg font-bold flex items-center gap-2">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl">
+            <div className="flex items-start sm:items-center justify-between mb-6 sm:mb-8 gap-2">
+              <h2 className="text-base sm:text-lg font-bold flex items-center gap-2">
                 <Activity className="text-blue-500" /> STATUS DO PROCESSO
               </h2>
               <span className="bg-slate-800 px-3 py-1 rounded-full text-[10px] font-black text-slate-400 tracking-widest uppercase">ACOMPANHAMENTO</span>
@@ -231,11 +231,11 @@ const ProcessDetails: React.FC = () => {
               <div className="absolute top-1/2 left-0 w-full h-1 bg-slate-800 -translate-y-1/2 z-0"></div>
               {statusSteps.map((step, idx) => (
                 <div key={step.key} className="relative z-10 flex flex-col items-center">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center border-4 border-slate-950 transition-all ${idx <= currentStepIndex ? step.color : 'bg-slate-800'}`}>
-                    {idx < currentStepIndex ? <div className="w-3 h-3 bg-white rounded-full"></div> : null}
-                    {idx === currentStepIndex ? <div className="w-4 h-4 bg-white rounded-full animate-pulse"></div> : null}
+                  <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center border-4 border-slate-950 transition-all ${idx <= currentStepIndex ? step.color : 'bg-slate-800'}`}>
+                    {idx < currentStepIndex ? <div className="w-2 h-2 sm:w-3 sm:h-3 bg-white rounded-full"></div> : null}
+                    {idx === currentStepIndex ? <div className="w-3 h-3 sm:w-4 sm:h-4 bg-white rounded-full animate-pulse"></div> : null}
                   </div>
-                  <span className={`mt-3 text-[10px] font-black uppercase tracking-tighter ${idx <= currentStepIndex ? 'text-white' : 'text-slate-600'}`}>
+                  <span className={`mt-2 sm:mt-3 text-[9px] sm:text-[10px] font-black uppercase tracking-tighter ${idx <= currentStepIndex ? 'text-white' : 'text-slate-600'}`}>
                     {step.label}
                   </span>
                 </div>
@@ -244,14 +244,14 @@ const ProcessDetails: React.FC = () => {
 
             {/* Status Actions */}
             {isAdmin && process.status !== 'concluido' && (
-              <div className="flex flex-wrap gap-2 mb-6">
+              <div className="flex flex-col sm:flex-row flex-wrap gap-2 mb-6">
                 {statusSteps.map((step, idx) => (
                   idx > currentStepIndex && (
                     <button
                       key={step.key}
                       onClick={() => handleStatusChange(step.key as Process['status'])}
                       disabled={submitting}
-                      className="px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 rounded-lg text-sm font-bold text-white flex items-center gap-2 transition-colors"
+                      className="w-full sm:w-auto px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 rounded-lg text-sm font-bold text-white flex items-center justify-center sm:justify-start gap-2 transition-colors"
                     >
                       Avançar para {step.label} <ChevronRight className="w-4 h-4" />
                     </button>
@@ -263,20 +263,20 @@ const ProcessDetails: React.FC = () => {
             {/* Manager and Notes Section */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-950/50 rounded-2xl border border-slate-800/50 overflow-hidden">
               {/* Manager */}
-              <div className="p-8 flex flex-col items-center text-center border-b md:border-b-0 md:border-r border-slate-800/50">
-                <div className="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center mb-4 bg-blue-600 shadow-xl">
-                  <UserCheck className="text-white w-8 h-8" />
+              <div className="p-4 sm:p-8 flex flex-col items-center text-center border-b md:border-b-0 md:border-r border-slate-800/50">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto rounded-2xl flex items-center justify-center mb-4 bg-blue-600 shadow-xl">
+                  <UserCheck className="text-white w-6 h-6 sm:w-8 sm:h-8" />
                 </div>
-                <p className="text-xl font-black uppercase tracking-tight text-white">
+                <p className="text-lg sm:text-xl font-black uppercase tracking-tight text-white">
                   {process.responsavel_user_id ? 'Atribuído' : 'A DEFINIR'}
                 </p>
                 <p className="text-slate-500 text-[10px] mt-1 uppercase font-bold tracking-widest">Gestor Responsável</p>
               </div>
 
               {/* Add Observation */}
-              <div className="p-8 flex flex-col items-center text-center">
-                <div className="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center mb-4 bg-purple-600 shadow-xl">
-                  <MessageSquare className="text-white w-8 h-8" />
+              <div className="p-4 sm:p-8 flex flex-col items-center text-center">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto rounded-2xl flex items-center justify-center mb-4 bg-purple-600 shadow-xl">
+                  <MessageSquare className="text-white w-6 h-6 sm:w-8 sm:h-8" />
                 </div>
                 {isAdmin ? (
                   <button
@@ -293,19 +293,19 @@ const ProcessDetails: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-            <h2 className="text-lg font-bold mb-6 flex items-center gap-2">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6">
+            <h2 className="text-base sm:text-lg font-bold mb-4 sm:mb-6 flex items-center gap-2">
               <Landmark className="text-emerald-500" /> PROCESSAMENTO ADMINISTRATIVO
             </h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="p-4 bg-gray-900 border border-slate-800 rounded-xl">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+              <div className="p-3 sm:p-4 bg-gray-900 border border-slate-800 rounded-xl">
                 <p className="text-slate-500 text-[10px] font-black uppercase mb-1">Protocolo SGI</p>
-                <p className="text-xl font-black text-blue-400">{process.protocolo || '-'}</p>
+                <p className="text-lg sm:text-xl font-black text-blue-400">{process.protocolo || '-'}</p>
               </div>
-              <div className="p-4 bg-gray-900 border border-slate-800 rounded-xl">
+              <div className="p-3 sm:p-4 bg-gray-900 border border-slate-800 rounded-xl">
                 <p className="text-slate-500 text-[10px] font-black uppercase mb-1">Situação Atual</p>
-                <p className="text-xl font-black text-white">
+                <p className="text-lg sm:text-xl font-black text-white">
                   {statusSteps.find(s => s.key === process.status)?.label || process.status}
                 </p>
               </div>
@@ -313,8 +313,8 @@ const ProcessDetails: React.FC = () => {
           </div>
 
           {requiredDocuments.length > 0 && (
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-              <h2 className="text-lg font-bold mb-3">Documentos obrigatórios</h2>
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6">
+              <h2 className="text-base sm:text-lg font-bold mb-3">Documentos obrigatórios</h2>
               <ul className="space-y-2">
                 {requiredDocuments.map((doc) => (
                   <li key={doc.id} className="text-sm text-slate-300">• {doc.document_name}</li>
@@ -323,8 +323,8 @@ const ProcessDetails: React.FC = () => {
             </div>
           )}
 
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-            <h2 className="text-lg font-bold mb-3">Anexos do processo</h2>
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6">
+            <h2 className="text-base sm:text-lg font-bold mb-3">Anexos do processo</h2>
             {attachments.length === 0 ? <p className="text-sm text-slate-500">Nenhum anexo.</p> : (
               <div className="space-y-3">
                 {attachments.map((a) => (
@@ -332,10 +332,10 @@ const ProcessDetails: React.FC = () => {
                     <p className="font-bold text-sm text-white">{a.document_name}</p>
                     <p className="text-xs text-slate-400">Status: {a.validation_status}</p>
                     {canReviewDocuments && (
-                      <div className="flex gap-2 mt-2">
-                        <button className="text-xs px-2 py-1 bg-emerald-700 rounded" onClick={() => handleReview(a.id, 'approved')}>Aprovar</button>
-                        <button className="text-xs px-2 py-1 bg-red-700 rounded" onClick={() => handleReview(a.id, 'rejected')}>Recusar</button>
-                        <button className="text-xs px-2 py-1 bg-yellow-700 rounded" onClick={() => handleReview(a.id, 'resubmission_requested')}>Solicitar reenvio</button>
+                      <div className="flex flex-col sm:flex-row gap-2 mt-2">
+                        <button className="w-full sm:w-auto text-xs px-3 py-2 sm:px-2 sm:py-1 bg-emerald-700 hover:bg-emerald-600 rounded font-bold transition-colors" onClick={() => handleReview(a.id, 'approved')}>Aprovar</button>
+                        <button className="w-full sm:w-auto text-xs px-3 py-2 sm:px-2 sm:py-1 bg-red-700 hover:bg-red-600 rounded font-bold transition-colors" onClick={() => handleReview(a.id, 'rejected')}>Recusar</button>
+                        <button className="w-full sm:w-auto text-xs px-3 py-2 sm:px-2 sm:py-1 bg-yellow-700 hover:bg-yellow-600 rounded font-bold transition-colors" onClick={() => handleReview(a.id, 'resubmission_requested')}>Solicitar reenvio</button>
                       </div>
                     )}
                   </div>
@@ -346,7 +346,7 @@ const ProcessDetails: React.FC = () => {
 
           {/* Communication Section */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
-            <h2 className="text-lg font-bold p-6 pb-0 flex items-center gap-2">
+            <h2 className="text-base sm:text-lg font-bold p-4 sm:p-6 pb-0 flex items-center gap-2">
               <MessageCircle className="text-cyan-500" /> COMUNICAÇÃO
             </h2>
             <CommunicationBlock processId={process.id} currentUserId={userContext.id} dark />
@@ -355,8 +355,8 @@ const ProcessDetails: React.FC = () => {
 
         {/* Sidebar Data Section */}
         <section className="space-y-6">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-            <h2 className="text-lg font-bold mb-6 flex items-center gap-2">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6">
+            <h2 className="text-base sm:text-lg font-bold mb-4 sm:mb-6 flex items-center gap-2">
               <UserIcon className="text-purple-500" /> DADOS CADASTRAIS
             </h2>
             <div className="space-y-4">
@@ -378,8 +378,8 @@ const ProcessDetails: React.FC = () => {
           </div>
 
           {process.payment_status && process.payment_status !== 'paid' && process.payment_status !== 'released' && (
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-              <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6">
+              <h2 className="text-base sm:text-lg font-bold mb-4 flex items-center gap-2">
                 <CreditCard className="text-emerald-500" /> PAGAMENTO
               </h2>
               <div className="space-y-3">
@@ -433,8 +433,8 @@ const ProcessDetails: React.FC = () => {
           )}
 
           {(process.payment_status === 'paid' || process.payment_status === 'released') && (
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-              <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6">
+              <h2 className="text-base sm:text-lg font-bold mb-4 flex items-center gap-2">
                 <FileDown className="text-emerald-500" /> CERTIFICADO
               </h2>
               <p className="text-sm text-slate-400 mb-4">Sua filiação foi confirmada. Acesse seu certificado oficial.</p>
@@ -448,11 +448,11 @@ const ProcessDetails: React.FC = () => {
             </div>
           )}
 
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-            <h2 className="text-lg font-bold mb-6 flex items-center gap-2">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6">
+            <h2 className="text-base sm:text-lg font-bold mb-4 sm:mb-6 flex items-center gap-2">
               <Calendar className="text-orange-500" /> LINHA DO TEMPO
             </h2>
-            <div className="max-h-80 overflow-y-auto pr-2 relative">
+            <div className="max-h-60 sm:max-h-80 overflow-y-auto pr-2 relative">
               <div className="absolute left-1 top-0 bottom-0 w-0.5 bg-slate-800"></div>
               <div className="space-y-6 pl-6 relative">
                 {events.length === 0 ? (
