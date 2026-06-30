@@ -448,8 +448,8 @@ const ProcessList: React.FC = () => {
 
       {/* Create Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto animate-scaleIn">
             <div className="flex items-center justify-between p-6 border-b border-slate-800">
               <h2 className="text-lg font-bold text-white">{step === 1 ? 'Novo Processo - Serviços' : 'Novo Processo - Dados'}</h2>
               <button onClick={resetModal} className="text-slate-500 hover:text-white">

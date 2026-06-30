@@ -3947,7 +3947,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           />
         </section>
       ) : currentSection === 'configuracoes' && activeTab === 'users' ? (
-        <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
+        <div key="tab-users" className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-[0_16px_34px_rgba(15,23,42,0.08)] animate-slideUp">
           <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 no-print">
             <div className="relative w-full md:w-96">
               <Search className="absolute left-3 top-2.5 text-gray-500 w-4 h-4" />
@@ -4050,12 +4050,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           )}
         </div>
       ) : currentSection === 'configuracoes' && activeTab === 'iban' ? (
-        <IbanManagementSection currentUser={currentUser} />
+        <div key="tab-iban" className="animate-slideUp"><IbanManagementSection currentUser={currentUser} /></div>
       ) : currentSection === 'configuracoes' && activeTab === 'servicos' ? (
-        <ServicesSection currentUser={currentUser} />
+        <div key="tab-servicos" className="animate-slideUp"><ServicesSection currentUser={currentUser} /></div>
       ) : currentSection === 'configuracoes' ? (
         /* Management Tab Content */
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div key="tab-management" className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-slideUp">
            <div className="lg:col-span-1 bg-white border border-gray-100 rounded-2xl p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
               <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
                 <Plus className="text-blue-500" /> Cadastrar Usuário e Nível
@@ -4265,8 +4265,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       ) : null}
 
       {showCreateClientModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-4xl rounded-3xl border border-gray-100 shadow-2xl overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white w-full max-w-4xl rounded-3xl border border-gray-100 shadow-2xl overflow-hidden animate-scaleIn">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
               <h3 className="text-xl font-black uppercase">Cadastrar novo cliente</h3>
               <button
@@ -4438,8 +4438,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       )}
 
       {showEditClientModal && editingClient && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-4xl rounded-3xl border border-gray-100 shadow-2xl overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white w-full max-w-4xl rounded-3xl border border-gray-100 shadow-2xl overflow-hidden animate-scaleIn">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
               <div>
                 <h3 className="text-xl font-black uppercase">Editar cadastro do cliente</h3>
@@ -4592,8 +4592,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
       {/* Details View Modal */}
       {selectedUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-          <div className="bg-white w-[calc(100%-2rem)] sm:w-[calc(100%-3rem)] md:w-full max-w-2xl rounded-2xl border border-gray-100 shadow-2xl max-h-[92vh] md:max-h-[85vh] flex flex-col overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white w-[calc(100%-2rem)] sm:w-[calc(100%-3rem)] md:w-full max-w-2xl rounded-2xl border border-gray-100 shadow-2xl max-h-[92vh] md:max-h-[85vh] flex flex-col overflow-hidden animate-scaleIn">
              <div className="shrink-0 px-4 sm:px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/80 backdrop-blur-sm">
                 <h3 className="text-sm sm:text-lg font-black uppercase tracking-tight truncate pr-2">Ficha Cadastral</h3>
                 <button onClick={() => setSelectedUser(null)} className="p-1.5 sm:p-2 bg-gray-100 hover:bg-gray-200 rounded-full hover:scale-105 active:scale-95 transition-transform shrink-0">
@@ -5118,8 +5118,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       )}
 
       {canCreateProcess && showCreateProcessModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-3xl rounded-3xl border border-gray-100 shadow-2xl overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white w-full max-w-3xl rounded-3xl border border-gray-100 shadow-2xl overflow-hidden animate-scaleIn">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
               <h3 className="text-xl font-black uppercase">Criar processo manual</h3>
               <button
@@ -5457,8 +5457,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
       {/* Edit Status Modal */}
       {editingUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-3xl rounded-3xl border border-gray-100 shadow-2xl overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white w-full max-w-3xl rounded-3xl border border-gray-100 shadow-2xl overflow-hidden animate-scaleIn">
              <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
                <h3 className="text-xl font-black uppercase">Editar Status: {editingUser.protocol}</h3>
                <button onClick={() => setEditingUser(null)} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full">
