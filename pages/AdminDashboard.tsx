@@ -569,9 +569,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
   useEffect(() => {
     if (currentSection === 'configuracoes') {
+      setActiveTab('users');
       const preset = new URLSearchParams(location.search).get('preset');
       if (preset === 'usuarios_cadastrados') {
-        setActiveTab('users');
         setSearchTerm('');
         return;
       }
@@ -3427,7 +3427,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       {currentSection === 'configuracoes' && (
         <>
           {/* Navigation Tabs */}
-          <div className="flex border-b border-gray-100 mb-6 gap-8 no-print">
+          <div className="flex border-b border-gray-100 mb-6 gap-8 no-print overflow-x-auto overflow-y-hidden whitespace-nowrap scroll-smooth" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         <button 
           onClick={() => setActiveTab('users')}
           className={`pb-4 px-2 font-black uppercase text-xs tracking-widest transition-all relative ${activeTab === 'users' ? 'text-blue-500' : 'text-gray-500'}`}
