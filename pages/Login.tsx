@@ -441,7 +441,7 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
                     placeholder="seu@email.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={`w-full pl-10 pr-4 py-3 bg-white border rounded-lg text-gray-800 font-semibold placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 ${error ? 'input-error' : 'border-gray-200'}`}
                     required={!showForgotPassword}
                     disabled={isLoading}
                   />
@@ -457,7 +457,7 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
                     placeholder="******"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-10 pr-12 py-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={`w-full pl-10 pr-12 py-3 bg-white border rounded-lg text-gray-800 font-semibold placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 ${error ? 'input-error' : 'border-gray-200'}`}
                     required={!showForgotPassword}
                     disabled={isLoading}
                   />

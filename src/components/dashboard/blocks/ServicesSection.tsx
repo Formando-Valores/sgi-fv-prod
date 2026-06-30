@@ -227,7 +227,7 @@ const ServicesSection: React.FC<Props> = () => {
                 <XCircle className="w-5 h-5 text-gray-500" />
               </button>
             </div>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className={`space-y-4 ${feedback?.type === 'error' ? 'p-3 -m-3 border-2 border-red-200 rounded-xl' : ''}`}>
               <div>
                 <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Nome *</label>
                 <input

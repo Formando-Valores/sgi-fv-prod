@@ -37,6 +37,19 @@
         ::-webkit-scrollbar-thumb:hover {
             background: #64748b;
         }
+        /* Form elements */
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+            border-color: #93c5fd;
+        }
+        .input-error {
+            border-color: #f87171 !important;
+        }
+        .input-error:focus {
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
+            border-color: #f87171 !important;
+        }
         @keyframes fadeIn {
             from { opacity: 0; }
             to { opacity: 1; }
