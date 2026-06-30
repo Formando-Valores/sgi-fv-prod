@@ -212,7 +212,7 @@ const ServicesSection: React.FC<Props> = () => {
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="fixed inset-0 bg-black/30" onClick={() => { if (!saving) { setShowModal(false); resetForm(); setFeedback(null); } }} />
-          <div className="relative bg-white w-full md:max-w-lg max-h-[90vh] md:rounded-2xl rounded-t-3xl shadow-2xl overflow-y-auto p-6">
+          <div className="relative bg-white w-[calc(100%-2rem)] sm:w-[calc(100%-3rem)] md:w-full md:max-w-lg max-h-[90vh] rounded-2xl shadow-2xl overflow-y-auto p-6">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-bold flex items-center gap-2">
                 {editingId ? <Pencil className="text-blue-500" /> : <Plus className="text-blue-500" />}
