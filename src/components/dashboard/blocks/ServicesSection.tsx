@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Trash2, Pencil, Loader2, Check, X, Search, XCircle, ChevronDown } from 'lucide-react';
+import { Plus, Trash2, Pencil, Loader2, Check, X, Search, ChevronDown, XCircle } from 'lucide-react';
 import {
   loadServicesCatalog,
   createService,
@@ -28,6 +28,7 @@ const ServicesSection: React.FC<Props> = () => {
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [search, setSearch] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [showModal, setShowModal] = useState(false);
 
   const [form, setForm] = useState(emptyForm);
   const [expandedUnits, setExpandedUnits] = useState<Record<string, boolean>>({});
@@ -46,6 +47,25 @@ const ServicesSection: React.FC<Props> = () => {
   const resetForm = () => {
     setForm(emptyForm);
     setEditingId(null);
+  };
+
+  const openNewModal = () => {
+    resetForm();
+    setFeedback(null);
+    setShowModal(true);
+  };
+
+  const openEditModal = (svc: DbCatalogService) => {
+    setForm({
+      name: svc.name,
+      description: svc.description || '',
+      unit: svc.unit,
+      group: svc.group || '',
+      price: svc.price,
+    });
+    setEditingId(svc.id);
+    setFeedback(null);
+    setShowModal(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -87,20 +107,12 @@ const ServicesSection: React.FC<Props> = () => {
       setFeedback({ type: 'success', message: 'Serviço cadastrado com sucesso!' });
     }
 
-    resetForm();
     await load();
-    setTimeout(() => setFeedback(null), 3000);
-  };
-
-  const handleEdit = (svc: DbCatalogService) => {
-    setForm({
-      name: svc.name,
-      description: svc.description || '',
-      unit: svc.unit,
-      group: svc.group || '',
-      price: svc.price,
-    });
-    setEditingId(svc.id);
+    setTimeout(() => {
+      setShowModal(false);
+      resetForm();
+      setFeedback(null);
+    }, 800);
   };
 
   const handleDelete = async (id: string) => {
@@ -124,93 +136,12 @@ const ServicesSection: React.FC<Props> = () => {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       <div className="lg:col-span-1 bg-white border border-gray-100 rounded-2xl p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
-        <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
-          {editingId ? <Pencil className="text-blue-500" /> : <Plus className="text-blue-500" />}
-          {editingId ? 'Editar Serviço' : 'Cadastrar Serviço'}
-        </h3>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Nome *</label>
-            <input
-              required
-              type="text"
-              placeholder="Nome do serviço"
-              value={form.name}
-              onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-              className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Descrição</label>
-            <textarea
-              placeholder="Descrição do serviço"
-              value={form.description}
-              onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
-              rows={3}
-              className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold resize-none"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Unidade *</label>
-            <select
-              required
-              value={form.unit}
-              onChange={(e) => setForm((prev) => ({ ...prev, unit: e.target.value }))}
-              className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold"
-            >
-              {Object.values(ServiceUnit).map((u) => (
-                <option key={u} value={u}>{u}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Grupo</label>
-            <input
-              type="text"
-              placeholder="Ex: Licenciamento, Certidão, etc."
-              value={form.group}
-              onChange={(e) => setForm((prev) => ({ ...prev, group: e.target.value }))}
-              className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Preço (R$) *</label>
-            <input
-              required
-              type="number"
-              step="0.01"
-              min="0.01"
-              placeholder="0.00"
-              value={form.price}
-              onChange={(e) => setForm((prev) => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
-              className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold"
-            />
-          </div>
-          <div className="flex gap-2">
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex-1 py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white font-bold uppercase rounded-xl transition-colors"
-            >
-              {saving ? <><Loader2 className="h-4 w-4 animate-spin inline mr-2" /> Salvando...</> : editingId ? 'Atualizar' : 'Cadastrar'}
-            </button>
-            {editingId && (
-              <button
-                type="button"
-                onClick={resetForm}
-                className="py-3 px-4 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-xl transition-colors"
-              >
-                <XCircle className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-          {feedback && (
-            <p className={`text-sm font-bold ${feedback.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
-              {feedback.type === 'success' ? <Check className="h-4 w-4 inline mr-1" /> : <X className="h-4 w-4 inline mr-1" />}
-              {feedback.message}
-            </p>
-          )}
-        </form>
+        <button
+          onClick={openNewModal}
+          className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold uppercase text-xs tracking-widest rounded-xl transition-all active:scale-95 flex items-center justify-center gap-2"
+        >
+          <Plus className="w-4 h-4" /> Cadastrar Serviço
+        </button>
       </div>
 
       <div className="lg:col-span-2 bg-white border border-gray-100 rounded-2xl p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
@@ -264,7 +195,7 @@ const ServicesSection: React.FC<Props> = () => {
                           </div>
                           <div className="flex items-center gap-3 shrink-0">
                             <span className="font-mono text-sm font-bold text-gray-700 whitespace-nowrap">R$ {svc.price.toFixed(2)}</span>
-                            <button onClick={() => handleEdit(svc)} className="p-1.5 bg-blue-100 hover:bg-blue-200 rounded-md text-blue-600" title="Editar"><Pencil className="w-4 h-4" /></button>
+                            <button onClick={() => openEditModal(svc)} className="p-1.5 bg-blue-100 hover:bg-blue-200 rounded-md text-blue-600" title="Editar"><Pencil className="w-4 h-4" /></button>
                             <button onClick={() => handleDelete(svc.id)} className="p-1.5 bg-red-100 hover:bg-red-200 rounded-md text-red-600" title="Excluir"><Trash2 className="w-4 h-4" /></button>
                           </div>
                         </div>
@@ -277,6 +208,98 @@ const ServicesSection: React.FC<Props> = () => {
           </div>
         )}
       </div>
+
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
+          <div className="fixed inset-0 bg-black/30" onClick={() => { if (!saving) { setShowModal(false); resetForm(); setFeedback(null); } }} />
+          <div className="relative bg-white w-full md:max-w-lg max-h-[90vh] md:rounded-2xl rounded-t-3xl shadow-2xl overflow-y-auto p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-bold flex items-center gap-2">
+                {editingId ? <Pencil className="text-blue-500" /> : <Plus className="text-blue-500" />}
+                {editingId ? 'Editar Serviço' : 'Novo Serviço'}
+              </h3>
+              <button
+                onClick={() => { setShowModal(false); resetForm(); setFeedback(null); }}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <XCircle className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Nome *</label>
+                <input
+                  required
+                  type="text"
+                  placeholder="Nome do serviço"
+                  value={form.name}
+                  onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+                  className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Descrição</label>
+                <textarea
+                  placeholder="Descrição do serviço"
+                  value={form.description}
+                  onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
+                  rows={3}
+                  className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold resize-none"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Unidade *</label>
+                <select
+                  required
+                  value={form.unit}
+                  onChange={(e) => setForm((prev) => ({ ...prev, unit: e.target.value }))}
+                  className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold"
+                >
+                  {Object.values(ServiceUnit).map((u) => (
+                    <option key={u} value={u}>{u}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Grupo</label>
+                <input
+                  type="text"
+                  placeholder="Ex: Licenciamento, Certidão, etc."
+                  value={form.group}
+                  onChange={(e) => setForm((prev) => ({ ...prev, group: e.target.value }))}
+                  className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Preço (R$) *</label>
+                <input
+                  required
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  placeholder="0.00"
+                  value={form.price}
+                  onChange={(e) => setForm((prev) => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
+                  className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold"
+                />
+              </div>
+              {feedback && (
+                <p className={`text-sm font-bold ${feedback.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
+                  {feedback.type === 'success' ? <Check className="h-4 w-4 inline mr-1" /> : <X className="h-4 w-4 inline mr-1" />}
+                  {feedback.message}
+                </p>
+              )}
+              <button
+                type="submit"
+                disabled={saving}
+                className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white font-bold uppercase rounded-xl transition-colors"
+              >
+                {saving ? <><Loader2 className="h-4 w-4 animate-spin inline mr-2" /> Salvando...</> : editingId ? 'Atualizar' : 'Cadastrar'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
