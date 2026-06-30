@@ -570,13 +570,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   useEffect(() => {
     if (currentSection === 'configuracoes') {
       setActiveTab('users');
-      const preset = new URLSearchParams(location.search).get('preset');
-      if (preset === 'usuarios_cadastrados') {
-        setSearchTerm('');
-        return;
-      }
-
-      setActiveTab('management');
       return;
     }
 
