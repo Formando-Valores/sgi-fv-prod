@@ -4595,15 +4595,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
       {/* Details View Modal */}
       {selectedUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-2xl rounded-3xl border border-gray-100 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
-             <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-               <h3 className="text-xl font-black uppercase">Ficha Cadastral do Cliente</h3>
-               <button onClick={() => setSelectedUser(null)} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full">
-                 <X className="w-5 h-5" />
-               </button>
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/80 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-2xl rounded-t-3xl md:rounded-3xl border border-gray-100 shadow-2xl max-h-[92vh] md:max-h-[85vh] flex flex-col overflow-hidden">
+             <div className="shrink-0 px-4 sm:px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/80 backdrop-blur-sm">
+                <h3 className="text-sm sm:text-lg font-black uppercase tracking-tight truncate pr-2">Ficha Cadastral</h3>
+                <button onClick={() => setSelectedUser(null)} className="p-1.5 sm:p-2 bg-gray-100 hover:bg-gray-200 rounded-full hover:scale-105 active:scale-95 transition-transform shrink-0">
+                  <X className="w-4 h-4 sm:w-5 sm:h-5" />
+                </button>
              </div>
-              <div className="p-6 sm:p-8 overflow-y-auto">
+               <div className="flex-1 overflow-y-auto overscroll-contain scroll-smooth px-4 sm:px-6 py-4 sm:py-6 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent">
                 {/* Sub-aba navigation */}
                 <div className="flex gap-1 mb-6 border-b border-gray-200">
                   <button
