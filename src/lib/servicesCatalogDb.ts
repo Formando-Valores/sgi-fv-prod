@@ -75,15 +75,13 @@ export async function updateService(id: string, updates: Partial<{
   price: number;
   active: boolean;
 }>) {
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from('services_catalog')
     .update({ ...updates, updated_at: new Date().toISOString() })
-    .eq('id', id)
-    .select()
-    .single();
+    .eq('id', id);
 
   if (!error) invalidateCache();
-  return { data, error };
+  return { data: null, error };
 }
 
 export async function deleteService(id: string) {
