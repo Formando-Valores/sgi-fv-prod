@@ -28,42 +28,57 @@ const Members: React.FC = () => {
         </button>
       </div>
 
-      {/* Members Table */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
-        <div className="p-6 border-b border-slate-800">
+        <div className="p-4 sm:p-6 border-b border-slate-800">
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
             <Users className="text-blue-500" /> Membros Ativos
           </h2>
         </div>
-        <div className="overflow-x-auto">
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="bg-slate-950 text-slate-400 uppercase text-[10px] font-black tracking-widest">
-                <th className="px-6 py-4">Membro</th>
-                <th className="px-6 py-4">E-mail</th>
-                <th className="px-6 py-4">Função</th>
-                <th className="px-6 py-4 text-right">Ações</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-4">Membro</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-4">E-mail</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-4">Função</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-4 text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
               {members.map((member) => (
                 <tr key={member.id} className="hover:bg-slate-800/50 transition-colors">
-                  <td className="px-6 py-4 font-bold text-slate-200">{member.name}</td>
-                  <td className="px-6 py-4 text-slate-400 font-bold">{member.email}</td>
-                  <td className="px-6 py-4">
+                  <td className="px-3 sm:px-6 py-2 sm:py-4 font-bold text-slate-200">{member.name}</td>
+                  <td className="px-3 sm:px-6 py-2 sm:py-4 text-slate-400 font-bold">{member.email}</td>
+                  <td className="px-3 sm:px-6 py-2 sm:py-4">
                     <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-black bg-blue-900/30 text-blue-400 border border-blue-900/50">
                       <Shield className="w-3 h-3" /> {member.role}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-right">
-                    <button className="text-slate-400 hover:text-white text-xs font-bold uppercase">
-                      Editar
-                    </button>
+                  <td className="px-3 sm:px-6 py-2 sm:py-4 text-right">
+                    <button className="text-slate-400 hover:text-white text-xs font-bold uppercase">Editar</button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+        <div className="block md:hidden space-y-2 p-3">
+          {members.map((member) => (
+            <div key={member.id} className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
+              <div className="flex items-start justify-between mb-2">
+                <div>
+                  <p className="font-bold text-slate-100 text-sm">{member.name}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">{member.email}</p>
+                </div>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-900/30 text-blue-400 border border-blue-900/50 shrink-0">
+                  <Shield className="w-3 h-3" /> {member.role}
+                </span>
+              </div>
+              <button className="text-slate-400 hover:text-white text-xs font-bold uppercase w-full text-center mt-2 pt-2 border-t border-slate-700">
+                Editar
+              </button>
+            </div>
+          ))}
         </div>
       </div>
     </div>

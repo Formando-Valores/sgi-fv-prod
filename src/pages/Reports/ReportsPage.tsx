@@ -247,22 +247,39 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ defaultOrgId, operationalOnly
           <h3 className="text-sm font-black text-amber-900">Pendências de reconciliação financeira</h3>
           <span className="rounded-md bg-amber-100 px-2 py-1 text-xs font-bold text-amber-800">{pendingPayments.length} itens</span>
         </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-xs">
-            <thead><tr className="text-amber-800"><th className="px-2 py-1 text-left">Protocolo</th><th className="px-2 py-1 text-left">Processo</th><th className="px-2 py-1 text-left">Valor</th><th className="px-2 py-1 text-left">Criado em</th></tr></thead>
-            <tbody>
+        {pendingPayments.length === 0 ? (
+          <p className="text-xs text-amber-800 text-center py-2">Nenhuma pendência fora da janela.</p>
+        ) : (
+          <>
+            <div className="hidden md:block overflow-x-auto">
+              <table className="min-w-full text-xs">
+                <thead><tr className="text-amber-800"><th className="px-2 py-1 text-left">Protocolo</th><th className="px-2 py-1 text-left">Processo</th><th className="px-2 py-1 text-left">Valor</th><th className="px-2 py-1 text-left">Criado em</th></tr></thead>
+                <tbody>
+                  {pendingPayments.map((row) => (
+                    <tr key={row.id} className="border-t border-amber-200">
+                      <td className="px-2 py-1 font-bold">{row.process?.protocolo || '-'}</td>
+                      <td className="px-2 py-1">{row.process?.titulo || row.process_id}</td>
+                      <td className="px-2 py-1">{Number(row.amount || 0).toLocaleString('pt-BR', { style: 'currency', currency: row.currency || 'BRL' })}</td>
+                      <td className="px-2 py-1">{new Date(row.created_at).toLocaleString('pt-BR')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="block md:hidden space-y-2">
               {pendingPayments.map((row) => (
-                <tr key={row.id} className="border-t border-amber-200">
-                  <td className="px-2 py-1 font-bold">{row.process?.protocolo || '-'}</td>
-                  <td className="px-2 py-1">{row.process?.titulo || row.process_id}</td>
-                  <td className="px-2 py-1">{Number(row.amount || 0).toLocaleString('pt-BR', { style: 'currency', currency: row.currency || 'BRL' })}</td>
-                  <td className="px-2 py-1">{new Date(row.created_at).toLocaleString('pt-BR')}</td>
-                </tr>
+                <div key={row.id} className="bg-white border border-amber-300 rounded-lg p-3">
+                  <p className="font-bold text-sm text-amber-900">{row.process?.protocolo || '-'}</p>
+                  <p className="text-xs text-amber-800 mt-1">{row.process?.titulo || row.process_id}</p>
+                  <div className="flex justify-between items-center mt-2 pt-2 border-t border-amber-200">
+                    <span className="text-sm font-bold text-amber-900">{Number(row.amount || 0).toLocaleString('pt-BR', { style: 'currency', currency: row.currency || 'BRL' })}</span>
+                    <span className="text-[10px] text-amber-700">{new Date(row.created_at).toLocaleString('pt-BR')}</span>
+                  </div>
+                </div>
               ))}
-              {!pendingPayments.length ? (<tr><td colSpan={4} className="px-2 py-2 text-center text-amber-800">Nenhuma pendência fora da janela.</td></tr>) : null}
-            </tbody>
-          </table>
-        </div>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
@@ -276,85 +293,147 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ defaultOrgId, operationalOnly
         <div className="rounded-xl border border-gray-100 bg-white p-4"><p className="text-xs text-gray-500">Consolidado por usuário (top)</p><p className="text-sm font-bold text-gray-900">{result?.summary.byUser.sort((a,b)=>b.total-a.total)[0]?.key || '-'}</p><p className="text-xs text-gray-500">{result?.summary.byUser.sort((a,b)=>b.total-a.total)[0]?.total || 0}</p></div>
       </div>
 
-      <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-x-auto">
+      <div className="rounded-2xl border border-gray-100 bg-white shadow-sm">
         {error && <div className="p-3 text-sm text-red-600">{error}</div>}
         {loading ? (
           <div className="p-4 text-sm text-gray-500">Carregando...</div>
         ) : (
-          <table className="min-w-full text-sm">
-            <thead className="bg-gray-50 text-xs uppercase text-gray-500">
-              <tr>
-                <th className="px-3 py-2 text-left">Protocolo</th><th className="px-3 py-2 text-left">Título</th><th className="px-3 py-2 text-left">Cliente</th><th className="px-3 py-2 text-left">Status</th><th className="px-3 py-2 text-left">Tipo</th><th className="px-3 py-2 text-left">Responsável</th><th className="px-3 py-2 text-left">Usuário ator</th><th className="px-3 py-2 text-left">Org.</th><th className="px-3 py-2 text-left">Último evento</th>
-              </tr>
-            </thead>
-            <tbody>
+          <>
+            <div className="hidden md:block overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Protocolo</th><th className="px-3 py-2 text-left">Título</th><th className="px-3 py-2 text-left">Cliente</th><th className="px-3 py-2 text-left">Status</th><th className="px-3 py-2 text-left">Tipo</th><th className="px-3 py-2 text-left">Responsável</th><th className="px-3 py-2 text-left">Usuário ator</th><th className="px-3 py-2 text-left">Org.</th><th className="px-3 py-2 text-left">Último evento</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {result?.rows.map((row) => {
+                    const isExpanded = expandedProcessId === row.process.id;
+                    return (
+                      <React.Fragment key={row.process.id}>
+                        <tr className="border-t border-gray-100">
+                          <td className="px-3 py-2 font-bold">{row.process.protocolo || '-'}</td>
+                          <td className="px-3 py-2">{row.process.titulo}</td>
+                          <td className="px-3 py-2">{row.process.cliente_nome || '-'}</td>
+                          <td className="px-3 py-2">{row.process.process_status || row.process.status || '-'}</td>
+                          <td className="px-3 py-2">{row.process.unidade_atendimento || '-'}</td>
+                          <td className="px-3 py-2">{row.responsibleName}</td>
+                          <td className="px-3 py-2">{row.actorName}</td>
+                          <td className="px-3 py-2">{row.organizationName}</td>
+                          <td className="px-3 py-2">
+                            <button onClick={() => setExpandedProcessId((current) => current === row.process.id ? null : row.process.id)} className="inline-flex items-start gap-1 text-left text-blue-600 hover:underline">
+                              <span>{row.latestEvent?.mensagem || '-'}</span>
+                              {isExpanded ? <ChevronUp className="mt-0.5 h-4 w-4 shrink-0" /> : <ChevronDown className="mt-0.5 h-4 w-4 shrink-0" />}
+                            </button>
+                          </td>
+                        </tr>
+                        {isExpanded ? (
+                          <tr className="border-t border-gray-100 bg-gray-50">
+                            <td className="px-3 py-2" colSpan={9}>
+                              <p className="mb-2 text-xs font-bold uppercase text-gray-500">Timeline detalhada</p>
+                              <ul className="space-y-1 text-xs text-gray-700">
+                                {row.events.map((event) => (
+                                  <li key={event.id}>
+                                    {new Date(event.created_at).toLocaleString('pt-BR')} · {event.event_type || event.tipo}
+                                    {event.field ? ` · ${event.field}` : ''} · {event.mensagem}
+                                    {(event.old_value || event.new_value) ? ` (${event.old_value || '∅'} → ${event.new_value || '∅'})` : ''}
+                                  </li>
+                                ))}
+                              </ul>
+                              <p className="mt-3 mb-1 text-xs font-bold uppercase text-gray-500">Financeiro</p>
+                              <ul className="space-y-1 text-xs text-gray-700">
+                                {row.financialHighlights.length ? row.financialHighlights.map((event, index) => (
+                                  <li key={`${event.type}-${index}`}>{event.createdAt ? new Date(event.createdAt).toLocaleString('pt-BR') : '-'} · {event.type} · {event.message}</li>
+                                )) : <li>Nenhum evento financeiro relevante.</li>}
+                              </ul>
+                              <p className="mt-3 mb-1 text-xs font-bold uppercase text-gray-500">Pagamentos</p>
+                              <ul className="space-y-1 text-xs text-gray-700">
+                                {row.payments.length ? row.payments.map((payment) => (
+                                  <li key={payment.id}>{payment.createdAt ? new Date(payment.createdAt).toLocaleString('pt-BR') : '-'} · {payment.paymentStatus || 'sem status'}{payment.amount != null ? ` · ${Number(payment.amount).toLocaleString('pt-BR', { style: 'currency', currency: payment.currency || 'BRL' })}` : ''}</li>
+                                )) : <li>Nenhum pagamento vinculado.</li>}
+                              </ul>
+                              <p className="mt-3 mb-1 text-xs font-bold uppercase text-gray-500">Documentos/Anexos</p>
+                              <ul className="space-y-1 text-xs text-gray-700">
+                                {row.attachments.length ? row.attachments.map((attachment) => (
+                                  <li key={attachment.id}>{attachment.createdAt ? new Date(attachment.createdAt).toLocaleString('pt-BR') : '-'} · {attachment.name}</li>
+                                )) : <li>Nenhum anexo registrado.</li>}
+                              </ul>
+                            </td>
+                          </tr>
+                        ) : null}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div className="block md:hidden space-y-2 p-3">
               {result?.rows.map((row) => {
                 const isExpanded = expandedProcessId === row.process.id;
                 return (
-                  <React.Fragment key={row.process.id}>
-                    <tr className="border-t border-gray-100">
-                      <td className="px-3 py-2 font-bold">{row.process.protocolo || '-'}</td>
-                      <td className="px-3 py-2">{row.process.titulo}</td>
-                      <td className="px-3 py-2">{row.process.cliente_nome || '-'}</td>
-                      <td className="px-3 py-2">{row.process.process_status || row.process.status || '-'}</td>
-                      <td className="px-3 py-2">{row.process.unidade_atendimento || '-'}</td>
-                      <td className="px-3 py-2">{row.responsibleName}</td>
-                      <td className="px-3 py-2">{row.actorName}</td>
-                      <td className="px-3 py-2">{row.organizationName}</td>
-                      <td className="px-3 py-2">
-                        <button
-                          onClick={() => setExpandedProcessId((current) => current === row.process.id ? null : row.process.id)}
-                          className="inline-flex items-start gap-1 text-left text-blue-600 hover:underline"
-                        >
-                          <span>{row.latestEvent?.mensagem || '-'}</span>
-                          {isExpanded ? <ChevronUp className="mt-0.5 h-4 w-4 shrink-0" /> : <ChevronDown className="mt-0.5 h-4 w-4 shrink-0" />}
-                        </button>
-                      </td>
-                    </tr>
-                    {isExpanded ? (
-                      <tr className="border-t border-gray-100 bg-gray-50">
-                        <td className="px-3 py-2" colSpan={9}>
-                          <p className="mb-2 text-xs font-bold uppercase text-gray-500">Timeline detalhada</p>
+                  <div key={row.process.id} className="border border-gray-100 rounded-xl p-4">
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <p className="font-bold text-gray-900 text-sm">{row.process.titulo}</p>
+                        <span className="text-[10px] font-black bg-blue-100 text-blue-700 px-2 py-0.5 rounded inline-block mt-1">{row.process.protocolo || '-'}</span>
+                      </div>
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 whitespace-nowrap">{row.process.process_status || row.process.status || '-'}</span>
+                    </div>
+                    <div className="space-y-1 text-xs text-gray-600">
+                      <p><span className="font-semibold text-gray-400">Cliente:</span> {row.process.cliente_nome || '-'}</p>
+                      <p><span className="font-semibold text-gray-400">Tipo:</span> {row.process.unidade_atendimento || '-'}</p>
+                      <p><span className="font-semibold text-gray-400">Responsável:</span> {row.responsibleName}</p>
+                      <p><span className="font-semibold text-gray-400">Usuário ator:</span> {row.actorName}</p>
+                      <p><span className="font-semibold text-gray-400">Org.:</span> {row.organizationName}</p>
+                      {row.latestEvent?.mensagem && (
+                        <p className="pt-2 mt-2 border-t border-gray-100"><span className="font-semibold text-gray-400">Último evento:</span> {row.latestEvent.mensagem}</p>
+                      )}
+                    </div>
+                    <button onClick={() => setExpandedProcessId((current) => current === row.process.id ? null : row.process.id)} className="mt-3 flex items-center gap-1 text-xs font-bold text-blue-600">
+                      {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      {isExpanded ? 'Ocultar detalhes' : 'Ver detalhes'}
+                    </button>
+                    {isExpanded && (
+                      <div className="mt-3 pt-3 border-t border-gray-100 space-y-3">
+                        <div>
+                          <p className="text-xs font-bold uppercase text-gray-500 mb-1">Timeline detalhada</p>
                           <ul className="space-y-1 text-xs text-gray-700">
                             {row.events.map((event) => (
-                              <li key={event.id}>
-                                {new Date(event.created_at).toLocaleString('pt-BR')} · {event.event_type || event.tipo}
-                                {event.field ? ` · ${event.field}` : ''} · {event.mensagem}
-                                {(event.old_value || event.new_value) ? ` (${event.old_value || '∅'} → ${event.new_value || '∅'})` : ''}
-                              </li>
+                              <li key={event.id}>{new Date(event.created_at).toLocaleString('pt-BR')} · {event.event_type || event.tipo}{event.field ? ` · ${event.field}` : ''} · {event.mensagem}{(event.old_value || event.new_value) ? ` (${event.old_value || '∅'} → ${event.new_value || '∅'})` : ''}</li>
                             ))}
                           </ul>
-                          <p className="mt-3 mb-1 text-xs font-bold uppercase text-gray-500">Financeiro</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold uppercase text-gray-500 mb-1">Financeiro</p>
                           <ul className="space-y-1 text-xs text-gray-700">
                             {row.financialHighlights.length ? row.financialHighlights.map((event, index) => (
-                              <li key={`${event.type}-${index}`}>
-                                {event.createdAt ? new Date(event.createdAt).toLocaleString('pt-BR') : '-'} · {event.type} · {event.message}
-                              </li>
+                              <li key={`${event.type}-${index}`}>{event.createdAt ? new Date(event.createdAt).toLocaleString('pt-BR') : '-'} · {event.type} · {event.message}</li>
                             )) : <li>Nenhum evento financeiro relevante.</li>}
                           </ul>
-                          <p className="mt-3 mb-1 text-xs font-bold uppercase text-gray-500">Pagamentos</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold uppercase text-gray-500 mb-1">Pagamentos</p>
                           <ul className="space-y-1 text-xs text-gray-700">
                             {row.payments.length ? row.payments.map((payment) => (
-                              <li key={payment.id}>
-                                {payment.createdAt ? new Date(payment.createdAt).toLocaleString('pt-BR') : '-'} · {payment.paymentStatus || 'sem status'}
-                                {payment.amount != null ? ` · ${Number(payment.amount).toLocaleString('pt-BR', { style: 'currency', currency: payment.currency || 'BRL' })}` : ''}
-                              </li>
+                              <li key={payment.id}>{payment.createdAt ? new Date(payment.createdAt).toLocaleString('pt-BR') : '-'} · {payment.paymentStatus || 'sem status'}{payment.amount != null ? ` · ${Number(payment.amount).toLocaleString('pt-BR', { style: 'currency', currency: payment.currency || 'BRL' })}` : ''}</li>
                             )) : <li>Nenhum pagamento vinculado.</li>}
                           </ul>
-                          <p className="mt-3 mb-1 text-xs font-bold uppercase text-gray-500">Documentos/Anexos</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold uppercase text-gray-500 mb-1">Documentos/Anexos</p>
                           <ul className="space-y-1 text-xs text-gray-700">
                             {row.attachments.length ? row.attachments.map((attachment) => (
                               <li key={attachment.id}>{attachment.createdAt ? new Date(attachment.createdAt).toLocaleString('pt-BR') : '-'} · {attachment.name}</li>
                             )) : <li>Nenhum anexo registrado.</li>}
                           </ul>
-                        </td>
-                      </tr>
-                    ) : null}
-                  </React.Fragment>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
+            </div>
+          </>
         )}
       </div>
 

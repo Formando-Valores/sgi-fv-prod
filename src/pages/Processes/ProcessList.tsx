@@ -268,48 +268,43 @@ const ProcessList: React.FC = () => {
         </div>
       ) : (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
-          <div className="overflow-x-auto">
+          {/* Desktop table */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="bg-slate-950 text-slate-400 uppercase text-[10px] font-black tracking-widest">
-                  <th className="px-6 py-4">Protocolo</th>
-                  <th className="px-6 py-4">Título</th>
-                  <th className="px-6 py-4">Cliente</th>
-                  <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4">Origem</th>
-                  <th className="px-6 py-4">Unidade</th>
-                  <th className="px-6 py-4">Data</th>
-                  <th className="px-6 py-4 text-right">Ações</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-4">Protocolo</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-4">Título</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-4">Cliente</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-4">Status</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-4">Origem</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-4">Unidade</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-4">Data</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-4 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800">
                 {filteredProcesses.map((process) => (
                   <tr key={process.id} className="hover:bg-slate-800/50 transition-colors">
-                    <td className="px-6 py-4">
-                      <span className="bg-blue-900/30 text-blue-400 px-2 py-1 rounded-md text-[10px] font-black">
-                        {process.protocolo || '-'}
-                      </span>
+                    <td className="px-3 sm:px-6 py-2 sm:py-4">
+                      <span className="bg-blue-900/30 text-blue-400 px-2 py-1 rounded-md text-[10px] font-black">{process.protocolo || '-'}</span>
                     </td>
-                    <td className="px-6 py-4 font-bold text-slate-200">{process.titulo}</td>
-                    <td className="px-6 py-4 text-slate-300">{process.cliente_nome || '-'}</td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 font-bold text-slate-200">{process.titulo}</td>
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-slate-300">{process.cliente_nome || '-'}</td>
+                    <td className="px-3 sm:px-6 py-2 sm:py-4">
                       {process.payment_status && (
-                        <span
-                          className={`mr-2 px-3 py-1 rounded-full text-[10px] font-black text-white ${PAYMENT_STATUS_BADGES[process.payment_status]?.color || 'bg-slate-600'}`}
-                        >
+                        <span className={`mr-2 px-3 py-1 rounded-full text-[10px] font-black text-white ${PAYMENT_STATUS_BADGES[process.payment_status]?.color || 'bg-slate-600'}`}>
                           Pgto: {PAYMENT_STATUS_BADGES[process.payment_status]?.label || process.payment_status}
                         </span>
                       )}
-                      <span
-                        className={`px-3 py-1 rounded-full text-[10px] font-black text-white ${PROCESS_STATUS_BADGES[getOperationalStatus(process)]?.color || 'bg-slate-600'}`}
-                      >
+                      <span className={`px-3 py-1 rounded-full text-[10px] font-black text-white ${PROCESS_STATUS_BADGES[getOperationalStatus(process)]?.color || 'bg-slate-600'}`}>
                         {PROCESS_STATUS_BADGES[getOperationalStatus(process)]?.label || getOperationalStatus(process)}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-slate-300 font-semibold">{formatSource(process.origem_canal)}</td>
-                    <td className="px-6 py-4 text-slate-300">{process.unidade_atendimento || '-'}</td>
-                    <td className="px-6 py-4 text-slate-400 font-bold">{formatDate(process.created_at)}</td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-slate-300 font-semibold">{formatSource(process.origem_canal)}</td>
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-slate-300">{process.unidade_atendimento || '-'}</td>
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-slate-400 font-bold">{formatDate(process.created_at)}</td>
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-right">
                       <div className="inline-flex items-center gap-2">
                         {process.process_status === 'aguardando_pagamento' && (process.payment_status == null || process.payment_status === 'pending' || process.payment_status === 'failed' || process.payment_status === 'rejected') && (
                           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-wide bg-amber-900/30 text-amber-300 border border-amber-700">
@@ -321,11 +316,7 @@ const ProcessList: React.FC = () => {
                           const uploadId = `proof-upload-${process.id}`;
                           return (
                             <>
-                              <input
-                                type="file"
-                                id={uploadId}
-                                accept="image/*,application/pdf"
-                                className="hidden"
+                              <input type="file" id={uploadId} accept="image/*,application/pdf" className="hidden"
                                 onChange={async (e) => {
                                   const file = e.target.files?.[0];
                                   if (!file) return;
@@ -342,11 +333,7 @@ const ProcessList: React.FC = () => {
                                   setTimeout(() => setProofUploadFeedback(null), 4000);
                                 }}
                               />
-                              <label
-                                htmlFor={uploadId}
-                                className={`p-2 bg-emerald-800 hover:bg-emerald-700 rounded-lg text-emerald-300 inline-flex cursor-pointer disabled:opacity-60 ${uploadingProofFor === process.id ? 'opacity-60 pointer-events-none' : ''}`}
-                                title="Enviar comprovante de pagamento"
-                              >
+                              <label htmlFor={uploadId} className={`p-2 bg-emerald-800 hover:bg-emerald-700 rounded-lg text-emerald-300 inline-flex cursor-pointer disabled:opacity-60 ${uploadingProofFor === process.id ? 'opacity-60 pointer-events-none' : ''}`} title="Enviar comprovante de pagamento">
                                 {uploadingProofFor === process.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
                               </label>
                             </>
@@ -354,26 +341,18 @@ const ProcessList: React.FC = () => {
                         })()}
                         {process.payment_status === 'pending_validation' && (
                           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-wide bg-amber-900/30 text-amber-300 border border-amber-700">
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                            Validando
+                            <Loader2 className="w-3 h-3 animate-spin" /> Validando
                           </span>
                         )}
                         {(process.payment_status === 'validated' || process.payment_status === 'accepted') && (
                           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-wide bg-emerald-900/30 text-emerald-300 border border-emerald-700">
-                            <Check className="w-3 h-3" />
-                            Pago
+                            <Check className="w-3 h-3" /> Pago
                           </span>
                         )}
                         {proofUploadFeedback && proofUploadFeedback.processId === process.id && (
-                          <span className={`text-[10px] font-bold ${proofUploadFeedback.type === 'success' ? 'text-emerald-400' : 'text-red-400'}`}>
-                            {proofUploadFeedback.message}
-                          </span>
+                          <span className={`text-[10px] font-bold ${proofUploadFeedback.type === 'success' ? 'text-emerald-400' : 'text-red-400'}`}>{proofUploadFeedback.message}</span>
                         )}
-                        <Link
-                          to={`/processos/${process.id}`}
-                          title={process.process_status === 'aguardando_pagamento' ? 'Visualização liberada. Edição bloqueada até confirmação do pagamento.' : 'Visualizar processo'}
-                          className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 inline-flex"
-                        >
+                        <Link to={`/processos/${process.id}`} title={process.process_status === 'aguardando_pagamento' ? 'Visualização liberada. Edição bloqueada até confirmação do pagamento.' : 'Visualizar processo'} className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 inline-flex">
                           <Eye className="w-4 h-4" />
                         </Link>
                       </div>
@@ -382,6 +361,81 @@ const ProcessList: React.FC = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+          {/* Mobile cards */}
+          <div className="block md:hidden space-y-2 p-3">
+            {filteredProcesses.map((process) => (
+              <div key={process.id} className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex-1 min-w-0 mr-2">
+                    <p className="font-bold text-slate-100 text-sm truncate">{process.titulo}</p>
+                    <span className="bg-blue-900/30 text-blue-400 px-2 py-0.5 rounded-md text-[10px] font-black inline-block mt-1">{process.protocolo || '-'}</span>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    {process.payment_status && (
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black text-white ${PAYMENT_STATUS_BADGES[process.payment_status]?.color || 'bg-slate-600'}`}>
+                        {PAYMENT_STATUS_BADGES[process.payment_status]?.label || process.payment_status}
+                      </span>
+                    )}
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black text-white ${PROCESS_STATUS_BADGES[getOperationalStatus(process)]?.color || 'bg-slate-600'}`}>
+                      {PROCESS_STATUS_BADGES[getOperationalStatus(process)]?.label || getOperationalStatus(process)}
+                    </span>
+                  </div>
+                </div>
+                <div className="space-y-1 text-xs text-slate-400">
+                  <p><span className="font-semibold text-slate-500">Cliente:</span> {process.cliente_nome || '-'}</p>
+                  <p><span className="font-semibold text-slate-500">Origem:</span> {formatSource(process.origem_canal)}</p>
+                  <p><span className="font-semibold text-slate-500">Unidade:</span> {process.unidade_atendimento || '-'}</p>
+                  <p><span className="font-semibold text-slate-500">Data:</span> {formatDate(process.created_at)}</p>
+                </div>
+                <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-700">
+                  {process.process_status === 'aguardando_pagamento' && (process.payment_status == null || process.payment_status === 'pending' || process.payment_status === 'failed' || process.payment_status === 'rejected') && (() => {
+                    const uploadId = `proof-upload-mobile-${process.id}`;
+                    return (
+                      <>
+                        <input type="file" id={uploadId} accept="image/*,application/pdf" className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            setUploadingProofFor(process.id);
+                            const { error } = await uploadPaymentProof(process.id, userContext?.id || '', file);
+                            setUploadingProofFor(null);
+                            if (e.target) e.target.value = '';
+                            if (error) {
+                              setProofUploadFeedback({ processId: process.id, message: error, type: 'error' });
+                            } else {
+                              setProofUploadFeedback({ processId: process.id, message: 'Comprovante enviado!', type: 'success' });
+                              setProcesses((prev) => prev.map((p) => p.id === process.id ? { ...p, payment_status: 'pending_validation' as any } : p));
+                            }
+                            setTimeout(() => setProofUploadFeedback(null), 4000);
+                          }}
+                        />
+                        <label htmlFor={uploadId} className={`flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-emerald-800 hover:bg-emerald-700 rounded-lg text-emerald-300 text-[10px] font-black uppercase tracking-wide cursor-pointer ${uploadingProofFor === process.id ? 'opacity-60 pointer-events-none' : ''}`}>
+                          {uploadingProofFor === process.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+                          Comprovante
+                        </label>
+                      </>
+                    );
+                  })()}
+                  {process.payment_status === 'pending_validation' && (
+                    <span className="flex-1 flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-wide bg-amber-900/30 text-amber-300 border border-amber-700">
+                      <Loader2 className="w-3 h-3 animate-spin" /> Validando
+                    </span>
+                  )}
+                  {(process.payment_status === 'validated' || process.payment_status === 'accepted') && (
+                    <span className="flex-1 flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-wide bg-emerald-900/30 text-emerald-300 border border-emerald-700">
+                      <Check className="w-3 h-3" /> Pago
+                    </span>
+                  )}
+                  <Link to={`/processos/${process.id}`} className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-200 text-[10px] font-black uppercase tracking-wide">
+                    <Eye className="w-3 h-3" /> Ver
+                  </Link>
+                </div>
+                {proofUploadFeedback && proofUploadFeedback.processId === process.id && (
+                  <p className={`mt-2 text-[10px] font-bold text-center ${proofUploadFeedback.type === 'success' ? 'text-emerald-400' : 'text-red-400'}`}>{proofUploadFeedback.message}</p>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )}
