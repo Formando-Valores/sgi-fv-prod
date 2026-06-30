@@ -31,7 +31,8 @@ import CommunicationBlock from '../src/components/dashboard/blocks/Communication
 import { useToast } from '../src/contexts/ToastContext';
 import { createCheckoutSession } from '../src/lib/stripe';
 import { getPaymentStatusUi } from '../src/lib/paymentStatus';
-import { getServicesByUnit, getGroupsByUnit, getServicesByGroup, SERVICE_CATALOG, calcAssociationFees, ASSOCIATION_ANNUAL_FEE, type AssociationFeeItem } from '../src/lib/servicesCatalog';
+import { calcAssociationFees, ASSOCIATION_ANNUAL_FEE, type AssociationFeeItem } from '../src/lib/servicesCatalog';
+import { loadServicesCatalog, filterServicesByUnit, filterGroupsByUnit, filterServicesByGroup, type DbCatalogService } from '../src/lib/servicesCatalogDb';
 import { uploadPaymentProof, validatePaymentProof, getPaymentProofs, type PaymentProof } from '../src/lib/paymentProofs';
 import { uploadProcessDocument, listProcessDocuments, reviewProcessDocument, deleteProcessDocument, type ProcessDocument } from '../src/lib/processDocuments';
 import { SUPABASE_EDGE_FUNCTIONS } from '../src/lib/supabaseFunctions';
@@ -323,6 +324,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [showCreateProcessModal, setShowCreateProcessModal] = useState(false);
   const [creatingProcess, setCreatingProcess] = useState(false);
   const [processVisualOverrides, setProcessVisualOverrides] = useState<ProcessVisualOverrides>({});
+  const [adminCatalog, setAdminCatalog] = useState<DbCatalogService[]>([]);
+
+  useEffect(() => {
+    loadServicesCatalog().then(setAdminCatalog);
+  }, []);
+
   const [newProcessForm, setNewProcessForm] = useState({
     organizationId: '',
     title: '',
@@ -1536,7 +1543,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const selectedServiceIds = newProcessForm.selectedServiceIds ?? [];
     const servicesSelected = selectedServiceIds.length > 0
       ? selectedServiceIds.map((id: string) => {
-          const svc = SERVICE_CATALOG.find((s) => s.id === id);
+          const svc = adminCatalog.find((s) => s.id === id);
           return svc ? { id: svc.id, name: svc.name, price: svc.price, group: svc.group } : null;
         }).filter(Boolean)
       : null;
@@ -5247,8 +5254,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                         />
                       </div>
                       <div className="space-y-2 max-h-80 overflow-y-auto">
-                        {getGroupsByUnit(newProcessForm.serviceUnit).map((group) => {
-                          const services = getServicesByGroup(newProcessForm.serviceUnit, group);
+                        {filterGroupsByUnit(adminCatalog, newProcessForm.serviceUnit).map((group) => {
+                          const services = filterServicesByGroup(adminCatalog, newProcessForm.serviceUnit, group);
                           const filtered = adminServiceSearch
                             ? services.filter((s) => s.name.toLowerCase().includes(adminServiceSearch.toLowerCase()))
                             : services;
@@ -5287,7 +5294,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                                                 const ids = prev.selectedServiceIds ?? [];
                                                 const next = selected ? ids.filter((i: string) => i !== svc.id) : [...ids, svc.id];
                                                 const svcTotal = next.reduce((sum: number, id: string) => {
-                                                  const s = getServicesByUnit(prev.serviceUnit!).find((x) => x.id === id);
+                                                  const s = filterServicesByUnit(adminCatalog, prev.serviceUnit!).find((x) => x.id === id);
                                                   return sum + (s?.price ?? 0);
                                                 }, 0);
                                                 const fees = svcTotal > 0 ? calcAssociationFees(svcTotal) : [];
@@ -5320,7 +5327,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                         <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Serviços Selecionados</label>
                         <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
                           {(newProcessForm.selectedServiceIds ?? []).map((id: string) => {
-                            const services = getServicesByUnit(newProcessForm.serviceUnit!);
+                            const services = filterServicesByUnit(adminCatalog, newProcessForm.serviceUnit!);
                             const svc = services.find((s) => s.id === id);
                             if (!svc) return null;
                             return (
@@ -5337,7 +5344,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                             <p className="text-sm font-black text-gray-700 uppercase">Subtotal Serviços</p>
                             <span className="text-base font-black text-emerald-700">
                               R$ {(newProcessForm.selectedServiceIds ?? []).reduce((sum: number, id: string) => {
-                                const servicesList = getServicesByUnit(newProcessForm.serviceUnit!);
+                                const servicesList = filterServicesByUnit(adminCatalog, newProcessForm.serviceUnit!);
                                 const s = servicesList.find((x) => x.id === id);
                                 return sum + (s?.price ?? 0);
                               }, 0).toFixed(2)}
@@ -5348,7 +5355,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
                       {(() => {
                         const svcTotal = (newProcessForm.selectedServiceIds ?? []).reduce((sum: number, id: string) => {
-                          const servicesList = getServicesByUnit(newProcessForm.serviceUnit!);
+                          const servicesList = filterServicesByUnit(adminCatalog, newProcessForm.serviceUnit!);
                           const s = servicesList.find((x) => x.id === id);
                           return sum + (s?.price ?? 0);
                         }, 0);

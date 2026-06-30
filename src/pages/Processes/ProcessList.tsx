@@ -15,7 +15,8 @@ import {
   PROCESS_STATUS_BADGES,
   getOperationalStatus,
 } from '../../lib/paymentStatus';
-import { getServicesByUnit, getGroupsByUnit, getServicesByGroup, CUSTOM_ANALYSIS_FEE, calcAssociationFees, type AssociationFeeItem } from '../../lib/servicesCatalog';
+import { CUSTOM_ANALYSIS_FEE, calcAssociationFees, type AssociationFeeItem } from '../../lib/servicesCatalog';
+import { loadServicesCatalog, filterServicesByUnit, filterGroupsByUnit, filterServicesByGroup, type DbCatalogService } from '../../lib/servicesCatalogDb';
 import { uploadPaymentProof } from '../../lib/paymentProofs';
 import type { ServiceUnit } from '../../../types';
 
@@ -34,6 +35,11 @@ const ProcessList: React.FC = () => {
   const [processes, setProcesses] = useState<Process[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [catalog, setCatalog] = useState<DbCatalogService[]>([]);
+
+  useEffect(() => {
+    loadServicesCatalog().then(setCatalog);
+  }, []);
 
   // Modal state
   const [showModal, setShowModal] = useState(false);
@@ -61,8 +67,8 @@ const ProcessList: React.FC = () => {
 
   const availableServices = useMemo(() => {
     if (!selectedUnit) return [];
-    return getServicesByUnit(selectedUnit);
-  }, [selectedUnit]);
+    return filterServicesByUnit(catalog, selectedUnit);
+  }, [selectedUnit, catalog]);
 
   const totalValue = useMemo(() => {
     let total = 0;
@@ -488,8 +494,8 @@ const ProcessList: React.FC = () => {
                       />
                     </div>
                     <div className="space-y-2 max-h-80 overflow-y-auto">
-                      {getGroupsByUnit(selectedUnit).map((group) => {
-                        const services = getServicesByGroup(selectedUnit, group);
+                      {filterGroupsByUnit(catalog, selectedUnit).map((group) => {
+                        const services = filterServicesByGroup(catalog, selectedUnit, group);
                         const filtered = serviceSearch
                           ? services.filter((s) => s.name.toLowerCase().includes(serviceSearch.toLowerCase()))
                           : services;

@@ -173,7 +173,7 @@ const ServicesSection: React.FC<Props> = () => {
             />
           </div>
           <div>
-            <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Preço (€) *</label>
+            <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Preço (R$) *</label>
             <input
               required
               type="number"
@@ -238,7 +238,7 @@ const ServicesSection: React.FC<Props> = () => {
                     <th className="px-3 sm:px-4 py-2 sm:py-3">Nome</th>
                     <th className="px-3 sm:px-4 py-2 sm:py-3">Unidade</th>
                     <th className="px-3 sm:px-4 py-2 sm:py-3">Grupo</th>
-                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-right">Preço (€)</th>
+                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-right">Preço (R$)</th>
                     <th className="px-3 sm:px-4 py-2 sm:py-3 text-center">Ativo</th>
                     <th className="px-3 sm:px-4 py-2 sm:py-3 text-right">Ações</th>
                   </tr>
@@ -249,7 +249,7 @@ const ServicesSection: React.FC<Props> = () => {
                       <td className="px-3 sm:px-4 py-2 sm:py-3 font-bold text-gray-700">{svc.name}</td>
                       <td className="px-3 sm:px-4 py-2 sm:py-3"><span className="text-[10px] font-black text-gray-500 whitespace-nowrap">{svc.unit}</span></td>
                       <td className="px-3 sm:px-4 py-2 sm:py-3 text-gray-500">{svc.group || '-'}</td>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3 text-right font-mono text-gray-700 whitespace-nowrap">€ {svc.price.toFixed(2)}</td>
+                      <td className="px-3 sm:px-4 py-2 sm:py-3 text-right font-mono text-gray-700 whitespace-nowrap">R$ {svc.price.toFixed(2)}</td>
                       <td className="px-3 sm:px-4 py-2 sm:py-3 text-center"><span className={`inline-block w-2 h-2 rounded-full ${svc.active ? 'bg-emerald-500' : 'bg-red-500'}`} /></td>
                       <td className="px-3 sm:px-4 py-2 sm:py-3 text-right whitespace-nowrap">
                         <div className="flex justify-end gap-1">
@@ -277,7 +277,7 @@ const ServicesSection: React.FC<Props> = () => {
                   </div>
                   <div className="space-y-1 text-xs text-gray-600">
                     <p><span className="font-semibold text-gray-400">Grupo:</span> {svc.group || '-'}</p>
-                    <p><span className="font-semibold text-gray-400">Preço:</span> <span className="font-mono">€ {svc.price.toFixed(2)}</span></p>
+                    <p><span className="font-semibold text-gray-400">Preço:</span> <span className="font-mono">R$ {svc.price.toFixed(2)}</span></p>
                     <p><span className="font-semibold text-gray-400">Ativo:</span> <span className={`inline-block w-2 h-2 rounded-full ${svc.active ? 'bg-emerald-500' : 'bg-red-500'}`} /></p>
                   </div>
                 </div>
