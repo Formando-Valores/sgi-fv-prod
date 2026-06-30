@@ -4612,7 +4612,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
              </div>
                <div className="flex-1 overflow-y-auto overscroll-contain scroll-smooth px-4 sm:px-6 py-4 sm:py-6 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent">
                 {/* Sub-aba navigation */}
-                <div className="flex gap-1 mb-6 border-b border-gray-200 flex-wrap justify-center overflow-y-hidden">
+                <div className="flex gap-1 mb-6 border-b border-gray-200 overflow-x-auto overflow-y-hidden scroll-smooth whitespace-nowrap scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                   <button
                     type="button"
                     onClick={() => setSelectedUserTab('cadastral')}
