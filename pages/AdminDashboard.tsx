@@ -4595,7 +4595,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
       {/* Details View Modal */}
       {selectedUser && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/80 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
           <div className="bg-white w-full max-w-2xl rounded-t-3xl md:rounded-3xl border border-gray-100 shadow-2xl max-h-[92vh] md:max-h-[85vh] flex flex-col overflow-hidden">
              <div className="shrink-0 px-4 sm:px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/80 backdrop-blur-sm">
                 <h3 className="text-sm sm:text-lg font-black uppercase tracking-tight truncate pr-2">Ficha Cadastral</h3>
