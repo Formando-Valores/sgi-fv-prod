@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Trash2, Pencil, Loader2, Check, X, Search, XCircle } from 'lucide-react';
+import { Plus, Trash2, Pencil, Loader2, Check, X, Search, XCircle, ChevronDown } from 'lucide-react';
 import {
   loadServicesCatalog,
   createService,
@@ -30,6 +30,9 @@ const ServicesSection: React.FC<Props> = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const [form, setForm] = useState(emptyForm);
+  const [expandedUnits, setExpandedUnits] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(Object.values(ServiceUnit).map(u => [u, true]))
+  );
 
   const load = async () => {
     setLoading(true);
@@ -230,60 +233,50 @@ const ServicesSection: React.FC<Props> = () => {
         ) : filtered.length === 0 ? (
           <p className="text-gray-500">Nenhum serviço encontrado.</p>
         ) : (
-          <>
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="bg-gray-50 text-gray-500 uppercase text-[10px] font-black tracking-widest">
-                    <th className="px-3 sm:px-4 py-2 sm:py-3">Nome</th>
-                    <th className="px-3 sm:px-4 py-2 sm:py-3">Unidade</th>
-                    <th className="px-3 sm:px-4 py-2 sm:py-3">Grupo</th>
-                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-right">Preço (R$)</th>
-                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-center">Ativo</th>
-                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-right">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {filtered.map((svc) => (
-                    <tr key={svc.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-3 sm:px-4 py-2 sm:py-3 font-bold text-gray-700">{svc.name}</td>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3"><span className="text-[10px] font-black text-gray-500 whitespace-nowrap">{svc.unit}</span></td>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3 text-gray-500">{svc.group || '-'}</td>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3 text-right font-mono text-gray-700 whitespace-nowrap">R$ {svc.price.toFixed(2)}</td>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3 text-center"><span className={`inline-block w-2 h-2 rounded-full ${svc.active ? 'bg-emerald-500' : 'bg-red-500'}`} /></td>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3 text-right whitespace-nowrap">
-                        <div className="flex justify-end gap-1">
-                          <button onClick={() => handleEdit(svc)} className="p-1.5 bg-blue-100 hover:bg-blue-200 rounded-md text-blue-600" title="Editar"><Pencil className="w-4 h-4" /></button>
-                          <button onClick={() => handleDelete(svc.id)} className="p-1.5 bg-red-100 hover:bg-red-200 rounded-md text-red-600" title="Excluir"><Trash2 className="w-4 h-4" /></button>
+          <div className="space-y-4">
+            {Object.values(ServiceUnit).map((unit) => {
+              const unitServices = filtered.filter((s) => s.unit === unit);
+              if (unitServices.length === 0) return null;
+              const isOpen = expandedUnits[unit] ?? true;
+              return (
+                <div key={unit} className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
+                  <button
+                    onClick={() => setExpandedUnits((prev) => ({ ...prev, [unit]: !isOpen }))}
+                    className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
+                  >
+                    <h4 className="font-black text-sm uppercase tracking-widest text-gray-700">{unit}</h4>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-bold text-gray-400">{unitServices.length} serviço{(unitServices.length !== 1) ? 's' : ''}</span>
+                      <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-0' : '-rotate-90'}`} />
+                    </div>
+                  </button>
+                  {isOpen && (
+                    <div className="divide-y divide-gray-50">
+                      {unitServices.map((svc) => (
+                        <div key={svc.id} className="flex items-start justify-between px-5 py-3 hover:bg-gray-50 transition-colors gap-4">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-gray-800 text-sm">{svc.name}</span>
+                              <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${svc.active ? 'bg-emerald-500' : 'bg-red-500'}`} title={svc.active ? 'Ativo' : 'Inativo'} />
+                            </div>
+                            <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-500">
+                              {svc.group && <span className="font-semibold">{svc.group}</span>}
+                              {svc.description && <span className="text-gray-400 truncate">{svc.description}</span>}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3 shrink-0">
+                            <span className="font-mono text-sm font-bold text-gray-700 whitespace-nowrap">R$ {svc.price.toFixed(2)}</span>
+                            <button onClick={() => handleEdit(svc)} className="p-1.5 bg-blue-100 hover:bg-blue-200 rounded-md text-blue-600" title="Editar"><Pencil className="w-4 h-4" /></button>
+                            <button onClick={() => handleDelete(svc.id)} className="p-1.5 bg-red-100 hover:bg-red-200 rounded-md text-red-600" title="Excluir"><Trash2 className="w-4 h-4" /></button>
+                          </div>
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="block md:hidden space-y-3">
-              {filtered.map((svc) => (
-                <div key={svc.id} className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
-                  <div className="flex items-start justify-between mb-2">
-                    <div>
-                      <p className="font-bold text-gray-800 text-sm">{svc.name}</p>
-                      <span className="text-[10px] font-black text-gray-500 inline-block mt-1">{svc.unit}</span>
+                      ))}
                     </div>
-                    <div className="flex gap-1 shrink-0">
-                      <button onClick={() => handleEdit(svc)} className="p-1.5 bg-blue-100 hover:bg-blue-200 rounded-md text-blue-600" title="Editar"><Pencil className="w-4 h-4" /></button>
-                      <button onClick={() => handleDelete(svc.id)} className="p-1.5 bg-red-100 hover:bg-red-200 rounded-md text-red-600" title="Excluir"><Trash2 className="w-4 h-4" /></button>
-                    </div>
-                  </div>
-                  <div className="space-y-1 text-xs text-gray-600">
-                    <p><span className="font-semibold text-gray-400">Grupo:</span> {svc.group || '-'}</p>
-                    <p><span className="font-semibold text-gray-400">Preço:</span> <span className="font-mono">R$ {svc.price.toFixed(2)}</span></p>
-                    <p><span className="font-semibold text-gray-400">Ativo:</span> <span className={`inline-block w-2 h-2 rounded-full ${svc.active ? 'bg-emerald-500' : 'bg-red-500'}`} /></p>
-                  </div>
+                  )}
                 </div>
-              ))}
-            </div>
-          </>
+              );
+            })}
+          </div>
         )}
       </div>
     </div>
