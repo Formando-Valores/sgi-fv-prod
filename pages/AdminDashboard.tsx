@@ -958,7 +958,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       value: users.length,
       helper: `${filteredUsers.length} visíveis no filtro atual`,
       icon: Users2,
-      styles: 'border-blue-100 bg-blue-50 text-blue-700',
+      styles: 'border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100 text-blue-700',
       targetSection: 'configuracoes' as DashboardSection,
       presetFilter: 'usuarios_cadastrados' as DashboardPresetFilter,
       ariaLabel: 'Ir para a seção de configurações na aba de usuários cadastrados',
@@ -969,7 +969,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       value: processStats.emAndamento,
       helper: `${processStats.total} processos no total`,
       icon: FolderKanban,
-      styles: 'border-indigo-100 bg-indigo-50 text-indigo-700',
+      styles: 'border-indigo-200 bg-gradient-to-br from-indigo-50 to-indigo-100 text-indigo-700',
       targetSection: 'processos' as DashboardSection,
       presetFilter: 'processos-em-andamento' as DashboardPresetFilter,
       ariaLabel: 'Ir para a seção de processos em andamento',
@@ -980,7 +980,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       value: processRows.filter((process) => process.status === ProcessStatus.TRIAGEM || process.status === ProcessStatus.ANALISE).length,
       helper: 'Triagem + Análise',
       icon: MessageSquare,
-      styles: 'border-amber-100 bg-amber-50 text-amber-700',
+      styles: 'border-amber-200 bg-gradient-to-br from-amber-50 to-amber-100 text-amber-700',
       targetSection: 'processos' as DashboardSection,
       presetFilter: 'processos-prioridade' as DashboardPresetFilter,
       ariaLabel: 'Ir para a seção de processos com foco em demandas prioritárias',
@@ -991,7 +991,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       value: processRows.filter((process) => isWithinPeriod(process.registrationDate, '7d')).length,
       helper: 'Velocidade de entrada',
       icon: Calendar,
-      styles: 'border-emerald-100 bg-emerald-50 text-emerald-700',
+      styles: 'border-emerald-200 bg-gradient-to-br from-emerald-50 to-emerald-100 text-emerald-700',
       targetSection: 'processos' as DashboardSection,
       presetFilter: 'processos-novos-7d' as DashboardPresetFilter,
       ariaLabel: 'Ir para a seção de processos com filtro de últimos sete dias',
@@ -3219,12 +3219,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               }}
               className={`rounded-2xl border p-4 shadow-sm ${item.styles} min-h-[112px] text-left transition outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500 ${canNavigateToHighlight ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
             >
-              <div className="mb-2 flex items-start justify-between gap-2">
-                <p className="text-[11px] font-black uppercase tracking-widest">{item.label}</p>
-                <item.icon className="h-5 w-5 opacity-80" />
-              </div>
-              <p className="text-3xl font-black leading-none">{item.value}</p>
-              <p className="mt-2 text-xs font-semibold opacity-80">{item.helper}</p>
+                <div className="mb-3 flex items-start justify-between gap-2">
+                  <p className="text-[11px] font-black uppercase tracking-widest leading-tight">{item.label}</p>
+                  <div className="w-8 h-8 rounded-lg bg-white/60 flex items-center justify-center shrink-0">
+                    <item.icon className="w-4 h-4" />
+                  </div>
+                </div>
+                <p className="text-3xl font-black leading-none">{item.value}</p>
+                <p className="mt-1.5 text-xs font-semibold opacity-70">{item.helper}</p>
             </button>
           )})}
         </section>
