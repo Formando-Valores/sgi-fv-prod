@@ -3357,7 +3357,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                 Ver todos os processos
               </button>
             </div>
-            <div className="overflow-x-auto">
+            <div className="hidden md:block overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
                   <tr>
@@ -3371,32 +3371,46 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                   </tr>
                 </thead>
                 <tbody>
-                  {dashboardRecentRows.map((process) => (
+                  {dashboardRecentRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-3 sm:px-4 py-4 sm:py-6 text-center text-gray-500 font-semibold">Nenhum processo encontrado.</td>
+                    </tr>
+                  ) : dashboardRecentRows.map((process) => (
                     <tr key={process.id} className="border-t border-gray-100">
                       <td className="px-3 sm:px-4 py-2 sm:py-3 font-bold text-gray-800">{process.protocol}</td>
                       <td className="px-3 sm:px-4 py-2 sm:py-3 text-gray-600">{process.processRecordId}</td>
                       <td className="px-3 sm:px-4 py-2 sm:py-3 text-gray-700">{process.processType}</td>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3">
-                        <Badge variant={statusBadgeVariant(process.status)} className="text-xs px-2 py-1">{process.status}</Badge>
-                      </td>
+                      <td className="px-3 sm:px-4 py-2 sm:py-3"><Badge variant={statusBadgeVariant(process.status)} className="text-xs px-2 py-1">{process.status}</Badge></td>
                       <td className="px-3 sm:px-4 py-2 sm:py-3 text-gray-600">{process.startDate}</td>
                       <td className="px-3 sm:px-4 py-2 sm:py-3 text-gray-600">{process.serviceManager || 'Não definido'}</td>
                       <td className="px-3 sm:px-4 py-2 sm:py-3">
-                        <button onClick={() => setSelectedUser(process)} className="text-blue-600 font-bold text-xs whitespace-nowrap">
-                          Abrir acompanhamento
-                        </button>
+                        <button onClick={() => setSelectedUser(process)} className="text-blue-600 font-bold text-xs whitespace-nowrap">Abrir acompanhamento</button>
                       </td>
                     </tr>
                   ))}
-                  {dashboardRecentRows.length === 0 && (
-                    <tr>
-                      <td colSpan={7} className="px-3 sm:px-4 py-4 sm:py-6 text-center text-gray-500 font-semibold">
-                        Nenhum processo encontrado.
-                      </td>
-                    </tr>
-                  )}
                 </tbody>
               </table>
+            </div>
+            <div className="block md:hidden space-y-3">
+              {dashboardRecentRows.length === 0 ? (
+                <p className="text-center text-gray-500 font-semibold py-4">Nenhum processo encontrado.</p>
+              ) : dashboardRecentRows.map((process) => (
+                <div key={process.id} className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <p className="font-bold text-gray-800 text-sm">{process.protocol}</p>
+                      <span className="text-[10px] font-black text-gray-500 inline-block mt-1">{process.processType}</span>
+                    </div>
+                    <Badge variant={statusBadgeVariant(process.status)} className="text-xs px-2 py-1 shrink-0">{process.status}</Badge>
+                  </div>
+                  <div className="space-y-1 text-xs text-gray-600">
+                    <p><span className="font-semibold text-gray-400">OS:</span> {process.processRecordId}</p>
+                    <p><span className="font-semibold text-gray-400">Abertura:</span> {process.startDate}</p>
+                    <p><span className="font-semibold text-gray-400">Setor:</span> {process.serviceManager || 'Não definido'}</p>
+                  </div>
+                  <button onClick={() => setSelectedUser(process)} className="mt-3 text-blue-600 font-bold text-xs">Abrir acompanhamento</button>
+                </div>
+              ))}
             </div>
           </article>
         </section>
@@ -3846,63 +3860,71 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         </button>
           </div>
 
-          <div className="overflow-x-auto rounded-xl border border-gray-100 bg-gray-50">
-            <table className="w-full text-left text-sm">
-              <thead>
-              <tr className="bg-gray-50 text-gray-500 uppercase text-[10px] font-black tracking-widest">
-                <th className="px-3 sm:px-6 py-2 sm:py-4">Usuário</th>
-                <th className="px-3 sm:px-6 py-2 sm:py-4">Nível</th>
-                <th className="px-3 sm:px-6 py-2 sm:py-4">Organização</th>
-                <th className="px-3 sm:px-6 py-2 sm:py-4">Email</th>
-                <th className="px-3 sm:px-6 py-2 sm:py-4">Origem</th>
-                <th className="px-3 sm:px-6 py-2 sm:py-4 text-right">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800">
-              {clientsLoading ? (
-                <tr>
-                  <td colSpan={6} className="px-3 sm:px-6 py-4 sm:py-8 text-center text-gray-500">Carregando membros...</td>
-                  </tr>
-                ) : visibleClients.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-3 sm:px-6 py-4 sm:py-8 text-center text-gray-500">Nenhum membro encontrado.</td>
-                  </tr>
-                ) : visibleClients.map((client) => (
-                  <tr key={client.id} className="hover:bg-gray-50">
-                    <td className="px-3 sm:px-6 py-2 sm:py-4 font-bold text-gray-800">{client.nome}</td>
-                    <td className="px-3 sm:px-6 py-2 sm:py-4">
-                      <span className="text-[10px] font-black text-blue-400 uppercase border border-blue-900/50 bg-blue-900/10 px-2 py-0.5 rounded">
-                        {client.accessLevel}
-                      </span>
-                    </td>
-                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-600 font-bold whitespace-nowrap">{client.org_name}</td>
-                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-500 font-bold">{client.email}</td>
-                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-400 text-[10px] font-bold uppercase whitespace-nowrap">
-                      {client.source === 'local_manual' ? 'Manual' : client.source === 'org_members+profiles' ? 'Sistema' : 'Sistema'}
-                    </td>
-                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-right whitespace-nowrap">
-                      <div className="flex justify-end gap-2">
-                        <button
-                          onClick={() => handleStartEditClient(client)}
-                          className="p-2 bg-gray-100 hover:bg-gray-200 rounded-md text-gray-500 hover:text-white transition-colors"
-                          title="Editar cliente"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteClient(client)}
-                          className="p-2 bg-red-900/20 hover:bg-red-900/40 rounded-md text-red-500 transition-colors"
-                          title="Remover cliente"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+          {/* Loading/empty states (shared) */}
+          {clientsLoading ? (
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-6 text-center text-gray-500">Carregando membros...</div>
+          ) : visibleClients.length === 0 ? (
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-6 text-center text-gray-500">Nenhum membro encontrado.</div>
+          ) : (
+            <>
+              <div className="hidden md:block overflow-x-auto rounded-xl border border-gray-100 bg-gray-50">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 text-gray-500 uppercase text-[10px] font-black tracking-widest">
+                      <th className="px-3 sm:px-6 py-2 sm:py-4">Usuário</th>
+                      <th className="px-3 sm:px-6 py-2 sm:py-4">Nível</th>
+                      <th className="px-3 sm:px-6 py-2 sm:py-4">Organização</th>
+                      <th className="px-3 sm:px-6 py-2 sm:py-4">Email</th>
+                      <th className="px-3 sm:px-6 py-2 sm:py-4">Origem</th>
+                      <th className="px-3 sm:px-6 py-2 sm:py-4 text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800">
+                    {visibleClients.map((client) => (
+                      <tr key={client.id} className="hover:bg-gray-50">
+                        <td className="px-3 sm:px-6 py-2 sm:py-4 font-bold text-gray-800">{client.nome}</td>
+                        <td className="px-3 sm:px-6 py-2 sm:py-4">
+                          <span className="text-[10px] font-black text-blue-400 uppercase border border-blue-900/50 bg-blue-900/10 px-2 py-0.5 rounded">{client.accessLevel}</span>
+                        </td>
+                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-600 font-bold whitespace-nowrap">{client.org_name}</td>
+                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-500 font-bold">{client.email}</td>
+                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-400 text-[10px] font-bold uppercase whitespace-nowrap">
+                          {client.source === 'local_manual' ? 'Manual' : client.source === 'org_members+profiles' ? 'Sistema' : 'Sistema'}
+                        </td>
+                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-right whitespace-nowrap">
+                          <div className="flex justify-end gap-2">
+                            <button onClick={() => handleStartEditClient(client)} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-md text-gray-500 hover:text-white transition-colors" title="Editar cliente"><Pencil className="w-4 h-4" /></button>
+                            <button onClick={() => handleDeleteClient(client)} className="p-2 bg-red-900/20 hover:bg-red-900/40 rounded-md text-red-500 transition-colors" title="Remover cliente"><Trash2 className="w-4 h-4" /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="block md:hidden space-y-3">
+                {visibleClients.map((client) => (
+                  <div key={client.id} className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <p className="font-bold text-gray-800 text-sm">{client.nome}</p>
+                        <span className="text-[10px] font-black text-blue-400 uppercase border border-blue-900/50 bg-blue-900/10 px-2 py-0.5 rounded inline-block mt-1">{client.accessLevel}</span>
                       </div>
-                    </td>
-                  </tr>
+                      <div className="flex gap-2 shrink-0">
+                        <button onClick={() => handleStartEditClient(client)} className="p-1.5 bg-gray-100 hover:bg-gray-200 rounded-md text-gray-600"><Pencil className="w-4 h-4" /></button>
+                        <button onClick={() => handleDeleteClient(client)} className="p-1.5 bg-red-100 hover:bg-red-200 rounded-md text-red-600"><Trash2 className="w-4 h-4" /></button>
+                      </div>
+                    </div>
+                    <div className="space-y-1 text-xs text-gray-600">
+                      <p><span className="font-semibold text-gray-400">Email:</span> {client.email}</p>
+                      <p><span className="font-semibold text-gray-400">Organização:</span> {client.org_name}</p>
+                      <p><span className="font-semibold text-gray-400">Origem:</span> {client.source === 'local_manual' ? 'Manual' : client.source === 'org_members+profiles' ? 'Sistema' : 'Sistema'}</p>
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </div>
+            </>
+          )}
         </DashboardCardContainer>
         </ClientsContainer>
       ) : currentSection === 'relatorios' ? (
@@ -3931,7 +3953,56 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          {/* Mobile card view */}
+          <div className="block md:hidden space-y-3">
+            {filteredUsers.length === 0 ? (
+              <p className="text-center text-gray-500 py-8">Nenhum usuário encontrado.</p>
+            ) : filteredUsers.map(user => (
+              <div key={user.id} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
+                <div className="flex items-start justify-between mb-2">
+                  <p className="font-bold text-gray-800 text-sm truncate flex-1">{user.name}</p>
+                  <span className={`ml-2 px-3 py-1 rounded-full text-[10px] font-black text-white shrink-0 ${
+                    user.status === ProcessStatus.PENDENTE ? 'bg-gray-200 text-gray-700' :
+                    user.status === ProcessStatus.TRIAGEM ? 'bg-yellow-600' :
+                    user.status === ProcessStatus.ANALISE ? 'bg-orange-600' : 'bg-emerald-600'
+                  }`}>
+                    {user.status}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <p className="text-[10px] font-black text-gray-500 uppercase">Telefone</p>
+                    <p className="font-bold text-gray-700 truncate">{user.phone} ({user.country})</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-gray-500 uppercase">Protocolo</p>
+                    <span className="bg-blue-900/30 text-blue-400 px-2 py-0.5 rounded-md text-[10px] font-black">{user.protocol}</span>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-gray-500 uppercase">Última Alteração</p>
+                    <p className="font-bold text-gray-600 truncate">{user.lastUpdate || user.registrationDate}</p>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 mt-3 pt-3 border-t border-gray-100">
+                  <button
+                    onClick={() => setSelectedUser(user)}
+                    className="p-1.5 bg-gray-100 hover:bg-gray-200 rounded-md text-gray-600"
+                  >
+                    <Eye className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setEditingUser(user)}
+                    className="p-1.5 bg-blue-900/30 hover:bg-blue-900/50 rounded-md text-blue-400"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop table view */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="bg-gray-50 text-gray-500 uppercase text-[10px] font-black tracking-widest">
@@ -4088,60 +4159,106 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                 </div>
               </div>
               {membersError && <p className="px-4 pt-3 text-sm text-red-400 font-bold">{membersError}</p>}
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="bg-gray-50 text-gray-500 uppercase text-[10px] font-black tracking-widest">
-                      <th className="px-3 sm:px-6 py-2 sm:py-4">Usuário</th>
-                      <th className="px-3 sm:px-6 py-2 sm:py-4">Nível de Acesso</th>
-                      <th className="px-3 sm:px-6 py-2 sm:py-4">Instituição</th>
-                      <th className="px-3 sm:px-6 py-2 sm:py-4 text-right">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800">
-                    {membersLoading ? (
-                      <tr>
-                        <td colSpan={4} className="px-3 sm:px-6 py-4 sm:py-8 text-center text-gray-500">Carregando membros...</td>
-                      </tr>
-                    ) : managementUsers.map(u => (
-                      <tr key={`${u.user_id}-${u.org_id}`} className="hover:bg-gray-50">
-                        <td className="px-3 sm:px-6 py-2 sm:py-4 font-bold flex flex-col">
-                           <span>{u.name}</span>
-                           <span className="text-[10px] text-gray-500">{u.email}</span>
-                        </td>
-                        <td className="px-3 sm:px-6 py-2 sm:py-4">
-                          <span className="text-[10px] font-black text-blue-400 uppercase border border-blue-900/50 bg-blue-900/10 px-2 py-0.5 rounded">
+
+              {membersLoading ? (
+                <p className="px-4 py-8 text-center text-gray-500">Carregando membros...</p>
+              ) : managementUsers.length === 0 ? (
+                <p className="px-4 py-8 text-center text-gray-500">Nenhum membro encontrado.</p>
+              ) : (
+                <>
+                  {/* Mobile card view */}
+                  <div className="block md:hidden space-y-3">
+                    {managementUsers.map(u => (
+                      <div key={`${u.user_id}-${u.org_id}`} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-bold text-gray-800 text-sm truncate">{u.name}</p>
+                            <p className="text-[10px] text-gray-500 truncate">{u.email}</p>
+                          </div>
+                          <span className="text-[10px] font-black text-blue-400 uppercase border border-blue-900/50 bg-blue-900/10 px-2 py-0.5 rounded shrink-0 ml-2">
                             {u.accessLevel.toUpperCase()}
                           </span>
-                        </td>
-                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-600 font-bold whitespace-nowrap">{u.org_name || 'Organização Padrão'}</td>
-                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-right whitespace-nowrap">
-                           <div className="flex justify-end gap-2">
-                              <button 
-                                onClick={() => {
-                                  setNewAdminName(u.name);
-                                  setNewAdminEmail(u.email === '-' ? '' : u.email);
-                                  setNewAdminOrgId(u.org_id);
-                                  setNewAccessLevel(u.accessLevel);
-                                  setEditingMemberUserId(u.user_id);
-                                }}
-                                className="p-2 bg-gray-100 hover:bg-gray-200 rounded-md text-gray-500 hover:text-white transition-colors"
-                              >
-                                <Pencil className="w-4 h-4" />
-                              </button>
-                              <button 
-                                onClick={() => handleDeleteMember(u)} 
-                                className="p-2 bg-red-900/20 hover:bg-red-900/40 rounded-md text-red-500 transition-colors"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                           </div>
-                        </td>
-                      </tr>
+                        </div>
+                        <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                          <p className="text-xs text-gray-600 font-bold truncate">{u.org_name || 'Organização Padrão'}</p>
+                          <div className="flex gap-2 shrink-0 ml-2">
+                            <button
+                              onClick={() => {
+                                setNewAdminName(u.name);
+                                setNewAdminEmail(u.email === '-' ? '' : u.email);
+                                setNewAdminOrgId(u.org_id);
+                                setNewAccessLevel(u.accessLevel);
+                                setEditingMemberUserId(u.user_id);
+                              }}
+                              className="p-1.5 bg-gray-100 hover:bg-gray-200 rounded-md text-gray-500"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteMember(u)}
+                              className="p-1.5 bg-red-900/20 hover:bg-red-900/40 rounded-md text-red-500"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
-              </div>
+                  </div>
+
+                  {/* Desktop table view */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                      <thead>
+                        <tr className="bg-gray-50 text-gray-500 uppercase text-[10px] font-black tracking-widest">
+                          <th className="px-3 sm:px-6 py-2 sm:py-4">Usuário</th>
+                          <th className="px-3 sm:px-6 py-2 sm:py-4">Nível de Acesso</th>
+                          <th className="px-3 sm:px-6 py-2 sm:py-4">Instituição</th>
+                          <th className="px-3 sm:px-6 py-2 sm:py-4 text-right">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800">
+                        {managementUsers.map(u => (
+                          <tr key={`${u.user_id}-${u.org_id}`} className="hover:bg-gray-50">
+                            <td className="px-3 sm:px-6 py-2 sm:py-4 font-bold flex flex-col">
+                               <span>{u.name}</span>
+                               <span className="text-[10px] text-gray-500">{u.email}</span>
+                            </td>
+                            <td className="px-3 sm:px-6 py-2 sm:py-4">
+                              <span className="text-[10px] font-black text-blue-400 uppercase border border-blue-900/50 bg-blue-900/10 px-2 py-0.5 rounded">
+                                {u.accessLevel.toUpperCase()}
+                              </span>
+                            </td>
+                            <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-600 font-bold whitespace-nowrap">{u.org_name || 'Organização Padrão'}</td>
+                            <td className="px-3 sm:px-6 py-2 sm:py-4 text-right whitespace-nowrap">
+                               <div className="flex justify-end gap-2">
+                                  <button
+                                    onClick={() => {
+                                      setNewAdminName(u.name);
+                                      setNewAdminEmail(u.email === '-' ? '' : u.email);
+                                      setNewAdminOrgId(u.org_id);
+                                      setNewAccessLevel(u.accessLevel);
+                                      setEditingMemberUserId(u.user_id);
+                                    }}
+                                    className="p-2 bg-gray-100 hover:bg-gray-200 rounded-md text-gray-500 hover:text-white transition-colors"
+                                  >
+                                    <Pencil className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteMember(u)}
+                                    className="p-2 bg-red-900/20 hover:bg-red-900/40 rounded-md text-red-500 transition-colors"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                               </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
            </div>
         </div>
       ) : currentSection === 'agenda' ? (
