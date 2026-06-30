@@ -30,9 +30,7 @@ const ServicesSection: React.FC<Props> = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const [form, setForm] = useState(emptyForm);
-  const [expandedUnits, setExpandedUnits] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(Object.values(ServiceUnit).map(u => [u, true]))
-  );
+  const [expandedUnits, setExpandedUnits] = useState<Record<string, boolean>>({});
 
   const load = async () => {
     setLoading(true);
@@ -237,7 +235,7 @@ const ServicesSection: React.FC<Props> = () => {
             {Object.values(ServiceUnit).map((unit) => {
               const unitServices = filtered.filter((s) => s.unit === unit);
               if (unitServices.length === 0) return null;
-              const isOpen = expandedUnits[unit] ?? true;
+              const isOpen = expandedUnits[unit] ?? false;
               return (
                 <div key={unit} className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
                   <button
