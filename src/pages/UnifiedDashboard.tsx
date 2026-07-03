@@ -4,8 +4,7 @@ import { User, UserRole } from '../../types';
 import { resolvePermissions } from '../lib/permissions';
 import OverviewBlock from '../components/dashboard/blocks/OverviewBlock';
 import ProcessesBlock from '../components/dashboard/blocks/ProcessesBlock';
-import ClientsBlock from '../components/dashboard/blocks/ClientsBlock';
-import OrganizationsBlock from '../components/dashboard/blocks/OrganizationsBlock';
+
 import ClientJourneyBlock from '../components/dashboard/blocks/ClientJourneyBlock';
 
 interface UnifiedDashboardProps {
@@ -39,8 +38,6 @@ const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({
       blocks={{
         OverviewBlock,
         ProcessesBlock: allowedModules.includes('processos') ? ProcessesBlock : EmptyBlock,
-        ClientsBlock: allowedModules.includes('clientes') ? ClientsBlock : EmptyBlock,
-        OrganizationsBlock: allowedModules.includes('organizacoes') ? OrganizationsBlock : EmptyBlock,
         ClientJourneyBlock: allowedModules.includes('clientes') ? ClientJourneyBlock : EmptyBlock,
       }}
     />
