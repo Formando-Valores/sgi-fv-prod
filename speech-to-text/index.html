@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fala para Texto</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: #1e1e2e;
+    color: #cdd6f4;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+  }
+  .toolbar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+  button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  button:active { transform: scale(.96); }
+  #recordBtn {
+    background: #45475a;
+    color: #cdd6f4;
+  }
+  #recordBtn.recording {
+    background: #f38ba8;
+    color: #1e1e2e;
+    animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: .7; }
+  }
+  #copyBtn { background: #a6e3a1; color: #1e1e2e; }
+  #clearBtn { background: #f9e2af; color: #1e1e2e; }
+  #status {
+    padding: 10px 0;
+    font-size: 13px;
+    color: #6c7086;
+    flex-shrink: 0;
+  }
+  #status.listening { color: #a6e3a1; }
+  #status.processing { color: #f9e2af; }
+  textarea {
+    flex: 1;
+    background: #313244;
+    color: #cdd6f4;
+    border: 1px solid #45475a;
+    border-radius: 8px;
+    padding: 16px;
+    font-size: 16px;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    resize: none;
+    outline: none;
+    width: 100%;
+  }
+  textarea:focus { border-color: #89b4fa; }
+  .shortcut {
+    margin-top: 8px;
+    font-size: 12px;
+    color: #585b70;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .lang-select {
+    background: #45475a;
+    color: #cdd6f4;
+    border: 1px solid #585b70;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <button id="recordBtn">🎤 Iniciar Gravação</button>
+  <button id="copyBtn">📋 Copiar</button>
+  <button id="clearBtn">🗑️ Limpar</button>
+  <select id="langSelect" class="lang-select">
+    <option value="pt-BR">Português (BR)</option>
+    <option value="en-US">English (US)</option>
+    <option value="es-ES">Español</option>
+    <option value="fr-FR">Français</option>
+    <option value="de-DE">Deutsch</option>
+    <option value="it-IT">Italiano</option>
+    <option value="ja-JP">日本語</option>
+  </select>
+</div>
+<div id="status">Pronto — clique em "Iniciar Gravação" e comece a falar</div>
+<textarea id="output" readonly></textarea>
+<div class="shortcut">Atalho: Ctrl+Shift+R (iniciar/parar) • Aperte Ctrl+C para copiar</div>
+
+<script>
+const recordBtn = document.getElementById('recordBtn');
+const copyBtn = document.getElementById('copyBtn');
+const clearBtn = document.getElementById('clearBtn');
+const output = document.getElementById('output');
+const status = document.getElementById('status');
+const langSelect = document.getElementById('langSelect');
+
+let recognition = null;
+let isRecording = false;
+let restartTimeout = null;
+
+function initRecognition() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    status.textContent = '❌ Seu navegador não suporta Speech Recognition. Use Chrome ou Edge.';
+    recordBtn.disabled = true;
+    return null;
+  }
+
+  const rec = new SpeechRecognition();
+  rec.lang = langSelect.value;
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.maxAlternatives = 1;
+
+  rec.onresult = (event) => {
+    let finalText = '';
+    let interimText = '';
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const result = event.results[i];
+      if (result.isFinal) {
+        finalText += result[0].transcript;
+      } else {
+        interimText += result[0].transcript;
+      }
+    }
+    if (finalText) {
+      const current = output.value;
+      output.value = current ? current + (current.endsWith(' ') ? '' : ' ') + finalText : finalText;
+      output.scrollTop = output.scrollHeight;
+      navigator.clipboard.writeText(finalText).catch(() => {});
+      status.textContent = '✅ Fala detectada! (copiada)';
+      status.className = 'listening';
+    }
+  };
+
+  rec.onerror = (event) => {
+    if (event.error === 'no-speech') return;
+    if (event.error === 'aborted') return;
+    status.textContent = `❌ Erro: ${event.error}`;
+    status.className = '';
+    if (event.error === 'not-allowed') {
+      stopRecording();
+    }
+  };
+
+  rec.onend = () => {
+    if (isRecording) {
+      restartTimeout = setTimeout(() => {
+        if (isRecording) {
+          try { recognition.start(); } catch(e) {}
+        }
+      }, 100);
+    }
+  };
+
+  return rec;
+}
+
+function startRecording() {
+  recognition = initRecognition();
+  if (!recognition) return;
+
+  try {
+    recognition.start();
+    isRecording = true;
+    recordBtn.textContent = '⏹️ Parar Gravação';
+    recordBtn.className = 'recording';
+    status.textContent = '🎤 Ouvindo...';
+    status.className = 'listening';
+  } catch (e) {
+    status.textContent = `❌ Erro ao iniciar: ${e.message}`;
+  }
+}
+
+function stopRecording() {
+  isRecording = false;
+  if (restartTimeout) {
+    clearTimeout(restartTimeout);
+    restartTimeout = null;
+  }
+  if (recognition) {
+    try { recognition.stop(); } catch(e) {}
+    recognition = null;
+  }
+  recordBtn.textContent = '🎤 Iniciar Gravação';
+  recordBtn.className = '';
+  status.textContent = '⏹️ Parado';
+  status.className = '';
+}
+
+function toggleRecording() {
+  if (isRecording) {
+    stopRecording();
+  } else {
+    startRecording();
+  }
+}
+
+recordBtn.addEventListener('click', toggleRecording);
+
+copyBtn.addEventListener('click', () => {
+  if (output.value) {
+    navigator.clipboard.writeText(output.value).then(() => {
+      status.textContent = '📋 Texto copiado!';
+      setTimeout(() => {
+        status.textContent = isRecording ? '🎤 Ouvindo...' : 'Pronto';
+        status.className = isRecording ? 'listening' : '';
+      }, 1500);
+    });
+  }
+});
+
+clearBtn.addEventListener('click', () => {
+  output.value = '';
+  status.textContent = '🗑️ Limpo';
+  setTimeout(() => {
+    status.textContent = isRecording ? '🎤 Ouvindo...' : 'Pronto';
+    status.className = isRecording ? 'listening' : '';
+  }, 1000);
+});
+
+langSelect.addEventListener('change', () => {
+  if (isRecording) {
+    stopRecording();
+    setTimeout(startRecording, 200);
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey && e.shiftKey && e.key === 'R') {
+    e.preventDefault();
+    toggleRecording();
+  }
+  if (e.ctrlKey && e.key === 'c' && document.activeElement === output) {
+    // Let default copy happen
+  }
+});
+
+status.textContent = 'Pronto — clique em "Iniciar Gravação" e comece a fala';
+</script>
+</body>
+</html>

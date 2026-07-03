@@ -1,0 +1,11 @@
+{
+  "always_on_top": true,
+  "opacity": 1.0,
+  "click_through": true,
+  "energy_threshold": 3000,
+  "pause_threshold": 0.8,
+  "language": "pt-BR",
+  "engine": "google",
+  "compact_mode": false,
+  "command_mode": true
+}
