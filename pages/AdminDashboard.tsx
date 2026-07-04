@@ -1,4 +1,4 @@
-
+﻿
 import React, { useEffect, useState, useRef } from 'react';
 import { Eye, Pencil, Search, Users, ShieldCheck, X, Plus, Trash2, Calendar, MessageSquare, Check, User as UserIcon, UserCheck, LayoutDashboard, FolderKanban, Users2, Settings, Building2, Flag, FileBarChart2, ExternalLink, Loader2, CreditCard, ChevronDown, Upload, FileDown, Mail, SearchX } from 'lucide-react';
 import { User, ProcessStatus, UserRole, Hierarchy, ServiceUnit, Organization } from '../types';
@@ -9,7 +9,7 @@ import { supabase } from '../supabase';
 import type { Process as DbProcess } from '../src/lib/processes';
 import Card from '../src/components/ui/Card';
 import Badge from '../src/components/ui/Badge';
-import Skeleton, { TableSkeleton, CardSkeleton } from '../src/components/ui/Skeleton';
+import Skeleton from '../src/components/ui/Skeleton';
 import Button from '../src/components/ui/Button';
 import DashboardShell from '../src/components/dashboard/DashboardShell';
 import DashboardSidebar from '../src/components/dashboard/DashboardSidebar';
@@ -31,6 +31,8 @@ import IbanManagementSection from '../src/components/dashboard/blocks/IbanManage
 import ServicesSection from '../src/components/dashboard/blocks/ServicesSection';
 import CommunicationBlock from '../src/components/dashboard/blocks/CommunicationBlock';
 import ProcessesSection from '../src/components/dashboard/blocks/ProcessesSection';
+import UsersSection from '../src/components/dashboard/blocks/UsersSection';
+import ManagementSection from '../src/components/dashboard/blocks/ManagementSection';
 import { useToast } from '../src/contexts/ToastContext';
 import { createCheckoutSession } from '../src/lib/stripe';
 import { getPaymentStatusUi } from '../src/lib/paymentStatus';
@@ -39,40 +41,7 @@ import { loadServicesCatalog, filterServicesByUnit, filterGroupsByUnit, filterSe
 import { uploadPaymentProof, validatePaymentProof, getPaymentProofs, type PaymentProof } from '../src/lib/paymentProofs';
 import { uploadProcessDocument, listProcessDocuments, reviewProcessDocument, deleteProcessDocument, type ProcessDocument } from '../src/lib/processDocuments';
 import { SUPABASE_EDGE_FUNCTIONS } from '../src/lib/supabaseFunctions';
-import { AccessLevel, sanitizeDisplayValue, mapOrgRoleToAccessLevel, mapAccessLevelToOrgRole, extractOrganizationName, ACCESS_LEVELS } from '../src/lib/clientUtils';
-
-interface OrgMemberView {
-  user_id: string;
-  org_id: string;
-  org_name: string;
-  name: string;
-  email: string;
-  accessLevel: AccessLevel;
-  source: 'org_members' | 'profiles';
-}
-
-type OrgMemberRow = {
-  org_id: string;
-  user_id: string;
-  role: string;
-  nome_completo?: string | null;
-  nome?: string | null;
-  name?: string | null;
-  full_name?: string | null;
-  organizations?: { name?: string } | Array<{ name?: string }> | null;
-};
-
-type ProfileRow = {
-  id: string;
-  org_id?: string | null;
-  role?: string | null;
-  email?: string | null;
-  nome_completo?: string | null;
-  nome?: string | null;
-  name?: string | null;
-  organizations?: { name?: string } | Array<{ name?: string }> | null;
-};
-
+import { sanitizeDisplayValue } from '../src/lib/clientUtils';
 
 interface AdminProcessRow extends User {
   processRecordId?: string;
@@ -116,33 +85,7 @@ type ProcessQuickPreset = 'andamento' | 'atencao' | 'novos7d';
 
 const CHECKLIST_EVENT_PREFIX = 'CHECKLIST_EVENT:';
 
-const DEFAULT_ORGANIZATION_NAME_KEYWORDS = ['central', 'default', 'padr', 'todas'];
 
-const normalizeText = (value: string) =>
-  value
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase();
-
-const isDefaultOrganizationName = (name: string | undefined | null) => {
-  if (!name) return false;
-  const normalized = normalizeText(name);
-  return DEFAULT_ORGANIZATION_NAME_KEYWORDS.some((keyword) => normalized.includes(keyword));
-};
-
-const resolveAccessLevel = (role: string | null | undefined): AccessLevel => {
-  if (!role) return 'Cliente';
-
-  const normalized = sanitizeDisplayValue(role).toLowerCase();
-
-  if (normalized === 'administrador' || normalized === 'admin' || normalized === 'owner') return 'Administrador';
-  if (normalized === 'usuário sênior' || normalized === 'usuario senior' || normalized === 'senior') return 'Usuário Sênior';
-  if (normalized === 'usuário pleno' || normalized === 'usuario pleno' || normalized === 'pleno' || normalized === 'staff') return 'Usuário Pleno';
-  if (normalized === 'operador') return 'Operador';
-  if (normalized === 'cliente' || normalized === 'client') return 'Cliente';
-
-  return 'Cliente';
-};
 
 
 
@@ -210,7 +153,6 @@ interface AdminDashboardProps {
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, setUsers, onLogout, section = 'dashboard', blocks }) => {
   const [activeTab, setActiveTab] = useState<'users' | 'management' | 'iban' | 'servicos'>('users');
-  const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState<AdminProcessRow | User | null>(null);
   const [selectedUserTab, setSelectedUserTab] = useState<'cadastral' | 'financeiro' | 'documentos' | 'comunicacao'>('cadastral');
   const [editingUser, setEditingUser] = useState<AdminProcessRow | User | null>(null);
@@ -218,12 +160,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [uploadingProof, setUploadingProof] = useState(false);
   const [validatingProof, setValidatingProof] = useState(false);
   const [paymentProofs, setPaymentProofs] = useState<PaymentProof[]>([]);
-  
-  // Management tab states
-  const [newAdminName, setNewAdminName] = useState('');
-  const [newAdminEmail, setNewAdminEmail] = useState('');
-  const [newAdminPassword, setNewAdminPassword] = useState('');
-  const [newAccessLevel, setNewAccessLevel] = useState<AccessLevel>('Usuário Sênior');
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { showToast } = useToast();
@@ -234,16 +170,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   useEffect(() => {
     loadServicesCatalog().then(setAdminCatalog);
   }, []);
-  const [configSearch, setConfigSearch] = useState('');
-  const [configRowsLimit, setConfigRowsLimit] = useState(10);
-  const [newAdminOrgId, setNewAdminOrgId] = useState('');
-  const [orgMembers, setOrgMembers] = useState<OrgMemberView[]>([]);
-  const [membersLoading, setMembersLoading] = useState(false);
-  const [membersError, setMembersError] = useState('');
-  const [editingMemberUserId, setEditingMemberUserId] = useState<string | null>(null);
-  
-  // User creation loading overlay
-  const [userCreationStatus, setUserCreationStatus] = useState<string | null>(null);
 
   // Documentos tab state
   const [processDocuments, setProcessDocuments] = useState<ProcessDocument[]>([]);
@@ -338,9 +264,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, visible: allowedModules.includes('dashboard') },
     { to: '/dashboard/processos', label: 'Processos', icon: FolderKanban, visible: allowedModules.includes('processos') },
     { to: '/dashboard/clientes', label: 'Clientes', icon: Users2, visible: allowedModules.includes('clientes') },
-    { to: '/dashboard/configuracoes', label: 'Configurações', icon: Settings, visible: allowedModules.includes('configuracoes') },
-    { to: '/dashboard/organizacoes', label: 'Organizações', icon: Building2, visible: allowedModules.includes('organizacoes') },
-    { to: '/dashboard/relatorios', label: 'Relatórios', icon: FileBarChart2, visible: allowedModules.includes('relatorios') },
+    { to: '/dashboard/configuracoes', label: 'ConfiguraÃ§Ãµes', icon: Settings, visible: allowedModules.includes('configuracoes') },
+    { to: '/dashboard/organizacoes', label: 'OrganizaÃ§Ãµes', icon: Building2, visible: allowedModules.includes('organizacoes') },
+    { to: '/dashboard/relatorios', label: 'RelatÃ³rios', icon: FileBarChart2, visible: allowedModules.includes('relatorios') },
     { to: '/dashboard/agenda', label: 'Agenda', icon: Calendar, visible: allowedModules.includes('agenda') },
   ].filter((item) => item.visible);
 
@@ -396,58 +322,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     }
   }, [selectedUserTab, selectedUser]);
 
-  const filteredUsers = users.filter(u => 
-    u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.protocol.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   const mapDatabaseStatusToLegacy = (status: string | null | undefined): ProcessStatus => {
     const normalized = sanitizeDisplayValue(status).toLowerCase();
     if (normalized === 'concluido') return ProcessStatus.CONCLUIDO;
     if (normalized === 'analise') return ProcessStatus.ANALISE;
     if (normalized === 'triagem') return ProcessStatus.TRIAGEM;
     return ProcessStatus.PENDENTE;
-  };
-
-  const resolveOrganizationScope = async () => {
-    const { data, error } = await supabase
-      .from('org_members')
-      .select('org_id,role,organizations(name,slug)')
-      .eq('user_id', currentUser.id);
-
-    if (error) {
-      return {
-        allowedOrgIds: new Set<string>(),
-        hasGlobalScope: false,
-        error,
-      };
-    }
-
-    const scopeRows = (data || []) as Array<{
-      org_id: string;
-      role?: string | null;
-      organizations?: { name?: string | null; slug?: string | null } | Array<{ name?: string | null; slug?: string | null }> | null;
-    }>;
-
-    const allowedOrgIds = new Set(scopeRows.map((row) => row.org_id).filter(Boolean));
-    const hasGlobalScope = scopeRows.some((row) => {
-      const normalizedRole = sanitizeDisplayValue(row.role).toLowerCase();
-      if (!['owner', 'admin'].includes(normalizedRole)) return false;
-
-      const organizationsValue = row.organizations;
-      const firstOrg = Array.isArray(organizationsValue) ? organizationsValue[0] : organizationsValue;
-      const orgSlug = sanitizeDisplayValue(firstOrg?.slug).toLowerCase();
-      const orgName = sanitizeDisplayValue(firstOrg?.name);
-
-      return orgSlug === 'default' || isDefaultOrganizationName(orgName);
-    });
-
-    return {
-      allowedOrgIds,
-      hasGlobalScope,
-      error: null as null,
-    };
   };
 
   const getEditingProcessRecordId = (user: AdminProcessRow | User | null) =>
@@ -546,9 +426,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
   const buildProcessStage = (process: DbProcess) => {
     const source = sanitizeDisplayValue(process.origem_canal).toLowerCase();
-    if (source === 'wix') return 'Solicitação recebida';
+    if (source === 'wix') return 'SolicitaÃ§Ã£o recebida';
     if (process.status === 'concluido') return 'Finalizado';
-    if (process.status === 'analise') return 'Em análise';
+    if (process.status === 'analise') return 'Em anÃ¡lise';
     if (process.status === 'triagem') return 'Triagem';
     return 'Cadastro';
   };
@@ -563,7 +443,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       const source = sanitizeDisplayValue(process.origem_canal);
       const contact = sanitizeDisplayValue(process.cliente_contato);
       const email = contact.includes('@') ? contact : '';
-      const requestedOrganizationName = sanitizeDisplayValue(process.org_nome_solicitado) || 'Não informado';
+      const requestedOrganizationName = sanitizeDisplayValue(process.org_nome_solicitado) || 'NÃ£o informado';
       const isExternalRequest = source.toLowerCase() === 'wix';
       const generatedValue = unit === ServiceUnit.ADMINISTRATIVO ? 5200 : unit === ServiceUnit.TECNOLOGICO ? 8200 : 1800;
       const processOverrides = processVisualOverrides[process.id] || {};
@@ -577,18 +457,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       const resolvedServiceManager = persistedServiceManager || manualServiceManager;
       const resolvedNotes = persistedNotes || manualNotes;
       const resolvedDeadlineDisplay =
-        formatDeadlineForDisplay(resolvedDeadline) || (isExternalRequest ? 'Aguardando análise' : '-');
+        formatDeadlineForDisplay(resolvedDeadline) || (isExternalRequest ? 'Aguardando anÃ¡lise' : '-');
 
       return {
         id: process.id,
         processRecordId: process.id,
         profileUserId: process.responsavel_user_id,
-        name: sanitizeDisplayValue(process.cliente_nome) || sanitizeDisplayValue(process.titulo) || 'Solicitação sem nome',
+        name: sanitizeDisplayValue(process.cliente_nome) || sanitizeDisplayValue(process.titulo) || 'SolicitaÃ§Ã£o sem nome',
         email: email || '-',
         role: UserRole.CLIENT,
         documentId: sanitizeDisplayValue(process.cliente_documento) || '---',
         taxId: sanitizeDisplayValue(process.cliente_documento) || '---',
-        address: requestedOrganizationName !== 'Não informado' ? `Organização solicitada: ${requestedOrganizationName}` : '---',
+        address: requestedOrganizationName !== 'NÃ£o informado' ? `OrganizaÃ§Ã£o solicitada: ${requestedOrganizationName}` : '---',
         maritalStatus: '---',
         country: 'Brasil',
         phone: !email && contact ? contact : '---',
@@ -601,21 +481,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         hierarchy: Hierarchy.STATUS_ONLY,
         notes:
           resolvedNotes ||
-          (isExternalRequest ? `Origem: Wix${requestedOrganizationName !== 'Não informado' ? ` · Organização solicitada: ${requestedOrganizationName}` : ''}` : undefined),
+          (isExternalRequest ? `Origem: Wix${requestedOrganizationName !== 'NÃ£o informado' ? ` Â· OrganizaÃ§Ã£o solicitada: ${requestedOrganizationName}` : ''}` : undefined),
         deadline: resolvedDeadline,
-        serviceManager: resolvedServiceManager || (isExternalRequest ? 'Aguardando aprovação' : 'Não definido'),
+        serviceManager: resolvedServiceManager || (isExternalRequest ? 'Aguardando aprovaÃ§Ã£o' : 'NÃ£o definido'),
         organizationId: process.org_id,
         organizationName: requestedOrganizationName,
         processType: unit,
         startDate: formatProcessDate(process.created_at),
         deadlineDate: resolvedDeadlineDisplay,
         etapaAtual: buildProcessStage(process),
-        financeiro: isExternalRequest ? 'Aguardando validação' : (legacyStatus === ProcessStatus.CONCLUIDO ? 'Quitado' : 'Pendente'),
-        prioridade: isExternalRequest ? 'Alta' : (legacyStatus === ProcessStatus.CONCLUIDO ? 'Média' : 'Baixa'),
+        financeiro: isExternalRequest ? 'Aguardando validaÃ§Ã£o' : (legacyStatus === ProcessStatus.CONCLUIDO ? 'Quitado' : 'Pendente'),
+        prioridade: isExternalRequest ? 'Alta' : (legacyStatus === ProcessStatus.CONCLUIDO ? 'MÃ©dia' : 'Baixa'),
         valor: process.os_value != null ? Number(process.os_value) : generatedValue,
         sourceLabel: source ? source.toUpperCase() : 'PAINEL',
         requestedOrganizationName,
-        contractedServiceName: sanitizeDisplayValue(process.titulo) || 'Serviço não informado',
+        contractedServiceName: sanitizeDisplayValue(process.titulo) || 'ServiÃ§o nÃ£o informado',
         paymentStatus: process.payment_status ?? null,
         osValue: process.os_value ?? null,
         servicesSelected: (process.services_selected as AdminProcessRow['servicesSelected']) ?? null,
@@ -627,16 +507,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         ...user,
         processRecordId: user.id,
         profileUserId: user.id,
-        processType: user.unit === ServiceUnit.ADMINISTRATIVO ? 'Administrativo' : 'Jurídico',
+        processType: user.unit === ServiceUnit.ADMINISTRATIVO ? 'Administrativo' : 'JurÃ­dico',
         startDate: user.registrationDate,
         deadlineDate: user.deadline || '12/03/2026',
         etapaAtual: user.status === ProcessStatus.CONCLUIDO ? 'Finalizado' : 'Documentos',
         financeiro: user.status === ProcessStatus.CONCLUIDO ? 'Quitado' : 'Pendente',
-        prioridade: user.status === ProcessStatus.CONCLUIDO ? 'Média' : 'Baixa',
+        prioridade: user.status === ProcessStatus.CONCLUIDO ? 'MÃ©dia' : 'Baixa',
         valor: generatedValue,
         sourceLabel: 'PAINEL',
-        requestedOrganizationName: user.organizationName || 'Não informado',
-        contractedServiceName: user.unit === ServiceUnit.ADMINISTRATIVO ? 'Serviço administrativo' : 'Serviço jurídico',
+        requestedOrganizationName: user.organizationName || 'NÃ£o informado',
+        contractedServiceName: user.unit === ServiceUnit.ADMINISTRATIVO ? 'ServiÃ§o administrativo' : 'ServiÃ§o jurÃ­dico',
       };
     })) as AdminProcessRow[];
 
@@ -674,7 +554,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       .maybeSingle();
 
     if (error) {
-      setEditingProfileError('Não foi possível carregar todos os dados cadastrais do usuário.');
+      setEditingProfileError('NÃ£o foi possÃ­vel carregar todos os dados cadastrais do usuÃ¡rio.');
       setEditingProfileLoading(false);
       return;
     }
@@ -721,7 +601,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         .order('created_at', { ascending: true });
 
       if (error) {
-        setChecklistError('Não foi possível carregar o checklist deste processo.');
+        setChecklistError('NÃ£o foi possÃ­vel carregar o checklist deste processo.');
         setChecklistLoading(false);
         return;
       }
@@ -788,7 +668,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     });
 
     if (error) {
-      setChecklistError('Não foi possível salvar o novo item do checklist.');
+      setChecklistError('NÃ£o foi possÃ­vel salvar o novo item do checklist.');
       setProcessChecklist((prev) => prev.filter((item) => item.id !== itemId));
     }
   };
@@ -813,7 +693,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     });
 
     if (error) {
-      setChecklistError('Não foi possível atualizar o checklist.');
+      setChecklistError('NÃ£o foi possÃ­vel atualizar o checklist.');
       setProcessChecklist((prev) =>
         prev.map((item) => (item.id === itemId ? { ...item, completed: !completed } : item))
       );
@@ -846,7 +726,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     });
 
     if (error) {
-      setChecklistError('Não foi possível editar o item do checklist.');
+      setChecklistError('NÃ£o foi possÃ­vel editar o item do checklist.');
       setProcessChecklist((prev) =>
         prev.map((item) =>
           item.id === itemId
@@ -882,7 +762,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     });
 
     if (error) {
-      setChecklistError('Não foi possível excluir o item do checklist.');
+      setChecklistError('NÃ£o foi possÃ­vel excluir o item do checklist.');
       setProcessChecklist(previousItems);
     }
   };
@@ -933,7 +813,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       const compactHistory = ((data || []) as Array<{ id: string; mensagem?: string | null; created_at?: string | null }>).map((event) => ({
         id: event.id,
         dateLabel: event.created_at ? new Date(event.created_at).toLocaleString('pt-BR') : 'Sem data',
-        message: sanitizeDisplayValue(event.mensagem) || 'Atualização registrada.',
+        message: sanitizeDisplayValue(event.mensagem) || 'AtualizaÃ§Ã£o registrada.',
       }));
 
       setClientJourneyHistory(compactHistory);
@@ -951,7 +831,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const processRow = selected as AdminProcessRow;
     const amount = Number(processRow.osValue ?? processRow.valor ?? 0);
     if (amount <= 0) {
-      window.alert('Valor do pagamento não definido para este processo.');
+      window.alert('Valor do pagamento nÃ£o definido para este processo.');
       return;
     }
     setRedirectingCheckout(true);
@@ -973,7 +853,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       }
     } catch (err) {
       console.error('Erro ao criar checkout:', err);
-      window.alert('Não foi possível iniciar o pagamento. Tente novamente mais tarde.');
+      window.alert('NÃ£o foi possÃ­vel iniciar o pagamento. Tente novamente mais tarde.');
     } finally {
       setRedirectingCheckout(false);
     }
@@ -1052,8 +932,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const statusLabelMap: Record<'cadastro' | 'triagem' | 'analise' | 'concluido', string> = {
       cadastro: 'cadastro',
       triagem: 'triagem',
-      analise: 'análise',
-      concluido: 'concluído',
+      analise: 'anÃ¡lise',
+      concluido: 'concluÃ­do',
     };
 
     const previousStatus = statusMap[(currentEditingUser as AdminProcessRow | null)?.status || ProcessStatus.PENDENTE];
@@ -1075,7 +955,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const notesChanged = previousNotes !== normalizedNotes;
 
     if (normalizedDeadline && !/^\d{4}-\d{2}-\d{2}$/.test(normalizedDeadline)) {
-      setEditingProfileError('Data de prazo inválida. Use o calendário para selecionar uma data válida.');
+      setEditingProfileError('Data de prazo invÃ¡lida. Use o calendÃ¡rio para selecionar uma data vÃ¡lida.');
       setEditingProfileSaving(false);
       return;
     }
@@ -1095,7 +975,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         .eq('id', processRecordId);
 
       if (error) {
-        processUpdateError = 'Não foi possível atualizar status, prazo, gestor e observações do processo no banco.';
+        processUpdateError = 'NÃ£o foi possÃ­vel atualizar status, prazo, gestor e observaÃ§Ãµes do processo no banco.';
       } else {
         setDbProcesses((prev) =>
           prev.map((process) => (process.id === processRecordId ? { ...process, ...processUpdatePayload } : process))
@@ -1135,20 +1015,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       }
 
       if (serviceManagerChanged) {
-        const previousManagerLabel = previousServiceManager || 'Não definido';
-        const nextManagerLabel = normalizedServiceManager || 'Não definido';
+        const previousManagerLabel = previousServiceManager || 'NÃ£o definido';
+        const nextManagerLabel = normalizedServiceManager || 'NÃ£o definido';
         processEventsPayload.push({
           org_id: processOrgId,
           process_id: processRecordId,
           tipo: 'atribuicao',
-          mensagem: `Responsável do serviço alterado de ${previousManagerLabel} para ${nextManagerLabel}.`,
+          mensagem: `ResponsÃ¡vel do serviÃ§o alterado de ${previousManagerLabel} para ${nextManagerLabel}.`,
           created_by: currentUser.id,
         });
       }
 
       if (deadlineChanged) {
-        const previousDeadlineLabel = previousDeadline ? formatDeadlineForDisplay(previousDeadline) : 'Não definido';
-        const nextDeadlineLabel = normalizedDeadline ? formatDeadlineForDisplay(normalizedDeadline) : 'Não definido';
+        const previousDeadlineLabel = previousDeadline ? formatDeadlineForDisplay(previousDeadline) : 'NÃ£o definido';
+        const nextDeadlineLabel = normalizedDeadline ? formatDeadlineForDisplay(normalizedDeadline) : 'NÃ£o definido';
         processEventsPayload.push({
           org_id: processOrgId,
           process_id: processRecordId,
@@ -1163,7 +1043,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           org_id: processOrgId,
           process_id: processRecordId,
           tipo: 'observacao',
-          mensagem: `Observação registrada: ${normalizedNotes}.`,
+          mensagem: `ObservaÃ§Ã£o registrada: ${normalizedNotes}.`,
           created_by: currentUser.id,
         });
       }
@@ -1209,7 +1089,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         .eq('id', profileUserId);
 
       if (error) {
-        profileUpdateError = 'Não foi possível atualizar os dados cadastrais na tabela profiles.';
+        profileUpdateError = 'NÃ£o foi possÃ­vel atualizar os dados cadastrais na tabela profiles.';
       }
     }
 
@@ -1242,418 +1122,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     setEditingProfileSaving(false);
   };
 
-  const fetchOrgMembers = async () => {
-    setMembersLoading(true);
-    setMembersError('');
 
-    const { allowedOrgIds, hasGlobalScope, error: scopeError } = await resolveOrganizationScope();
-    if (scopeError) {
-      setMembersError('Não foi possível validar o escopo de membros da organização.');
-      setMembersLoading(false);
-      return;
-    }
-    if (!hasGlobalScope && allowedOrgIds.size === 0) {
-      setOrgMembers([]);
-      setMembersLoading(false);
-      return;
-    }
-
-    const orgMemberSelectOptions = [
-      'org_id,user_id,role,nome_completo,nome,name,full_name,organizations(name)',
-      'org_id,user_id,role,organizations(name)',
-      'org_id,user_id,role',
-    ];
-
-    let memberRows: OrgMemberRow[] | null = null;
-    let memberError: { message?: string } | null = null;
-
-    for (const selectFields of orgMemberSelectOptions) {
-      const queryBuilder = supabase
-        .from('org_members')
-        .select(selectFields)
-        .order('created_at', { ascending: false });
-      const query = !hasGlobalScope
-        ? await queryBuilder.in('org_id', Array.from(allowedOrgIds))
-        : await queryBuilder;
-
-      if (!query.error) {
-        memberRows = query.data as unknown as OrgMemberRow[] | null;
-        memberError = null;
-        break;
-      }
-
-      memberError = query.error;
-    }
-
-    if (memberError) {
-      setMembersError('Não foi possível carregar os membros da organização.');
-      setMembersLoading(false);
-      return;
-    }
-
-    const memberUserIds = Array.from(new Set((memberRows || []).map((row) => row.user_id)));
-    let profileMap = new Map<string, { nome_completo?: string | null; nome?: string | null; name?: string | null; email?: string | null; role?: string | null }>();
-
-    if (memberUserIds.length > 0) {
-      const profileSelectOptions = [
-        'id,nome_completo,nome,name,email,role',
-        'id,nome_completo,name,email,role',
-        'id,nome_completo,email,role',
-        'id,email,role',
-      ];
-
-      for (const selectFields of profileSelectOptions) {
-        const profileQuery = await supabase
-          .from('profiles')
-          .select(selectFields)
-          .in('id', memberUserIds);
-
-        if (!profileQuery.error) {
-          const rows = (profileQuery.data || []) as unknown as Array<{ id: string; nome_completo?: string | null; nome?: string | null; name?: string | null; email?: string | null; role?: string | null }>;
-          profileMap = new Map(rows.map((profile) => [profile.id, profile]));
-          break;
-        }
-      }
-    }
-
-    const normalizedMembersFromMembership: OrgMemberView[] = (memberRows || []).map((member) => {
-      const profile = profileMap.get(member.user_id);
-      const fallbackUser = users.find((user) => user.id === member.user_id);
-      const nameFromMemberRow =
-        sanitizeDisplayValue(member.nome_completo) ||
-        sanitizeDisplayValue(member.full_name) ||
-        sanitizeDisplayValue(member.name) ||
-        sanitizeDisplayValue(member.nome);
-      const roleFromProfile = typeof profile?.role === 'string' ? profile.role : null;
-      const accessLevelFromMembership = mapOrgRoleToAccessLevel(member.role);
-      const accessLevelFromProfile = roleFromProfile ? resolveAccessLevel(roleFromProfile) : null;
-
-      const accessLevel =
-        accessLevelFromMembership !== 'Cliente'
-          ? accessLevelFromMembership
-          : accessLevelFromProfile || 'Cliente';
-
-      const resolvedEmail = sanitizeDisplayValue(profile?.email) || sanitizeDisplayValue(fallbackUser?.email) || '';
-      const resolvedName =
-        nameFromMemberRow ||
-        sanitizeDisplayValue(profile?.nome_completo) ||
-        sanitizeDisplayValue(profile?.name) ||
-        sanitizeDisplayValue(profile?.nome) ||
-        sanitizeDisplayValue(fallbackUser?.name) ||
-        (resolvedEmail ? resolvedEmail.split('@')[0] : '') ||
-        `Usuário ${member.user_id.slice(0, 8)}`;
-
-      return {
-        user_id: member.user_id,
-        org_id: member.org_id,
-        org_name: extractOrganizationName(member.organizations) || 'Organização Padrão',
-        name: resolvedName,
-        email: resolvedEmail || '-',
-        accessLevel,
-        source: 'org_members',
-      };
-    });
-
-    const profileSelectOptions = [
-      'id,org_id,role,email,nome_completo,nome,name,organizations(name)',
-      'id,org_id,role,email,nome_completo,name,organizations(name)',
-      'id,org_id,role,email,nome_completo,nome,name',
-      'id,org_id,role,email,nome_completo,name',
-      'id,org_id,role,email,nome_completo',
-      'id,org_id,role,email',
-    ];
-
-    let profileRows: ProfileRow[] | null = null;
-    let allProfilesError: { message?: string } | null = null;
-
-    for (const selectFields of profileSelectOptions) {
-      const queryBuilder = supabase
-        .from('profiles')
-        .select(selectFields)
-        .order('created_at', { ascending: false });
-      const query = !hasGlobalScope
-        ? await queryBuilder.in('org_id', Array.from(allowedOrgIds))
-        : await queryBuilder;
-
-      if (!query.error) {
-        profileRows = (query.data as unknown as ProfileRow[] | null) || [];
-        allProfilesError = null;
-        break;
-      }
-
-      allProfilesError = query.error;
-    }
-
-    if (allProfilesError) {
-      console.warn('[configuracoes] não foi possível carregar profiles completos; exibindo apenas org_members', allProfilesError);
-    }
-
-    const membershipKeys = new Set(normalizedMembersFromMembership.map((member) => `${member.org_id}-${member.user_id}`));
-
-    let defaultOrgId = newAdminOrgId || organizations[0]?.id || '';
-    let defaultOrgName = organizations.find((org) => org.id === defaultOrgId)?.name || 'Organização Padrão';
-
-    if (!defaultOrgId) {
-      const { data: fallbackOrganizations, error: fallbackOrganizationsError } = await supabase
-        .from('organizations')
-        .select('id,name,slug')
-        .order('created_at', { ascending: true });
-
-      if (!fallbackOrganizationsError && (fallbackOrganizations || []).length > 0) {
-        const defaultOrg =
-          (fallbackOrganizations || []).find((org) => String(org.slug || '').toLowerCase() === 'default') ||
-          (fallbackOrganizations || []).find((org) => String(org.name || '').toLowerCase().includes('padr')) ||
-          fallbackOrganizations?.[0];
-
-        if (defaultOrg?.id) {
-          defaultOrgId = defaultOrg.id;
-          defaultOrgName = defaultOrg.name || defaultOrgName;
-
-          if (!newAdminOrgId) {
-            setNewAdminOrgId(defaultOrg.id);
-          }
-        }
-      }
-    }
-
-    const profileOnlyMembers: OrgMemberView[] = (((allProfilesError ? [] : profileRows) || []) as ProfileRow[])
-      .filter((profile) => Boolean(profile.id))
-      .map((profile) => {
-        const orgId = sanitizeDisplayValue(profile.org_id) || 'sem-org';
-        return {
-          profile,
-          key: `${orgId}-${profile.id}`,
-        };
-      })
-      .filter(({ key }) => !membershipKeys.has(key))
-      .map(({ profile }) => {
-        const fallbackUser = users.find((user) => user.id === profile.id);
-        const resolvedEmail = sanitizeDisplayValue(profile.email) || sanitizeDisplayValue(fallbackUser?.email) || '-';
-        const resolvedName =
-          sanitizeDisplayValue(profile.nome_completo) ||
-          sanitizeDisplayValue(profile.name) ||
-          sanitizeDisplayValue(profile.nome) ||
-          sanitizeDisplayValue(fallbackUser?.name) ||
-          (resolvedEmail !== '-' ? resolvedEmail.split('@')[0] : '') ||
-          `Usuário ${profile.id.slice(0, 8)}`;
-
-        return {
-          user_id: profile.id,
-          org_id: sanitizeDisplayValue(profile.org_id) || defaultOrgId,
-          org_name: extractOrganizationName(profile.organizations) || defaultOrgName,
-          name: resolvedName,
-          email: resolvedEmail,
-          accessLevel: resolveAccessLevel(profile.role),
-          source: 'profiles',
-        };
-      });
-
-    setOrgMembers([...normalizedMembersFromMembership, ...profileOnlyMembers]);
-    setMembersLoading(false);
-  };
-
-  const handleCreateUser = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newAdminName) return;
-
-    const selectedOrg = organizations.find((org) => org.id === newAdminOrgId);
-    if (!selectedOrg) {
-      alert('Selecione uma organização válida.');
-      return;
-    }
-    const selectedOrgName = selectedOrg?.name || 'Organização Padrão';
-
-    let targetUserId = editingMemberUserId;
-    const normalizedEmail = sanitizeDisplayValue(newAdminEmail);
-    const shouldLookupProfileByEmail = !targetUserId && normalizedEmail && normalizedEmail !== '-';
-
-    setUserCreationStatus('Verificando email...');
-
-    let existingProfile: { id?: string; email?: string | null } | null = null;
-    let profileLookupError: { message?: string } | null = null;
-
-    if (shouldLookupProfileByEmail) {
-      const lookupResult = await supabase
-        .from('profiles')
-        .select('id,email')
-        .eq('email', normalizedEmail)
-        .maybeSingle();
-
-      existingProfile = lookupResult.data;
-      profileLookupError = lookupResult.error;
-    }
-
-    if (profileLookupError) {
-      setUserCreationStatus(null);
-      alert('Erro ao buscar usuário no banco. Tente novamente.');
-      return;
-    }
-
-    if (existingProfile?.id && !editingMemberUserId) {
-      alert(`O email ${normalizedEmail} já possui cadastro. O usuário será vinculado à organização atual.`);
-    }
-
-    // If password is provided, use the edge function (idempotent — handles both create and update)
-    if (newAdminPassword) {
-      const supabaseUrl = String(import.meta.env.VITE_SUPABASE_URL ?? '').trim();
-      const anonKey = String(import.meta.env.VITE_SUPABASE_ANON_KEY ?? '').trim();
-      if (!supabaseUrl || !anonKey) {
-        setUserCreationStatus(null);
-        alert('Erro de configuração do ambiente.');
-        return;
-      }
-      setUserCreationStatus('Criando conta no sistema…');
-      try {
-        const response = await fetch(`${supabaseUrl}/functions/v1/${SUPABASE_EDGE_FUNCTIONS.CREATE_USER}`, {
-          method: 'POST',
-          headers: {
-            apikey: anonKey,
-            Authorization: `Bearer ${anonKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: normalizedEmail,
-            password: newAdminPassword,
-            name: sanitizeDisplayValue(newAdminName),
-            role: newAccessLevel,
-            org_id: newAdminOrgId,
-            unit: ServiceUnit.ADMINISTRATIVO,
-          }),
-        });
-        const result = await response.json();
-        if (!response.ok) {
-          setUserCreationStatus(null);
-          alert(`Erro ao criar usuário: ${result.error || 'desconhecido'}`);
-          return;
-        }
-        targetUserId = result.user_id;
-        if (result.process_warning) {
-          alert(`Atenção: ${result.process_warning}`);
-        }
-        setNewAdminPassword('');
-      } catch (fetchErr: any) {
-        setUserCreationStatus(null);
-        alert(`Erro ao comunicar com o servidor: ${fetchErr?.message || 'desconhecido'}`);
-        return;
-      }
-    } else if (!targetUserId && !existingProfile?.id) {
-      setUserCreationStatus(null);
-      alert('Usuário não encontrado no sistema. Informe uma senha para criar um novo cadastro.');
-      return;
-    }
-
-    targetUserId = targetUserId || existingProfile?.id || null;
-
-    if (!targetUserId) {
-      setUserCreationStatus(null);
-      alert('Não foi possível identificar o usuário selecionado para atualização.');
-      return;
-    }
-
-    setUserCreationStatus('Vinculando à organização…');
-
-    const orgRole = mapAccessLevelToOrgRole(newAccessLevel);
-
-    const { error: upsertMemberError } = await supabase
-      .from('org_members')
-      .upsert(
-        {
-          org_id: newAdminOrgId,
-          user_id: targetUserId,
-          role: orgRole,
-        },
-        { onConflict: 'org_id,user_id' }
-      );
-
-    let membershipWarning = '';
-
-    if (upsertMemberError) {
-      const errorMessage = String(upsertMemberError.message || '').toLowerCase();
-      const errorCode = String((upsertMemberError as { code?: string }).code || '').toLowerCase();
-      const errorStatus = String((upsertMemberError as { status?: number }).status || '');
-
-      const isPermissionError =
-        errorStatus === '403' ||
-        errorCode === '42501' ||
-        errorMessage.includes('permission denied') ||
-        errorMessage.includes('row-level security') ||
-        errorMessage.includes('not allowed');
-
-      if (isPermissionError) {
-        membershipWarning = 'Nível atualizado no perfil, mas o vínculo em org_members foi bloqueado por permissão.';
-      } else {
-        setUserCreationStatus(null);
-        alert('Erro ao salvar vínculo na tabela org_members.');
-        return;
-      }
-    }
-
-    setUserCreationStatus('Atualizando perfil…');
-
-    const { error: profileUpdateError } = await supabase
-      .from('profiles')
-      .update({
-        nome_completo: sanitizeDisplayValue(newAdminName),
-        name: sanitizeDisplayValue(newAdminName),
-        role: newAccessLevel,
-        org_id: newAdminOrgId,
-      })
-      .eq('id', targetUserId);
-
-    if (profileUpdateError) {
-      console.warn('handleCreateUser: profiles.update() falhou —', profileUpdateError.message);
-    }
-
-    setUserCreationStatus('Finalizando…');
-
-    setUsers((prev) => {
-      const found = prev.find((user) => user.id === targetUserId || user.email === normalizedEmail);
-      const role = newAccessLevel === 'Administrador' ? UserRole.ADMIN : UserRole.CLIENT;
-
-      if (found) {
-        return prev.map((user) =>
-          user.id === found.id
-            ? { ...user, name: sanitizeDisplayValue(newAdminName) || user.name, role, hierarchy: Hierarchy.FULL, organizationId: newAdminOrgId, organizationName: selectedOrgName }
-            : user
-        );
-      }
-
-      const newUser: User = {
-        id: targetUserId,
-        name: sanitizeDisplayValue(newAdminName) || 'Usuário',
-        email: normalizedEmail || '-',
-        role,
-        hierarchy: Hierarchy.FULL,
-        documentId: '---',
-        taxId: '---',
-        address: '---',
-        maritalStatus: '---',
-        country: '---',
-        phone: '---',
-        unit: ServiceUnit.ADMINISTRATIVO,
-        status: ProcessStatus.PENDENTE,
-        protocol: `USR-2026-000`,
-        registrationDate: new Date().toLocaleString('pt-BR'),
-        lastUpdate: new Date().toLocaleString('pt-BR'),
-        organizationId: newAdminOrgId,
-        organizationName: selectedOrgName,
-      };
-      return [...prev, newUser];
-    });
-
-    setNewAdminEmail('');
-    setNewAdminName('');
-    setNewAdminPassword('');
-    setNewAdminOrgId(selectedOrg.id);
-    setNewAccessLevel('Usuário Sênior');
-    setEditingMemberUserId(null);
-    setUserCreationStatus(null);
-    await fetchOrgMembers();
-    alert(membershipWarning || 'Membro cadastrado/atualizado com sucesso.');
-  };
 
   const handleDeleteUser = (id: string) => {
-    if(window.confirm('Deseja realmente excluir este usuário?')) {
+    if(window.confirm('Deseja realmente excluir este usuÃ¡rio?')) {
       setUsers(prev => prev.filter(u => u.id !== id));
     }
   };
@@ -1712,188 +1184,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     }
   };
 
-  const refreshOrganizations = async () => {
-    const { organizations: loadedOrganizations, error } = await loadOrganizations();
-
-    if (error) {
-      console.warn('[organizacoes] erro ao carregar organizações', error);
-      return;
-    }
-
-    setOrganizations(loadedOrganizations);
-    if (!newAdminOrgId && loadedOrganizations.length > 0) {
-      const defaultOrg = loadedOrganizations.find((org) => org.name.toLowerCase().includes('padr'));
-      setNewAdminOrgId(defaultOrg?.id || loadedOrganizations[0].id);
-    }
-  };
-
-  useEffect(() => {
-    void refreshOrganizations();
-    fetchOrgMembers();
-  }, []);
-
-  const managementUsers = orgMembers
-    .filter((user) =>
-      user.name.toLowerCase().includes(configSearch.toLowerCase()) ||
-      user.email.toLowerCase().includes(configSearch.toLowerCase())
-    )
-    .slice(0, configRowsLimit);
-
-  const handleDeleteMember = async (member: OrgMemberView) => {
-    if (!window.confirm('Deseja realmente remover este membro da organização?')) return;
-    const fallbackEmail = sanitizeDisplayValue(member.email) || 'sem-email';
-
-    const { data: profileBeforeDelete } = await supabase
-      .from('profiles')
-      .select('id,email')
-      .eq('id', member.user_id)
-      .maybeSingle();
-
-    const memberEmail = sanitizeDisplayValue(profileBeforeDelete?.email) || fallbackEmail;
-
-    const { data: existingProfile } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('id', member.user_id)
-      .maybeSingle();
-
-    const { data: existingMembership } = await supabase
-      .from('org_members')
-      .select('user_id')
-      .eq('org_id', member.org_id)
-      .eq('user_id', member.user_id)
-      .maybeSingle();
-
-    if (!existingProfile && !existingMembership) {
-      showToast({ type: 'warning', message: `O usuário ${memberEmail} já não possui cadastro no banco. A listagem foi atualizada.` });
-      await fetchOrgMembers();
-      return;
-    }
-
-    let rpcMissingFunction = false;
-
-    const { error: hardDeleteError } = await supabase.rpc('delete_user_completely', {
-      target_user_id: member.user_id,
-    });
-
-    if (hardDeleteError) {
-      const rpcStatus = String((hardDeleteError as { status?: number }).status || '');
-      const rpcCode = String((hardDeleteError as { code?: string }).code || '').toLowerCase();
-      const rpcMessage = String(hardDeleteError.message || '').toLowerCase();
-
-      const rpcMissing =
-        rpcStatus === '404' ||
-        rpcCode.includes('pgrst202') ||
-        rpcMessage.includes('delete_user_completely') ||
-        rpcMessage.includes('function') ||
-        rpcMessage.includes('not found');
-
-      if (rpcMissing) {
-        rpcMissingFunction = true;
-      }
-    }
-
-    if (!hardDeleteError) {
-      const { data: profileStillExistsAfterRpc } = await supabase
-        .from('profiles')
-        .select('id')
-        .or(`id.eq.${member.user_id},email.eq.${memberEmail}`)
-        .limit(1)
-        .maybeSingle();
-
-      const { data: membershipStillExistsAfterRpc } = await supabase
-        .from('org_members')
-        .select('user_id')
-        .eq('user_id', member.user_id)
-        .limit(1)
-        .maybeSingle();
-
-      if (!profileStillExistsAfterRpc && !membershipStillExistsAfterRpc) {
-        setUsers((prev) => prev.filter((user) => user.id !== member.user_id));
-        showToast({ type: 'success', message: `Usuário ${memberEmail} excluído com sucesso do sistema.` });
-        await fetchOrgMembers();
-        return;
-      }
-    }
-
-    const { error: orgMemberDeleteError } = await supabase
-      .from('org_members')
-      .delete()
-      .eq('user_id', member.user_id);
-
-    if (orgMemberDeleteError) {
-      showToast({ type: 'error', message: `Erro ao remover vínculos de organização para ${memberEmail}.` });
-      alert('Erro ao remover vínculo na organização.');
-      return;
-    }
-
-    const { error: profileDeleteError } = await supabase
-      .from('profiles')
-      .delete()
-      .eq('id', member.user_id);
-
-    if (profileDeleteError) {
-      const errorMessage = String(profileDeleteError.message || '').toLowerCase();
-      const errorCode = String((profileDeleteError as { code?: string }).code || '').toLowerCase();
-      const errorStatus = String((profileDeleteError as { status?: number }).status || '');
-
-      const isPermissionError =
-        errorStatus === '403' ||
-        errorCode === '42501' ||
-        errorMessage.includes('permission denied') ||
-        errorMessage.includes('row-level security') ||
-        errorMessage.includes('not allowed');
-
-      if (isPermissionError) {
-        showToast({ type: 'warning', message: `Vínculo removido, mas o perfil de ${memberEmail} não pôde ser excluído por permissão no Supabase.` });
-        alert('Vínculo removido, mas não foi possível excluir o perfil por permissão. Verifique políticas do Supabase para exclusão completa.');
-      } else {
-        showToast({ type: 'error', message: `Vínculo removido, mas houve erro ao excluir o perfil de ${memberEmail} no banco.` });
-        alert('Vínculo removido, mas houve erro ao excluir o perfil no banco.');
-      }
-
-      await fetchOrgMembers();
-      return;
-    }
-
-    if (memberEmail !== 'sem-email') {
-      await supabase
-        .from('profiles')
-        .delete()
-        .eq('email', memberEmail)
-        .neq('id', member.user_id);
-    }
-
-    const { data: profileStillExists } = await supabase
-      .from('profiles')
-      .select('id,email')
-      .or(`id.eq.${member.user_id},email.eq.${memberEmail}`)
-      .limit(1)
-      .maybeSingle();
-
-    const { data: membershipStillExists } = await supabase
-      .from('org_members')
-      .select('user_id')
-      .eq('user_id', member.user_id)
-      .limit(1)
-      .maybeSingle();
-
-    if (profileStillExists || membershipStillExists) {
-      showToast({ type: 'warning', message: rpcMissingFunction
-        ? `Exclusão definitiva indisponível para ${memberEmail}: a função RPC delete_user_completely não está publicada neste banco.`
-        : `A exclusão de ${memberEmail} não foi concluída totalmente. Ainda existe cadastro no banco.` });
-      await fetchOrgMembers();
-      return;
-    }
-
-    setUsers((prev) => prev.filter((user) => user.id !== member.user_id));
-    showToast({ type: 'success', message: `Usuário ${memberEmail} excluído com sucesso do sistema.` });
-
-    await fetchOrgMembers();
-  };
-
-
-
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingForProcess, setUploadingForProcess] = useState<string | null>(null);
@@ -1950,7 +1240,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       <DashboardSection
         dashboardProcessRows={baseProcessRows}
         usersCount={users.length}
-        filteredUsersCount={filteredUsers.length}
+        filteredUsersCount={users.length}
         isClientScope={isClientScope}
         canAccessSection={canAccessSection}
         navigateToDashboardHighlight={navigateToDashboardHighlight}
@@ -1968,14 +1258,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           onClick={() => setActiveTab('users')}
           className={`pb-4 px-2 font-black uppercase text-xs tracking-widest transition-all relative ${activeTab === 'users' ? 'text-blue-500' : 'text-gray-500'}`}
         >
-          Visualização de Usuários
+          VisualizaÃ§Ã£o de UsuÃ¡rios
           {activeTab === 'users' && <div className="absolute bottom-0 left-0 w-full h-1 bg-blue-500 rounded-t-full"></div>}
         </button>
         <button 
           onClick={() => setActiveTab('management')}
           className={`pb-4 px-2 font-black uppercase text-xs tracking-widest transition-all relative ${activeTab === 'management' ? 'text-blue-500' : 'text-gray-500'}`}
         >
-          Gestão de Acessos
+          GestÃ£o de Acessos
           {activeTab === 'management' && <div className="absolute bottom-0 left-0 w-full h-1 bg-blue-500 rounded-t-full"></div>}
         </button>
         <button 
@@ -1989,7 +1279,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           onClick={() => setActiveTab('servicos')}
           className={`pb-4 px-2 font-black uppercase text-xs tracking-widest transition-all relative ${activeTab === 'servicos' ? 'text-blue-500' : 'text-gray-500'}`}
         >
-          Serviços
+          ServiÃ§os
           {activeTab === 'servicos' && <div className="absolute bottom-0 left-0 w-full h-1 bg-blue-500 rounded-t-full"></div>}
         </button>
           </div>
@@ -2000,7 +1290,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       <OrganizationsSection
         organizations={organizations}
         canManageOrganizations={can('manage', 'organizacoes', permissionSubject)}
-        onRefreshOrganizations={refreshOrganizations}
+        onRefreshOrganizations={async () => { const { organizations: loaded, error } = await loadOrganizations(); if (!error) setOrganizations(loaded); }}
       />
       <ProcessesSection
         baseProcessRows={baseProcessRows}
@@ -2015,7 +1305,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         selectedUser={selectedUser}
         setEditingUser={setEditingUser}
         setSelectedUser={setSelectedUser}
-        newAdminOrgId={newAdminOrgId}
+        newAdminOrgId={organizations[0]?.id || ''}
         currentSection={currentSection}
         locationSearch={location.search}
         ProcessesContainer={ProcessesContainer}
@@ -2032,108 +1322,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         </section>
       )}
       {currentSection === 'configuracoes' && activeTab === 'users' && (
-        <div key="tab-users" className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-[0_16px_34px_rgba(15,23,42,0.08)] animate-slideUp">
-          <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 no-print">
-            <div className="relative w-full md:w-96">
-              <Search className="absolute left-3 top-2.5 text-gray-500 w-4 h-4" />
-              <input 
-                type="text" 
-                placeholder="Pesquise Por: Nome, Protocolo ou E-mail"
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-full text-gray-800 text-sm font-semibold placeholder:text-gray-600 focus:ring-1 focus:ring-blue-500 outline-none"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-gray-500 text-[10px] font-black uppercase">Total de Registros:</span>
-              <span className="bg-blue-50 px-2 py-0.5 rounded-md text-blue-600 font-bold text-xs">{filteredUsers.length}</span>
-            </div>
-          </div>
-
-          {filteredUsers.length === 0 ? (
-            <div className="py-12 text-center">
-              <SearchX className="w-8 h-8 text-gray-300 mx-auto mb-3" />
-              <p className="text-sm font-bold text-gray-500">Nenhum usuário encontrado</p>
-              <p className="text-xs text-gray-400 mt-1">Tente alterar o termo da busca.</p>
-            </div>
-          ) : (
-            <>
-              <div className="block md:hidden space-y-3">
-                {filteredUsers.map(user => (
-                  <div key={user.id} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
-                    <div className="flex items-start justify-between mb-2">
-                      <p className="font-bold text-gray-800 text-sm truncate flex-1">{user.name}</p>
-                      <span className={`ml-2 px-3 py-1 rounded-full text-[10px] font-black text-white shrink-0 ${
-                        user.status === ProcessStatus.PENDENTE ? 'bg-gray-200 text-gray-700' :
-                        user.status === ProcessStatus.TRIAGEM ? 'bg-yellow-600' :
-                        user.status === ProcessStatus.ANALISE ? 'bg-orange-600' : 'bg-emerald-600'
-                      }`}>
-                        {user.status}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div>
-                        <p className="text-[10px] font-black text-gray-500 uppercase">Telefone</p>
-                        <p className="font-bold text-gray-700 truncate">{user.phone} ({user.country})</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-black text-gray-500 uppercase">Protocolo</p>
-                        <span className="bg-blue-900/30 text-blue-400 px-2 py-0.5 rounded-md text-[10px] font-black">{user.protocol}</span>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-black text-gray-500 uppercase">Última Alteração</p>
-                        <p className="font-bold text-gray-600 truncate">{user.lastUpdate || user.registrationDate}</p>
-                      </div>
-                    </div>
-                    <div className="flex justify-end gap-2 mt-3 pt-3 border-t border-gray-100">
-                      <button onClick={() => setSelectedUser(user)} className="p-1.5 bg-gray-100 hover:bg-gray-200 rounded-md text-gray-600"><Eye className="w-4 h-4" /></button>
-                      <button onClick={() => setEditingUser(user)} className="p-1.5 bg-blue-900/30 hover:bg-blue-900/50 rounded-md text-blue-400"><Pencil className="w-4 h-4" /></button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="hidden md:block overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="bg-gray-50 text-gray-500 uppercase text-[10px] font-black tracking-widest">
-                      <th className="px-3 sm:px-6 py-2 sm:py-4">Nome Completo</th>
-                      <th className="px-3 sm:px-6 py-2 sm:py-4">Telefone+DDD+País</th>
-                      <th className="px-3 sm:px-6 py-2 sm:py-4">Protocolo SGI</th>
-                      <th className="px-3 sm:px-6 py-2 sm:py-4">Status do Processo</th>
-                      <th className="px-3 sm:px-6 py-2 sm:py-4">Última Alteração</th>
-                      <th className="px-3 sm:px-6 py-2 sm:py-4 text-right">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800">
-                    {filteredUsers.map(user => (
-                      <tr key={user.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-3 sm:px-6 py-2 sm:py-4 font-bold text-gray-700">{user.name}</td>
-                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-500 font-bold whitespace-nowrap">{user.phone} ({user.country})</td>
-                        <td className="px-3 sm:px-6 py-2 sm:py-4"><span className="bg-blue-900/30 text-blue-400 px-2 py-1 rounded-md text-[10px] font-black">{user.protocol}</span></td>
-                        <td className="px-3 sm:px-6 py-2 sm:py-4">
-                          <span className={`px-3 py-1 rounded-full text-[10px] font-black text-white ${
-                            user.status === ProcessStatus.PENDENTE ? 'bg-gray-200 text-gray-700' :
-                            user.status === ProcessStatus.TRIAGEM ? 'bg-yellow-600' :
-                            user.status === ProcessStatus.ANALISE ? 'bg-orange-600' : 'bg-emerald-600'
-                          }`}>
-                            {user.status}
-                          </span>
-                        </td>
-                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-500 text-[10px] font-bold whitespace-nowrap">{user.lastUpdate || user.registrationDate}</td>
-                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-right whitespace-nowrap no-print">
-                          <div className="flex justify-end gap-2">
-                            <button onClick={() => setSelectedUser(user)} className="p-1.5 bg-gray-100 hover:bg-gray-200 rounded-md text-gray-600"><Eye className="w-4 h-4" /></button>
-                            <button onClick={() => setEditingUser(user)} className="p-1.5 bg-blue-900/30 hover:bg-blue-900/50 rounded-md text-blue-400"><Pencil className="w-4 h-4" /></button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          )}
-        </div>
+        <UsersSection users={users} onSelectUser={setSelectedUser} onEditUser={setEditingUser} />
       )}
       {currentSection === 'configuracoes' && activeTab === 'iban' && (
         <div key="tab-iban" className="animate-slideUp"><IbanManagementSection currentUser={currentUser} /></div>
@@ -2142,210 +1331,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         <div key="tab-servicos" className="animate-slideUp"><ServicesSection currentUser={currentUser} /></div>
       )}
       {currentSection === 'configuracoes' && activeTab === 'management' && (
-        /* Management Tab Content */
-        <div key="tab-management" className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-slideUp">
-           <div className="lg:col-span-1 bg-white border border-gray-100 rounded-2xl p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
-              <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
-                <Plus className="text-blue-500" /> Cadastrar Usuário e Nível
-              </h3>
-              <form onSubmit={handleCreateUser} className="space-y-4">
-                 <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Nome de Usuário</label>
-                    <input 
-                      required
-                      type="text"
-                      placeholder="Nome do Gestor"
-                      value={newAdminName}
-                      onChange={e => setNewAdminName(e.target.value)}
-                      className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold" 
-                    />
-                 </div>
-                  <div>
-                     <label className="text-xs font-bold text-gray-500 uppercase block mb-1">E-mail</label>
-                     <input 
-                       required
-                       type="email"
-                       placeholder="admin@sgi.com"
-                       value={newAdminEmail}
-                       onChange={e => setNewAdminEmail(e.target.value)}
-                       className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold" 
-                     />
-                  </div>
-                  <div>
-                     <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Senha <span className="text-[10px] font-normal text-gray-400">(obrigatório se o usuário não existir)</span></label>
-                     <input 
-                       type="password"
-                       placeholder="mín. 6 caracteres"
-                       value={newAdminPassword}
-                       onChange={e => setNewAdminPassword(e.target.value)}
-                       className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold" 
-                     />
-                     <p className="text-[11px] text-gray-400 mt-1">Se o e-mail já estiver cadastrado, a senha será ignorada.</p>
-                  </div>
-                 <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Perfil de Acesso</label>
-                    <select
-                      value={newAccessLevel}
-                      onChange={(event) => setNewAccessLevel(event.target.value as AccessLevel)}
-                      className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold"
-                    >
-                      {ACCESS_LEVELS.map((level) => (
-                        <option key={level} value={level}>{level}</option>
-                      ))}
-                    </select>
-                    <p className="text-[11px] text-gray-500 mt-2">Diretoria/Gerência da organização: agenda, equipe e distribuição autorizada.</p>
-                 </div>
-                 <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Instituição / Organização</label>
-                    <select
-                      value={newAdminOrgId}
-                      onChange={(event) => setNewAdminOrgId(event.target.value)}
-                      className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold"
-                    >
-                      {organizations.length === 0 && <option value="">Carregando organizações...</option>}
-                      {organizations.map((org) => (
-                        <option key={org.id} value={org.id}>{org.name}</option>
-                      ))}
-                    </select>
-                    <p className="text-[11px] text-gray-500 mt-2">Instituição atual selecionada: {organizations.find((org) => org.id === newAdminOrgId)?.name || 'Organização Padrão'}</p>
-                  </div>
-                  <button type="submit" className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg uppercase text-xs tracking-widest mt-4 shadow-lg active:scale-95 transition-transform">
-                    {editingMemberUserId ? 'Atualizar / Definir' : 'Cadastrar / Definir'}
-                 </button>
-              </form>
-           </div>
-
-           <div className="lg:col-span-2 bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
-              <div className="p-4 border-b border-gray-100 flex flex-col md:flex-row gap-3 md:items-center md:justify-between bg-white">
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-600 text-sm font-bold">Mostrar</span>
-                  <select
-                    value={configRowsLimit}
-                    onChange={(event) => setConfigRowsLimit(Number(event.target.value))}
-                    className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-gray-800 font-semibold"
-                  >
-                    <option value={10}>10</option>
-                    <option value={25}>25</option>
-                    <option value={50}>50</option>
-                  </select>
-                </div>
-                <div className="relative w-full md:w-72">
-                  <Search className="absolute left-3 top-3 text-gray-500 w-4 h-4" />
-                  <input
-                    value={configSearch}
-                    onChange={(event) => setConfigSearch(event.target.value)}
-                    placeholder="Pesquisar..."
-                    className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold"
-                  />
-                </div>
-              </div>
-              {membersError && <p className="px-4 pt-3 text-sm text-red-400 font-bold">{membersError}</p>}
-
-              {membersLoading ? (
-                <div className="p-8"><TableSkeleton rows={4} cols={4} /></div>
-              ) : managementUsers.length === 0 ? (
-                <div className="py-12 text-center">
-                  <Users className="w-8 h-8 text-gray-300 mx-auto mb-3" />
-                  <p className="text-sm font-bold text-gray-500">Nenhum membro encontrado</p>
-                  <p className="text-xs text-gray-400 mt-1">Cadastre novos membros usando o formulário ao lado.</p>
-                </div>
-              ) : (
-                <>
-                  {/* Mobile card view */}
-                  <div className="block md:hidden space-y-3">
-                    {managementUsers.map(u => (
-                      <div key={`${u.user_id}-${u.org_id}`} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="min-w-0 flex-1">
-                            <p className="font-bold text-gray-800 text-sm truncate">{u.name}</p>
-                            <p className="text-[10px] text-gray-500 truncate">{u.email}</p>
-                          </div>
-                          <span className="text-[10px] font-black text-blue-400 uppercase border border-blue-900/50 bg-blue-900/10 px-2 py-0.5 rounded shrink-0 ml-2">
-                            {u.accessLevel.toUpperCase()}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                          <p className="text-xs text-gray-600 font-bold truncate">{u.org_name || 'Organização Padrão'}</p>
-                          <div className="flex gap-2 shrink-0 ml-2">
-                            <button
-                              onClick={() => {
-                                setNewAdminName(u.name);
-                                setNewAdminEmail(u.email === '-' ? '' : u.email);
-                                setNewAdminOrgId(u.org_id);
-                                setNewAccessLevel(u.accessLevel);
-                                setEditingMemberUserId(u.user_id);
-                              }}
-                              className="p-1.5 bg-gray-100 hover:bg-gray-200 rounded-md text-gray-500"
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteMember(u)}
-                              className="p-1.5 bg-red-900/20 hover:bg-red-900/40 rounded-md text-red-500"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Desktop table view */}
-                  <div className="hidden md:block overflow-x-auto">
-                    <table className="w-full text-left text-sm">
-                      <thead>
-                        <tr className="bg-gray-50 text-gray-500 uppercase text-[10px] font-black tracking-widest">
-                          <th className="px-3 sm:px-6 py-2 sm:py-4">Usuário</th>
-                          <th className="px-3 sm:px-6 py-2 sm:py-4">Nível de Acesso</th>
-                          <th className="px-3 sm:px-6 py-2 sm:py-4">Instituição</th>
-                          <th className="px-3 sm:px-6 py-2 sm:py-4 text-right">Ações</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-800">
-                        {managementUsers.map(u => (
-                          <tr key={`${u.user_id}-${u.org_id}`} className="hover:bg-gray-50">
-                            <td className="px-3 sm:px-6 py-2 sm:py-4 font-bold flex flex-col">
-                               <span>{u.name}</span>
-                               <span className="text-[10px] text-gray-500">{u.email}</span>
-                            </td>
-                            <td className="px-3 sm:px-6 py-2 sm:py-4">
-                              <span className="text-[10px] font-black text-blue-400 uppercase border border-blue-900/50 bg-blue-900/10 px-2 py-0.5 rounded">
-                                {u.accessLevel.toUpperCase()}
-                              </span>
-                            </td>
-                            <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-600 font-bold whitespace-nowrap">{u.org_name || 'Organização Padrão'}</td>
-                            <td className="px-3 sm:px-6 py-2 sm:py-4 text-right whitespace-nowrap">
-                               <div className="flex justify-end gap-2">
-                                  <button
-                                    onClick={() => {
-                                      setNewAdminName(u.name);
-                                      setNewAdminEmail(u.email === '-' ? '' : u.email);
-                                      setNewAdminOrgId(u.org_id);
-                                      setNewAccessLevel(u.accessLevel);
-                                      setEditingMemberUserId(u.user_id);
-                                    }}
-                                    className="p-2 bg-gray-100 hover:bg-gray-200 rounded-md text-gray-500 hover:text-white transition-colors"
-                                  >
-                                    <Pencil className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteMember(u)}
-                                    className="p-2 bg-red-900/20 hover:bg-red-900/40 rounded-md text-red-500 transition-colors"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                               </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </>
-              )}
-            </div>
-         </div>
+        <ManagementSection users={users} setUsers={setUsers} organizations={organizations} currentUser={currentUser} />
       )}
       {currentSection === 'agenda' && (
         <div className="max-w-full bg-white border border-gray-100 rounded-2xl shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
@@ -2408,7 +1394,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                   >
-                    Comunicação
+                    ComunicaÃ§Ã£o
                   </button>
                 </div>
 
@@ -2430,7 +1416,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                           <p className="font-bold break-words">{selectedUser.documentId} / {selectedUser.taxId}</p>
                         </div>
                         <div>
-                          <label className="text-[10px] font-black text-gray-500 uppercase">Estado Civil / País</label>
+                          <label className="text-[10px] font-black text-gray-500 uppercase">Estado Civil / PaÃ­s</label>
                           <p className="font-bold break-words">{selectedUser.maritalStatus} - {selectedUser.country}</p>
                         </div>
                       </div>
@@ -2440,8 +1426,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                           <p className="text-lg font-black text-emerald-400 break-words">{selectedUser.protocol}</p>
                         </div>
                         <div>
-                          <label className="text-[10px] font-black text-gray-500 uppercase">Título do processo</label>
-                          <p className="font-bold break-words">{sanitizeDisplayValue((selectedUser as AdminProcessRow).contractedServiceName) || 'Não informado'}</p>
+                          <label className="text-[10px] font-black text-gray-500 uppercase">TÃ­tulo do processo</label>
+                          <p className="font-bold break-words">{sanitizeDisplayValue((selectedUser as AdminProcessRow).contractedServiceName) || 'NÃ£o informado'}</p>
                         </div>
                         <div>
                           <label className="text-[10px] font-black text-gray-500 uppercase">Unidade Atendimento</label>
@@ -2449,7 +1435,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                         </div>
                         <div>
                           <label className="text-[10px] font-black text-gray-500 uppercase">Processo Judicial</label>
-                          <p className="font-bold break-words">{selectedUser.processNumber || 'NÃO INFORMADO'}</p>
+                          <p className="font-bold break-words">{selectedUser.processNumber || 'NÃƒO INFORMADO'}</p>
                         </div>
                         <div>
                           <label className="text-[10px] font-black text-gray-500 uppercase">Status Atual</label>
@@ -2458,12 +1444,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                       </div>
                     </div>
                     <div className="mt-8 pt-6 border-t border-gray-100">
-                      <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Endereço Completo</label>
+                      <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">EndereÃ§o Completo</label>
                       <p className="font-semibold p-4 bg-gray-50 border border-gray-200 rounded-xl">{selectedUser.address}</p>
                     </div>
                     {selectedUser.notes && (
                       <div className="mt-4">
-                        <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Observações Internas</label>
+                        <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">ObservaÃ§Ãµes Internas</label>
                         <p className="font-bold p-4 bg-blue-900/10 border border-blue-900/30 rounded-xl text-blue-200 italic">"{selectedUser.notes}"</p>
                       </div>
                     )}
@@ -2484,7 +1470,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
                     {(selectedUser as AdminProcessRow).servicesSelected && (selectedUser as AdminProcessRow).servicesSelected!.length > 0 && (
                       <div>
-                        <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Serviços Contratados</label>
+                        <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">ServiÃ§os Contratados</label>
                         <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
                           {(selectedUser as AdminProcessRow).servicesSelected!.map((svc, idx) => (
                             <div key={idx} className="flex items-center justify-between px-4 py-3 bg-white">
@@ -2512,14 +1498,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                           <label className="text-[10px] font-black text-amber-700 uppercase block mb-2">Taxas Associativas</label>
                           <div className="divide-y divide-amber-100 border border-amber-200 rounded-xl overflow-hidden">
                             <div className="flex items-center justify-between px-4 py-3 bg-blue-50">
-                              <p className="text-sm font-bold text-blue-800">Valor Bruto dos Serviços</p>
+                              <p className="text-sm font-bold text-blue-800">Valor Bruto dos ServiÃ§os</p>
                               <span className="text-sm font-black text-blue-800">R$ {servicosTotal.toFixed(2)}</span>
                             </div>
                             {convenioFees.map((fee, idx) => (
                               <div key={idx} className="flex items-center justify-between px-4 py-3 bg-amber-50">
                                 <div className="min-w-0 flex-1">
                                   <p className="text-sm font-bold text-amber-900 truncate">{fee.name}</p>
-                                  <p className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider">Associação</p>
+                                  <p className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider">AssociaÃ§Ã£o</p>
                                 </div>
                                 <span className="text-sm font-black text-amber-700 ml-3">- R$ {fee.price.toFixed(2)}</span>
                               </div>
@@ -2528,13 +1514,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                               <div className="flex items-center justify-between px-4 py-3 bg-purple-50">
                                 <div className="min-w-0 flex-1">
                                   <p className="text-sm font-bold text-purple-900 truncate">{doacaoFee.name}</p>
-                                  <p className="text-[10px] font-semibold text-purple-600 uppercase tracking-wider">Associação</p>
+                                  <p className="text-[10px] font-semibold text-purple-600 uppercase tracking-wider">AssociaÃ§Ã£o</p>
                                 </div>
                                 <span className="text-sm font-black text-purple-700 ml-3">+ R$ {doacaoFee.price.toFixed(2)}</span>
                               </div>
                             )}
                             <div className="flex items-center justify-between px-4 py-3 bg-emerald-50">
-                              <p className="text-sm font-bold text-emerald-800">Valor Líquido ao Profissional</p>
+                              <p className="text-sm font-bold text-emerald-800">Valor LÃ­quido ao Profissional</p>
                               <span className="text-base font-black text-emerald-700">R$ {Math.max(0, profissionalNet).toFixed(2)}</span>
                             </div>
                             <div className="flex items-center justify-between px-4 py-3 bg-amber-100">
@@ -2548,7 +1534,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl">
-                        <label className="text-[10px] font-black text-gray-500 uppercase block mb-1">Tipo de Serviço</label>
+                        <label className="text-[10px] font-black text-gray-500 uppercase block mb-1">Tipo de ServiÃ§o</label>
                         <p className="text-lg font-black text-gray-900">{(selectedUser as AdminProcessRow).processType || '-'}</p>
                       </div>
                       <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl">
@@ -2579,10 +1565,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                           {redirectingCheckout ? (
                             <><Loader2 className="h-5 w-5 animate-spin" /> Redirecionando para pagamento...</>
                           ) : (
-                            <><CreditCard className="h-5 w-5" /> Pagar agora — R$ {Number((selectedUser as AdminProcessRow).osValue ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</>
+                            <><CreditCard className="h-5 w-5" /> Pagar agora â€” R$ {Number((selectedUser as AdminProcessRow).osValue ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</>
                           )}
                         </button>
-                        <p className="text-xs text-gray-500 text-center">Pagamento processado via Stripe com segurança</p>
+                        <p className="text-xs text-gray-500 text-center">Pagamento processado via Stripe com seguranÃ§a</p>
 
                         {/* Payment proof upload for clients */}
                         {(isClientScope) && (
@@ -2601,7 +1587,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                         <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-center">
                           <p className="font-bold text-amber-800">
                             {isClientScope
-                              ? 'Comprovante enviado! Aguardando validação.'
+                              ? 'Comprovante enviado! Aguardando validaÃ§Ã£o.'
                               : 'Cliente enviou comprovante. Valide abaixo.'}
                           </p>
                         </div>
@@ -2682,7 +1668,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                       <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
                         <Check className="h-8 w-8 text-emerald-600 mx-auto mb-2" />
                         <p className="font-bold text-emerald-800 text-lg">Pagamento Validado</p>
-                        <p className="text-sm text-emerald-600 mt-1">Certificado de Filiação disponível para download.</p>
+                        <p className="text-sm text-emerald-600 mt-1">Certificado de FiliaÃ§Ã£o disponÃ­vel para download.</p>
                       </div>
                     )}
 
@@ -2691,7 +1677,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                       <div className="space-y-3">
                         <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-center">
                           <p className="font-bold text-red-800">Comprovante rejeitado</p>
-                          <p className="text-sm text-red-600 mt-1">Envie um novo comprovante válido.</p>
+                          <p className="text-sm text-red-600 mt-1">Envie um novo comprovante vÃ¡lido.</p>
                         </div>
                         {isClientScope && (
                           <PaymentProofUploadButton
@@ -2707,7 +1693,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     {((selectedUser as AdminProcessRow).paymentStatus === 'paid' || (selectedUser as AdminProcessRow).paymentStatus === 'validated' || (selectedUser as AdminProcessRow).paymentStatus === 'accepted') && (
                       <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-xl">
                         <div className="flex items-center justify-between mb-3">
-                          <h4 className="text-sm font-black uppercase text-blue-800">Certificado de Filiação</h4>
+                          <h4 className="text-sm font-black uppercase text-blue-800">Certificado de FiliaÃ§Ã£o</h4>
                           <a
                             href={`/#/certificate?processId=${(selectedUser as AdminProcessRow).processRecordId || selectedUser.id}`}
                             className="inline-flex items-center gap-1 text-xs font-bold text-blue-700 hover:text-blue-900 underline"
@@ -2760,7 +1746,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                       <h3 className="text-lg font-black uppercase text-gray-800">Documentos do Processo</h3>
                       <label className={`inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-bold text-white transition-colors cursor-pointer ${uploadingDocument ? 'bg-violet-400' : 'bg-violet-600 hover:bg-violet-500'}`}>
                         {uploadingDocument ? (
-                          <><Loader2 className="h-4 w-4 animate-spin" /> Enviando…</>
+                          <><Loader2 className="h-4 w-4 animate-spin" /> Enviandoâ€¦</>
                         ) : (
                           <><Upload className="h-4 w-4" /> Adicionar Documento</>
                         )}
@@ -2814,7 +1800,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                               {doc.file_path && (
                                 <a href={doc.file_path} target="_blank" rel="noopener noreferrer"
                                    className="text-xs text-blue-600 hover:text-blue-800 font-bold mt-1 inline-block">
-                                  Visualizar arquivo →
+                                  Visualizar arquivo â†’
                                 </a>
                               )}
                             </div>
@@ -2867,7 +1853,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                 {selectedUserTab === 'comunicacao' && selectedUser && (
                   <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
                     <div className="p-4 border-b border-gray-100 bg-gray-50">
-                      <h3 className="text-sm font-black uppercase text-gray-700">Comunicação do Processo</h3>
+                      <h3 className="text-sm font-black uppercase text-gray-700">ComunicaÃ§Ã£o do Processo</h3>
                     </div>
                     <CommunicationBlock
                       processId={(selectedUser as AdminProcessRow).processRecordId || selectedUser.id}
@@ -2914,7 +1900,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                       </div>
                       <div>
                         <label className="text-[10px] font-black text-gray-500 uppercase mb-2 block flex items-center gap-2">
-                          <UserCheck className="w-3 h-3" /> Gestor do Serviço
+                          <UserCheck className="w-3 h-3" /> Gestor do ServiÃ§o
                         </label>
                         <select name="serviceManager" defaultValue={editingUser.serviceManager} className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none ring-blue-500 focus:ring-2">
                           <option value="">Selecione um gestor</option>
@@ -2933,9 +1919,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     </div>
                     <div>
                       <label className="text-[10px] font-black text-gray-500 uppercase mb-2 block flex items-center gap-2">
-                        <MessageSquare className="w-3 h-3" /> Nota de Observações
+                        <MessageSquare className="w-3 h-3" /> Nota de ObservaÃ§Ãµes
                       </label>
-                      <textarea name="notes" rows={4} defaultValue={editingUser.notes} className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold resize-none" placeholder="Digite as anotações do processo..."></textarea>
+                      <textarea name="notes" rows={4} defaultValue={editingUser.notes} className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold resize-none" placeholder="Digite as anotaÃ§Ãµes do processo..."></textarea>
                     </div>
 
                     <div className="rounded-2xl border border-gray-200 bg-gray-50/70 p-4">
@@ -2944,7 +1930,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                         <h4 className="text-sm font-black uppercase text-gray-700">Checklist do processo</h4>
                       </div>
                       <p className="text-xs text-gray-500 mb-3">
-                        Todos os administradores podem criar itens e marcar como concluídos.
+                        Todos os administradores podem criar itens e marcar como concluÃ­dos.
                       </p>
 
                       <div className="flex flex-col sm:flex-row gap-2 mb-3">
@@ -3016,7 +2002,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                                 )}
                                 <p className="text-[11px] text-gray-500">
                                   Criado por {item.createdByName || 'Administrador'} em {new Date(item.createdAt).toLocaleString('pt-BR')}
-                                  {item.updatedAt ? ` • Atualizado por ${item.updatedByName || 'Administrador'} em ${new Date(item.updatedAt).toLocaleString('pt-BR')}` : ''}
+                                  {item.updatedAt ? ` â€¢ Atualizado por ${item.updatedByName || 'Administrador'} em ${new Date(item.updatedAt).toLocaleString('pt-BR')}` : ''}
                                 </p>
                               </div>
                               <div className="flex items-center gap-1">
@@ -3051,7 +2037,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     </div>
 
                     <div className="border-t border-gray-100 pt-6">
-                      <h4 className="text-lg font-black uppercase mb-4">Dados cadastrais do usuário</h4>
+                      <h4 className="text-lg font-black uppercase mb-4">Dados cadastrais do usuÃ¡rio</h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="md:col-span-2">
                           <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Nome Completo</label>
@@ -3108,7 +2094,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">País</label>
+                          <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">PaÃ­s</label>
                           <input
                             type="text"
                             value={editingProfileForm.country}
@@ -3117,7 +2103,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                           />
                         </div>
                         <div className="md:col-span-2">
-                          <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Endereço completo (inclua CEP)</label>
+                          <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">EndereÃ§o completo (inclua CEP)</label>
                           <input
                             type="text"
                             value={editingProfileForm.address}
@@ -3140,30 +2126,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                       disabled={editingProfileSaving}
                       className="w-full py-5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-black uppercase tracking-widest rounded-2xl shadow-xl transition-all"
                     >
-                      {editingProfileSaving ? 'SALVANDO...' : 'Salvar Alterações'}
+                      {editingProfileSaving ? 'SALVANDO...' : 'Salvar AlteraÃ§Ãµes'}
                     </button>
                   </div>
                 </form>
              </div>
-          </div>
-        </div>
-      )}
-
-      {userCreationStatus && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 9999,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
-        }}>
-          <div style={{
-            backgroundColor: 'white', borderRadius: 24, padding: '40px 48px',
-            boxShadow: '0 24px 64px rgba(0,0,0,0.25)', textAlign: 'center',
-            maxWidth: 400, width: '90%',
-          }}>
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-200 border-t-blue-600 mx-auto mb-5" />
-            <p style={{ color: '#1f2937', fontWeight: 700, fontSize: 15, margin: 0 }}>
-              {userCreationStatus}
-            </p>
           </div>
         </div>
       )}
