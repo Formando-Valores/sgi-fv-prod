@@ -646,20 +646,24 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                       >
                         <Eye className="w-4 h-4" />
                       </button>
-                      <button
-                        onClick={() => setEditingUser(process)}
-                        className="p-2 bg-yellow-500 hover:bg-yellow-600 rounded-lg text-white"
-                        title="Editar"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => void handleDeleteProcess(process)}
-                        className="p-2 bg-red-500 hover:bg-red-600 rounded-lg text-white"
-                        title="Excluir processo"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {!isClientScope && (
+                        <button
+                          onClick={() => setEditingUser(process)}
+                          className="p-2 bg-yellow-500 hover:bg-yellow-600 rounded-lg text-white"
+                          title="Editar"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                      )}
+                      {!isClientScope && (
+                        <button
+                          onClick={() => void handleDeleteProcess(process)}
+                          className="p-2 bg-red-500 hover:bg-red-600 rounded-lg text-white"
+                          title="Excluir processo"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </div>
 
