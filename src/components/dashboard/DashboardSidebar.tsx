@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { LogOut } from 'lucide-react';
 
 type SidebarLink = {
@@ -19,6 +19,10 @@ interface DashboardSidebarProps {
 }
 
 const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ sidebarOpen, onNavigate, onSelectSection, onLogout, userName, hierarchyLabel, links }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const currentPath = location.pathname;
+
   return (
     <aside
       className={`fixed lg:static inset-y-0 left-0 z-50 lg:z-auto w-72 shrink-0 bg-white border border-gray-100 rounded-r-2xl lg:rounded-2xl p-5 h-full lg:h-fit transition-transform duration-300 shadow-sm ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
@@ -32,21 +36,25 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ sidebarOpen, onNavi
       </div>
 
       <nav className="space-y-2">
-        {links.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            onClick={() => {
-              const sectionFromPath = item.to.split('/')[2] || 'dashboard';
-              onSelectSection?.(sectionFromPath);
-              onNavigate();
-            }}
-            className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-xl border transition-all min-w-0 ${isActive ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-white text-gray-600 border-gray-100 hover:bg-gray-50'}`}
-          >
-            <item.icon className="w-4 h-4" />
-            <span className="font-bold truncate">{item.label}</span>
-          </NavLink>
-        ))}
+        {links.map((item) => {
+          const isActive = currentPath === item.to || (item.to !== '/dashboard' && currentPath.startsWith(item.to));
+          return (
+            <button
+              key={item.to}
+              type="button"
+              onClick={() => {
+                const sectionFromPath = item.to.split('/')[2] || 'dashboard';
+                onSelectSection?.(sectionFromPath);
+                navigate(item.to);
+                onNavigate();
+              }}
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all min-w-0 w-full text-left ${isActive ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-white text-gray-600 border-gray-100 hover:bg-gray-50'}`}
+            >
+              <item.icon className="w-4 h-4 shrink-0" />
+              <span className="font-bold truncate">{item.label}</span>
+            </button>
+          );
+        })}
 
         <button
           type="button"
