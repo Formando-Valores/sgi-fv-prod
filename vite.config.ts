@@ -1,4 +1,5 @@
 import path from 'path';
+import fs from 'fs';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 
@@ -33,7 +34,18 @@ export default defineConfig(({ mode }) => {
           },
         },
       },
-      plugins: [react()],
+      plugins: [
+        react(),
+        {
+          name: 'generate-version-json',
+          closeBundle() {
+            fs.writeFileSync(
+              path.resolve(__dirname, 'dist', 'version.json'),
+              JSON.stringify({ buildTime: Date.now() }, null, 2)
+            );
+          },
+        },
+      ],
       define: {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)

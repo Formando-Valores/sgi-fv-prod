@@ -188,14 +188,12 @@ async function bootstrap() {
       )
     );
 
-    // Registra service worker para PWA
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(() => {});
-    }
-
     console.log('[MAIN] ✅ root.render() called successfully');
     console.log('[MAIN] 🎉 Application render initiated!');
     console.log('='.repeat(60));
+
+    const { initVersionCheck } = await import('./src/lib/version-check');
+    initVersionCheck();
   } catch (renderError: any) {
     renderRuntimeError(renderError);
     throw renderError;
