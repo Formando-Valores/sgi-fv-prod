@@ -266,9 +266,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, visible: allowedModules.includes('dashboard') },
     { to: '/dashboard/processos', label: 'Processos', icon: FolderKanban, visible: allowedModules.includes('processos') },
     { to: '/dashboard/clientes', label: 'Clientes', icon: Users2, visible: allowedModules.includes('clientes') },
-    { to: '/dashboard/configuracoes', label: 'ConfiguraÃ§Ãµes', icon: Settings, visible: allowedModules.includes('configuracoes') },
-    { to: '/dashboard/organizacoes', label: 'OrganizaÃ§Ãµes', icon: Building2, visible: allowedModules.includes('organizacoes') },
-    { to: '/dashboard/relatorios', label: 'RelatÃ³rios', icon: FileBarChart2, visible: allowedModules.includes('relatorios') },
+    { to: '/dashboard/configuracoes', label: 'Configurações', icon: Settings, visible: allowedModules.includes('configuracoes') },
+    { to: '/dashboard/organizacoes', label: 'Organizações', icon: Building2, visible: allowedModules.includes('organizacoes') },
+    { to: '/dashboard/relatorios', label: 'Relatórios', icon: FileBarChart2, visible: allowedModules.includes('relatorios') },
     { to: '/dashboard/agenda', label: 'Agenda', icon: Calendar, visible: allowedModules.includes('agenda') },
   ].filter((item) => item.visible);
 
@@ -433,9 +433,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
   const buildProcessStage = (process: DbProcess) => {
     const source = sanitizeDisplayValue(process.origem_canal).toLowerCase();
-    if (source === 'wix') return 'SolicitaÃ§Ã£o recebida';
+    if (source === 'wix') return 'Solicitação recebida';
     if (process.status === 'concluido') return 'Finalizado';
-    if (process.status === 'analise') return 'Em anÃ¡lise';
+    if (process.status === 'analise') return 'Em análise';
     if (process.status === 'triagem') return 'Triagem';
     return 'Cadastro';
   };
@@ -450,7 +450,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       const source = sanitizeDisplayValue(process.origem_canal);
       const contact = sanitizeDisplayValue(process.cliente_contato);
       const email = contact.includes('@') ? contact : '';
-      const requestedOrganizationName = sanitizeDisplayValue(process.org_nome_solicitado) || 'NÃ£o informado';
+      const requestedOrganizationName = sanitizeDisplayValue(process.org_nome_solicitado) || 'Não informado';
       const isExternalRequest = source.toLowerCase() === 'wix';
       const generatedValue = unit === ServiceUnit.ADMINISTRATIVO ? 5200 : unit === ServiceUnit.TECNOLOGICO ? 8200 : 1800;
       const processOverrides = processVisualOverrides[process.id] || {};
@@ -464,18 +464,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       const resolvedServiceManager = persistedServiceManager || manualServiceManager;
       const resolvedNotes = persistedNotes || manualNotes;
       const resolvedDeadlineDisplay =
-        formatDeadlineForDisplay(resolvedDeadline) || (isExternalRequest ? 'Aguardando anÃ¡lise' : '-');
+        formatDeadlineForDisplay(resolvedDeadline) || (isExternalRequest ? 'Aguardando análise' : '-');
 
       return {
         id: process.id,
         processRecordId: process.id,
         profileUserId: process.responsavel_user_id,
-        name: sanitizeDisplayValue(process.cliente_nome) || sanitizeDisplayValue(process.titulo) || 'SolicitaÃ§Ã£o sem nome',
+        name: sanitizeDisplayValue(process.cliente_nome) || sanitizeDisplayValue(process.titulo) || 'Solicitação sem nome',
         email: email || '-',
         role: UserRole.CLIENT,
         documentId: sanitizeDisplayValue(process.cliente_documento) || '---',
         taxId: sanitizeDisplayValue(process.cliente_documento) || '---',
-        address: requestedOrganizationName !== 'NÃ£o informado' ? `OrganizaÃ§Ã£o solicitada: ${requestedOrganizationName}` : '---',
+        address: requestedOrganizationName !== 'Não informado' ? `Organização solicitada: ${requestedOrganizationName}` : '---',
         maritalStatus: '---',
         country: 'Brasil',
         phone: !email && contact ? contact : '---',
@@ -488,21 +488,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         hierarchy: Hierarchy.STATUS_ONLY,
         notes:
           resolvedNotes ||
-          (isExternalRequest ? `Origem: Wix${requestedOrganizationName !== 'NÃ£o informado' ? ` Â· OrganizaÃ§Ã£o solicitada: ${requestedOrganizationName}` : ''}` : undefined),
+          (isExternalRequest ? `Origem: Wix${requestedOrganizationName !== 'Não informado' ? ` · Organização solicitada: ${requestedOrganizationName}` : ''}` : undefined),
         deadline: resolvedDeadline,
-        serviceManager: resolvedServiceManager || (isExternalRequest ? 'Aguardando aprovaÃ§Ã£o' : 'NÃ£o definido'),
+        serviceManager: resolvedServiceManager || (isExternalRequest ? 'Aguardando aprovação' : 'Não definido'),
         organizationId: process.org_id,
         organizationName: requestedOrganizationName,
         processType: unit,
         startDate: formatProcessDate(process.created_at),
         deadlineDate: resolvedDeadlineDisplay,
         etapaAtual: buildProcessStage(process),
-        financeiro: isExternalRequest ? 'Aguardando validaÃ§Ã£o' : (legacyStatus === ProcessStatus.CONCLUIDO ? 'Quitado' : 'Pendente'),
-        prioridade: isExternalRequest ? 'Alta' : (legacyStatus === ProcessStatus.CONCLUIDO ? 'MÃ©dia' : 'Baixa'),
+        financeiro: isExternalRequest ? 'Aguardando validação' : (legacyStatus === ProcessStatus.CONCLUIDO ? 'Quitado' : 'Pendente'),
+        prioridade: isExternalRequest ? 'Alta' : (legacyStatus === ProcessStatus.CONCLUIDO ? 'Média' : 'Baixa'),
         valor: process.os_value != null ? Number(process.os_value) : generatedValue,
         sourceLabel: source ? source.toUpperCase() : 'PAINEL',
         requestedOrganizationName,
-        contractedServiceName: sanitizeDisplayValue(process.titulo) || 'ServiÃ§o nÃ£o informado',
+        contractedServiceName: sanitizeDisplayValue(process.titulo) || 'Serviço não informado',
         paymentStatus: process.payment_status ?? null,
         osValue: process.os_value ?? null,
         servicesSelected: (process.services_selected as AdminProcessRow['servicesSelected']) ?? null,
@@ -514,16 +514,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         ...user,
         processRecordId: user.id,
         profileUserId: user.id,
-        processType: user.unit === ServiceUnit.ADMINISTRATIVO ? 'Administrativo' : 'JurÃ­dico',
+        processType: user.unit === ServiceUnit.ADMINISTRATIVO ? 'Administrativo' : 'Jurídico',
         startDate: user.registrationDate,
         deadlineDate: user.deadline || '12/03/2026',
         etapaAtual: user.status === ProcessStatus.CONCLUIDO ? 'Finalizado' : 'Documentos',
         financeiro: user.status === ProcessStatus.CONCLUIDO ? 'Quitado' : 'Pendente',
-        prioridade: user.status === ProcessStatus.CONCLUIDO ? 'MÃ©dia' : 'Baixa',
+        prioridade: user.status === ProcessStatus.CONCLUIDO ? 'Média' : 'Baixa',
         valor: generatedValue,
         sourceLabel: 'PAINEL',
-        requestedOrganizationName: user.organizationName || 'NÃ£o informado',
-        contractedServiceName: user.unit === ServiceUnit.ADMINISTRATIVO ? 'ServiÃ§o administrativo' : 'ServiÃ§o jurÃ­dico',
+        requestedOrganizationName: user.organizationName || 'Não informado',
+        contractedServiceName: user.unit === ServiceUnit.ADMINISTRATIVO ? 'Serviço administrativo' : 'Serviço jurídico',
       };
     })) as AdminProcessRow[];
 
@@ -563,7 +563,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       .maybeSingle();
 
     if (error) {
-      setEditingProfileError('NÃ£o foi possÃ­vel carregar todos os dados cadastrais do usuÃ¡rio.');
+      setEditingProfileError('Não foi possível carregar todos os dados cadastrais do usuário.');
       setEditingProfileLoading(false);
       return;
     }
@@ -610,7 +610,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         .order('created_at', { ascending: true });
 
       if (error) {
-        setChecklistError('NÃ£o foi possÃ­vel carregar o checklist deste processo.');
+        setChecklistError('Não foi possível carregar o checklist deste processo.');
         setChecklistLoading(false);
         return;
       }
@@ -677,7 +677,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     });
 
     if (error) {
-      setChecklistError('NÃ£o foi possÃ­vel salvar o novo item do checklist.');
+      setChecklistError('Não foi possível salvar o novo item do checklist.');
       setProcessChecklist((prev) => prev.filter((item) => item.id !== itemId));
     }
   };
@@ -702,7 +702,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     });
 
     if (error) {
-      setChecklistError('NÃ£o foi possÃ­vel atualizar o checklist.');
+      setChecklistError('Não foi possível atualizar o checklist.');
       setProcessChecklist((prev) =>
         prev.map((item) => (item.id === itemId ? { ...item, completed: !completed } : item))
       );
@@ -735,7 +735,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     });
 
     if (error) {
-      setChecklistError('NÃ£o foi possÃ­vel editar o item do checklist.');
+      setChecklistError('Não foi possível editar o item do checklist.');
       setProcessChecklist((prev) =>
         prev.map((item) =>
           item.id === itemId
@@ -771,7 +771,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     });
 
     if (error) {
-      setChecklistError('NÃ£o foi possÃ­vel excluir o item do checklist.');
+      setChecklistError('Não foi possível excluir o item do checklist.');
       setProcessChecklist(previousItems);
     }
   };
@@ -822,7 +822,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       const compactHistory = ((data || []) as Array<{ id: string; mensagem?: string | null; created_at?: string | null }>).map((event) => ({
         id: event.id,
         dateLabel: event.created_at ? new Date(event.created_at).toLocaleString('pt-BR') : 'Sem data',
-        message: sanitizeDisplayValue(event.mensagem) || 'AtualizaÃ§Ã£o registrada.',
+        message: sanitizeDisplayValue(event.mensagem) || 'Atualização registrada.',
       }));
 
       setClientJourneyHistory(compactHistory);
@@ -840,7 +840,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const processRow = selected as AdminProcessRow;
     const amount = Number(processRow.osValue ?? processRow.valor ?? 0);
     if (amount <= 0) {
-      window.alert('Valor do pagamento nÃ£o definido para este processo.');
+      window.alert('Valor do pagamento não definido para este processo.');
       return;
     }
     setRedirectingCheckout(true);
@@ -862,7 +862,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       }
     } catch (err) {
       console.error('Erro ao criar checkout:', err);
-      window.alert('NÃ£o foi possÃ­vel iniciar o pagamento. Tente novamente mais tarde.');
+      window.alert('Não foi possível iniciar o pagamento. Tente novamente mais tarde.');
     } finally {
       setRedirectingCheckout(false);
     }
@@ -941,8 +941,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const statusLabelMap: Record<'cadastro' | 'triagem' | 'analise' | 'concluido', string> = {
       cadastro: 'cadastro',
       triagem: 'triagem',
-      analise: 'anÃ¡lise',
-      concluido: 'concluÃ­do',
+      analise: 'análise',
+      concluido: 'concluído',
     };
 
     const previousStatus = statusMap[(currentEditingUser as AdminProcessRow | null)?.status || ProcessStatus.PENDENTE];
@@ -964,7 +964,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const notesChanged = previousNotes !== normalizedNotes;
 
     if (normalizedDeadline && !/^\d{4}-\d{2}-\d{2}$/.test(normalizedDeadline)) {
-      setEditingProfileError('Data de prazo invÃ¡lida. Use o calendÃ¡rio para selecionar uma data vÃ¡lida.');
+      setEditingProfileError('Data de prazo inválida. Use o calendário para selecionar uma data válida.');
       setEditingProfileSaving(false);
       return;
     }
@@ -984,7 +984,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         .eq('id', processRecordId);
 
       if (error) {
-        processUpdateError = 'NÃ£o foi possÃ­vel atualizar status, prazo, gestor e observaÃ§Ãµes do processo no banco.';
+        processUpdateError = 'Não foi possível atualizar status, prazo, gestor e observações do processo no banco.';
       } else {
         setDbProcesses((prev) =>
           prev.map((process) => (process.id === processRecordId ? { ...process, ...processUpdatePayload } : process))
@@ -1024,20 +1024,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       }
 
       if (serviceManagerChanged) {
-        const previousManagerLabel = previousServiceManager || 'NÃ£o definido';
-        const nextManagerLabel = normalizedServiceManager || 'NÃ£o definido';
+        const previousManagerLabel = previousServiceManager || 'Não definido';
+        const nextManagerLabel = normalizedServiceManager || 'Não definido';
         processEventsPayload.push({
           org_id: processOrgId,
           process_id: processRecordId,
           tipo: 'atribuicao',
-          mensagem: `ResponsÃ¡vel do serviÃ§o alterado de ${previousManagerLabel} para ${nextManagerLabel}.`,
+          mensagem: `Responsável do serviço alterado de ${previousManagerLabel} para ${nextManagerLabel}.`,
           created_by: currentUser.id,
         });
       }
 
       if (deadlineChanged) {
-        const previousDeadlineLabel = previousDeadline ? formatDeadlineForDisplay(previousDeadline) : 'NÃ£o definido';
-        const nextDeadlineLabel = normalizedDeadline ? formatDeadlineForDisplay(normalizedDeadline) : 'NÃ£o definido';
+        const previousDeadlineLabel = previousDeadline ? formatDeadlineForDisplay(previousDeadline) : 'Não definido';
+        const nextDeadlineLabel = normalizedDeadline ? formatDeadlineForDisplay(normalizedDeadline) : 'Não definido';
         processEventsPayload.push({
           org_id: processOrgId,
           process_id: processRecordId,
@@ -1052,7 +1052,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           org_id: processOrgId,
           process_id: processRecordId,
           tipo: 'observacao',
-          mensagem: `ObservaÃ§Ã£o registrada: ${normalizedNotes}.`,
+          mensagem: `Observação registrada: ${normalizedNotes}.`,
           created_by: currentUser.id,
         });
       }
@@ -1098,7 +1098,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         .eq('id', profileUserId);
 
       if (error) {
-        profileUpdateError = 'NÃ£o foi possÃ­vel atualizar os dados cadastrais na tabela profiles.';
+        profileUpdateError = 'Não foi possível atualizar os dados cadastrais na tabela profiles.';
       }
     }
 
@@ -1134,7 +1134,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
 
   const handleDeleteUser = (id: string) => {
-    if(window.confirm('Deseja realmente excluir este usuÃ¡rio?')) {
+    if(window.confirm('Deseja realmente excluir este usuário?')) {
       setUsers(prev => prev.filter(u => u.id !== id));
     }
   };
@@ -1269,14 +1269,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           onClick={() => setActiveTab('users')}
           className={`pb-4 px-2 font-black uppercase text-xs tracking-widest transition-all relative ${activeTab === 'users' ? 'text-blue-500' : 'text-gray-500'}`}
         >
-          VisualizaÃ§Ã£o de UsuÃ¡rios
+          Visualização de Usuários
           {activeTab === 'users' && <div className="absolute bottom-0 left-0 w-full h-1 bg-blue-500 rounded-t-full"></div>}
         </button>
         <button 
           onClick={() => setActiveTab('management')}
           className={`pb-4 px-2 font-black uppercase text-xs tracking-widest transition-all relative ${activeTab === 'management' ? 'text-blue-500' : 'text-gray-500'}`}
         >
-          GestÃ£o de Acessos
+          Gestão de Acessos
           {activeTab === 'management' && <div className="absolute bottom-0 left-0 w-full h-1 bg-blue-500 rounded-t-full"></div>}
         </button>
         <button 
@@ -1290,7 +1290,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           onClick={() => setActiveTab('servicos')}
           className={`pb-4 px-2 font-black uppercase text-xs tracking-widest transition-all relative ${activeTab === 'servicos' ? 'text-blue-500' : 'text-gray-500'}`}
         >
-          ServiÃ§os
+          Serviços
           {activeTab === 'servicos' && <div className="absolute bottom-0 left-0 w-full h-1 bg-blue-500 rounded-t-full"></div>}
         </button>
           </div>
@@ -1387,7 +1387,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                   >
-                    Suas finanÃ§as
+                    Suas finanças
                   </button>
                   <button
                     type="button"
@@ -1431,7 +1431,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                           <p className="font-bold break-words">{selectedUser.documentId} / {selectedUser.taxId}</p>
                         </div>
                         <div>
-                          <label className="text-[10px] font-black text-gray-500 uppercase">Estado Civil / PaÃ­s</label>
+                          <label className="text-[10px] font-black text-gray-500 uppercase">Estado Civil / País</label>
                           <p className="font-bold break-words">{selectedUser.maritalStatus} - {selectedUser.country}</p>
                         </div>
                       </div>
@@ -1441,8 +1441,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                           <p className="text-lg font-black text-emerald-400 break-words">{selectedUser.protocol}</p>
                         </div>
                         <div>
-                          <label className="text-[10px] font-black text-gray-500 uppercase">TÃ­tulo do processo</label>
-                          <p className="font-bold break-words">{sanitizeDisplayValue((selectedUser as AdminProcessRow).contractedServiceName) || 'NÃ£o informado'}</p>
+                          <label className="text-[10px] font-black text-gray-500 uppercase">Título do processo</label>
+                          <p className="font-bold break-words">{sanitizeDisplayValue((selectedUser as AdminProcessRow).contractedServiceName) || 'Não informado'}</p>
                         </div>
                         <div>
                           <label className="text-[10px] font-black text-gray-500 uppercase">Unidade Atendimento</label>
@@ -1459,12 +1459,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                       </div>
                     </div>
                     <div className="mt-8 pt-6 border-t border-gray-100">
-                      <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">EndereÃ§o Completo</label>
+                      <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Endereço Completo</label>
                       <p className="font-semibold p-4 bg-gray-50 border border-gray-200 rounded-xl">{selectedUser.address}</p>
                     </div>
                     {selectedUser.notes && (
                       <div className="mt-4">
-                        <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">ObservaÃ§Ãµes Internas</label>
+                        <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Observações Internas</label>
                         <p className="font-bold p-4 bg-blue-900/10 border border-blue-900/30 rounded-xl text-blue-200 italic">"{selectedUser.notes}"</p>
                       </div>
                     )}
@@ -1485,7 +1485,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
                     {(selectedUser as AdminProcessRow).servicesSelected && (selectedUser as AdminProcessRow).servicesSelected!.length > 0 && (
                       <div>
-                        <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">ServiÃ§os Contratados</label>
+                        <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Serviços Contratados</label>
                         <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
                           {(selectedUser as AdminProcessRow).servicesSelected!.map((svc, idx) => (
                             <div key={idx} className="flex items-center justify-between px-4 py-3 bg-white">
@@ -1513,14 +1513,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                           <label className="text-[10px] font-black text-amber-700 uppercase block mb-2">Taxas Associativas</label>
                           <div className="divide-y divide-amber-100 border border-amber-200 rounded-xl overflow-hidden">
                             <div className="flex items-center justify-between px-4 py-3 bg-blue-50">
-                              <p className="text-sm font-bold text-blue-800">Valor Bruto dos ServiÃ§os</p>
+                              <p className="text-sm font-bold text-blue-800">Valor Bruto dos Serviços</p>
                               <span className="text-sm font-black text-blue-800">R$ {servicosTotal.toFixed(2)}</span>
                             </div>
                             {convenioFees.map((fee, idx) => (
                               <div key={idx} className="flex items-center justify-between px-4 py-3 bg-amber-50">
                                 <div className="min-w-0 flex-1">
                                   <p className="text-sm font-bold text-amber-900 truncate">{fee.name}</p>
-                                  <p className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider">AssociaÃ§Ã£o</p>
+                                  <p className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider">Associação</p>
                                 </div>
                                 <span className="text-sm font-black text-amber-700 ml-3">- R$ {fee.price.toFixed(2)}</span>
                               </div>
@@ -1529,13 +1529,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                               <div className="flex items-center justify-between px-4 py-3 bg-purple-50">
                                 <div className="min-w-0 flex-1">
                                   <p className="text-sm font-bold text-purple-900 truncate">{doacaoFee.name}</p>
-                                  <p className="text-[10px] font-semibold text-purple-600 uppercase tracking-wider">AssociaÃ§Ã£o</p>
+                                  <p className="text-[10px] font-semibold text-purple-600 uppercase tracking-wider">Associação</p>
                                 </div>
                                 <span className="text-sm font-black text-purple-700 ml-3">+ R$ {doacaoFee.price.toFixed(2)}</span>
                               </div>
                             )}
                             <div className="flex items-center justify-between px-4 py-3 bg-emerald-50">
-                              <p className="text-sm font-bold text-emerald-800">Valor LÃ­quido ao Profissional</p>
+                              <p className="text-sm font-bold text-emerald-800">Valor Líquido ao Profissional</p>
                               <span className="text-base font-black text-emerald-700">R$ {Math.max(0, profissionalNet).toFixed(2)}</span>
                             </div>
                             <div className="flex items-center justify-between px-4 py-3 bg-amber-100">
@@ -1549,7 +1549,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl">
-                        <label className="text-[10px] font-black text-gray-500 uppercase block mb-1">Tipo de ServiÃ§o</label>
+                        <label className="text-[10px] font-black text-gray-500 uppercase block mb-1">Tipo de Serviço</label>
                         <p className="text-lg font-black text-gray-900">{(selectedUser as AdminProcessRow).processType || '-'}</p>
                       </div>
                       <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl">
@@ -1583,7 +1583,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                             <><CreditCard className="h-5 w-5" /> Pagar agora â€” R$ {Number((selectedUser as AdminProcessRow).osValue ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</>
                           )}
                         </button>
-                        <p className="text-xs text-gray-500 text-center">Pagamento processado via Stripe com seguranÃ§a</p>
+                        <p className="text-xs text-gray-500 text-center">Pagamento processado via Stripe com segurança</p>
 
                         {/* Payment proof upload for clients */}
                         {(isClientScope) && (
@@ -1602,7 +1602,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                         <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-center">
                           <p className="font-bold text-amber-800">
                             {isClientScope
-                              ? 'Comprovante enviado! Aguardando validaÃ§Ã£o.'
+                              ? 'Comprovante enviado! Aguardando validação.'
                               : 'Cliente enviou comprovante. Valide abaixo.'}
                           </p>
                         </div>
@@ -1683,7 +1683,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                       <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
                         <Check className="h-8 w-8 text-emerald-600 mx-auto mb-2" />
                         <p className="font-bold text-emerald-800 text-lg">Pagamento Validado</p>
-                        <p className="text-sm text-emerald-600 mt-1">Certificado de FiliaÃ§Ã£o disponÃ­vel para download.</p>
+                        <p className="text-sm text-emerald-600 mt-1">Certificado de Filiação disponível para download.</p>
                       </div>
                     )}
 
@@ -1692,7 +1692,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                       <div className="space-y-3">
                         <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-center">
                           <p className="font-bold text-red-800">Comprovante rejeitado</p>
-                          <p className="text-sm text-red-600 mt-1">Envie um novo comprovante vÃ¡lido.</p>
+                          <p className="text-sm text-red-600 mt-1">Envie um novo comprovante válido.</p>
                         </div>
                         {isClientScope && (
                           <PaymentProofUploadButton
@@ -1708,7 +1708,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     {((selectedUser as AdminProcessRow).paymentStatus === 'paid' || (selectedUser as AdminProcessRow).paymentStatus === 'validated' || (selectedUser as AdminProcessRow).paymentStatus === 'accepted') && (
                       <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-xl">
                         <div className="flex items-center justify-between mb-3">
-                          <h4 className="text-sm font-black uppercase text-blue-800">Certificado de FiliaÃ§Ã£o</h4>
+                          <h4 className="text-sm font-black uppercase text-blue-800">Certificado de Filiação</h4>
                           <a
                             href={`/#/certificate?processId=${(selectedUser as AdminProcessRow).processRecordId || selectedUser.id}`}
                             className="inline-flex items-center gap-1 text-xs font-bold text-blue-700 hover:text-blue-900 underline"
@@ -1868,7 +1868,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                 {selectedUserTab === 'comunicacao' && selectedUser && (
                   <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
                     <div className="p-4 border-b border-gray-100 bg-gray-50">
-                      <h3 className="text-sm font-black uppercase text-gray-700">ComunicaÃ§Ã£o do Processo</h3>
+                      <h3 className="text-sm font-black uppercase text-gray-700">Comunicação do Processo</h3>
                     </div>
                     <CommunicationBlock
                       processId={(selectedUser as AdminProcessRow).processRecordId || selectedUser.id}
@@ -1915,7 +1915,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                       </div>
                       <div>
                         <label className="text-[10px] font-black text-gray-500 uppercase mb-2 block flex items-center gap-2">
-                          <UserCheck className="w-3 h-3" /> Gestor do ServiÃ§o
+                          <UserCheck className="w-3 h-3" /> Gestor do Serviço
                         </label>
                         <select name="serviceManager" defaultValue={editingUser.serviceManager} className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none ring-blue-500 focus:ring-2">
                           <option value="">Selecione um gestor</option>
@@ -1934,9 +1934,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     </div>
                     <div>
                       <label className="text-[10px] font-black text-gray-500 uppercase mb-2 block flex items-center gap-2">
-                        <MessageSquare className="w-3 h-3" /> Nota de ObservaÃ§Ãµes
+                        <MessageSquare className="w-3 h-3" /> Nota de Observações
                       </label>
-                      <textarea name="notes" rows={4} defaultValue={editingUser.notes} className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold resize-none" placeholder="Digite as anotaÃ§Ãµes do processo..."></textarea>
+                      <textarea name="notes" rows={4} defaultValue={editingUser.notes} className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold resize-none" placeholder="Digite as anotações do processo..."></textarea>
                     </div>
 
                     <div className="rounded-2xl border border-gray-200 bg-gray-50/70 p-4">
@@ -1945,7 +1945,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                         <h4 className="text-sm font-black uppercase text-gray-700">Checklist do processo</h4>
                       </div>
                       <p className="text-xs text-gray-500 mb-3">
-                        Todos os administradores podem criar itens e marcar como concluÃ­dos.
+                        Todos os administradores podem criar itens e marcar como concluídos.
                       </p>
 
                       <div className="flex flex-col sm:flex-row gap-2 mb-3">
@@ -2052,7 +2052,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     </div>
 
                     <div className="border-t border-gray-100 pt-6">
-                      <h4 className="text-lg font-black uppercase mb-4">Dados cadastrais do usuÃ¡rio</h4>
+                      <h4 className="text-lg font-black uppercase mb-4">Dados cadastrais do usuário</h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="md:col-span-2">
                           <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Nome Completo</label>
@@ -2109,7 +2109,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">PaÃ­s</label>
+                          <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">País</label>
                           <input
                             type="text"
                             value={editingProfileForm.country}
@@ -2118,7 +2118,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                           />
                         </div>
                         <div className="md:col-span-2">
-                          <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">EndereÃ§o completo (inclua CEP)</label>
+                          <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Endereço completo (inclua CEP)</label>
                           <input
                             type="text"
                             value={editingProfileForm.address}
@@ -2141,7 +2141,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                       disabled={editingProfileSaving}
                       className="w-full py-5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-black uppercase tracking-widest rounded-2xl shadow-xl transition-all"
                     >
-                      {editingProfileSaving ? 'SALVANDO...' : 'Salvar AlteraÃ§Ãµes'}
+                      {editingProfileSaving ? 'SALVANDO...' : 'Salvar Alterações'}
                     </button>
                   </div>
                 </form>
