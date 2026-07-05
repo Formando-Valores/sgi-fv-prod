@@ -25,16 +25,11 @@ export default defineConfig(({ mode }) => {
         // Clean build without source maps in production
         sourcemap: !isProd,
         // Remove console logs in production
-        minify: 'terser',
+        minify: 'esbuild',
         rollupOptions: {
           input: {
             main: path.resolve(__dirname, 'index.html'),
             recovery: path.resolve(__dirname, 'recovery.html'),
-          },
-        },
-        terserOptions: {
-          compress: {
-            drop_console: isProd,
           },
         },
       },
