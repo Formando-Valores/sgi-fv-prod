@@ -22,6 +22,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ sidebarOpen, onNavi
   const navigate = useNavigate();
   const location = useLocation();
   const currentPath = location.pathname;
+  console.log('[DashboardSidebar] links:', links.map(l => l.to).join(', '));
 
   return (
     <aside
@@ -43,8 +44,11 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ sidebarOpen, onNavi
               key={item.to}
               type="button"
               onClick={() => {
+                console.log('[Sidebar] clicked:', item.label, 'to:', item.to);
                 const sectionFromPath = item.to.split('/')[2] || 'dashboard';
+                console.log('[Sidebar] calling onSelectSection:', sectionFromPath);
                 onSelectSection?.(sectionFromPath);
+                console.log('[Sidebar] calling navigate:', item.to);
                 navigate(item.to);
                 onNavigate();
               }}

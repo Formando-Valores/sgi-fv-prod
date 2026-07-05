@@ -292,7 +292,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   }, [location.pathname]);
 
   useEffect(() => {
-    setCurrentSection(resolveSectionFromLocation());
+    const resolved = resolveSectionFromLocation();
+    console.log('[AdminDashboard] location change → pathname:', location.pathname, 'section:', resolved);
+    setCurrentSection(resolved);
   }, [location.hash, location.pathname, location.search]);
 
   useEffect(() => {
@@ -300,7 +302,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const hasInvalidSectionInRoute =
       Boolean(location.pathname.split('/')[2] || location.hash.split('/')[2]) && !requestedSection;
 
-    if (!hasInvalidSectionInRoute && canAccessSection(currentSection)) return;
+    const canAccess = canAccessSection(currentSection);
+    console.log('[AdminDashboard] access check → section:', currentSection, 'canAccess:', canAccess, 'requested:', requestedSection, 'invalidRoute:', hasInvalidSectionInRoute);
+    if (!hasInvalidSectionInRoute && canAccess) return;
+    console.log('[AdminDashboard] ⚠️ redirecting to /dashboard from', currentSection);
     navigate('/dashboard', { replace: true });
     setCurrentSection('dashboard');
   }, [currentSection, navigate, allowedModules, location.pathname, location.hash]);
@@ -1239,18 +1244,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       onSelectSection={(nextSection) => setCurrentSection(parseSectionCandidate(nextSection) || 'dashboard')}
     >
 
-      <DashboardSection
-        dashboardProcessRows={baseProcessRows}
-        usersCount={users.length}
-        filteredUsersCount={users.length}
-        isClientScope={isClientScope}
-        canAccessSection={canAccessSection}
-        navigateToDashboardHighlight={navigateToDashboardHighlight}
-        setSelectedUser={setSelectedUser}
-        OverviewContainer={OverviewContainer}
-        clientJourneyHistory={clientJourneyHistory}
-        clientJourneyLoading={clientJourneyLoading}
-      />
+      {currentSection === 'dashboard' && (
+        <DashboardSection
+          dashboardProcessRows={baseProcessRows}
+          usersCount={users.length}
+          filteredUsersCount={users.length}
+          isClientScope={isClientScope}
+          canAccessSection={canAccessSection}
+          navigateToDashboardHighlight={navigateToDashboardHighlight}
+          setSelectedUser={setSelectedUser}
+          OverviewContainer={OverviewContainer}
+          clientJourneyHistory={clientJourneyHistory}
+          clientJourneyLoading={clientJourneyLoading}
+        />
+      )}
 
       {currentSection === 'configuracoes' && (
         <>
@@ -1289,12 +1296,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       )}
 
 
-      <OrganizationsSection
-        organizations={organizations}
-        canManageOrganizations={can('manage', 'organizacoes', permissionSubject)}
-        onRefreshOrganizations={async () => { const { organizations: loaded, error } = await loadOrganizations(); if (!error) setOrganizations(loaded); }}
-      />
-      <ProcessesSection
+      {(currentSection === 'dashboard' || currentSection === 'organizacoes') && (
+        <OrganizationsSection
+          organizations={organizations}
+          canManageOrganizations={can('manage', 'organizacoes', permissionSubject)}
+          onRefreshOrganizations={async () => { const { organizations: loaded, error } = await loadOrganizations(); if (!error) setOrganizations(loaded); }}
+        />
+      )}
+      {(currentSection === 'dashboard' || currentSection === 'processos') && (
+        <ProcessesSection
         baseProcessRows={baseProcessRows}
         organizations={organizations}
         currentUser={currentUser}
@@ -1312,6 +1322,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         locationSearch={location.search}
         ProcessesContainer={ProcessesContainer}
       />
+      )}
       {currentSection === 'clientes' && (
         <ClientsSection organizations={organizations} users={users} setUsers={setUsers} />
       )}
