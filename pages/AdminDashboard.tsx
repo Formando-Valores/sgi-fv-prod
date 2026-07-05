@@ -520,6 +520,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       };
     })) as AdminProcessRow[];
 
+  const clientPrimaryProcess: AdminProcessRow | null = isClientScope ? (baseProcessRows[0] ?? null) : null;
+
   const navigateToDashboardHighlight = (targetSection: DashboardSection, presetFilter: DashboardPresetFilter) => {
     setCurrentSection(targetSection);
     navigate(`/dashboard/${targetSection}?preset=${presetFilter}`);
@@ -1143,21 +1145,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   };
 
   const handleDocumentReview = async (docId: string, decision: 'approved' | 'rejected' | 'resubmission_requested') => {
-    if (!selectedUser?.id || !userContext?.id) return;
+    if (!selectedUser?.id || !currentUser.id) return;
     setReviewingDocumentId(docId);
-    await reviewProcessDocument(docId, decision, userContext.id);
+    await reviewProcessDocument(docId, decision, currentUser.id);
     setReviewingDocumentId(null);
     await loadProcessDocuments();
   };
 
   const handleUploadDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !selectedUser || !userContext?.id) return;
+    if (!file || !selectedUser || !currentUser.id) return;
     const processId = (selectedUser as AdminProcessRow).processRecordId || selectedUser.id;
-    const orgId = userContext.org_id;
+    const orgId = currentUser.organizationId;
     if (!orgId || !processId) return;
     setUploadingDocument(true);
-    await uploadProcessDocument(orgId, processId, userContext.id, file);
+    await uploadProcessDocument(orgId, processId, currentUser.id, file);
     setUploadingDocument(false);
     if (e.target) e.target.value = '';
     await loadProcessDocuments();
@@ -1724,11 +1726,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                               accept="application/pdf,image/*"
                               onChange={async (e) => {
                                 const file = e.target.files?.[0];
-                                if (!file || !selectedUser || !userContext?.id) return;
+                                if (!file || !selectedUser || !currentUser.id) return;
                                 const processId = (selectedUser as AdminProcessRow).processRecordId || selectedUser.id;
-                                const orgId = userContext.org_id;
+                                const orgId = currentUser.organizationId;
                                 if (!orgId || !processId) return;
-                                await uploadProcessDocument(orgId, processId, userContext.id, file, 'Certificado - Upload Manual');
+                                await uploadProcessDocument(orgId, processId, currentUser.id, file, 'Certificado - Upload Manual');
                                 if (e.target) e.target.value = '';
                                 await loadProcessDocuments();
                               }}
