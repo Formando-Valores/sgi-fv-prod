@@ -1,3 +1,5 @@
+import { generateTermoPdf } from './termoPdf.ts';
+
 export type AccessEmailPayload = {
   email: string;
   fullName?: string;
@@ -124,6 +126,19 @@ export async function sendAccessCredentialsEmail(payload: AccessEmailPayload) {
     'Braga - Leiria - Lisboa - Porto',
   ];
 
+  let attachmentBase64: string | undefined;
+  try {
+    const pdfBytes = await generateTermoPdf(recipientName);
+    let binary = '';
+    const bytes = new Uint8Array(pdfBytes);
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    attachmentBase64 = btoa(binary);
+  } catch {
+    console.error('[accessEmail] erro ao gerar PDF do termo de associado, enviando sem anexo');
+  }
+
   const html = `
     <div style="font-family:Arial,sans-serif;line-height:1.7;color:#0f172a;white-space:pre-line;">
       ${bodyLines.map((line) => escapeHtml(line)).join('\n')}
@@ -143,6 +158,14 @@ export async function sendAccessCredentialsEmail(payload: AccessEmailPayload) {
       subject: 'Bem-vindo ao SIGA-FV - Dados de acesso',
       html,
       text: bodyLines.join('\n'),
+      ...(attachmentBase64 ? {
+        attachments: [
+          {
+            filename: 'termo-associado.pdf',
+            content: attachmentBase64,
+          },
+        ],
+      } : {}),
     }),
   });
 
