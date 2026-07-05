@@ -374,7 +374,7 @@ const DashboardSection: React.FC<DashboardSectionProps> = ({
                           <td className="px-3 sm:px-4 py-2 sm:py-3 text-gray-600">{process.startDate}</td>
                           <td className="px-3 sm:px-4 py-2 sm:py-3 text-gray-600">{process.serviceManager || 'Não definido'}</td>
                           <td className="px-3 sm:px-4 py-2 sm:py-3">
-                            <button onClick={() => setSelectedUser(process)} className="text-blue-600 font-bold text-xs whitespace-nowrap">Abrir acompanhamento</button>
+                            <button onClick={() => setSelectedUser(process)} className="text-blue-600 font-bold text-xs whitespace-nowrap">Acompanhar</button>
                           </td>
                         </tr>
                       ))}
@@ -396,7 +396,7 @@ const DashboardSection: React.FC<DashboardSectionProps> = ({
                         <p><span className="font-semibold text-gray-400">Abertura:</span> {process.startDate}</p>
                         <p><span className="font-semibold text-gray-400">Setor:</span> {process.serviceManager || 'Não definido'}</p>
                       </div>
-                      <button onClick={() => setSelectedUser(process)} className="mt-3 text-blue-600 font-bold text-xs">Abrir acompanhamento</button>
+                      <button onClick={() => setSelectedUser(process)} className="mt-3 text-blue-600 font-bold text-xs">Acompanhar</button>
                     </div>
                   ))}
                 </div>

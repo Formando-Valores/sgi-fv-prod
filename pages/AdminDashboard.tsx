@@ -1350,51 +1350,51 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                 </button>
              </div>
                <div className="flex-1 overflow-y-auto overscroll-contain scroll-smooth px-4 sm:px-6 py-4 sm:py-6 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent">
-                {/* Sub-aba navigation */}
-                <div className="flex gap-1 mb-6 border-b border-gray-200 overflow-x-auto overflow-y-hidden scroll-smooth whitespace-nowrap scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                 {/* Sub-aba navigation */}
+                <div className="grid grid-cols-2 md:flex gap-2 mb-6">
                   <button
                     type="button"
                     onClick={() => setSelectedUserTab('cadastral')}
-                    className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-t-lg transition-colors ${
+                    className={`px-4 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition-all text-center ${
                       selectedUserTab === 'cadastral'
-                        ? 'bg-blue-600 text-white'
+                        ? 'bg-blue-600 text-white shadow-md'
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                   >
-                    Dados Cadastrais
+                    Consulte seus dados
                   </button>
                   <button
                     type="button"
                     onClick={() => setSelectedUserTab('financeiro')}
-                    className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-t-lg transition-colors ${
+                    className={`px-4 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition-all text-center ${
                       selectedUserTab === 'financeiro'
-                        ? 'bg-emerald-600 text-white'
+                        ? 'bg-emerald-600 text-white shadow-md'
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                   >
-                    Financeiro
+                    Suas finanÃ§as
                   </button>
                   <button
                     type="button"
                     onClick={() => { setSelectedUserTab('documentos'); loadProcessDocuments(); }}
-                    className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-t-lg transition-colors ${
+                    className={`px-4 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition-all text-center ${
                       selectedUserTab === 'documentos'
-                        ? 'bg-violet-600 text-white'
+                        ? 'bg-violet-600 text-white shadow-md'
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                   >
-                    Documentos
+                    Seus documentos
                   </button>
                   <button
                     type="button"
                     onClick={() => setSelectedUserTab('comunicacao')}
-                    className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-t-lg transition-colors ${
+                    className={`px-4 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition-all text-center ${
                       selectedUserTab === 'comunicacao'
-                        ? 'bg-sky-600 text-white'
+                        ? 'bg-sky-600 text-white shadow-md'
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                   >
-                    ComunicaÃ§Ã£o
+                    Fale conosco
                   </button>
                 </div>
 
