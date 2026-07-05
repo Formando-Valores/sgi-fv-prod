@@ -140,6 +140,7 @@ export interface User {
   org_slug?: string;
   org_name?: string;
   org_role?: OrgRole;
+  profile_role?: string | null;
 }
 
 // ============================================
@@ -168,7 +169,8 @@ export function userContextToLegacyUser(ctx: UserContext): User {
     org_id: ctx.org_id,
     org_slug: ctx.org_slug,
     org_name: ctx.org_name,
-    org_role: ctx.role
+    org_role: ctx.role,
+    profile_role: ctx.profile_role ?? null
   };
 }
 

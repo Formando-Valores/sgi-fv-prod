@@ -244,7 +244,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
 
 
-  const permissions = resolvePermissions(currentUser.org_role ?? (currentUser.role === UserRole.ADMIN ? 'admin' : 'client'));
+  const permissions = resolvePermissions(currentUser.org_role ?? (currentUser.role === UserRole.ADMIN ? 'admin' : 'client'), {
+    profileRole: currentUser.profile_role ?? null,
+  });
   const permissionSubject = { org_role: currentUser.org_role ?? null, hierarchy: permissions.hierarchy };
   const allowedModules = getAllowedModules(permissionSubject);
   const canCreateProcess = can('create', 'processos', permissionSubject);

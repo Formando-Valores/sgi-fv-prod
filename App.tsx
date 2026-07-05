@@ -239,7 +239,9 @@ const RootApp: React.FC = () => {
       return <Navigate to="/login" />;
     }
 
-    const permissions = resolvePermissions(currentUser.org_role ?? (currentUser.role === UserRole.ADMIN ? 'admin' : 'client'));
+    const permissions = resolvePermissions(currentUser.org_role ?? (currentUser.role === UserRole.ADMIN ? 'admin' : 'client'), {
+      profileRole: currentUser.profile_role ?? null,
+    });
     const allowedModules = getAllowedModules({ org_role: currentUser.org_role ?? null, hierarchy: permissions.hierarchy });
     if (section !== 'dashboard' && !allowedModules.includes(section)) {
       return <Navigate to="/dashboard" replace />;
