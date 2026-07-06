@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { Send, Paperclip, Loader2, FileText, Image, X } from 'lucide-react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { Send, Paperclip, Loader2, FileText, Image, X, Printer } from 'lucide-react';
 import { supabase } from '../../../../supabase';
 import { listMessages, sendMessage, uploadMessageAttachment, type ProcessMessage } from '../../../lib/processMessages';
 
@@ -15,6 +15,7 @@ const CommunicationBlock: React.FC<Props> = ({ processId, currentUserId, dark })
   const [files, setFiles] = useState<File[]>([]);
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [reportLoading, setReportLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const load = async () => {
@@ -71,8 +72,71 @@ const CommunicationBlock: React.FC<Props> = ({ processId, currentUserId, dark })
     return <FileText className="h-4 w-4" />;
   };
 
+  const generateReport = useCallback(async () => {
+    setReportLoading(true);
+    const msgs = messages.length > 0 ? messages : await listMessages(processId);
+    setReportLoading(false);
+
+    const formatDate = (ts: string) => {
+      const d = new Date(ts);
+      return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    };
+
+    const reportHtml = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="UTF-8"><title>Relatório de Comunicação</title>
+<style>
+  @page { margin: 2cm; }
+  body { font-family: Arial, sans-serif; color: #333; line-height: 1.6; }
+  h1 { color: #1e3a5f; border-bottom: 2px solid #1e3a5f; padding-bottom: 8px; font-size: 20px; }
+  .header-info { margin-bottom: 24px; padding: 12px; background: #f8fafc; border-radius: 6px; font-size: 13px; }
+  .header-info strong { display: inline-block; min-width: 100px; }
+  .msg { margin-bottom: 12px; padding: 10px 14px; border-radius: 8px; page-break-inside: avoid; }
+  .msg-client { background: #eff6ff; border-left: 3px solid #2563eb; }
+  .msg-staff { background: #f8fafc; border-left: 3px solid #94a3b8; }
+  .msg-header { font-size: 12px; color: #64748b; margin-bottom: 4px; }
+  .msg-author { font-weight: bold; color: #1e293b; }
+  .msg-text { font-size: 14px; margin: 4px 0; white-space: pre-wrap; }
+  .msg-attach { font-size: 12px; color: #2563eb; margin-top: 4px; }
+  .footer { margin-top: 32px; padding-top: 12px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; text-align: center; }
+</style></head><body>
+<h1>Relatório de Comunicação</h1>
+<div class="header-info">
+  <strong>Processo:</strong> ${processId}<br>
+  <strong>Período:</strong> ${msgs.length > 0 ? formatDate(msgs[0].created_at) + ' até ' + formatDate(msgs[msgs.length - 1].created_at) : 'N/A'}<br>
+  <strong>Total de mensagens:</strong> ${msgs.length}
+</div>
+${msgs.map(msg => `
+<div class="msg ${msg.sender_id === currentUserId ? 'msg-staff' : 'msg-client'}">
+  <div class="msg-header"><span class="msg-author">${msg.sender_name || 'Desconhecido'}</span> &mdash; ${formatDate(msg.created_at)}</div>
+  <div class="msg-text">${msg.message}</div>
+  ${msg.attachments?.length ? `<div class="msg-attach">📎 ${msg.attachments.map(a => a.name).join(', ')}</div>` : ''}
+</div>`).join('')}
+<div class="footer">Relatório gerado pelo SGI FV em ${new Date().toLocaleString('pt-BR')}</div>
+</body></html>`;
+
+    const win = window.open('', '_blank');
+    if (win) {
+      win.document.write(reportHtml);
+      win.document.close();
+      win.focus();
+      setTimeout(() => { win.print(); }, 500);
+    }
+  }, [messages, processId, currentUserId]);
+
   return (
     <div className="flex flex-col h-[500px]">
+      <div className={`flex items-center justify-between px-4 py-2 border-b ${dark ? 'border-slate-600' : 'border-gray-100'}`}>
+        <h3 className={`text-sm font-bold ${dark ? 'text-slate-200' : 'text-gray-700'}`}>Comunicação</h3>
+        <button
+          onClick={generateReport}
+          disabled={reportLoading}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-blue-600 text-white hover:bg-blue-500 transition-all disabled:opacity-50"
+        >
+          {reportLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Printer className="h-3.5 w-3.5" />}
+          Expedir Relatório
+        </button>
+      </div>
       <div className="flex-1 overflow-y-auto space-y-3 p-4">
         {loading ? (
           <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-blue-600" /></div>
