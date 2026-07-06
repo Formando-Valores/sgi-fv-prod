@@ -84,40 +84,40 @@ const DashboardSection: React.FC<DashboardSectionProps> = ({
   const dashboardHighlights = [
     {
       key: 'usuarios',
-      label: 'Usuários cadastrados',
-      value: usersCount,
-      helper: `${filteredUsersCount} visíveis no filtro atual`,
+      label: isClientScope ? 'Seu Cadastro' : 'Usuários cadastrados',
+      value: isClientScope ? 1 : usersCount,
+      helper: isClientScope ? 'Informações do seu cadastro' : `${filteredUsersCount} visíveis no filtro atual`,
       icon: Users2,
       styles: 'border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100 text-blue-700',
       targetSection: 'configuracoes' as string,
       presetFilter: 'usuarios_cadastrados' as string,
-      ariaLabel: 'Ir para a seção de configurações na aba de usuários cadastrados',
+      ariaLabel: isClientScope ? 'Ir para seu cadastro' : 'Ir para a seção de configurações na aba de usuários cadastrados',
     },
     {
       key: 'processos-ativos',
-      label: 'Processos em andamento',
+      label: isClientScope ? 'Seu Processo' : 'Processos em andamento',
       value: dashboardProcessStats.emAndamento,
-      helper: `${dashboardProcessStats.total} processos no total`,
+      helper: isClientScope ? 'Acompanhe o andamento' : `${dashboardProcessStats.total} processos no total`,
       icon: FolderKanban,
       styles: 'border-indigo-200 bg-gradient-to-br from-indigo-50 to-indigo-100 text-indigo-700',
       targetSection: 'processos' as string,
       presetFilter: 'processos-em-andamento' as string,
-      ariaLabel: 'Ir para a seção de processos em andamento',
+      ariaLabel: isClientScope ? 'Acompanhar seu processo' : 'Ir para a seção de processos em andamento',
     },
     {
       key: 'prioridade',
-      label: 'Demandas que exigem atenção',
+      label: isClientScope ? 'Suas providências' : 'Demandas que exigem atenção',
       value: dashboardProcessRows.filter((process) => process.status === ProcessStatus.TRIAGEM || process.status === ProcessStatus.ANALISE).length,
-      helper: 'Triagem + Análise',
+      helper: isClientScope ? 'Providências necessárias' : 'Triagem + Análise',
       icon: MessageSquare,
       styles: 'border-amber-200 bg-gradient-to-br from-amber-50 to-amber-100 text-amber-700',
       targetSection: 'processos' as string,
       presetFilter: 'processos-prioridade' as string,
-      ariaLabel: 'Ir para a seção de processos com foco em demandas prioritárias',
+      ariaLabel: isClientScope ? 'Suas providências necessárias' : 'Ir para a seção de processos com foco em demandas prioritárias',
     },
     {
       key: 'novos',
-      label: 'Novos nos últimos 7 dias',
+      label: isClientScope ? 'Serviços disponíveis' : 'Novos nos últimos 7 dias',
       value: dashboardProcessRows.filter((process) => {
         if (!process.registrationDate) return false;
         const parsedDate = new Date(process.registrationDate);
@@ -127,12 +127,12 @@ const DashboardSection: React.FC<DashboardSectionProps> = ({
         const diffDays = diffMs / (1000 * 60 * 60 * 24);
         return diffDays <= 7;
       }).length,
-      helper: 'Velocidade de entrada',
+      helper: isClientScope ? 'Serviços que você pode contratar' : 'Velocidade de entrada',
       icon: Calendar,
       styles: 'border-emerald-200 bg-gradient-to-br from-emerald-50 to-emerald-100 text-emerald-700',
       targetSection: 'processos' as string,
       presetFilter: 'processos-novos-7d' as string,
-      ariaLabel: 'Ir para a seção de processos com filtro de últimos sete dias',
+      ariaLabel: isClientScope ? 'Serviços disponíveis para contratação' : 'Ir para a seção de processos com filtro de últimos sete dias',
     },
   ];
 
