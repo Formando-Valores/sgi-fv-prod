@@ -15,7 +15,7 @@ import {
   PROCESS_STATUS_BADGES,
   getOperationalStatus,
 } from '../../lib/paymentStatus';
-import { CUSTOM_ANALYSIS_FEE, calcAssociationFees, type AssociationFeeItem } from '../../lib/servicesCatalog';
+import { CUSTOM_ANALYSIS_FEE, calcAssociationFees, type AssociationFeeItem, formatEuro } from '../../lib/servicesCatalog';
 import { loadServicesCatalog, filterServicesByUnit, filterGroupsByUnit, filterServicesByGroup, type DbCatalogService } from '../../lib/servicesCatalogDb';
 import { uploadPaymentProof } from '../../lib/paymentProofs';
 import type { ServiceUnit } from '../../../types';
@@ -538,7 +538,7 @@ const ProcessList: React.FC = () => {
                                       </div>
                                     </div>
                                     <span className="text-sm font-black text-emerald-400">
-                                      R$ {svc.price.toFixed(2)}
+                                      {formatEuro(svc.price)}
                                     </span>
                                   </label>
                                 ))}
@@ -567,7 +567,7 @@ const ProcessList: React.FC = () => {
                   {customMode && (
                     <div className="mt-2 p-3 bg-amber-900/20 border border-amber-700 rounded-xl">
                       <p className="text-xs text-amber-300 mb-2 font-bold">
-                        Informe o serviço desejado. Uma taxa de análise de <span className="text-white">R$ {CUSTOM_ANALYSIS_FEE.toFixed(2)}</span> será aplicada.
+                        Informe o serviço desejado. Uma taxa de análise de <span className="text-white">{formatEuro(CUSTOM_ANALYSIS_FEE)}</span> será aplicada.
                         O valor real será apresentado em um novo processo após a análise.
                       </p>
                       <input
@@ -584,7 +584,7 @@ const ProcessList: React.FC = () => {
                 {totalValue > 0 && (
                   <div className="p-4 bg-slate-800 rounded-xl text-right">
                     <p className="text-xs text-slate-400 font-bold">VALOR TOTAL</p>
-                    <p className="text-2xl font-black text-emerald-400">R$ {totalValue.toFixed(2)}</p>
+                    <p className="text-2xl font-black text-emerald-400">{formatEuro(totalValue)}</p>
                   </div>
                 )}
 
@@ -658,7 +658,7 @@ const ProcessList: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-slate-300 mb-2">Valor da OS (R$)</label>
+                  <label className="block text-sm font-bold text-slate-300 mb-2">Valor da OS (€)</label>
                   <input
                     type="number"
                     min="0"
@@ -672,7 +672,7 @@ const ProcessList: React.FC = () => {
                   <p className="text-xs text-slate-500 mt-1">Valor calculado com base nos serviços selecionados. Pode ser ajustado manualmente.</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-slate-300 mb-2">Doação Voluntária (R$) <span className="text-xs text-slate-500 font-normal">— valor extra para a associação</span></label>
+                  <label className="block text-sm font-bold text-slate-300 mb-2">Doação Voluntária (€) <span className="text-xs text-slate-500 font-normal">— valor extra para a associação</span></label>
                   <input
                     type="number"
                     min="0"
@@ -712,7 +712,7 @@ const ProcessList: React.FC = () => {
                 {selectedUnit && (
                   <div className="p-3 bg-slate-800 rounded-xl">
                     <p className="text-xs text-slate-400 font-bold">Tipo: {SERVICE_UNITS.find(u => u.value === selectedUnit)?.label}</p>
-                    <p className="text-lg font-black text-emerald-400 mt-1">R$ {(formData.os_value ?? 0).toFixed(2)}</p>
+                    <p className="text-lg font-black text-emerald-400 mt-1">{formatEuro(formData.os_value ?? 0)}</p>
                     <button
                       type="button"
                       onClick={() => setStep(1)}
@@ -738,7 +738,7 @@ const ProcessList: React.FC = () => {
                       <div className="divide-y divide-amber-800/50 border border-amber-700/50 rounded-xl overflow-hidden">
                         <div className="flex items-center justify-between px-4 py-3 bg-slate-800/40">
                           <p className="text-sm font-bold text-slate-200">Valor Bruto dos Serviços</p>
-                          <span className="text-sm font-black text-white">R$ {servicosTotal.toFixed(2)}</span>
+                          <span className="text-sm font-black text-white">{formatEuro(servicosTotal)}</span>
                         </div>
                         {convenioFees.map((fee) => (
                           <div key={fee.type} className="flex items-center justify-between px-4 py-3 bg-amber-900/20">
@@ -746,7 +746,7 @@ const ProcessList: React.FC = () => {
                               <p className="text-sm font-bold text-amber-200 truncate">{fee.name}</p>
                               <p className="text-[10px] font-semibold text-amber-400 uppercase tracking-wider">Associação</p>
                             </div>
-                            <span className="text-sm font-black text-amber-300 ml-3">- R$ {fee.price.toFixed(2)}</span>
+                            <span className="text-sm font-black text-amber-300 ml-3">- {formatEuro(fee.price)}</span>
                           </div>
                         ))}
                         {doacaoFee && (
@@ -755,16 +755,16 @@ const ProcessList: React.FC = () => {
                               <p className="text-sm font-bold text-purple-200 truncate">{doacaoFee.name}</p>
                               <p className="text-[10px] font-semibold text-purple-400 uppercase tracking-wider">Associação</p>
                             </div>
-                            <span className="text-sm font-black text-purple-300 ml-3">+ R$ {doacaoFee.price.toFixed(2)}</span>
+                            <span className="text-sm font-black text-purple-300 ml-3">+ {formatEuro(doacaoFee.price)}</span>
                           </div>
                         )}
                         <div className="flex items-center justify-between px-4 py-3 bg-emerald-900/30">
                           <p className="text-sm font-bold text-emerald-200">Valor Líquido ao Profissional</p>
-                          <span className="text-base font-black text-emerald-300">R$ {Math.max(0, profissionalNet).toFixed(2)}</span>
+                          <span className="text-base font-black text-emerald-300">{formatEuro(Math.max(0, profissionalNet))}</span>
                         </div>
                         <div className="flex items-center justify-between px-4 py-3 bg-amber-900/40">
                           <p className="text-sm font-black text-amber-200 uppercase">Total a Pagar</p>
-                          <span className="text-base font-black text-amber-200">R$ {svcTotal.toFixed(2)}</span>
+                          <span className="text-base font-black text-amber-200">{formatEuro(svcTotal)}</span>
                         </div>
                       </div>
                     </div>

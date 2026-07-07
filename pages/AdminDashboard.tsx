@@ -37,7 +37,7 @@ import ManagementSection from '../src/components/dashboard/blocks/ManagementSect
 import { useToast } from '../src/contexts/ToastContext';
 import { createCheckoutSession } from '../src/lib/stripe';
 import { getPaymentStatusUi } from '../src/lib/paymentStatus';
-import { calcAssociationFees, ASSOCIATION_ANNUAL_FEE, type AssociationFeeItem } from '../src/lib/servicesCatalog';
+import { calcAssociationFees, ASSOCIATION_ANNUAL_FEE, type AssociationFeeItem, formatEuro } from '../src/lib/servicesCatalog';
 import { loadServicesCatalog, filterServicesByUnit, filterGroupsByUnit, filterServicesByGroup, type DbCatalogService } from '../src/lib/servicesCatalogDb';
 import { uploadPaymentProof, validatePaymentProof, getPaymentProofs, type PaymentProof } from '../src/lib/paymentProofs';
 import { uploadProcessDocument, listProcessDocuments, reviewProcessDocument, deleteProcessDocument, type ProcessDocument } from '../src/lib/processDocuments';
@@ -1528,7 +1528,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                       <label className="text-[10px] font-black text-emerald-700 uppercase block mb-1">Resumo do Pagamento</label>
                       <p className="text-3xl font-black text-emerald-700">
                         {(selectedUser as AdminProcessRow).osValue != null
-                          ? `R$ ${Number((selectedUser as AdminProcessRow).osValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                          ? formatEuro(Number((selectedUser as AdminProcessRow).osValue ?? 0))
                           : '-'}
                       </p>
                     </div>
@@ -1543,7 +1543,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                                 <p className="text-sm font-bold text-gray-800 truncate">{svc.name}</p>
                                 <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">{svc.group}</p>
                               </div>
-                              <span className="text-sm font-black text-gray-700 ml-3">R$ {svc.price.toFixed(2)}</span>
+                              <span className="text-sm font-black text-gray-700 ml-3">{formatEuro(svc.price)}</span>
                             </div>
                           ))}
                         </div>
@@ -1564,7 +1564,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                           <div className="divide-y divide-amber-100 border border-amber-200 rounded-xl overflow-hidden">
                             <div className="flex items-center justify-between px-4 py-3 bg-blue-50">
                               <p className="text-sm font-bold text-blue-800">Valor Bruto dos Serviços</p>
-                              <span className="text-sm font-black text-blue-800">R$ {servicosTotal.toFixed(2)}</span>
+                              <span className="text-sm font-black text-blue-800">{formatEuro(servicosTotal)}</span>
                             </div>
                             {convenioFees.map((fee, idx) => (
                               <div key={idx} className="flex items-center justify-between px-4 py-3 bg-amber-50">
@@ -1572,7 +1572,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                                   <p className="text-sm font-bold text-amber-900 truncate">{fee.name}</p>
                                   <p className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider">Associação</p>
                                 </div>
-                                <span className="text-sm font-black text-amber-700 ml-3">- R$ {fee.price.toFixed(2)}</span>
+                                <span className="text-sm font-black text-amber-700 ml-3">- {formatEuro(fee.price)}</span>
                               </div>
                             ))}
                             {doacaoFee && (
@@ -1581,16 +1581,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                                   <p className="text-sm font-bold text-purple-900 truncate">{doacaoFee.name}</p>
                                   <p className="text-[10px] font-semibold text-purple-600 uppercase tracking-wider">Associação</p>
                                 </div>
-                                <span className="text-sm font-black text-purple-700 ml-3">+ R$ {doacaoFee.price.toFixed(2)}</span>
+                                <span className="text-sm font-black text-purple-700 ml-3">+ {formatEuro(doacaoFee.price)}</span>
                               </div>
                             )}
                             <div className="flex items-center justify-between px-4 py-3 bg-emerald-50">
                               <p className="text-sm font-bold text-emerald-800">Valor Líquido ao Profissional</p>
-                              <span className="text-base font-black text-emerald-700">R$ {Math.max(0, profissionalNet).toFixed(2)}</span>
+                              <span className="text-base font-black text-emerald-700">{formatEuro(Math.max(0, profissionalNet))}</span>
                             </div>
                             <div className="flex items-center justify-between px-4 py-3 bg-amber-100">
                               <p className="text-sm font-black text-amber-900 uppercase">Total a Pagar</p>
-                              <span className="text-base font-black text-amber-900">R$ {svcTotal.toFixed(2)}</span>
+                              <span className="text-base font-black text-amber-900">{formatEuro(svcTotal)}</span>
                             </div>
                           </div>
                         </div>
@@ -1630,7 +1630,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                           {redirectingCheckout ? (
                             <><Loader2 className="h-5 w-5 animate-spin" /> Redirecionando para pagamento...</>
                           ) : (
-                            <><CreditCard className="h-5 w-5" /> Pagar agora â€” R$ {Number((selectedUser as AdminProcessRow).osValue ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</>
+                            <><CreditCard className="h-5 w-5" /> Pagar agora — {formatEuro(Number((selectedUser as AdminProcessRow).osValue ?? 0))}</>
                           )}
                         </button>
                         <p className="text-xs text-gray-500 text-center">Pagamento processado via Stripe com segurança</p>
@@ -1667,7 +1667,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                                   <div className="min-w-0 flex-1">
                                     <p className="text-sm font-bold text-gray-800 truncate">{proof.file_name || 'Comprovante'}</p>
                                     {proof.amount && (
-                                      <p className="text-[10px] font-semibold text-gray-500">Valor: R$ {proof.amount.toFixed(2)}</p>
+                                      <p className="text-[10px] font-semibold text-gray-500">Valor: {formatEuro(proof.amount)}</p>
                                     )}
                                     {proof.notes && <p className="text-[10px] text-gray-500 mt-1">{proof.notes}</p>}
                                   </div>

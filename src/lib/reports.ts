@@ -291,7 +291,7 @@ export async function listReportActivities(
         payments: payments.map((payment) => ({
           id: payment.id,
           amount: typeof payment.amount === 'number' ? payment.amount : payment.amount ? Number(payment.amount) : null,
-          currency: payment.currency || processFinancial?.currency || 'BRL',
+          currency: payment.currency || processFinancial?.currency || 'EUR',
           paymentStatus: payment.status || null,
           paidAt: payment.paid_at || null,
           createdAt: payment.created_at || null,

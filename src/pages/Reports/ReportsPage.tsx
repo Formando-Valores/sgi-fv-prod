@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, Download, FileText, Search } from 'lucide-react';
 import { listReportActivities, type ReportFilters, type ReportRow } from '../../lib/reports';
+import { formatEuro } from '../../lib/servicesCatalog';
 import { listPendingPaymentsForReconciliation, type PendingPaymentRow } from '../../lib/paymentsReconciliation';
 import { TableSkeleton } from '../../components/ui/Skeleton';
 
@@ -132,7 +133,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ defaultOrgId, operationalOnly
             <p><strong>Ações/Apontamentos:</strong> ${row.eventCount}</p>
             <p><strong>Documentos/Anexos:</strong> ${row.attachments.length ? row.attachments.map((a) => a.name).join(', ') : 'Nenhum'}</p>
             <p><strong>Eventos financeiros relevantes:</strong> ${row.financialHighlights.length ? row.financialHighlights.map((event) => `${event.type}: ${event.message}`).join(' | ') : 'Nenhum'}</p>
-            <p><strong>Pagamentos:</strong> ${row.payments.length ? row.payments.map((payment) => `${payment.paymentStatus || 'sem status'} ${payment.amount != null ? `- ${Number(payment.amount).toLocaleString('pt-BR', { style: 'currency', currency: payment.currency || 'BRL' })}` : ''}`).join(' | ') : 'Nenhum'}</p>
+            <p><strong>Pagamentos:</strong> ${row.payments.length ? row.payments.map((payment) => `${payment.paymentStatus || 'sem status'} ${payment.amount != null ? `- ${formatEuro(Number(payment.amount))}` : ''}`).join(' | ') : 'Nenhum'}</p>
             <ul>
               ${row.events
                 .map(
@@ -260,7 +261,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ defaultOrgId, operationalOnly
                     <tr key={row.id} className="border-t border-amber-200">
                       <td className="px-2 py-1 font-bold">{row.process?.protocolo || '-'}</td>
                       <td className="px-2 py-1">{row.process?.titulo || row.process_id}</td>
-                      <td className="px-2 py-1">{Number(row.amount || 0).toLocaleString('pt-BR', { style: 'currency', currency: row.currency || 'BRL' })}</td>
+                      <td className="px-2 py-1">{formatEuro(Number(row.amount || 0))}</td>
                       <td className="px-2 py-1">{new Date(row.created_at).toLocaleString('pt-BR')}</td>
                     </tr>
                   ))}
@@ -273,7 +274,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ defaultOrgId, operationalOnly
                   <p className="font-bold text-sm text-amber-900">{row.process?.protocolo || '-'}</p>
                   <p className="text-xs text-amber-800 mt-1">{row.process?.titulo || row.process_id}</p>
                   <div className="flex justify-between items-center mt-2 pt-2 border-t border-amber-200">
-                    <span className="text-sm font-bold text-amber-900">{Number(row.amount || 0).toLocaleString('pt-BR', { style: 'currency', currency: row.currency || 'BRL' })}</span>
+                    <span className="text-sm font-bold text-amber-900">{formatEuro(Number(row.amount || 0))}</span>
                     <span className="text-[10px] text-amber-700">{new Date(row.created_at).toLocaleString('pt-BR')}</span>
                   </div>
                 </div>
@@ -350,7 +351,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ defaultOrgId, operationalOnly
                               <p className="mt-3 mb-1 text-xs font-bold uppercase text-gray-500">Pagamentos</p>
                               <ul className="space-y-1 text-xs text-gray-700">
                                 {row.payments.length ? row.payments.map((payment) => (
-                                  <li key={payment.id}>{payment.createdAt ? new Date(payment.createdAt).toLocaleString('pt-BR') : '-'} · {payment.paymentStatus || 'sem status'}{payment.amount != null ? ` · ${Number(payment.amount).toLocaleString('pt-BR', { style: 'currency', currency: payment.currency || 'BRL' })}` : ''}</li>
+                                  <li key={payment.id}>{payment.createdAt ? new Date(payment.createdAt).toLocaleString('pt-BR') : '-'} · {payment.paymentStatus || 'sem status'}{payment.amount != null ? ` · ${formatEuro(Number(payment.amount))}` : ''}</li>
                                 )) : <li>Nenhum pagamento vinculado.</li>}
                               </ul>
                               <p className="mt-3 mb-1 text-xs font-bold uppercase text-gray-500">Documentos/Anexos</p>
@@ -416,7 +417,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ defaultOrgId, operationalOnly
                           <p className="text-xs font-bold uppercase text-gray-500 mb-1">Pagamentos</p>
                           <ul className="space-y-1 text-xs text-gray-700">
                             {row.payments.length ? row.payments.map((payment) => (
-                              <li key={payment.id}>{payment.createdAt ? new Date(payment.createdAt).toLocaleString('pt-BR') : '-'} · {payment.paymentStatus || 'sem status'}{payment.amount != null ? ` · ${Number(payment.amount).toLocaleString('pt-BR', { style: 'currency', currency: payment.currency || 'BRL' })}` : ''}</li>
+                              <li key={payment.id}>{payment.createdAt ? new Date(payment.createdAt).toLocaleString('pt-BR') : '-'} · {payment.paymentStatus || 'sem status'}{payment.amount != null ? ` · ${formatEuro(Number(payment.amount))}` : ''}</li>
                             )) : <li>Nenhum pagamento vinculado.</li>}
                           </ul>
                         </div>

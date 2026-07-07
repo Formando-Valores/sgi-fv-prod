@@ -11,6 +11,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { getProcessById, listProcessEvents, updateProcessStatus, addProcessEvent, listRequiredChecklistDocuments, listProcessAttachments, reviewProcessAttachment, type Process, type ProcessEvent, type ProcessDocumentAttachment, type ProcessDocumentChecklistItem } from '../../lib/processes';
 import { createCheckoutSession } from '../../lib/stripe';
 import { getPaymentStatusUi } from '../../lib/paymentStatus';
+import { formatEuro } from '../../lib/servicesCatalog';
 
 const statusSteps = [
   { key: 'cadastro', label: 'CADASTRO', color: 'bg-slate-500' },
@@ -400,7 +401,7 @@ const ProcessDetails: React.FC = () => {
                             <p className="text-sm font-bold text-slate-200">{svc.name}</p>
                             <p className="text-[10px] text-slate-500">{svc.group}</p>
                           </div>
-                          <span className="text-sm font-black text-emerald-400">R$ {svc.price.toFixed(2)}</span>
+                          <span className="text-sm font-black text-emerald-400">{formatEuro(svc.price)}</span>
                         </div>
                       ))}
                     </div>
@@ -410,7 +411,7 @@ const ProcessDetails: React.FC = () => {
                 {process.os_value != null && Number(process.os_value) > 0 && (
                   <div className="flex items-center justify-between p-3 bg-gray-900 rounded-xl">
                     <span className="text-sm font-bold text-slate-300">Valor total</span>
-                    <span className="text-lg font-black text-emerald-400">R$ {Number(process.os_value).toFixed(2)}</span>
+                    <span className="text-lg font-black text-emerald-400">{formatEuro(Number(process.os_value))}</span>
                   </div>
                 )}
 

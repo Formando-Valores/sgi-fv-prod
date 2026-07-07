@@ -4,7 +4,7 @@ import type { Process as DbProcess } from '../../../lib/processes';
 import { ProcessStatus, ServiceUnit, type User, type Organization } from '../../../../types';
 import { sanitizeDisplayValue } from '../../../lib/clientUtils';
 import { supabase } from '../../../../supabase';
-import { calcAssociationFees } from '../../../lib/servicesCatalog';
+import { calcAssociationFees, formatEuro } from '../../../lib/servicesCatalog';
 import { filterServicesByUnit, filterGroupsByUnit, filterServicesByGroup, type DbCatalogService } from '../../../lib/servicesCatalogDb';
 import { getPaymentStatusUi } from '../../../lib/paymentStatus';
 import { useToast } from '../../../contexts/ToastContext';
@@ -703,7 +703,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                       <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Prioridade & Valor</p>
                       <p className="mt-1 flex flex-wrap items-center gap-2">
                         <Badge variant="success" className="text-xs px-2.5 py-1">{process.prioridade}</Badge>
-                        <span className="text-gray-800 font-black">R$ {process.valor.toLocaleString('pt-BR')}</span>
+                        <span className="text-gray-800 font-black">{formatEuro(process.valor)}</span>
                       </p>
                     </div>
                   </div>
@@ -894,7 +894,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                                             <p className="text-xs text-gray-500">{svc.description}</p>
                                           </div>
                                         </div>
-                                        <span className="text-sm font-black text-emerald-600">R$ {svc.price.toFixed(2)}</span>
+                                        <span className="text-sm font-black text-emerald-600">{formatEuro(svc.price)}</span>
                                       </label>
                                     );
                                   })}
@@ -922,18 +922,18 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                                   <p className="text-sm font-bold text-gray-800 truncate">{svc.name}</p>
                                   <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">{svc.group}</p>
                                 </div>
-                                <span className="text-sm font-black text-emerald-600 ml-3">R$ {svc.price.toFixed(2)}</span>
+                                <span className="text-sm font-black text-emerald-600 ml-3">{formatEuro(svc.price)}</span>
                               </div>
                             );
                           })}
                           <div className="flex items-center justify-between px-4 py-3 bg-gray-50">
                             <p className="text-sm font-black text-gray-700 uppercase">Subtotal Serviços</p>
                             <span className="text-base font-black text-emerald-700">
-                              R$ {(newProcessForm.selectedServiceIds ?? []).reduce((sum: number, id: string) => {
+                              {formatEuro((newProcessForm.selectedServiceIds ?? []).reduce((sum: number, id: string) => {
                                 const servicesList = filterServicesByUnit(adminCatalog, newProcessForm.serviceUnit!);
                                 const s = servicesList.find((x) => x.id === id);
                                 return sum + (s?.price ?? 0);
-                              }, 0).toFixed(2)}
+                              }, 0))}
                             </span>
                           </div>
                         </div>
@@ -957,7 +957,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                             <div className="divide-y divide-amber-100 border border-amber-200 rounded-xl overflow-hidden">
                               <div className="flex items-center justify-between px-4 py-3 bg-blue-50">
                                 <p className="text-sm font-bold text-blue-800">Valor Bruto dos Serviços</p>
-                                <span className="text-sm font-black text-blue-800">R$ {svcTotal.toFixed(2)}</span>
+                                <span className="text-sm font-black text-blue-800">{formatEuro(svcTotal)}</span>
                               </div>
                               {fees.map((fee) => (
                                 <div key={fee.type} className="flex items-center justify-between px-4 py-3 bg-amber-50">
@@ -965,7 +965,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                                     <p className="text-sm font-bold text-amber-900 truncate">{fee.name}</p>
                                     <p className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider">Associação</p>
                                   </div>
-                                  <span className="text-sm font-black text-amber-700 ml-3">- R$ {fee.price.toFixed(2)}</span>
+                                  <span className="text-sm font-black text-amber-700 ml-3">- {formatEuro(fee.price)}</span>
                                 </div>
                               ))}
                               {doacaoFee && (
@@ -974,16 +974,16 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                                     <p className="text-sm font-bold text-purple-900 truncate">{doacaoFee.name}</p>
                                     <p className="text-[10px] font-semibold text-purple-600 uppercase tracking-wider">Associação</p>
                                   </div>
-                                  <span className="text-sm font-black text-purple-700 ml-3">+ R$ {doacaoFee.price.toFixed(2)}</span>
+                                  <span className="text-sm font-black text-purple-700 ml-3">+ {formatEuro(doacaoFee.price)}</span>
                                 </div>
                               )}
                               <div className="flex items-center justify-between px-4 py-3 bg-emerald-50">
                                 <p className="text-sm font-bold text-emerald-800">Valor Líquido ao Profissional</p>
-                                <span className="text-base font-black text-emerald-700">R$ {Math.max(0, profissionalNet).toFixed(2)}</span>
+                                <span className="text-base font-black text-emerald-700">{formatEuro(Math.max(0, profissionalNet))}</span>
                               </div>
                               <div className="flex items-center justify-between px-4 py-3 bg-amber-100">
                                 <p className="text-sm font-black text-amber-900 uppercase">Total a Pagar</p>
-                                <span className="text-base font-black text-amber-900">R$ {(svcTotal + newProcessForm.donation).toFixed(2)}</span>
+                                <span className="text-base font-black text-amber-900">{formatEuro(svcTotal + newProcessForm.donation)}</span>
                               </div>
                             </div>
                           </div>
@@ -993,7 +993,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                   )}
 
                   <div>
-                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Valor da OS (R$)</label>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Valor da OS (€)</label>
                     <input
                       type="number"
                       min="0"
@@ -1009,7 +1009,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-black text-purple-600 uppercase block mb-2">Doação Voluntária (R$) <span className="text-[10px] font-normal text-gray-400">— valor extra para associação</span></label>
+                    <label className="text-[10px] font-black text-purple-600 uppercase block mb-2">Doação Voluntária (€) <span className="text-[10px] font-normal text-gray-400">— valor extra para associação</span></label>
                     <input
                       type="number"
                       min="0"

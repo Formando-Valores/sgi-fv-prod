@@ -9,6 +9,7 @@ import {
   deleteService,
   type DbCatalogService,
 } from '../../../lib/servicesCatalogDb';
+import { formatEuro } from '../../../lib/servicesCatalog';
 import { ServiceUnit } from '../../../../types';
 
 interface Props {
@@ -196,7 +197,7 @@ const ServicesSection: React.FC<Props> = () => {
                             </div>
                           </div>
                           <div className="flex items-center gap-3 shrink-0">
-                            <span className="font-mono text-sm font-bold text-gray-700 whitespace-nowrap">R$ {svc.price.toFixed(2)}</span>
+                            <span className="font-mono text-sm font-bold text-gray-700 whitespace-nowrap">{formatEuro(svc.price)}</span>
                             <button onClick={() => openEditModal(svc)} className="p-1.5 bg-blue-100 hover:bg-blue-200 rounded-md text-blue-600" title="Editar"><Pencil className="w-4 h-4" /></button>
                             <button onClick={() => handleDelete(svc.id)} className="p-1.5 bg-red-100 hover:bg-red-200 rounded-md text-red-600" title="Excluir"><Trash2 className="w-4 h-4" /></button>
                           </div>
@@ -273,7 +274,7 @@ const ServicesSection: React.FC<Props> = () => {
                 />
               </div>
               <div>
-                <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Preço (R$) *</label>
+                <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Preço (€) *</label>
                 <input
                   required
                   type="number"

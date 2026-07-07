@@ -1,5 +1,12 @@
 import type { ServiceUnit } from '../../types';
 
+export const EUR_RATE = 6;
+
+export function formatEuro(amountBRL: number): string {
+  const amountEUR = amountBRL / EUR_RATE;
+  return `€ ${amountEUR.toFixed(2)}`;
+}
+
 export type CatalogService = {
   id: string;
   name: string;
