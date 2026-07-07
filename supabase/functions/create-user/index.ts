@@ -97,17 +97,18 @@ Deno.serve(async (request) => {
       });
 
       if (authError) {
-        // If "already registered", try to find the existing user
-        if (authError.message?.toLowerCase().includes('already registered')) {
+        console.error('[create-user] auth error:', JSON.stringify(authError));
+        const authErrMsg = typeof authError.message === 'string' ? authError.message : JSON.stringify(authError);
+        if (authErrMsg?.toLowerCase().includes('already registered')) {
           const { data: usersList } = await adminClient.auth.admin.listUsers();
           const found = usersList?.users?.find(u => u.email === email);
           if (found) {
             userId = found.id;
           } else {
-            return jsonResponse(400, { error: `Usuário já existe mas não foi possível localizá-lo: ${authError.message}` });
+            return jsonResponse(400, { error: `Usuário já existe mas não foi possível localizá-lo: ${authErrMsg}` });
           }
         } else {
-          return jsonResponse(400, { error: `Erro ao criar usuário no Auth: ${authError.message}` });
+          return jsonResponse(400, { error: `Erro ao criar usuário no Auth: ${authErrMsg}` });
         }
       } else if (authData?.user) {
         userId = authData.user.id;
