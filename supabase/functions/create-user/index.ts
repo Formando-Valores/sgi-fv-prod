@@ -189,14 +189,15 @@ Deno.serve(async (request) => {
 
     // 6. Create Stripe checkout session and send credentials email
     if (processId) {
-      const appUrl = Deno.env.get('APP_URL') ?? Deno.env.get('SITE_URL') ?? '';
+      const appUrl = Deno.env.get('APP_URL') ?? Deno.env.get('SITE_URL') ?? 'https://sgi-fv-prod.vercel.app';
       const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
 
-      if (appUrl && supabaseAnonKey) {
+      if (supabaseAnonKey) {
         const successUrl = `${appUrl}/#/payments/success?processId=${processId}`;
         const cancelUrl = `${appUrl}/#/payments/cancel?processId=${processId}`;
 
         let paymentUrl = '';
+        let emailError: string | undefined;
         try {
           const stripeResponse = await fetch(
             `${supabaseUrl}/functions/v1/stripe-create-checkout-session`,
@@ -223,18 +224,19 @@ Deno.serve(async (request) => {
           );
           const stripeResult = await stripeResponse.json();
           if (stripeResult.url) paymentUrl = stripeResult.url;
-        } catch {
-          console.warn('[create-user] erro ao criar checkout session');
+        } catch (e) {
+          console.error('[create-user] erro ao criar checkout session:', e);
         }
 
         try {
-          await fetch(
+          const emailResponse = await fetch(
             `${supabaseUrl}/functions/v1/send-access-credentials`,
             {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
                 apikey: supabaseAnonKey,
+                Authorization: `Bearer ${supabaseAnonKey}`,
               },
               body: JSON.stringify({
                 email,
@@ -247,8 +249,14 @@ Deno.serve(async (request) => {
               }),
             }
           );
-        } catch {
-          console.warn('[create-user] erro ao enviar email de credenciais');
+          if (!emailResponse.ok) {
+            const emailBody = await emailResponse.text();
+            emailError = `send-access-credentials retornou ${emailResponse.status}: ${emailBody}`;
+            console.error('[create-user] erro ao enviar email:', emailError);
+          }
+        } catch (e) {
+          emailError = e instanceof Error ? e.message : 'erro desconhecido';
+          console.error('[create-user] erro ao enviar email de credenciais:', e);
         }
       }
     }
@@ -261,6 +269,9 @@ Deno.serve(async (request) => {
     };
     if (processWarning) {
       result.process_warning = processWarning;
+    }
+    if (emailError) {
+      result.email_warning = emailError;
     }
     return jsonResponse(200, result);
 
