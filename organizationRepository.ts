@@ -128,7 +128,9 @@ export const loadOrganizations = async () => {
 
   if (mergedOrganizations.size > 0) {
     return {
-      organizations: Array.from(mergedOrganizations.values()).sort((left, right) => left.name.localeCompare(right.name, 'pt-BR')),
+      organizations: Array.from(mergedOrganizations.values())
+        .filter((org) => org.isActive !== false)
+        .sort((left, right) => left.name.localeCompare(right.name, 'pt-BR')),
       resolvedSchema: null,
       resolvedTable: null,
       error: null as PostgrestErrorLike | null,
