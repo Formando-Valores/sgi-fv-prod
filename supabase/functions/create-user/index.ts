@@ -237,7 +237,6 @@ Deno.serve(async (request) => {
               headers: {
                 'Content-Type': 'application/json',
                 apikey: supabaseAnonKey,
-                Authorization: `Bearer ${supabaseAnonKey}`,
               },
               body: JSON.stringify({
                 email,

@@ -44,6 +44,7 @@ Deno.serve(async (request) => {
 
     const { data: userData, error: userError } = await client.auth.getUser(jwt);
     if (userError || !userData.user?.email) {
+      console.error('[send-access-credentials] JWT validation failed:', userError?.message ?? 'no user email');
       return jsonResponse(401, { success: false, error: 'Usuário autenticado não encontrado.' });
     }
 
