@@ -169,6 +169,7 @@ Deno.serve(async (request) => {
           correlation_checkout_session_id: session.id,
           correlation_stripe_event_id: null,
           event_code: 'checkout_session_created',
+          actor_user_id: clientId,
         },
         {
           org_id: organizationId,
@@ -179,6 +180,7 @@ Deno.serve(async (request) => {
           correlation_checkout_session_id: session.id,
           correlation_stripe_event_id: null,
           event_code: 'client_redirected',
+          actor_user_id: clientId,
         },
       ]);
 
