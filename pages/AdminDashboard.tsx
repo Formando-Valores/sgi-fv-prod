@@ -187,6 +187,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
 
   const [dbProcesses, setDbProcesses] = useState<DbProcess[]>([]);
+  const [profileMap, setProfileMap] = useState<Map<string, Record<string, unknown>>>(new Map());
   const [editingProfileForm, setEditingProfileForm] = useState({
     fullName: '',
     email: '',
@@ -333,7 +334,26 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   useEffect(() => {
     const orgId = currentUser.organizationId || currentUser.org_id;
     if (orgId) {
-      listProcesses(orgId).then((processes) => setDbProcesses(processes as DbProcess[]));
+      listProcesses(orgId).then(async (processes) => {
+        const typed = processes as DbProcess[];
+        setDbProcesses(typed);
+        const userIds: string[] = [];
+        const seen = new Set<string>();
+        for (const p of typed) {
+          const uid = (p as Record<string, unknown>).cliente_user_id;
+          if (typeof uid === 'string' && uid && !seen.has(uid)) {
+            seen.add(uid);
+            userIds.push(uid);
+          }
+        }
+        if (userIds.length > 0) {
+          const { data: rows } = await supabase
+            .from('profiles')
+            .select('*')
+            .in('id', userIds);
+          setProfileMap(new Map((rows || []).map(r => [r.id, r as Record<string, unknown>])));
+        }
+      });
     }
   }, [currentUser.organizationId, currentUser.org_id]);
 
@@ -480,19 +500,29 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       const resolvedDeadlineDisplay =
         formatDeadlineForDisplay(resolvedDeadline) || (isExternalRequest ? 'Aguardando análise' : '-');
 
+      const pClientUserId = (process as Record<string, unknown>).cliente_user_id;
+      const profile = typeof pClientUserId === 'string' && pClientUserId ? profileMap.get(pClientUserId) : null;
+      const pEmail = profile?.email as string | undefined;
+      const pDocId = profile?.documento_identidade as string | undefined;
+      const pTaxId = profile?.nif_cpf as string | undefined;
+      const pMarital = profile?.estado_civil as string | undefined;
+      const pCountry = profile?.pais as string | undefined;
+      const pAddress = profile?.endereco as string | undefined;
+      const pPhone = profile?.phone as string | undefined;
+
       return {
         id: process.id,
         processRecordId: process.id,
         profileUserId: process.responsavel_user_id,
         name: sanitizeDisplayValue(process.cliente_nome) || sanitizeDisplayValue(process.titulo) || 'Solicitação sem nome',
-        email: email || '-',
+        email: pEmail || email || '-',
         role: UserRole.CLIENT,
-        documentId: sanitizeDisplayValue(process.cliente_documento) || '---',
-        taxId: sanitizeDisplayValue(process.cliente_documento) || '---',
-        address: requestedOrganizationName !== 'Não informado' ? `Organização solicitada: ${requestedOrganizationName}` : '---',
-        maritalStatus: '---',
-        country: 'Brasil',
-        phone: !email && contact ? contact : '---',
+        documentId: sanitizeDisplayValue(process.cliente_documento) || pDocId || '---',
+        taxId: pTaxId || sanitizeDisplayValue(process.cliente_documento) || '---',
+        address: pAddress || (requestedOrganizationName !== 'Não informado' ? `Organização solicitada: ${requestedOrganizationName}` : '---'),
+        maritalStatus: pMarital || '---',
+        country: pCountry || 'Brasil',
+        phone: pPhone || (!email && contact ? contact : '---'),
         processNumber: process.id,
         unit,
         status: legacyStatus,
