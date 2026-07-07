@@ -183,7 +183,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
 
   const resetNewProcessForm = () => {
     setNewProcessForm({
-      organizationId: newAdminOrgId || organizations[0]?.id || '',
+      organizationId: '',
       title: '',
       clientName: '',
       clientDocument: '',
