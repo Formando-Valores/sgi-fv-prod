@@ -171,6 +171,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     loadServicesCatalog().then(setAdminCatalog);
   }, []);
 
+  useEffect(() => {
+    loadOrganizations().then(({ organizations: loaded, error }) => {
+      if (!error) setOrganizations(loaded);
+    });
+  }, []);
+
   // Documentos tab state
   const [processDocuments, setProcessDocuments] = useState<ProcessDocument[]>([]);
   const [processDocumentsLoading, setProcessDocumentsLoading] = useState(false);
