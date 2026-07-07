@@ -72,7 +72,7 @@ const RootApp: React.FC = () => {
             phone: profile.phone || '-',
             unit: ServiceUnit.JURIDICO,
             status: ProcessStatus.PENDENTE,
-            protocol: `SGI-${new Date().getFullYear()}-000`,
+            protocol: '-',
             registrationDate: profile.created_at
               ? new Date(profile.created_at).toLocaleString('pt-BR')
               : new Date().toLocaleString('pt-BR'),

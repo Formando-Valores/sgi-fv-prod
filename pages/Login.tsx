@@ -333,7 +333,7 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
           processNumber: existingUser?.processNumber ?? '',
           unit: existingUser?.unit ?? ServiceUnit.JURIDICO,
           status: existingUser?.status ?? ProcessStatus.PENDENTE,
-          protocol: existingUser?.protocol ?? `JURA-${new Date().getFullYear()}-000`,
+          protocol: existingUser?.protocol ?? '-',
           registrationDate: existingUser?.registrationDate ?? new Date().toLocaleString('pt-BR'),
           notes: existingUser?.notes,
           deadline: existingUser?.deadline,
