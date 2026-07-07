@@ -7,6 +7,7 @@ import { SERVICE_MANAGERS } from '../constants';
 import { loadOrganizations } from '../organizationRepository';
 import { supabase } from '../supabase';
 import type { Process as DbProcess } from '../src/lib/processes';
+import { listProcesses } from '../src/lib/processes';
 import Card from '../src/components/ui/Card';
 import Badge from '../src/components/ui/Badge';
 import Skeleton from '../src/components/ui/Skeleton';
@@ -328,6 +329,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       setActiveTab('users');
     }
   }, [currentSection, location.search]);
+
+  useEffect(() => {
+    const orgId = currentUser.organizationId || currentUser.org_id;
+    if (orgId) {
+      listProcesses(orgId).then((processes) => setDbProcesses(processes as DbProcess[]));
+    }
+  }, [currentUser.organizationId, currentUser.org_id]);
 
   useEffect(() => {
     if (selectedUserTab === 'financeiro' && selectedUser) {
