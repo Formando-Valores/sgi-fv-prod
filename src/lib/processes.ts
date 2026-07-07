@@ -133,12 +133,14 @@ async function resolveProcessQueryScope(
     return null;
   }
 
-  const { data: membershipData, error: membershipError } = await supabase
+  let membershipQuery = supabase
     .from('org_members')
     .select('role')
-    .eq('user_id', actorUserId)
-    .eq('org_id', resolvedOrgId || '')
-    .maybeSingle();
+    .eq('user_id', actorUserId);
+  if (resolvedOrgId) {
+    membershipQuery = membershipQuery.eq('org_id', resolvedOrgId);
+  }
+  const { data: membershipData, error: membershipError } = await membershipQuery.maybeSingle();
 
   if (membershipError && resolvedOrgId) {
     logError(`[${moduleName}] failed to resolve org membership role:`, membershipError);
