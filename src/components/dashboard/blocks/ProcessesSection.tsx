@@ -146,7 +146,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
 
   const resolveOrganizationScope = async () => {
     const { data, error } = await supabase
-      .from('organization_members')
+      .from('org_members')
       .select('org_id,role,organizations!inner(slug,name)')
       .eq('user_id', sanitizeDisplayValue(currentUser.id));
 
