@@ -15,6 +15,7 @@ import {
   AccessLevel,
 } from '../../../lib/clientUtils';
 import { SUPABASE_EDGE_FUNCTIONS } from '../../../lib/supabaseFunctions';
+import { useToast } from '../../../contexts/ToastContext';
 
 interface ClientsSectionProps {
   organizations: Organization[];
@@ -23,6 +24,7 @@ interface ClientsSectionProps {
 }
 
 const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, setUsers }) => {
+  const { showToast } = useToast();
   const [clientsData, setClientsData] = useState<ClientProfileView[]>([]);
   const [clientsLoading, setClientsLoading] = useState(false);
   const [clientsError, setClientsError] = useState('');
@@ -246,9 +248,9 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
       }
 
       await fetchClients();
-      setClientFormSuccess('Cliente cadastrado com sucesso. Os dados de acesso foram enviados por e-mail.');
       resetNewClientForm();
       setShowCreateClientModal(false);
+      showToast({ type: 'success', message: `Cliente ${name} cadastrado com sucesso. Os dados de acesso foram enviados por e-mail.` });
     } catch (fetchErr: any) {
       setClientFormError(`Erro ao comunicar com o servidor: ${fetchErr?.message || 'desconhecido'}`);
     } finally {
