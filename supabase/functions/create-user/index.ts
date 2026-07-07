@@ -159,6 +159,7 @@ Deno.serve(async (request) => {
 
     let processWarning: string | undefined;
     let processId: string | undefined;
+    let emailError: string | undefined;
 
     if (!existingProcess) {
       const { data: newProcess, error: processError } = await adminClient
@@ -198,7 +199,6 @@ Deno.serve(async (request) => {
         const cancelUrl = `${appUrl}/#/payments/cancel?processId=${processId}`;
 
         let paymentUrl = '';
-        let emailError: string | undefined;
         try {
           const stripeResponse = await fetch(
             `${supabaseUrl}/functions/v1/stripe-create-checkout-session`,
