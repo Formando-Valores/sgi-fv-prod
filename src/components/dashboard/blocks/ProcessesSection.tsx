@@ -188,7 +188,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
       clientName: '',
       clientDocument: '',
       clientContact: '',
-      serviceUnit: ServiceUnit.JURIDICO,
+      serviceUnit: null,
       selectedServiceIds: [],
       osValue: undefined,
       donation: 0,
