@@ -145,7 +145,7 @@ Deno.serve(async (request) => {
       }, { onConflict: 'org_id,user_id' });
 
     if (memberError) {
-      console.warn('[create-user] org_members upsert failed:', memberError.message);
+      return jsonResponse(400, { error: `Erro ao vincular cliente à organização: ${memberError.message}` });
     }
 
     // 5. Auto-create membership process only if one doesn't already exist
