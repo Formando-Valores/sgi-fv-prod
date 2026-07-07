@@ -829,7 +829,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
 
                   {newProcessForm.serviceUnit && (
                     <div className="md:col-span-2">
-                      <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Serviços</label>
+                      <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Serviços <span className="font-normal normal-case text-gray-400">(selecione abaixo o serviço a contratar)</span></label>
                       <div className="relative mb-3">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                         <input
