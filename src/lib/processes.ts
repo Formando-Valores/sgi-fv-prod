@@ -122,7 +122,8 @@ async function resolveProcessQueryScope(
   }
 
   const normalizedOrgId = orgId ? String(orgId).trim() : '';
-  const resolvedOrgId = isDefaultOrgAdmin ? null : (normalizedOrgId || null);
+  const rawResolvedOrgId = normalizedOrgId || null;
+  const resolvedOrgId = isDefaultOrgAdmin ? null : rawResolvedOrgId;
 
   if (!isDefaultOrgAdmin && !resolvedOrgId) {
     logError(`[${moduleName}] blocked: org_id is mandatory for non-default-org profile.`, {
@@ -133,12 +134,14 @@ async function resolveProcessQueryScope(
     return null;
   }
 
+  const safeOrgId = resolvedOrgId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(resolvedOrgId) ? resolvedOrgId : null;
+
   let membershipQuery = supabase
     .from('org_members')
     .select('role')
     .eq('user_id', actorUserId);
-  if (resolvedOrgId) {
-    membershipQuery = membershipQuery.eq('org_id', resolvedOrgId);
+  if (safeOrgId) {
+    membershipQuery = membershipQuery.eq('org_id', safeOrgId);
   }
   const { data: membershipData, error: membershipError } = await membershipQuery.maybeSingle();
 

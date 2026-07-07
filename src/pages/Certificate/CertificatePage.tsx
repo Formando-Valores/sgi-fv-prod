@@ -43,6 +43,11 @@ const CertificatePage: React.FC = () => {
       }
 
       if (process.cliente_user_id !== currentUserId) {
+        if (!process.org_id) {
+          setError('Processo sem organização vinculada.');
+          setLoading(false);
+          return;
+        }
         const { data: membership } = await supabase
           .from('org_members')
           .select('role')

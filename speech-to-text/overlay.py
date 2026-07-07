@@ -73,7 +73,7 @@ DEFAULT_CONFIG = {
     "pause_threshold": 0.8,
     "language": "pt-BR",
     "engine": "google",
-    "compact_mode": False,
+    "compact_mode": True,
     "command_mode": True
 }
 
@@ -93,7 +93,7 @@ class FloatingOverlay:
         self.is_listening = False
         self.listener_thread = None
         self.click_through_enabled = self.config.get("click_through", False)
-        self.compact = self.config.get("compact_mode", False)
+        self.compact = True
         self.command_mode = self.config.get("command_mode", True)
         self.last_text = ""
         self.full_text = ""
@@ -356,8 +356,8 @@ class FloatingOverlay:
     def show_context_menu(self, event):
         menu = tk.Menu(self.root, tearoff=0, bg="#313244", fg="#cdd6f4",
                        activebackground="#45475a", activeforeground="#cdd6f4")
-        menu.add_command(label="Compacto" if not self.compact else "Expandido",
-                         command=self.toggle_compact)
+        menu.add_command(label="📋 Copiar", command=self.copy_text)
+        menu.add_separator()
         menu.add_separator()
         opacity_menu = tk.Menu(menu, tearoff=0, bg="#313244", fg="#cdd6f4",
                                activebackground="#45475a", activeforeground="#cdd6f4")
