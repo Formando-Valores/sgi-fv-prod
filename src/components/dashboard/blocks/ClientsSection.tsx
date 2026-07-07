@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Users, Pencil, Trash2, X, Plus, Check } from 'lucide-react';
-import { User, ProcessStatus, ServiceUnit, Hierarchy, Organization, UserRole } from '../../../../types';
+import { User, ServiceUnit, Organization } from '../../../../types';
 import { supabase } from '../../../../supabase';
 import Button from '../../ui/Button';
 import { TableSkeleton } from '../../ui/Skeleton';
@@ -14,6 +14,7 @@ import {
   mapOrgRoleToAccessLevel,
   AccessLevel,
 } from '../../../lib/clientUtils';
+import { SUPABASE_EDGE_FUNCTIONS } from '../../../lib/supabaseFunctions';
 
 interface ClientsSectionProps {
   organizations: Organization[];
@@ -60,7 +61,6 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
     maritalStatus: 'Solteiro',
     organizationId: '',
     accessLevel: 'Cliente',
-    grantSystemAccess: false,
   });
 
   const ACCESS_LEVELS: AccessLevel[] = ['Administrador', 'Usuário Sênior', 'Usuário Pleno', 'Operador', 'Cliente'];
@@ -156,9 +156,8 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
       address: '',
       country: 'Brasil',
       maritalStatus: 'Solteiro',
-      organizationId: organizations[0]?.id || '',
+      organizationId: '',
       accessLevel: 'Cliente',
-      grantSystemAccess: false,
     });
     setClientFormError('');
     setClientFormSuccess('');
@@ -171,6 +170,9 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
 
     const name = sanitizeDisplayValue(newClientForm.fullName);
     const email = sanitizeDisplayValue(newClientForm.email);
+    const taxId = sanitizeDisplayValue(newClientForm.taxId);
+    const phone = sanitizeDisplayValue(newClientForm.phone);
+    const address = sanitizeDisplayValue(newClientForm.address);
     const selectedOrg = organizations.find((org) => org.id === newClientForm.organizationId);
 
     if (!name) {
@@ -183,6 +185,21 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
       return;
     }
 
+    if (!taxId) {
+      setClientFormError('Informe o NIF/CPF do cliente.');
+      return;
+    }
+
+    if (!phone) {
+      setClientFormError('Informe o telefone do cliente.');
+      return;
+    }
+
+    if (!address) {
+      setClientFormError('Informe o endereço do cliente.');
+      return;
+    }
+
     if (!selectedOrg) {
       setClientFormError('Selecione uma organização válida.');
       return;
@@ -191,110 +208,49 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
     setCreatingClient(true);
 
     try {
-      const normalizedRole = mapAccessLevelToOrgRole(newClientForm.accessLevel);
-
-      if (newClientForm.grantSystemAccess) {
-        const { data: existingProfile, error: lookupError } = await supabase
-          .from('profiles')
-          .select('id,email')
-          .eq('email', email)
-          .maybeSingle();
-
-        if (lookupError) {
-          setClientFormError('Não foi possível validar o perfil no banco de dados.');
-          return;
-        }
-
-        if (!existingProfile?.id) {
-          setClientFormError('Para liberar acesso ao sistema, este e-mail precisa já ter conta criada no Auth.');
-          return;
-        }
-
-        const { error: updateProfileError } = await supabase
-          .from('profiles')
-          .update({
-            nome_completo: name,
-            name,
-            documento_identidade: sanitizeDisplayValue(newClientForm.documentId) || null,
-            nif_cpf: sanitizeDisplayValue(newClientForm.taxId) || null,
-            estado_civil: sanitizeDisplayValue(newClientForm.maritalStatus) || null,
-            phone: sanitizeDisplayValue(newClientForm.phone) || null,
-            endereco: sanitizeDisplayValue(newClientForm.address) || null,
-            pais: sanitizeDisplayValue(newClientForm.country) || null,
-            role: newClientForm.accessLevel,
-            org_id: selectedOrg.id,
-          })
-          .eq('id', existingProfile.id);
-
-        if (updateProfileError) {
-          setClientFormError('Não foi possível atualizar o perfil do cliente.');
-          return;
-        }
-
-        const { error: upsertMemberError } = await supabase
-          .from('org_members')
-          .upsert(
-            {
-              org_id: selectedOrg.id,
-              user_id: existingProfile.id,
-              role: normalizedRole,
-            },
-            { onConflict: 'org_id,user_id' }
-          );
-
-        if (upsertMemberError) {
-          setClientFormError('Perfil atualizado, mas não foi possível vincular cliente à organização.');
-          return;
-        }
-
-        await fetchClients();
-      } else {
-        const tempId = `local-${Date.now()}`;
-        const now = new Date().toLocaleString('pt-BR');
-
-        setUsers((prev) => [
-          {
-            id: tempId,
-            name,
-            email,
-            role: UserRole.CLIENT,
-            documentId: sanitizeDisplayValue(newClientForm.documentId) || '---',
-            taxId: sanitizeDisplayValue(newClientForm.taxId) || '---',
-            address: sanitizeDisplayValue(newClientForm.address) || '---',
-            maritalStatus: sanitizeDisplayValue(newClientForm.maritalStatus) || '---',
-            country: sanitizeDisplayValue(newClientForm.country) || '---',
-            phone: sanitizeDisplayValue(newClientForm.phone) || '---',
-            unit: ServiceUnit.ADMINISTRATIVO,
-            status: ProcessStatus.PENDENTE,
-            protocol: `CLI-${new Date().getFullYear()}-${String(prev.length + 1).padStart(3, '0')}`,
-            registrationDate: now,
-            lastUpdate: now,
-            hierarchy: Hierarchy.NOTES_ONLY,
-            organizationId: selectedOrg.id,
-            organizationName: selectedOrg.name,
-          },
-          ...prev,
-        ]);
-
-        setClientsData((prev) => [
-          {
-            id: `${selectedOrg.id}-${tempId}`,
-            user_id: tempId,
-            org_id: selectedOrg.id,
-            org_name: selectedOrg.name,
-            nome: name,
-            email,
-            accessLevel: newClientForm.accessLevel,
-            source: 'local_manual',
-            created_at: new Date().toISOString(),
-          },
-          ...prev,
-        ]);
+      const supabaseUrl = String(import.meta.env.VITE_SUPABASE_URL ?? '').trim();
+      const anonKey = String(import.meta.env.VITE_SUPABASE_ANON_KEY ?? '').trim();
+      if (!supabaseUrl || !anonKey) {
+        setClientFormError('Erro de configuração do ambiente.');
+        return;
       }
 
-      setClientFormSuccess('Cliente cadastrado com sucesso.');
+      const tempPassword = crypto.randomUUID().slice(0, 12);
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/${SUPABASE_EDGE_FUNCTIONS.CREATE_USER}`, {
+        method: 'POST',
+        headers: {
+          apikey: anonKey,
+          Authorization: `Bearer ${anonKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          password: tempPassword,
+          name,
+          role: newClientForm.accessLevel,
+          org_id: selectedOrg.id,
+          unit: ServiceUnit.ADMINISTRATIVO,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setClientFormError(`Erro ao criar cliente: ${result.error || 'desconhecido'}`);
+        return;
+      }
+
+      if (result.process_warning) {
+        console.warn('[create-client] aviso do processo:', result.process_warning);
+      }
+
+      await fetchClients();
+      setClientFormSuccess('Cliente cadastrado com sucesso. Os dados de acesso foram enviados por e-mail.');
       resetNewClientForm();
       setShowCreateClientModal(false);
+    } catch (fetchErr: any) {
+      setClientFormError(`Erro ao comunicar com o servidor: ${fetchErr?.message || 'desconhecido'}`);
     } finally {
       setCreatingClient(false);
     }
@@ -669,7 +625,7 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-500 mb-2 block">Telefone</label>
+                    <label className="text-xs font-bold text-gray-500 mb-2 block">Telefone *</label>
                     <input
                       value={newClientForm.phone}
                       onChange={(e) => setNewClientForm((prev) => ({ ...prev, phone: e.target.value }))}
@@ -687,7 +643,7 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-500 mb-2 block">NIF / CPF</label>
+                    <label className="text-xs font-bold text-gray-500 mb-2 block">NIF / CPF *</label>
                     <input
                       value={newClientForm.taxId}
                       onChange={(e) => setNewClientForm((prev) => ({ ...prev, taxId: e.target.value }))}
@@ -731,7 +687,7 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
                     </select>
                   </div>
                   <div className="md:col-span-2">
-                    <label className="text-xs font-bold text-gray-500 mb-2 block">Endereço</label>
+                    <label className="text-xs font-bold text-gray-500 mb-2 block">Endereço *</label>
                     <input
                       value={newClientForm.address}
                       onChange={(e) => setNewClientForm((prev) => ({ ...prev, address: e.target.value }))}
@@ -751,17 +707,10 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
                       ))}
                     </select>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="grantSystemAccess"
-                      checked={newClientForm.grantSystemAccess}
-                      onChange={(e) => setNewClientForm((prev) => ({ ...prev, grantSystemAccess: e.target.checked }))}
-                      className="w-4 h-4"
-                    />
-                    <label htmlFor="grantSystemAccess" className="text-xs font-bold text-gray-500">
-                      Liberar acesso ao sistema (o e-mail informado deve possuir conta no Auth)
-                    </label>
+                  <div className="md:col-span-2 pt-2">
+                    <p className="text-xs font-semibold text-gray-400 italic">
+                      Os dados de acesso serão enviados automaticamente para o e-mail informado.
+                    </p>
                   </div>
                 </div>
                 {clientFormError && (

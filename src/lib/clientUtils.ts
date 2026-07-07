@@ -23,7 +23,6 @@ export interface NewClientFormState {
   maritalStatus: string;
   organizationId: string;
   accessLevel: AccessLevel;
-  grantSystemAccess: boolean;
 }
 
 export interface EditClientFormState {
