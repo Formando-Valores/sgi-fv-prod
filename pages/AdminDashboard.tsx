@@ -518,7 +518,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       const generatedValue = user.unit === ServiceUnit.ADMINISTRATIVO ? 5200 : 1800;
       return {
         ...user,
-        processRecordId: user.id,
+        processRecordId: undefined,
         profileUserId: user.id,
         processType: user.unit === ServiceUnit.ADMINISTRATIVO ? 'Administrativo' : 'Jurídico',
         startDate: user.registrationDate,
@@ -876,14 +876,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
   const fetchPaymentProofsForSelected = async () => {
     if (!selectedUser) return;
-    const processId = (selectedUser as AdminProcessRow).processRecordId || selectedUser.id;
+    const processId = (selectedUser as AdminProcessRow).processRecordId;
+    if (!processId) { setPaymentProofs([]); return; }
     const proofs = await getPaymentProofs(processId);
     setPaymentProofs(proofs);
   };
 
   const handleUploadProof = async (file: File, amount?: number) => {
     if (!selectedUser) return;
-    const processId = (selectedUser as AdminProcessRow).processRecordId || selectedUser.id;
+    const processId = (selectedUser as AdminProcessRow).processRecordId;
+    if (!processId) { window.alert('Usuário não possui um processo vinculado para comprovante de pagamento.'); return; }
     setUploadingProof(true);
     const { proof, error } = await uploadPaymentProof(processId, currentUser.id, file, amount);
     setUploadingProof(false);
@@ -1151,8 +1153,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
   const loadProcessDocuments = async () => {
     if (!selectedUser?.id) return;
+    const processId = (selectedUser as AdminProcessRow).processRecordId;
+    if (!processId) return;
     setProcessDocumentsLoading(true);
-    const docs = await listProcessDocuments(selectedUser.id);
+    const docs = await listProcessDocuments(processId);
     setProcessDocuments(docs);
     setProcessDocumentsLoading(false);
   };
@@ -1168,9 +1172,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const handleUploadDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !selectedUser || !currentUser.id) return;
-    const processId = (selectedUser as AdminProcessRow).processRecordId || selectedUser.id;
+    const processId = (selectedUser as AdminProcessRow).processRecordId;
+    if (!processId) { alert('Usuário não possui um processo vinculado para anexar documentos.'); return; }
     const orgId = currentUser.organizationId;
-    if (!orgId || !processId) return;
+    if (!orgId) return;
     setUploadingDocument(true);
     await uploadProcessDocument(orgId, processId, currentUser.id, file);
     setUploadingDocument(false);
@@ -1180,7 +1185,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
   const handleResendCertificate = async () => {
     if (!selectedUser) return;
-    const processId = (selectedUser as AdminProcessRow).processRecordId || selectedUser.id;
+    const processId = (selectedUser as AdminProcessRow).processRecordId;
+    if (!processId) { alert('Usuário não possui um processo vinculado para reenviar certificado.'); return; }
     setResendingCertificate(true);
     try {
       const response = await supabase.functions.invoke(
@@ -1204,8 +1210,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [uploadingForProcess, setUploadingForProcess] = useState<string | null>(null);
 
   const PaymentProofUploadButton = ({ processRow }: { processRow: AdminProcessRow }) => {
-    const pid = processRow.processRecordId || processRow.id;
-    const isUploading = uploadingProof && uploadingForProcess === pid;
+    const pid = processRow.processRecordId;
+    const isUploading = uploadingProof && !!pid && uploadingForProcess === pid;
 
     return (
       <div>
@@ -1647,9 +1653,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                             <button
                               type="button"
                               onClick={() => {
-                                const pid = (selectedUser as AdminProcessRow).processRecordId || selectedUser.id;
+                                const pid = (selectedUser as AdminProcessRow).processRecordId;
                                 const proofId = paymentProofs[0]?.id;
-                                if (proofId) void handleValidateProof(proofId, pid, 'validated');
+                                if (proofId && pid) void handleValidateProof(proofId, pid, 'validated');
                               }}
                               disabled={validatingProof || paymentProofs.length === 0}
                               className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-emerald-500 disabled:opacity-60"
@@ -1660,9 +1666,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                             <button
                               type="button"
                               onClick={() => {
-                                const pid = (selectedUser as AdminProcessRow).processRecordId || selectedUser.id;
+                                const pid = (selectedUser as AdminProcessRow).processRecordId;
                                 const proofId = paymentProofs[0]?.id;
-                                if (proofId) void handleValidateProof(proofId, pid, 'rejected');
+                                if (proofId && pid) void handleValidateProof(proofId, pid, 'rejected');
                               }}
                               disabled={validatingProof || paymentProofs.length === 0}
                               className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-red-500 disabled:opacity-60"
@@ -1716,7 +1722,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                         <div className="flex items-center justify-between mb-3">
                           <h4 className="text-sm font-black uppercase text-blue-800">Certificado de Filiação</h4>
                           <a
-                            href={`/#/certificate?processId=${(selectedUser as AdminProcessRow).processRecordId || selectedUser.id}`}
+                             href={(selectedUser as AdminProcessRow).processRecordId ? `/#/certificate?processId=${(selectedUser as AdminProcessRow).processRecordId}` : '#'}
                             className="inline-flex items-center gap-1 text-xs font-bold text-blue-700 hover:text-blue-900 underline"
                           >
                             <FileDown className="h-3 w-3" />
@@ -1746,7 +1752,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                               onChange={async (e) => {
                                 const file = e.target.files?.[0];
                                 if (!file || !selectedUser || !currentUser.id) return;
-                                const processId = (selectedUser as AdminProcessRow).processRecordId || selectedUser.id;
+                                const processId = (selectedUser as AdminProcessRow).processRecordId;
                                 const orgId = currentUser.organizationId;
                                 if (!orgId || !processId) return;
                                 await uploadProcessDocument(orgId, processId, currentUser.id, file, 'Certificado - Upload Manual');
@@ -1871,13 +1877,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                   </div>
                 )}
 
-                {selectedUserTab === 'comunicacao' && selectedUser && (
+                {selectedUserTab === 'comunicacao' && selectedUser && (selectedUser as AdminProcessRow).processRecordId && (
                   <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
                     <div className="p-4 border-b border-gray-100 bg-gray-50">
                       <h3 className="text-sm font-black uppercase text-gray-700">Comunicação do Processo</h3>
                     </div>
                     <CommunicationBlock
-                      processId={(selectedUser as AdminProcessRow).processRecordId || selectedUser.id}
+                      processId={(selectedUser as AdminProcessRow).processRecordId!}
                       currentUserId={currentUser.id}
                     />
                   </div>
