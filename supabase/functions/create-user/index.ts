@@ -135,7 +135,7 @@ Deno.serve(async (request) => {
     }
 
     // 4. Upsert org_members link
-    const orgRole = role === 'Administrador' ? 'admin' : 'member';
+    const orgRole = role === 'Administrador' ? 'admin' : 'client';
     const { error: memberError } = await adminClient
       .from('org_members')
       .upsert({
