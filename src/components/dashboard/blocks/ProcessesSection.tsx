@@ -124,6 +124,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
   const [processResponsibleFilter, setProcessResponsibleFilter] = useState('all');
   const [processTypeFilter, setProcessTypeFilter] = useState<'all' | ServiceUnit>('all');
   const [processPeriodFilter, setProcessPeriodFilter] = useState<'all' | 'today' | '7d' | '30d'>('all');
+  const [processOverdueFilter, setProcessOverdueFilter] = useState(false);
   const [activeProcessQuickPreset, setActiveProcessQuickPreset] = useState<ProcessQuickPreset | null>(null);
   const [processRowsLimit, setProcessRowsLimit] = useState(10);
   const [showCreateProcessModal, setShowCreateProcessModal] = useState(false);
@@ -289,8 +290,9 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
     const matchesResponsible = processResponsibleFilter === 'all' || (process.serviceManager || 'Não definido') === processResponsibleFilter;
     const matchesType = processTypeFilter === 'all' || process.processType === processTypeFilter;
     const matchesPeriod = isWithinPeriod(process.registrationDate, processPeriodFilter);
+    const matchesOverdue = !processOverdueFilter || (process.status !== ProcessStatus.CONCLUIDO && Boolean(process.deadline));
 
-    return matchesSearch && matchesStatus && matchesResponsible && matchesType && matchesPeriod;
+    return matchesSearch && matchesStatus && matchesResponsible && matchesType && matchesPeriod && matchesOverdue;
   });
 
   const quickPresetVisual = activeProcessQuickPreset
@@ -496,27 +498,42 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
           )}
 
           <div className="grid min-w-0 grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5 gap-2 sm:gap-2">
-            <div className="bg-white border-l-4 border-blue-500 rounded-xl p-1.5 shadow-sm border border-gray-100">
+            <div
+              className="bg-white border-l-4 border-blue-500 rounded-xl p-1.5 shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => { setProcessStatusFilter('all'); setProcessStatusPreset('all'); setProcessOverdueFilter(false); }}
+            >
               <p className="text-[10px] text-blue-500 uppercase font-bold">Processos</p>
               <p className="text-xl font-black leading-none mt-0.5 text-blue-600">{processStats.total}</p>
               <p className="text-[10px] text-blue-600 mt-0.5">Total após filtros</p>
             </div>
-            <div className="bg-white border-l-4 border-blue-400 rounded-xl p-1.5 shadow-sm border border-gray-100">
+            <div
+              className="bg-white border-l-4 border-blue-400 rounded-xl p-1.5 shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => { setProcessStatusFilter('all'); setProcessStatusPreset('andamento'); setProcessOverdueFilter(false); }}
+            >
               <p className="text-[10px] text-blue-500 uppercase font-bold">Em andamento</p>
               <p className="text-xl font-black leading-none mt-0.5 text-blue-600">{processStats.emAndamento}</p>
               <p className="text-[10px] text-blue-600 mt-0.5">Ativos</p>
             </div>
-            <div className="bg-white border-l-4 border-green-500 rounded-xl p-1.5 shadow-sm border border-gray-100">
+            <div
+              className="bg-white border-l-4 border-green-500 rounded-xl p-1.5 shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => { setProcessStatusFilter(ProcessStatus.CONCLUIDO); setProcessStatusPreset('all'); setProcessOverdueFilter(false); }}
+            >
               <p className="text-[10px] text-green-500 uppercase font-bold">Concluídos</p>
               <p className="text-xl font-black leading-none mt-0.5 text-green-600">{processStats.concluidos}</p>
               <p className="text-[10px] text-green-600 mt-0.5">Finalizados</p>
             </div>
-            <div className="bg-white border-l-4 border-yellow-500 rounded-xl p-1.5 shadow-sm border border-gray-100">
+            <div
+              className="bg-white border-l-4 border-yellow-500 rounded-xl p-1.5 shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => { setProcessStatusFilter('all'); setProcessStatusPreset('atencao'); setProcessOverdueFilter(false); }}
+            >
               <p className="text-[10px] text-yellow-500 uppercase font-bold">Aguardando</p>
               <p className="text-xl font-black leading-none mt-0.5 text-yellow-600">{processStats.aguardando}</p>
               <p className="text-[10px] text-yellow-600 mt-0.5">Pendências</p>
             </div>
-            <div className="bg-white border-l-4 border-red-500 rounded-xl p-1.5 shadow-sm border border-gray-100">
+            <div
+              className="bg-white border-l-4 border-red-500 rounded-xl p-1.5 shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => { setProcessStatusFilter('all'); setProcessStatusPreset('all'); setProcessOverdueFilter(true); }}
+            >
               <p className="text-[10px] text-red-500 uppercase font-bold">Atrasados</p>
               <p className="text-xl font-black leading-none mt-0.5 text-red-600">{processStats.atrasados}</p>
               <p className="text-[10px] text-red-600 mt-0.5">Prazo vencido</p>
