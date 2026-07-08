@@ -79,6 +79,7 @@ const ManagementSection: React.FC<ManagementSectionProps> = ({ users, setUsers, 
   const [membersLoading, setMembersLoading] = useState(false);
   const [membersError, setMembersError] = useState('');
   const [editingMemberUserId, setEditingMemberUserId] = useState<string | null>(null);
+  const [editingMemberOrgId, setEditingMemberOrgId] = useState<string | null>(null);
   const [userCreationStatus, setUserCreationStatus] = useState<string | null>(null);
   const [configSearch, setConfigSearch] = useState('');
   const [configRowsLimit, setConfigRowsLimit] = useState(10);
@@ -432,6 +433,10 @@ const ManagementSection: React.FC<ManagementSectionProps> = ({ users, setUsers, 
 
     const orgRole = mapAccessLevelToOrgRole(newAccessLevel);
 
+    if (editingMemberUserId && editingMemberOrgId && editingMemberOrgId !== newAdminOrgId) {
+      await supabase.from('org_members').delete().eq('user_id', targetUserId).eq('org_id', editingMemberOrgId);
+    }
+
     const { error: upsertMemberError } = await supabase
       .from('org_members')
       .upsert(
@@ -521,6 +526,7 @@ const ManagementSection: React.FC<ManagementSectionProps> = ({ users, setUsers, 
     setNewAdminOrgId(selectedOrg.id);
     setNewAccessLevel('Usuário Sênior');
     setEditingMemberUserId(null);
+    setEditingMemberOrgId(null);
     setUserCreationStatus(null);
     await fetchOrgMembers();
     alert(membershipWarning || 'Membro cadastrado/atualizado com sucesso.');
@@ -781,6 +787,7 @@ const ManagementSection: React.FC<ManagementSectionProps> = ({ users, setUsers, 
                           setNewAdminName(u.name);
                           setNewAdminEmail(u.email === '-' ? '' : u.email);
                           setNewAdminOrgId(u.org_id);
+                          setEditingMemberOrgId(u.org_id);
                           setNewAccessLevel(u.accessLevel);
                           setEditingMemberUserId(u.user_id);
                         }}
@@ -830,6 +837,7 @@ const ManagementSection: React.FC<ManagementSectionProps> = ({ users, setUsers, 
                               setNewAdminName(u.name);
                               setNewAdminEmail(u.email === '-' ? '' : u.email);
                               setNewAdminOrgId(u.org_id);
+                              setEditingMemberOrgId(u.org_id);
                               setNewAccessLevel(u.accessLevel);
                               setEditingMemberUserId(u.user_id);
                             }}
