@@ -82,6 +82,7 @@ const ManagementSection: React.FC<ManagementSectionProps> = ({ users, setUsers, 
   const [userCreationStatus, setUserCreationStatus] = useState<string | null>(null);
   const [configSearch, setConfigSearch] = useState('');
   const [configRowsLimit, setConfigRowsLimit] = useState(10);
+  const [showCreateUserForm, setShowCreateUserForm] = useState(false);
 
   useEffect(() => {
     if (organizations.length > 0 && !newAdminOrgId) {
@@ -638,9 +639,24 @@ const ManagementSection: React.FC<ManagementSectionProps> = ({ users, setUsers, 
   return (
     <div key="tab-management" className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-slideUp">
       <div className="lg:col-span-1 bg-white border border-gray-100 rounded-2xl p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
-        <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
-          <Plus className="text-blue-500" /> Cadastrar Usuário e Nível
-        </h3>
+        <button
+          type="button"
+          onClick={() => setShowCreateUserForm(!showCreateUserForm)}
+          className="w-full flex items-center justify-between gap-2 text-left"
+        >
+          <h3 className="text-lg font-bold flex items-center gap-2">
+            <Plus className="text-blue-500" /> Cadastrar Usuário e Nível
+          </h3>
+          <svg
+            className={`w-5 h-5 text-gray-400 transition-transform duration-300 ${showCreateUserForm ? 'rotate-180' : ''}`}
+            fill="none" stroke="currentColor" viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        <div
+          className={`overflow-hidden transition-all duration-300 ease-in-out ${showCreateUserForm ? 'max-h-[800px] opacity-100 mt-6' : 'max-h-0 opacity-0'}`}
+        >
         <form onSubmit={handleCreateUser} className="space-y-4">
           <div>
             <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Nome de Usuário</label>
@@ -706,6 +722,7 @@ const ManagementSection: React.FC<ManagementSectionProps> = ({ users, setUsers, 
             {editingMemberUserId ? 'Atualizar / Definir' : 'Cadastrar / Definir'}
           </button>
         </form>
+        </div>
       </div>
 
       <div className="lg:col-span-2 bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
