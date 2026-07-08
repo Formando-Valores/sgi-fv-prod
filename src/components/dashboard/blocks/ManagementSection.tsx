@@ -280,6 +280,7 @@ const ManagementSection: React.FC<ManagementSectionProps> = ({ users, setUsers, 
     }
 
     const membershipKeys = new Set(normalizedMembersFromMembership.map((member) => `${member.org_id}-${member.user_id}`));
+    const userIdsWithMembership = new Set(normalizedMembersFromMembership.map((member) => member.user_id));
 
     let defaultOrgId = newAdminOrgId || organizations[0]?.id || '';
     let defaultOrgName = organizations.find((org) => org.id === defaultOrgId)?.name || 'Organização Padrão';
@@ -312,7 +313,7 @@ const ManagementSection: React.FC<ManagementSectionProps> = ({ users, setUsers, 
         const orgId = sanitizeDisplayValue(profile.org_id) || 'sem-org';
         return { profile, key: `${orgId}-${profile.id}` };
       })
-      .filter(({ key }) => !membershipKeys.has(key))
+      .filter(({ key, profile }) => !membershipKeys.has(key) && !userIdsWithMembership.has(profile.id))
       .map(({ profile }) => {
         const fallbackUser = users.find((user) => user.id === profile.id);
         const resolvedEmail = sanitizeDisplayValue(profile.email) || sanitizeDisplayValue(fallbackUser?.email) || '-';
