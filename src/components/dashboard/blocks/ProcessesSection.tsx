@@ -182,8 +182,9 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
   };
 
   const resetNewProcessForm = () => {
+    const clientOrgId = isClientScope ? (currentUser.organizationId || currentUser.org_id || '') : '';
     setNewProcessForm({
-      organizationId: '',
+      organizationId: clientOrgId,
       title: '',
       clientName: '',
       clientDocument: '',
@@ -740,7 +741,10 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                       required
                     >
                       <option value="">Selecione a organização</option>
-                      {organizations.map((organization) => (
+                      {(isClientScope
+                        ? organizations.filter((org) => org.id === currentUser.organizationId || org.id === currentUser.org_id)
+                        : organizations
+                      ).map((organization) => (
                         <option key={organization.id} value={organization.id}>{organization.name}</option>
                       ))}
                     </select>
