@@ -11,6 +11,7 @@ import {
 } from '../../../lib/servicesCatalogDb';
 import { formatEuro } from '../../../lib/servicesCatalog';
 import { ServiceUnit } from '../../../../types';
+import { useToast } from '../../../contexts/ToastContext';
 
 interface Props {
   currentUser: { id: string; role: string };
@@ -25,6 +26,7 @@ const emptyForm = {
 };
 
 const ServicesSection: React.FC<Props> = () => {
+  const { showToast } = useToast();
   const [services, setServices] = useState<DbCatalogService[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -94,6 +96,7 @@ const ServicesSection: React.FC<Props> = () => {
         return;
       }
       setFeedback({ type: 'success', message: 'Serviço atualizado com sucesso!' });
+      showToast({ type: 'success', message: 'Serviço atualizado com sucesso.' });
     } else {
       const { error } = await createService({
         name: form.name,
@@ -108,6 +111,7 @@ const ServicesSection: React.FC<Props> = () => {
         return;
       }
       setFeedback({ type: 'success', message: 'Serviço cadastrado com sucesso!' });
+      showToast({ type: 'success', message: 'Serviço cadastrado com sucesso.' });
     }
 
     await load();
@@ -126,6 +130,7 @@ const ServicesSection: React.FC<Props> = () => {
       return;
     }
     setFeedback({ type: 'success', message: 'Serviço excluído.' });
+    showToast({ type: 'success', message: 'Serviço excluído com sucesso.' });
     await load();
     setTimeout(() => setFeedback(null), 3000);
   };
