@@ -495,31 +495,31 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
             <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">Modo somente leitura neste escopo: visualização habilitada, ações de criação/remoção bloqueadas.</p>
           )}
 
-          <div className="grid min-w-0 grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5 gap-2.5 sm:gap-3">
-            <div className="bg-white border-l-4 border-blue-500 rounded-xl p-3 shadow-sm border border-gray-100">
-              <p className="text-xs text-blue-500 uppercase">Processos</p>
-              <p className="text-3xl font-black leading-none mt-1.5 text-blue-600">{processStats.total}</p>
-              <p className="text-blue-600 mt-1">Total após filtros</p>
+          <div className="grid min-w-0 grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5 gap-2 sm:gap-2">
+            <div className="bg-white border-l-4 border-blue-500 rounded-xl p-1.5 shadow-sm border border-gray-100">
+              <p className="text-[10px] text-blue-500 uppercase font-bold">Processos</p>
+              <p className="text-xl font-black leading-none mt-0.5 text-blue-600">{processStats.total}</p>
+              <p className="text-[10px] text-blue-600 mt-0.5">Total após filtros</p>
             </div>
-            <div className="bg-white border-l-4 border-blue-400 rounded-xl p-3 shadow-sm border border-gray-100">
-              <p className="text-xs text-blue-500 uppercase">Em andamento</p>
-              <p className="text-3xl font-black leading-none mt-1.5 text-blue-600">{processStats.emAndamento}</p>
-              <p className="text-blue-600 mt-1">Ativos</p>
+            <div className="bg-white border-l-4 border-blue-400 rounded-xl p-1.5 shadow-sm border border-gray-100">
+              <p className="text-[10px] text-blue-500 uppercase font-bold">Em andamento</p>
+              <p className="text-xl font-black leading-none mt-0.5 text-blue-600">{processStats.emAndamento}</p>
+              <p className="text-[10px] text-blue-600 mt-0.5">Ativos</p>
             </div>
-            <div className="bg-white border-l-4 border-green-500 rounded-xl p-3 shadow-sm border border-gray-100">
-              <p className="text-xs text-green-500 uppercase">Concluídos</p>
-              <p className="text-3xl font-black leading-none mt-1.5 text-green-600">{processStats.concluidos}</p>
-              <p className="text-green-600 mt-1">Finalizados</p>
+            <div className="bg-white border-l-4 border-green-500 rounded-xl p-1.5 shadow-sm border border-gray-100">
+              <p className="text-[10px] text-green-500 uppercase font-bold">Concluídos</p>
+              <p className="text-xl font-black leading-none mt-0.5 text-green-600">{processStats.concluidos}</p>
+              <p className="text-[10px] text-green-600 mt-0.5">Finalizados</p>
             </div>
-            <div className="bg-white border-l-4 border-yellow-500 rounded-xl p-3 shadow-sm border border-gray-100">
-              <p className="text-xs text-yellow-500 uppercase">Aguardando</p>
-              <p className="text-3xl font-black leading-none mt-1.5 text-yellow-600">{processStats.aguardando}</p>
-              <p className="text-yellow-600 mt-1">Pendências</p>
+            <div className="bg-white border-l-4 border-yellow-500 rounded-xl p-1.5 shadow-sm border border-gray-100">
+              <p className="text-[10px] text-yellow-500 uppercase font-bold">Aguardando</p>
+              <p className="text-xl font-black leading-none mt-0.5 text-yellow-600">{processStats.aguardando}</p>
+              <p className="text-[10px] text-yellow-600 mt-0.5">Pendências</p>
             </div>
-            <div className="bg-white border-l-4 border-red-500 rounded-xl p-3 shadow-sm border border-gray-100">
-              <p className="text-xs text-red-500 uppercase">Atrasados</p>
-              <p className="text-3xl font-black leading-none mt-1.5 text-red-600">{processStats.atrasados}</p>
-              <p className="text-red-600 mt-1">Prazo vencido</p>
+            <div className="bg-white border-l-4 border-red-500 rounded-xl p-1.5 shadow-sm border border-gray-100">
+              <p className="text-[10px] text-red-500 uppercase font-bold">Atrasados</p>
+              <p className="text-xl font-black leading-none mt-0.5 text-red-600">{processStats.atrasados}</p>
+              <p className="text-[10px] text-red-600 mt-0.5">Prazo vencido</p>
             </div>
           </div>
 
