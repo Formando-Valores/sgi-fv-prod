@@ -345,7 +345,7 @@ const ManagementSection: React.FC<ManagementSectionProps> = ({ users, setUsers, 
 
     const selectedOrg = organizations.find((org) => org.id === newAdminOrgId);
     if (!selectedOrg) {
-      alert('Selecione uma organização válida.');
+      showToast({ type: 'error', message: 'Selecione uma organização válida.' });
       return;
     }
     const selectedOrgName = selectedOrg?.name || 'Organização Padrão';
@@ -372,12 +372,12 @@ const ManagementSection: React.FC<ManagementSectionProps> = ({ users, setUsers, 
 
     if (profileLookupError) {
       setUserCreationStatus(null);
-      alert('Erro ao buscar usuário no banco. Tente novamente.');
+      showToast({ type: 'error', message: 'Erro ao buscar usuário no banco. Tente novamente.' });
       return;
     }
 
     if (existingProfile?.id && !editingMemberUserId) {
-      alert(`O email ${normalizedEmail} já possui cadastro. O usuário será vinculado à organização atual.`);
+      showToast({ type: 'info', message: `O email ${normalizedEmail} já possui cadastro. O usuário será vinculado à organização atual.` });
     }
 
     if (newAdminPassword) {
@@ -385,7 +385,7 @@ const ManagementSection: React.FC<ManagementSectionProps> = ({ users, setUsers, 
       const anonKey = String(import.meta.env.VITE_SUPABASE_ANON_KEY ?? '').trim();
       if (!supabaseUrl || !anonKey) {
         setUserCreationStatus(null);
-        alert('Erro de configuração do ambiente.');
+        showToast({ type: 'error', message: 'Erro de configuração do ambiente.' });
         return;
       }
       setUserCreationStatus('Criando conta no sistema…');
@@ -409,22 +409,22 @@ const ManagementSection: React.FC<ManagementSectionProps> = ({ users, setUsers, 
         const result = await response.json();
         if (!response.ok) {
           setUserCreationStatus(null);
-          alert(`Erro ao criar usuário: ${result.error || 'desconhecido'}`);
+          showToast({ type: 'error', message: `Erro ao criar usuário: ${result.error || 'desconhecido'}` });
           return;
         }
         targetUserId = result.user_id;
         if (result.process_warning) {
-          alert(`Atenção: ${result.process_warning}`);
+          showToast({ type: 'warning', message: `Atenção: ${result.process_warning}` });
         }
         setNewAdminPassword('');
       } catch (fetchErr: any) {
         setUserCreationStatus(null);
-        alert(`Erro ao comunicar com o servidor: ${fetchErr?.message || 'desconhecido'}`);
+        showToast({ type: 'error', message: `Erro ao comunicar com o servidor: ${fetchErr?.message || 'desconhecido'}` });
         return;
       }
     } else if (!targetUserId && !existingProfile?.id) {
       setUserCreationStatus(null);
-      alert('Usuário não encontrado no sistema. Informe uma senha para criar um novo cadastro.');
+      showToast({ type: 'error', message: 'Usuário não encontrado no sistema. Informe uma senha para criar um novo cadastro.' });
       return;
     }
 
@@ -432,7 +432,7 @@ const ManagementSection: React.FC<ManagementSectionProps> = ({ users, setUsers, 
 
     if (!targetUserId) {
       setUserCreationStatus(null);
-      alert('Não foi possível identificar o usuário selecionado para atualização.');
+      showToast({ type: 'error', message: 'Não foi possível identificar o usuário selecionado para atualização.' });
       return;
     }
 
@@ -469,7 +469,7 @@ const ManagementSection: React.FC<ManagementSectionProps> = ({ users, setUsers, 
         membershipWarning = 'Nível atualizado no perfil, mas o vínculo em org_members foi bloqueado por permissão.';
       } else {
         setUserCreationStatus(null);
-        alert('Erro ao salvar vínculo na tabela org_members.');
+        showToast({ type: 'error', message: 'Erro ao salvar vínculo na tabela org_members.' });
         return;
       }
     }
@@ -536,7 +536,7 @@ const ManagementSection: React.FC<ManagementSectionProps> = ({ users, setUsers, 
     setEditingMemberOrgId(null);
     setUserCreationStatus(null);
     await fetchOrgMembers();
-    alert(membershipWarning || 'Membro cadastrado/atualizado com sucesso.');
+    showToast({ type: membershipWarning ? 'warning' : 'success', message: membershipWarning || 'Membro cadastrado/atualizado com sucesso.' });
   };
 
   const handleDeleteMember = async (member: OrgMemberView) => {
@@ -623,7 +623,7 @@ const ManagementSection: React.FC<ManagementSectionProps> = ({ users, setUsers, 
 
     if (orgMemberDeleteError) {
       showToast({ type: 'error', message: `Erro ao remover vínculos de organização para ${memberEmail}.` });
-      alert('Erro ao remover vínculo na organização.');
+      showToast({ type: 'error', message: 'Erro ao remover vínculo na organização.' });
       return;
     }
 
