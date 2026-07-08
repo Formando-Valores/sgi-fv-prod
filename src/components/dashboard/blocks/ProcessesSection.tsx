@@ -8,6 +8,7 @@ import { calcAssociationFees, formatEuro } from '../../../lib/servicesCatalog';
 import { filterServicesByUnit, filterGroupsByUnit, filterServicesByGroup, type DbCatalogService } from '../../../lib/servicesCatalogDb';
 import { getPaymentStatusUi } from '../../../lib/paymentStatus';
 import { useToast } from '../../../contexts/ToastContext';
+import { createCheckoutSession } from '../../../lib/stripe';
 import Card from '../../ui/Card';
 import Badge from '../../ui/Badge';
 
@@ -129,6 +130,8 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
   const [processRowsLimit, setProcessRowsLimit] = useState(10);
   const [showCreateProcessModal, setShowCreateProcessModal] = useState(false);
   const [creatingProcess, setCreatingProcess] = useState(false);
+  const [createdProcessInfo, setCreatedProcessInfo] = useState<{ id: string; osValue: number; orgId: string } | null>(null);
+  const [redirectingCheckout, setRedirectingCheckout] = useState(false);
   const [newProcessForm, setNewProcessForm] = useState<NewProcessFormState>({
     organizationId: '',
     title: '',
@@ -424,7 +427,46 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
     setDbProcesses((prev) => [normalizeProcessOptionalFields(processToAdd as DbProcess), ...prev]);
     showToast({ type: 'success', message: 'Processo criado com sucesso e adicionado à lista.' });
     setCreatingProcess(false);
+    setCreatedProcessInfo({
+      id: createdProcess.id,
+      osValue: totalOsValue > 0 ? totalOsValue : 0,
+      orgId: selectedOrganization.id,
+    });
+  };
+
+  const handlePayCreatedProcess = async () => {
+    if (!createdProcessInfo || createdProcessInfo.osValue <= 0) {
+      showToast({ type: 'error', message: 'Valor do pagamento não definido para este processo.' });
+      return;
+    }
+    setRedirectingCheckout(true);
+    try {
+      const session = await createCheckoutSession({
+        amount: Math.round(createdProcessInfo.osValue * 100),
+        currency: 'eur',
+        successUrl: `${window.location.origin}/#/payments/success?processId=${createdProcessInfo.id}`,
+        cancelUrl: `${window.location.origin}/#/payments/cancel?processId=${createdProcessInfo.id}`,
+        processId: createdProcessInfo.id,
+        clientId: currentUser.id,
+        serviceId: '',
+        organizationId: createdProcessInfo.orgId,
+        areaId: '',
+        sectorId: '',
+      });
+      if (session.url) {
+        window.location.assign(session.url);
+      }
+    } catch (err) {
+      console.error('Erro ao criar checkout:', err);
+      showToast({ type: 'error', message: 'Não foi possível iniciar o pagamento. Tente novamente mais tarde.' });
+    } finally {
+      setRedirectingCheckout(false);
+    }
+  };
+
+  const handleGoToCreatedProcess = () => {
     setShowCreateProcessModal(false);
+    setCreatedProcessInfo(null);
     resetNewProcessForm();
   };
 
@@ -736,10 +778,12 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
           <div className="bg-white w-full max-w-3xl rounded-3xl border border-gray-100 shadow-2xl overflow-hidden animate-scaleIn">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-              <h3 className="text-xl font-black uppercase">Criar processo manual</h3>
+              <h3 className="text-xl font-black uppercase">{createdProcessInfo ? 'Processo criado' : 'Criar processo manual'}</h3>
               <button
                 onClick={() => {
                   setShowCreateProcessModal(false);
+                  setCreatedProcessInfo(null);
+                  resetNewProcessForm();
                 }}
                 className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full"
               >
@@ -748,6 +792,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
             </div>
             <div className="p-8 max-h-[85vh] overflow-y-auto">
               <form onSubmit={handleCreateProcess} className="space-y-6">
+                <fieldset disabled={!!createdProcessInfo} className="contents">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
                     <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Organização</label>
@@ -1043,28 +1088,54 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                   </div>
                 </div>
 
+                </fieldset>
+
                 <div className="rounded-2xl border border-gray-100 bg-gray-50/70 p-4 text-sm text-gray-600">
-                  O processo será criado manualmente com origem <span className="font-black text-gray-800">PAINEL</span>,
-                  status inicial <span className="font-black text-gray-800">Cadastro</span> e vinculado à organização selecionada.
+                  {createdProcessInfo
+                    ? 'Processo criado com sucesso! Utilize os botões abaixo para acompanhar o andamento ou efetuar o pagamento.'
+                    : <>O processo será criado manualmente com origem <span className="font-black text-gray-800">PAINEL</span>, status inicial <span className="font-black text-gray-800">Cadastro</span> e vinculado à organização selecionada.</>
+                  }
                 </div>
 
                 <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowCreateProcessModal(false);
-                    }}
-                    className="px-5 py-3 rounded-xl border border-gray-200 text-gray-700 font-bold hover:bg-gray-100 transition-colors"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={creatingProcess}
-                    className="px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:cursor-not-allowed text-white font-black uppercase tracking-wider"
-                  >
-                    {creatingProcess ? 'Criando processo...' : 'Criar processo'}
-                  </button>
+                  {createdProcessInfo ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleGoToCreatedProcess}
+                        className="px-5 py-3 rounded-xl border border-gray-200 text-gray-700 font-bold hover:bg-gray-100 transition-colors"
+                      >
+                        Acompanhar Processo
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handlePayCreatedProcess}
+                        disabled={redirectingCheckout}
+                        className="px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 disabled:cursor-not-allowed text-white font-black uppercase tracking-wider"
+                      >
+                        {redirectingCheckout ? 'Redirecionando...' : `Pagar agora — ${formatEuro(createdProcessInfo.osValue)}`}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowCreateProcessModal(false);
+                        }}
+                        className="px-5 py-3 rounded-xl border border-gray-200 text-gray-700 font-bold hover:bg-gray-100 transition-colors"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={creatingProcess}
+                        className="px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:cursor-not-allowed text-white font-black uppercase tracking-wider"
+                      >
+                        {creatingProcess ? 'Criando processo...' : 'Criar processo'}
+                      </button>
+                    </>
+                  )}
                 </div>
               </form>
             </div>
