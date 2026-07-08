@@ -132,6 +132,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
   const [creatingProcess, setCreatingProcess] = useState(false);
   const [createdProcessInfo, setCreatedProcessInfo] = useState<{ id: string; osValue: number; orgId: string } | null>(null);
   const [redirectingCheckout, setRedirectingCheckout] = useState(false);
+  const [pendingDonation, setPendingDonation] = useState('');
   const [newProcessForm, setNewProcessForm] = useState<NewProcessFormState>({
     organizationId: '',
     title: '',
@@ -187,6 +188,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
 
   const resetNewProcessForm = () => {
     const clientOrgId = isClientScope ? (currentUser.organizationId || currentUser.org_id || '') : '';
+    setPendingDonation('');
     setNewProcessForm({
       organizationId: clientOrgId,
       title: '',
@@ -429,7 +431,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
     setCreatingProcess(false);
     setCreatedProcessInfo({
       id: createdProcess.id,
-      osValue: totalOsValue > 0 ? totalOsValue : 0,
+      osValue: Number(processToAdd.os_value ?? totalOsValue),
       orgId: selectedOrganization.id,
     });
   };
@@ -1076,15 +1078,46 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
 
                   <div>
                     <label className="text-[10px] font-black text-purple-600 uppercase block mb-2">Doação Voluntária (€) <span className="text-[10px] font-normal text-gray-400">— valor extra para associação</span></label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={newProcessForm.donation || ''}
-                      onChange={(event) => setNewProcessForm((prev) => ({ ...prev, donation: event.target.value ? Number(event.target.value) : 0 }))}
-                      className="w-full bg-purple-50 border border-purple-200 rounded-xl p-4 text-purple-800 font-semibold outline-none focus:ring-2 focus:ring-purple-500"
-                      placeholder="0,00"
-                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={pendingDonation}
+                        onChange={(e) => setPendingDonation(e.target.value)}
+                        className="flex-1 bg-purple-50 border border-purple-200 rounded-xl p-4 text-purple-800 font-semibold outline-none focus:ring-2 focus:ring-purple-500"
+                        placeholder="0,00"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const val = parseFloat(pendingDonation);
+                          if (val > 0) {
+                            setNewProcessForm((prev) => ({ ...prev, donation: val }));
+                            setPendingDonation('');
+                          }
+                        }}
+                        disabled={!pendingDonation || parseFloat(pendingDonation) <= 0}
+                        className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:bg-purple-300 text-white font-bold text-sm whitespace-nowrap"
+                      >
+                        Adicionar
+                      </button>
+                      {newProcessForm.donation > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNewProcessForm((prev) => ({ ...prev, donation: 0 }));
+                          }}
+                          className="px-3 py-2 rounded-xl bg-red-100 hover:bg-red-200 text-red-600 font-bold text-sm"
+                          title="Remover doação"
+                        >
+                          X
+                        </button>
+                      )}
+                    </div>
+                    {newProcessForm.donation > 0 && (
+                      <p className="text-xs text-purple-600 font-semibold mt-1">Doação de {formatEuro(newProcessForm.donation)} confirmada.</p>
+                    )}
                   </div>
                 </div>
 

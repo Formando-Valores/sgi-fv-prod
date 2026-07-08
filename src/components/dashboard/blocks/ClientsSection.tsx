@@ -446,11 +446,12 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
       .eq('org_id', client.org_id);
 
     if (deleteError) {
-      alert('Erro ao remover cliente da organização.');
+      showToast({ type: 'error', message: `Erro ao remover ${client.nome} da organização.` });
       return;
     }
 
     await fetchClients();
+    showToast({ type: 'success', message: `Cliente ${client.nome} removido com sucesso.` });
   };
 
   const extractOrganizationName = (
