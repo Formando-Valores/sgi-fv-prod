@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Plus, Trash2, Pencil, Search, Users, Loader2 } from 'lucide-react';
 import { supabase } from '../../../../supabase';
 import type { User, Organization } from '../../../../types';
@@ -84,6 +84,13 @@ const ManagementSection: React.FC<ManagementSectionProps> = ({ users, setUsers, 
   const [configSearch, setConfigSearch] = useState('');
   const [configRowsLimit, setConfigRowsLimit] = useState(10);
   const [showCreateUserForm, setShowCreateUserForm] = useState(false);
+  const createUserFormRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (editingMemberUserId && createUserFormRef.current) {
+      createUserFormRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [editingMemberUserId]);
 
   useEffect(() => {
     if (organizations.length > 0 && !newAdminOrgId) {
@@ -644,7 +651,7 @@ const ManagementSection: React.FC<ManagementSectionProps> = ({ users, setUsers, 
 
   return (
     <div key="tab-management" className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-slideUp">
-      <div className="lg:col-span-1 bg-white border border-gray-100 rounded-2xl p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
+      <div ref={createUserFormRef} className="lg:col-span-1 bg-white border border-gray-100 rounded-2xl p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
         <button
           type="button"
           onClick={() => setShowCreateUserForm(!showCreateUserForm)}
@@ -790,6 +797,7 @@ const ManagementSection: React.FC<ManagementSectionProps> = ({ users, setUsers, 
                           setEditingMemberOrgId(u.org_id);
                           setNewAccessLevel(u.accessLevel);
                           setEditingMemberUserId(u.user_id);
+                          setShowCreateUserForm(true);
                         }}
                         className="p-1.5 bg-gray-100 hover:bg-gray-200 rounded-md text-gray-500"
                       >
@@ -840,6 +848,7 @@ const ManagementSection: React.FC<ManagementSectionProps> = ({ users, setUsers, 
                               setEditingMemberOrgId(u.org_id);
                               setNewAccessLevel(u.accessLevel);
                               setEditingMemberUserId(u.user_id);
+                              setShowCreateUserForm(true);
                             }}
                             className="p-2 bg-gray-100 hover:bg-gray-200 rounded-md text-gray-500 hover:text-white transition-colors"
                           >
