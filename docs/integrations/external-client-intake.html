@@ -123,6 +123,7 @@
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
 
+      const consentCheckboxExternal = document.getElementById("consentExternal") as HTMLInputElement | null;
       const data = new FormData(form);
       const payload = {
         organizationSlug: DEFAULT_ORGANIZATION_SLUG || "default",
@@ -140,7 +141,8 @@
         phone: data.get("phone") || "",
         processTitle: data.get("processTitle") || "",
         serviceUnit: data.get("serviceUnit") || "JURÍDICO / ADVOCACIA",
-        organizationRequestedName: data.get("organizationRequestedName") || ""
+        organizationRequestedName: data.get("organizationRequestedName") || "",
+        consentPrivacyPolicy: !!consentCheckboxExternal?.checked
       };
 
       setMessage("Enviando cadastro...", true);
