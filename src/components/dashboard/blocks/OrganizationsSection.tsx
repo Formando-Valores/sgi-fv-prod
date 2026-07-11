@@ -113,11 +113,7 @@ const OrganizationsSection: React.FC<OrganizationsSectionProps> = ({
   };
 
   if (!canManageOrganizations) {
-    return (
-      <Card className="bg-white border-gray-100 p-6">
-        <p className="text-sm font-semibold text-gray-500">Você não possui permissão para gerenciar organizações.</p>
-      </Card>
-    );
+    return null;
   }
 
   return (
