@@ -1,6 +1,6 @@
 ﻿
 import React, { useEffect, useState, useRef } from 'react';
-import { Eye, Pencil, Search, Users, ShieldCheck, X, Plus, Trash2, Calendar, MessageSquare, Check, User as UserIcon, UserCheck, LayoutDashboard, FolderKanban, Users2, Settings, Building2, Flag, FileBarChart2, ExternalLink, Loader2, CreditCard, ChevronDown, Upload, FileDown, Mail, SearchX } from 'lucide-react';
+import { Eye, Pencil, Search, Users, ShieldCheck, X, Plus, Trash2, Calendar, MessageSquare, Check, User as UserIcon, UserCheck, LayoutDashboard, FolderKanban, Users2, Settings, Building2, Flag, FileBarChart2, ExternalLink, Loader2, CreditCard, ChevronDown, Upload, FileDown, Mail, SearchX, BarChart3, FilePlus } from 'lucide-react';
 import { User, ProcessStatus, UserRole, Hierarchy, ServiceUnit, Organization } from '../types';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { SERVICE_MANAGERS } from '../constants';
@@ -216,7 +216,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
   const location = useLocation();
   const navigate = useNavigate();
-  const validSections = ['dashboard', 'processos', 'clientes', 'configuracoes', 'organizacoes', 'relatorios', 'agenda'] as const;
+  const validSections = ['dashboard', 'indicadores', 'processos', 'clientes', 'configuracoes', 'organizacoes', 'relatorios', 'agenda'] as const;
   type DashboardSection = typeof validSections[number];
   type DashboardPresetFilter =
     | 'usuarios_cadastrados'
@@ -272,6 +272,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
   const sidebarLinks = [
     { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, visible: allowedModules.includes('dashboard') },
+    { to: '/dashboard/indicadores', label: 'Indicadores', icon: BarChart3, visible: allowedModules.includes('dashboard') },
+    { to: '/dashboard/processos?novo=1', label: 'Novo Processo', icon: FilePlus, visible: allowedModules.includes('processos') },
     { to: '/dashboard/processos', label: 'Processos', icon: FolderKanban, visible: allowedModules.includes('processos') },
     { to: '/dashboard/clientes', label: 'Clientes', icon: Users2, visible: allowedModules.includes('clientes') },
     { to: '/dashboard/configuracoes', label: 'Configurações', icon: Settings, visible: allowedModules.includes('configuracoes') },
@@ -282,6 +284,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
   const sectionModuleMap: Partial<Record<DashboardSection, 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes' | 'relatorios' | 'agenda'>> = {
     dashboard: 'dashboard',
+    indicadores: 'dashboard',
     processos: 'processos',
     clientes: 'clientes',
     configuracoes: 'configuracoes',
@@ -1297,6 +1300,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     >
 
       {currentSection === 'dashboard' && (
+        <DashboardSection
+          dashboardProcessRows={baseProcessRows}
+          usersCount={users.length}
+          filteredUsersCount={users.length}
+          isClientScope={isClientScope}
+          canAccessSection={canAccessSection}
+          navigateToDashboardHighlight={navigateToDashboardHighlight}
+          setSelectedUser={setSelectedUser}
+          OverviewContainer={OverviewContainer}
+          clientJourneyHistory={clientJourneyHistory}
+          clientJourneyLoading={clientJourneyLoading}
+        />
+      )}
+
+      {currentSection === 'indicadores' && (
         <DashboardSection
           dashboardProcessRows={baseProcessRows}
           usersCount={users.length}

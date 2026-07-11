@@ -240,6 +240,16 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
     applyProcessQuickPreset(detectedPreset);
   }, [currentSection, locationSearch]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(locationSearch);
+    if (params.get('novo') === '1') {
+      resetNewProcessForm();
+      setShowCreateProcessModal(true);
+      const cleanHash = window.location.hash.replace('?novo=1', '');
+      window.history.replaceState(null, '', cleanHash);
+    }
+  }, [locationSearch]);
+
   const parseProcessQuickPresetFromSearch = (search: string): ProcessQuickPreset | null => {
     const preset = new URLSearchParams(search).get('preset');
     if (!preset) return null;
@@ -523,18 +533,6 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
             <div className="min-w-0">
               <h3 className="text-3xl sm:text-4xl font-black tracking-tight leading-none">Processos</h3>
             </div>
-            {canCreateProcess && (
-              <button
-                type="button"
-                onClick={() => {
-                  resetNewProcessForm();
-                  setShowCreateProcessModal(true);
-                }}
-                className="inline-flex items-center gap-2 shrink-0 px-4 py-2 rounded-lg border border-blue-100 bg-blue-50 text-blue-600 font-semibold hover:bg-blue-100 transition-colors"
-              >
-                <Plus className="w-4 h-4" /> Novo processo
-              </button>
-            )}
           </div>
           <p className="text-gray-500 text-sm mb-4">Visão geral em formato de planilha para filtrar, acompanhar status e agir rápido.</p>
           {sectionReadOnly && (
