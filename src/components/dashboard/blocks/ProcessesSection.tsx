@@ -4,7 +4,7 @@ import type { Process as DbProcess } from '../../../lib/processes';
 import { ProcessStatus, ServiceUnit, type User, type Organization } from '../../../../types';
 import { sanitizeDisplayValue } from '../../../lib/clientUtils';
 import { supabase } from '../../../../supabase';
-import { calcAssociationFees, formatEuro } from '../../../lib/servicesCatalog';
+import { calcAssociationFees, EUR_RATE, formatEuro } from '../../../lib/servicesCatalog';
 import { filterServicesByUnit, filterGroupsByUnit, filterServicesByGroup, type DbCatalogService } from '../../../lib/servicesCatalogDb';
 import { getPaymentStatusUi } from '../../../lib/paymentStatus';
 import { useToast } from '../../../contexts/ToastContext';
@@ -1018,42 +1018,44 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
 
                       <div>
                         <label className="text-[10px] font-black text-purple-600 uppercase block mb-2">Doação Voluntária (€) <span className="text-[10px] font-normal text-gray-400">— valor extra para associação</span></label>
-                        <div className="flex gap-2">
+                        <div className="flex flex-col sm:flex-row gap-2">
                           <input
                             type="number"
                             min="0"
                             step="0.01"
                             value={pendingDonation}
                             onChange={(e) => setPendingDonation(e.target.value)}
-                            className="flex-1 bg-purple-50 border border-purple-200 rounded-xl p-4 text-purple-800 font-semibold outline-none focus:ring-2 focus:ring-purple-500"
+                            className="w-full sm:flex-1 bg-purple-50 border border-purple-200 rounded-xl p-4 text-purple-800 font-semibold outline-none focus:ring-2 focus:ring-purple-500"
                             placeholder="0,00"
                           />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const val = parseFloat(pendingDonation);
-                              if (val > 0) {
-                                setNewProcessForm((prev) => ({ ...prev, donation: val }));
-                                setPendingDonation('');
-                              }
-                            }}
-                            disabled={!pendingDonation || parseFloat(pendingDonation) <= 0}
-                            className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:bg-purple-300 text-white font-bold text-sm whitespace-nowrap"
-                          >
-                            Adicionar
-                          </button>
-                          {newProcessForm.donation > 0 && (
+                          <div className="flex gap-2">
                             <button
                               type="button"
                               onClick={() => {
-                                setNewProcessForm((prev) => ({ ...prev, donation: 0 }));
+                                const val = parseFloat(pendingDonation);
+                                if (val > 0) {
+                                  setNewProcessForm((prev) => ({ ...prev, donation: val * EUR_RATE }));
+                                  setPendingDonation('');
+                                }
                               }}
-                              className="px-3 py-2 rounded-xl bg-red-100 hover:bg-red-200 text-red-600 font-bold text-sm"
-                              title="Remover doação"
+                              disabled={!pendingDonation || parseFloat(pendingDonation) <= 0}
+                              className="flex-1 sm:flex-none px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:bg-purple-300 text-white font-bold text-sm whitespace-nowrap"
                             >
-                              X
+                              Adicionar
                             </button>
-                          )}
+                            {newProcessForm.donation > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setNewProcessForm((prev) => ({ ...prev, donation: 0 }));
+                                }}
+                                className="flex-1 sm:flex-none px-3 py-2 rounded-xl bg-red-100 hover:bg-red-200 text-red-600 font-bold text-sm whitespace-nowrap"
+                                title="Remover doação"
+                              >
+                                X
+                              </button>
+                            )}
+                          </div>
                         </div>
                         {newProcessForm.donation > 0 && (
                           <p className="text-xs text-purple-600 font-semibold mt-1">Doação de {formatEuro(newProcessForm.donation)} confirmada.</p>
@@ -1114,40 +1116,42 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                   {(newProcessForm.selectedServiceIds ?? []).length === 0 && (
                     <div className="md:col-span-2">
                       <label className="text-[10px] font-black text-purple-600 uppercase block mb-2">Doação Voluntária (€) <span className="text-[10px] font-normal text-gray-400">— valor extra para associação</span></label>
-                      <div className="flex gap-2">
+                      <div className="flex flex-col sm:flex-row gap-2">
                         <input
                           type="number"
                           min="0"
                           step="0.01"
                           value={pendingDonation}
                           onChange={(e) => setPendingDonation(e.target.value)}
-                          className="flex-1 bg-purple-50 border border-purple-200 rounded-xl p-4 text-purple-800 font-semibold outline-none focus:ring-2 focus:ring-purple-500"
+                          className="w-full sm:flex-1 bg-purple-50 border border-purple-200 rounded-xl p-4 text-purple-800 font-semibold outline-none focus:ring-2 focus:ring-purple-500"
                           placeholder="0,00"
                         />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const val = parseFloat(pendingDonation);
-                            if (val > 0) {
-                              setNewProcessForm((prev) => ({ ...prev, donation: val }));
-                              setPendingDonation('');
-                            }
-                          }}
-                          disabled={!pendingDonation || parseFloat(pendingDonation) <= 0}
-                          className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:bg-purple-300 text-white font-bold text-sm whitespace-nowrap"
-                        >
-                          Adicionar
-                        </button>
-                        {newProcessForm.donation > 0 && (
+                        <div className="flex gap-2">
                           <button
                             type="button"
-                            onClick={() => { setNewProcessForm((prev) => ({ ...prev, donation: 0 })); }}
-                            className="px-3 py-2 rounded-xl bg-red-100 hover:bg-red-200 text-red-600 font-bold text-sm"
-                            title="Remover doação"
+                            onClick={() => {
+                              const val = parseFloat(pendingDonation);
+                              if (val > 0) {
+                                setNewProcessForm((prev) => ({ ...prev, donation: val * EUR_RATE }));
+                                setPendingDonation('');
+                              }
+                            }}
+                            disabled={!pendingDonation || parseFloat(pendingDonation) <= 0}
+                            className="flex-1 sm:flex-none px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:bg-purple-300 text-white font-bold text-sm whitespace-nowrap"
                           >
-                            X
+                            Adicionar
                           </button>
-                        )}
+                          {newProcessForm.donation > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => { setNewProcessForm((prev) => ({ ...prev, donation: 0 })); }}
+                              className="flex-1 sm:flex-none px-3 py-2 rounded-xl bg-red-100 hover:bg-red-200 text-red-600 font-bold text-sm whitespace-nowrap"
+                              title="Remover doação"
+                            >
+                              X
+                            </button>
+                          )}
+                        </div>
                       </div>
                       {newProcessForm.donation > 0 && (
                         <p className="text-xs text-purple-600 font-semibold mt-1">Doação de {formatEuro(newProcessForm.donation)} confirmada.</p>
