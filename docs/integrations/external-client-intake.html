@@ -17,12 +17,19 @@
 
     <div>
       <label>Senha</label>
-      <input type="password" name="password" required minlength="8" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;" />
+      <input type="password" id="passwordField" name="password" required style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;" />
+      <ul id="passwordRules" style="list-style:none;padding:4px 0 0;margin:4px 0 0;font-size:12px;color:#64748b;">
+        <li id="ruleLength">✗ Mínimo 8 caracteres</li>
+        <li id="ruleUpper">✗ Uma letra maiúscula</li>
+        <li id="ruleNumber">✗ Um número</li>
+        <li id="ruleSpecial">✗ Um caractere especial (!@#$%^&*(),.?":{}|&lt;&gt;)</li>
+      </ul>
     </div>
 
     <div>
       <label>Confirmar senha</label>
-      <input type="password" name="confirmPassword" required minlength="8" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;" />
+      <input type="password" id="confirmPasswordField" name="confirmPassword" required style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;" />
+      <p id="confirmMatch" style="margin:4px 0 0;font-size:12px;color:#64748b;"></p>
     </div>
 
     <div>
@@ -114,14 +121,63 @@
 
     const form = document.getElementById("sgiExternalForm");
     const message = document.getElementById("sgiExternalMessage");
+    const passwordField = document.getElementById("passwordField");
+    const confirmField = document.getElementById("confirmPasswordField");
+    const ruleLength = document.getElementById("ruleLength");
+    const ruleUpper = document.getElementById("ruleUpper");
+    const ruleNumber = document.getElementById("ruleNumber");
+    const ruleSpecial = document.getElementById("ruleSpecial");
+    const confirmMatch = document.getElementById("confirmMatch");
 
     const setMessage = (text, ok) => {
       message.textContent = text;
       message.style.color = ok ? "#166534" : "#b91c1c";
     };
 
+    const checkPassword = () => {
+      const val = passwordField.value;
+      const hasLength = val.length >= 8;
+      const hasUpper = /[A-Z]/.test(val);
+      const hasNumber = /[0-9]/.test(val);
+      const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(val);
+      ruleLength.textContent = (hasLength ? "\u2713" : "\u2717") + " M\u00ednimo 8 caracteres";
+      ruleLength.style.color = hasLength ? "#166534" : "#b91c1c";
+      ruleUpper.textContent = (hasUpper ? "\u2713" : "\u2717") + " Uma letra mai\u00fascula";
+      ruleUpper.style.color = hasUpper ? "#166534" : "#b91c1c";
+      ruleNumber.textContent = (hasNumber ? "\u2713" : "\u2717") + " Um n\u00famero";
+      ruleNumber.style.color = hasNumber ? "#166534" : "#b91c1c";
+      ruleSpecial.textContent = (hasSpecial ? "\u2713" : "\u2717") + " Um caractere especial (!@#$%^&*(),.?\":{}|&lt;&gt;)";
+      ruleSpecial.style.color = hasSpecial ? "#166534" : "#b91c1c";
+      return hasLength && hasUpper && hasNumber && hasSpecial;
+    };
+
+    const checkConfirm = () => {
+      if (!confirmField.value) {
+        confirmMatch.textContent = "";
+        return;
+      }
+      confirmMatch.textContent = passwordField.value === confirmField.value ? "\u2713 Senhas coincidem" : "\u2717 Senhas n\u00e3o coincidem";
+      confirmMatch.style.color = passwordField.value === confirmField.value ? "#166534" : "#b91c1c";
+    };
+
+    passwordField.addEventListener("input", function () {
+      checkPassword();
+      if (confirmField.value) checkConfirm();
+    });
+    confirmField.addEventListener("input", checkConfirm);
+
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
+
+      if (!checkPassword()) {
+        setMessage("A senha deve ter 8 caracteres, uma letra maiúscula, um caractere especial e um número.", false);
+        return;
+      }
+
+      if (passwordField.value !== confirmField.value) {
+        setMessage("As senhas não coincidem.", false);
+        return;
+      }
 
       const consentCheckboxExternal = document.getElementById("consentExternal");
       const data = new FormData(form);

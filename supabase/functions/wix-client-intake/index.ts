@@ -93,8 +93,11 @@ Deno.serve(async (request) => {
     return buildResponse(400, { success: false, error: 'Nome, e-mail e senha são obrigatórios.' });
   }
 
-  if (password.length < 8) {
-    return buildResponse(400, { success: false, error: 'A senha deve conter no mínimo 8 caracteres.' });
+  if (password.length < 8 || !/[A-Z]/.test(password) || !/[0-9]/.test(password) || !/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+    return buildResponse(400, {
+      success: false,
+      error: 'A senha deve ter 8 caracteres, uma letra maiúscula, um caractere especial e um número.',
+    });
   }
 
   if (password !== confirmPassword) {
