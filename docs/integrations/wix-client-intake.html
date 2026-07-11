@@ -153,7 +153,7 @@
 
       setMessage("Enviando cadastro...", true);
 
-      const consentCheckbox = document.getElementById("consent") as HTMLInputElement | null;
+      const consentCheckbox = document.getElementById("consent");
       const data = new FormData(form);
       const payload = {
         organizationSlug: "default",
@@ -172,7 +172,7 @@
         processTitle: data.get("processTitle") || "",
         serviceUnit: data.get("serviceUnit") || "JURÍDICO / ADVOCACIA",
         organizationRequestedName: data.get("organizationRequestedName") || "",
-        consentPrivacyPolicy: !!consentCheckbox?.checked
+        consentPrivacyPolicy: consentCheckbox ? consentCheckbox.checked : false
       };
 
       try {
