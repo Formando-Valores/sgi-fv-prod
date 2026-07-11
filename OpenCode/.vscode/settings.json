@@ -1,9 +1,0 @@
-{
-  "opencode.autoFocusTerminal": true,
-  "opencode.codeAction.severityLevels": ["error", "warning"],
-  "opencode.terminal.close-on-exit": false,
-  "opencode.keybindings": {
-    "quickLaunch": "ctrl+alt+o",
-    "newSession": "ctrl+shift+esc"
-  }
-}

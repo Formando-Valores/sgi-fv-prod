@@ -22,3 +22,30 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Credenciais
+.env
+.env.local
+
+# Build / cache
+.next/
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+__pycache__/
+
+# Outros projetos
+cardapio-inteligente/
+palpiteiros-novo/
+speech-to-text/
+Gera Pagina Shopee/
+Gera Pagina Shopee.zip
+OpenCode/
+
+# Arquivos órfãos
+orphaned_section.txt
+
+# Ferramentas externas
+.abacus.donotdelete
+
+# Supabase temp
+supabase/.temp/
