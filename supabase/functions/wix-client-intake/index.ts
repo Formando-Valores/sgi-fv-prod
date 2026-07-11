@@ -266,11 +266,6 @@ Deno.serve(async (request) => {
       unidade_atendimento: serviceUnit,
       org_nome_solicitado: organizationRequestedName || null,
       origem_canal: source,
-      consent_privacy_policy: consentPrivacyPolicy,
-      consent_service_contact: consentServiceContact,
-      consent_informative_communications: consentInformativeCommunications,
-      consent_text_version: consentTextVersion,
-      consent_captured_at: consentCapturedAt,
     };
 
     const { data: process, error: processError } = await adminClient
