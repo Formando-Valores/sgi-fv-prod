@@ -18,7 +18,7 @@
     <div>
       <label>Senha</label>
       <input type="password" id="passwordField" name="password" required style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;" />
-      <ul id="passwordRules" style="list-style:none;padding:4px 0 0;margin:4px 0 0;font-size:12px;color:#64748b;">
+      <ul id="passwordRules" style="list-style:none;padding:4px 0 0;margin:4px 0 0;font-size:12px;color:#64748b;display:none;">
         <li id="ruleLength">✗ Mínimo 8 caracteres</li>
         <li id="ruleUpper">✗ Uma letra maiúscula</li>
         <li id="ruleNumber">✗ Um número</li>
@@ -140,6 +140,8 @@
       const hasUpper = /[A-Z]/.test(val);
       const hasNumber = /[0-9]/.test(val);
       const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(val);
+      const rules = document.getElementById("passwordRules");
+      rules.style.display = val.length > 0 || passwordField === document.activeElement ? "block" : "none";
       ruleLength.textContent = (hasLength ? "\u2713" : "\u2717") + " M\u00ednimo 8 caracteres";
       ruleLength.style.color = hasLength ? "#166534" : "#b91c1c";
       ruleUpper.textContent = (hasUpper ? "\u2713" : "\u2717") + " Uma letra mai\u00fascula";
@@ -160,6 +162,13 @@
       confirmMatch.style.color = passwordField.value === confirmField.value ? "#166534" : "#b91c1c";
     };
 
+    const showRules = () => { document.getElementById("passwordRules").style.display = "block"; };
+    const hideRules = () => {
+      if (!passwordField.value) document.getElementById("passwordRules").style.display = "none";
+    };
+
+    passwordField.addEventListener("focus", function () { showRules(); checkPassword(); });
+    passwordField.addEventListener("blur", hideRules);
     passwordField.addEventListener("input", function () {
       checkPassword();
       if (confirmField.value) checkConfirm();
