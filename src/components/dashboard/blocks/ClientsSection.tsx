@@ -299,7 +299,7 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
 
     const { data: profileData, error } = await supabase
       .from('profiles')
-      .select('nome_completo,nome,email,phone,documento_identidade,nif_cpf,endereco,pais,estado_civil')
+      .select('nome_completo,email,phone,documento_identidade,nif_cpf,endereco,pais,estado_civil')
       .eq('id', client.user_id)
       .maybeSingle();
 
@@ -311,7 +311,7 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
     if (!profileData) return;
 
     setEditClientForm({
-      fullName: sanitizeDisplayValue(profileData.nome_completo) || sanitizeDisplayValue(profileData.nome) || baseForm.fullName,
+      fullName: sanitizeDisplayValue(profileData.nome_completo) || baseForm.fullName,
       email: sanitizeDisplayValue(profileData.email) || baseForm.email,
       phone: sanitizeDisplayValue(profileData.phone),
       documentId: sanitizeDisplayValue(profileData.documento_identidade),

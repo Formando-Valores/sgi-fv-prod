@@ -196,6 +196,14 @@ Deno.serve(async (request) => {
       }
 
       userId = existingProfile.id;
+
+      const { error: updatePwdError } = await adminClient.auth.admin.updateUserById(
+        userId,
+        { password }
+      );
+      if (updatePwdError) {
+        console.error('Falha ao atualizar senha do usuário existente:', updatePwdError.message);
+      }
     } else {
       userId = createdUser.user?.id ?? null;
     }
