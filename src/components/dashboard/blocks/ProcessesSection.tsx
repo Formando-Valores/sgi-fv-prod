@@ -872,30 +872,32 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                   <div>
                     <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Tipo</label>
                     <select
-                      value={newProcessForm.serviceUnit}
+                      value={newProcessForm.serviceUnit ?? ''}
                       onChange={(event) => {
-                        const unit = event.target.value as ServiceUnit;
+                        const value = event.target.value;
                         setNewProcessForm((prev) => ({
                           ...prev,
-                          serviceUnit: unit,
-                          selectedServiceIds: [],
-                          osValue: undefined,
+                          serviceUnit: value || null,
                         }));
                         setAdminServiceSearch('');
                         setAdminExpandedGroups({});
                       }}
                       className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                     >
-                      <option value="">Selecione o tipo...</option>
+                      <option value="">Todos os tipos</option>
                       <option value={ServiceUnit.ADMINISTRATIVO}>Administrativo</option>
                       <option value={ServiceUnit.JURIDICO}>Jurídico / Advocacia</option>
                       <option value={ServiceUnit.TECNOLOGICO}>Tecnológico / AI</option>
                     </select>
                   </div>
 
-                  {newProcessForm.serviceUnit && (
+                  {(() => {
+                    const displayUnits = newProcessForm.serviceUnit
+                      ? [newProcessForm.serviceUnit]
+                      : [...new Set(adminCatalog.map(s => s.unit))];
+                    return (
                     <div className="md:col-span-2">
-                      <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Serviços <span className="font-normal normal-case text-gray-400">(selecione abaixo o serviço a contratar)</span></label>
+                      <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Serviços <span className="font-normal normal-case text-gray-400">(selecione abaixo os serviços a contratar)</span></label>
                       <div className="relative mb-3">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                         <input
@@ -906,87 +908,97 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                           className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-gray-800 text-sm font-bold placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 outline-none"
                         />
                       </div>
-                      <div className="space-y-2 max-h-80 overflow-y-auto">
-                        {filterGroupsByUnit(adminCatalog, newProcessForm.serviceUnit).map((group) => {
-                          const services = filterServicesByGroup(adminCatalog, newProcessForm.serviceUnit, group);
-                          const filtered = adminServiceSearch
-                            ? services.filter((s) => s.name.toLowerCase().includes(adminServiceSearch.toLowerCase()))
-                            : services;
-                          if (filtered.length === 0) return null;
-                          const isCollapsed = !adminExpandedGroups[group];
-                          return (
-                            <div key={group} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                              <button
-                                type="button"
-                                onClick={() => setAdminExpandedGroups((prev) => {
-                                  if (prev[group]) { const { [group]: _, ...rest } = prev; return rest; }
-                                  return { ...prev, [group]: true };
-                                })}
-                                className="flex items-center justify-between w-full px-4 py-3 text-xs font-black uppercase tracking-wider text-gray-500 hover:text-gray-700 transition-colors"
-                              >
-                                {group}
-                                <ChevronDown className={`w-4 h-4 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
-                              </button>
-                              {!isCollapsed && (
-                                <div className="px-3 pb-3 space-y-2">
-                                  {filtered.map((svc) => {
-                                    const selected = (newProcessForm.selectedServiceIds ?? []).includes(svc.id);
-                                    return (
-                                      <label
-                                        key={svc.id}
-                                        className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors border ${
-                                          selected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300'
-                                        }`}
-                                      >
-                                        <div className="flex items-center gap-3">
-                                          <input
-                                            type="checkbox"
-                                            checked={selected}
-                                            onChange={() => {
-                                              setNewProcessForm((prev) => {
-                                                const ids = prev.selectedServiceIds ?? [];
-                                                const next = selected ? ids.filter((i: string) => i !== svc.id) : [...ids, svc.id];
-                                                const svcTotal = next.reduce((sum: number, id: string) => {
-                                                  const s = filterServicesByUnit(adminCatalog, prev.serviceUnit!).find((x) => x.id === id);
-                                                  return sum + (s?.price ?? 0);
-                                                }, 0);
-                                                return { ...prev, selectedServiceIds: next, osValue: svcTotal > 0 ? svcTotal : undefined };
-                                              });
-                                            }}
-                                            className="w-4 h-4 accent-blue-600"
-                                          />
-                                          <div>
-                                            <p className="text-sm font-bold text-gray-800">{svc.name}</p>
-                                            <p className="text-xs text-gray-500">{svc.description}</p>
-                                          </div>
-                                        </div>
-                                        <span className="text-sm font-black text-emerald-600">{formatEuro(svc.price)}</span>
-                                      </label>
-                                    );
-                                  })}
+                      <div className="space-y-3 max-h-80 overflow-y-auto">
+                        {displayUnits.map((unit) => (
+                          <div key={unit}>
+                            {newProcessForm.serviceUnit === null && (
+                              <h4 className="text-xs font-black uppercase tracking-wider text-gray-500 mb-1 px-1">{unit}</h4>
+                            )}
+                            <div className="space-y-2">
+                            {filterGroupsByUnit(adminCatalog, unit).map((group) => {
+                              const services = filterServicesByGroup(adminCatalog, unit, group);
+                              const filtered = adminServiceSearch
+                                ? services.filter((s) => s.name.toLowerCase().includes(adminServiceSearch.toLowerCase()))
+                                : services;
+                              if (filtered.length === 0) return null;
+                              const groupKey = `${unit}|${group}`;
+                              const isCollapsed = !adminExpandedGroups[groupKey];
+                              return (
+                                <div key={groupKey} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                                  <button
+                                    type="button"
+                                    onClick={() => setAdminExpandedGroups((prev) => {
+                                      if (prev[groupKey]) { const { [groupKey]: _, ...rest } = prev; return rest; }
+                                      return { ...prev, [groupKey]: true };
+                                    })}
+                                    className="flex items-center justify-between w-full px-4 py-3 text-xs font-black uppercase tracking-wider text-gray-500 hover:text-gray-700 transition-colors"
+                                  >
+                                    {group}
+                                    <ChevronDown className={`w-4 h-4 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
+                                  </button>
+                                  {!isCollapsed && (
+                                    <div className="px-3 pb-3 space-y-2">
+                                      {filtered.map((svc) => {
+                                        const selected = (newProcessForm.selectedServiceIds ?? []).includes(svc.id);
+                                        return (
+                                          <label
+                                            key={svc.id}
+                                            className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors border ${
+                                              selected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300'
+                                            }`}
+                                          >
+                                            <div className="flex items-center gap-3">
+                                              <input
+                                                type="checkbox"
+                                                checked={selected}
+                                                onChange={() => {
+                                                  setNewProcessForm((prev) => {
+                                                    const ids = prev.selectedServiceIds ?? [];
+                                                    const next = selected ? ids.filter((i: string) => i !== svc.id) : [...ids, svc.id];
+                                                    const svcTotal = next.reduce((sum: number, id: string) => {
+                                                      const s = adminCatalog.find((x) => x.id === id);
+                                                      return sum + (s?.price ?? 0);
+                                                    }, 0);
+                                                    return { ...prev, selectedServiceIds: next, osValue: svcTotal > 0 ? svcTotal : undefined };
+                                                  });
+                                                }}
+                                                className="w-4 h-4 accent-blue-600"
+                                              />
+                                              <div>
+                                                <p className="text-sm font-bold text-gray-800">{svc.name}</p>
+                                                <p className="text-xs text-gray-500">{svc.description}</p>
+                                              </div>
+                                            </div>
+                                            <span className="text-sm font-black text-emerald-600">{formatEuro(svc.price)}</span>
+                                          </label>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
                                 </div>
-                              )}
+                              );
+                            })}
                             </div>
-                          );
-                        })}
+                          </div>
+                        ))}
                       </div>
                     </div>
-                  )}
+                    );
+                  })()}
 
-                  {newProcessForm.serviceUnit && (newProcessForm.selectedServiceIds ?? []).length > 0 && (
+                  {(newProcessForm.selectedServiceIds ?? []).length > 0 && (
                     <div className="md:col-span-2 space-y-3">
                       <div>
                         <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Serviços Selecionados</label>
                         <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
                           {(newProcessForm.selectedServiceIds ?? []).map((id: string) => {
-                            const servicesList = filterServicesByUnit(adminCatalog, newProcessForm.serviceUnit!);
-                            const svc = servicesList.find((s) => s.id === id);
+                            const svc = adminCatalog.find((s) => s.id === id);
                             if (!svc) return null;
                             return (
                               <div key={id} className="flex items-center justify-between px-4 py-3 bg-white">
                                 <div className="min-w-0 flex-1">
                                   <p className="text-sm font-bold text-gray-800 truncate">{svc.name}</p>
-                                  <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">{svc.group}</p>
+                                  <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">{svc.group} · {svc.unit}</p>
                                 </div>
                                 <span className="text-sm font-black text-emerald-600 ml-3">{formatEuro(svc.price)}</span>
                               </div>
@@ -996,8 +1008,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                             <p className="text-sm font-black text-gray-700 uppercase">Subtotal Serviços</p>
                             <span className="text-base font-black text-emerald-700">
                               {formatEuro((newProcessForm.selectedServiceIds ?? []).reduce((sum: number, id: string) => {
-                                const servicesList = filterServicesByUnit(adminCatalog, newProcessForm.serviceUnit!);
-                                const s = servicesList.find((x) => x.id === id);
+                                const s = adminCatalog.find((x) => x.id === id);
                                 return sum + (s?.price ?? 0);
                               }, 0))}
                             </span>
@@ -1007,8 +1018,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
 
                       {(() => {
                         const svcTotal = (newProcessForm.selectedServiceIds ?? []).reduce((sum: number, id: string) => {
-                          const servicesList = filterServicesByUnit(adminCatalog, newProcessForm.serviceUnit!);
-                          const s = servicesList.find((x) => x.id === id);
+                          const s = adminCatalog.find((x) => x.id === id);
                           return sum + (s?.price ?? 0);
                         }, 0);
                         const fees = calcAssociationFees(svcTotal);
