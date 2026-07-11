@@ -1,5 +1,5 @@
 import React from 'react';
-import { Inbox, Users2, FolderKanban, MessageSquare, Calendar } from 'lucide-react';
+import { Inbox, Users2, FolderKanban, MessageSquare, Calendar, FilePlus, Clock } from 'lucide-react';
 import { ProcessStatus, type User } from '../../../../types';
 import { useNavigate } from 'react-router-dom';
 import Badge from '../../ui/Badge';
@@ -184,15 +184,71 @@ const DashboardSection: React.FC<DashboardSectionProps> = ({
     <>
       <OverviewContainer>
         {isClientScope ? (
-          <section className="mb-6 no-print">
-            <ClientProcessProgressPanel
-              serviceName={clientPrimaryProcess?.contractedServiceName || 'Nenhum serviço contratado ainda'}
-              responsibleSector={clientPrimaryProcess?.processType || 'Setor não definido'}
-              currentStatus={clientPrimaryProcess ? clientStatusLabelMap[clientPrimaryProcess.status] : 'Sem processo ativo'}
-              currentStepIndex={clientPrimaryProcess ? clientStepByStatus[clientPrimaryProcess.status] : 0}
-              history={clientJourneyLoading ? [{ id: 'loading', dateLabel: 'Carregando', message: 'Buscando histórico do processo...' }] : clientJourneyHistory}
-            />
-          </section>
+          <>
+            <section className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 no-print">
+              {[
+                {
+                  key: 'novo-processo',
+                  label: 'Novo Processo',
+                  value: dashboardProcessStats.emAndamento,
+                  helper: 'Processos em andamento',
+                  icon: FilePlus,
+                  styles: 'border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100 text-blue-700',
+                  action: () => navigate('/dashboard/processos?novo=1'),
+                  ariaLabel: 'Criar novo processo',
+                },
+                {
+                  key: 'ultimas-atividades',
+                  label: 'Últimas Atividades',
+                  value: clientJourneyHistory.length,
+                  helper: clientJourneyHistory.length > 0 ? 'Clique para acompanhar' : 'Nenhuma atividade recente',
+                  icon: Clock,
+                  styles: 'border-indigo-200 bg-gradient-to-br from-indigo-50 to-indigo-100 text-indigo-700',
+                  action: () => {
+                    document.getElementById('client-journey')?.scrollIntoView({ behavior: 'smooth' });
+                  },
+                  ariaLabel: 'Ver últimas atividades',
+                },
+                {
+                  key: 'posicao-pedidos',
+                  label: 'Posição dos seus pedidos',
+                  value: dashboardProcessRows.filter((process) => process.status === ProcessStatus.TRIAGEM || process.status === ProcessStatus.ANALISE).length,
+                  helper: 'Status de cada processo',
+                  icon: MessageSquare,
+                  styles: 'border-amber-200 bg-gradient-to-br from-amber-50 to-amber-100 text-amber-700',
+                  action: () => navigate('/dashboard/processos'),
+                  ariaLabel: 'Ver posição dos pedidos',
+                },
+              ].map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  aria-label={item.ariaLabel}
+                  onClick={item.action}
+                  className={`rounded-2xl border p-4 shadow-sm ${item.styles} min-h-[112px] text-left cursor-pointer transition outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500`}
+                >
+                  <div className="mb-3 flex items-start justify-between gap-2">
+                    <p className="text-[11px] font-black uppercase tracking-widest leading-tight">{item.label}</p>
+                    <div className="w-8 h-8 rounded-lg bg-white/60 flex items-center justify-center shrink-0">
+                      <item.icon className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <p className="text-3xl font-black leading-none">{item.value}</p>
+                  <p className="mt-1.5 text-xs font-semibold opacity-70">{item.helper}</p>
+                </button>
+              ))}
+            </section>
+
+            <section id="client-journey" className="mb-6 no-print">
+              <ClientProcessProgressPanel
+                serviceName={clientPrimaryProcess?.contractedServiceName || 'Nenhum serviço contratado ainda'}
+                responsibleSector={clientPrimaryProcess?.processType || 'Setor não definido'}
+                currentStatus={clientPrimaryProcess ? clientStatusLabelMap[clientPrimaryProcess.status] : 'Sem processo ativo'}
+                currentStepIndex={clientPrimaryProcess ? clientStepByStatus[clientPrimaryProcess.status] : 0}
+                history={clientJourneyLoading ? [{ id: 'loading', dateLabel: 'Carregando', message: 'Buscando histórico do processo...' }] : clientJourneyHistory}
+              />
+            </section>
+          </>
         ) : (
           <>
             <section className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5 no-print">
