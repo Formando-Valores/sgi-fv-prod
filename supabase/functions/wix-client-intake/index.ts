@@ -202,7 +202,10 @@ Deno.serve(async (request) => {
         { password }
       );
       if (updatePwdError) {
-        console.error('Falha ao atualizar senha do usuário existente:', updatePwdError.message);
+        return buildResponse(400, {
+          success: false,
+          error: `E-mail já cadastrado. Não foi possível atualizar a senha: ${updatePwdError.message}. Utilize a opção "Esqueci minha senha" no login.`,
+        });
       }
     } else {
       userId = createdUser.user?.id ?? null;
