@@ -71,7 +71,23 @@ const PaymentSuccess: React.FC = () => {
         .maybeSingle();
 
       if (error) throw error;
-      if (data) return data;
+      if (data) {
+        if (data.payment_status === 'paid' || data.payment_status === 'released') return data;
+
+        const { data: paymentData, error: paymentError } = await supabase
+          .from('payments')
+          .select('status, updated_at')
+          .eq('process_id', processId)
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (!paymentError && paymentData && (paymentData.status === 'paid' || paymentData.status === 'released')) {
+          return { ...data, payment_status: paymentData.status, updated_at: paymentData.updated_at };
+        }
+
+        return data;
+      }
     }
 
     if (!sessionId) return null;
@@ -184,6 +200,11 @@ const PaymentSuccess: React.FC = () => {
 
   const canRetryCheckout = status === 'failed' || status === 'expired';
 
+  const handleForceRefresh = useCallback(() => {
+    setStatus('checking');
+    setErrorMessage('');
+  }, []);
+
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-10 text-gray-900">
       <div className="mx-auto max-w-2xl rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
@@ -257,6 +278,16 @@ const PaymentSuccess: React.FC = () => {
         </div>
 
         <div className="mt-8 flex flex-wrap gap-3">
+          {(status === 'awaiting' || status === 'timeout' || status === 'not_found' || status === 'error') && (
+            <button
+              type="button"
+              onClick={handleForceRefresh}
+              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-blue-500"
+            >
+              <RefreshCcw className="h-4 w-4" />
+              Consultar novamente
+            </button>
+          )}
           {canRetryCheckout && (
             <button
               type="button"
