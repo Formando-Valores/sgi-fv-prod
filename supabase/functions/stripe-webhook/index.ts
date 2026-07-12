@@ -5,10 +5,6 @@ type ProcessRecord = {
   id: string;
   org_id: string;
   responsavel_user_id?: string | null;
-  service_id?: string | null;
-  selected_service_id?: string | null;
-  servico_id?: string | null;
-  service_reference?: string | null;
 };
 
 const corsHeaders = {
@@ -24,9 +20,6 @@ const jsonResponse = (status: number, body: Record<string, unknown>) =>
   });
 
 const hasTruthyMetadata = (value?: string | null) => Boolean(value && value.trim());
-
-const pickProcessServiceId = (process: ProcessRecord) =>
-  process.service_id ?? process.selected_service_id ?? process.servico_id ?? process.service_reference ?? null;
 
 const normalizeStripeId = (value: string | Stripe.PaymentIntent | null) => {
   if (!value) return null;
@@ -61,7 +54,7 @@ const resolveProcessUpdate = (paymentStatus: 'paid' | 'failed' | 'canceled' | 'r
 
 const validateProcessConsistency = (
   process: ProcessRecord,
-  metadata: { processId?: string; clientId?: string; serviceId?: string; orgId?: string; organizationId?: string },
+  metadata: { processId?: string; clientId?: string; orgId?: string; organizationId?: string },
 ) => {
   const metadataOrgId = metadata.orgId ?? metadata.organizationId;
   if (hasTruthyMetadata(metadataOrgId) && metadataOrgId !== process.org_id) {
@@ -71,12 +64,6 @@ const validateProcessConsistency = (
     const processClientId = process.responsavel_user_id ?? null;
     if (processClientId && processClientId !== metadata.clientId) {
       throw new Error('Inconsistência entre clientId do metadata e do processo.');
-    }
-  }
-  if (hasTruthyMetadata(metadata.serviceId)) {
-    const processServiceId = pickProcessServiceId(process);
-    if (processServiceId && processServiceId !== metadata.serviceId) {
-      throw new Error('Inconsistência entre serviceId do metadata e do processo.');
     }
   }
 };
@@ -177,7 +164,9 @@ Deno.serve(async (request) => {
       const paymentIntent = event.data.object as Stripe.PaymentIntent;
       processId = String(paymentIntent.metadata?.processId ?? '').trim();
       paymentIntentId = paymentIntent.id;
-      checkoutSessionId = String(paymentIntent.metadata?.checkoutSessionId ?? '').trim() || null;
+      checkoutSessionId = String(paymentIntent.metadata?.checkoutSessionId ?? '').trim()
+        || (paymentIntent.payment_details as Record<string, unknown> | null)?.order_reference as string | null
+        || null;
       Object.assign(metadata, paymentIntent.metadata ?? {});
     }
 
@@ -190,12 +179,34 @@ Deno.serve(async (request) => {
     }
 
     if (!processId) {
-      throw new Error('processId ausente no metadata do evento Stripe.');
+      if (paymentIntentId && checkoutSessionId) {
+        const { data: existingBySession } = await supabase
+          .from('payments')
+          .select('process_id')
+          .eq('stripe_checkout_session_id', checkoutSessionId)
+          .maybeSingle();
+        if (existingBySession?.process_id) {
+          processId = existingBySession.process_id;
+        }
+      }
+      if (paymentIntentId && !processId) {
+        const { data: existingByPi } = await supabase
+          .from('payments')
+          .select('process_id')
+          .eq('stripe_payment_intent_id', paymentIntentId)
+          .maybeSingle();
+        if (existingByPi?.process_id) {
+          processId = existingByPi.process_id;
+        }
+      }
+      if (!processId) {
+        throw new Error('processId ausente no metadata do evento Stripe.');
+      }
     }
 
     const { data: process, error: processError } = await supabase
       .from('processes')
-      .select('id, org_id, responsavel_user_id, service_id, selected_service_id, servico_id, service_reference')
+      .select('id, org_id, responsavel_user_id')
       .eq('id', processId)
       .single();
 
@@ -206,7 +217,6 @@ Deno.serve(async (request) => {
     validateProcessConsistency(process, {
       processId,
       clientId: metadata.clientId,
-      serviceId: metadata.serviceId,
       orgId: metadata.orgId,
       organizationId: metadata.organizationId,
     });
