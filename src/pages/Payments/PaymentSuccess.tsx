@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2, CheckCircle2, AlertCircle, RefreshCcw } from 'lucide-react';
 import { supabase } from '../../../supabase';
 import { SUPABASE_EDGE_FUNCTIONS } from '../../lib/supabaseFunctions';
@@ -18,11 +18,13 @@ const POLL_INTERVAL_MS = 4000;
 const POLL_TIMEOUT_MS = 90000;
 
 const PaymentSuccess: React.FC = () => {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [status, setStatus] = useState<PollState>('checking');
   const [snapshot, setSnapshot] = useState<ProcessPaymentSnapshot | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [retryingCheckout, setRetryingCheckout] = useState(false);
+  const [redirectCountdown, setRedirectCountdown] = useState(0);
 
   const sessionId = useMemo(() => {
     return searchParams.get('session_id') || searchParams.get('sessionId') || '';
@@ -161,6 +163,25 @@ const PaymentSuccess: React.FC = () => {
     };
   }, [fetchProcessSnapshot, mapPollState]);
 
+  useEffect(() => {
+    if (status !== 'confirmed') {
+      setRedirectCountdown(0);
+      return;
+    }
+    setRedirectCountdown(10);
+    const timer = setInterval(() => {
+      setRedirectCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          navigate('/dashboard/processos');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [status, navigate]);
+
   const canRetryCheckout = status === 'failed' || status === 'expired';
 
   return (
@@ -183,9 +204,12 @@ const PaymentSuccess: React.FC = () => {
           )}
 
           {status === 'confirmed' && (
-            <div className="flex items-center gap-3 text-emerald-700">
-              <CheckCircle2 className="h-5 w-5" />
-              <span className="text-sm font-semibold">Pagamento confirmado. Seu processo seguirá o fluxo normal.</span>
+            <div className="space-y-2">
+              <div className="flex items-center gap-3 text-emerald-700">
+                <CheckCircle2 className="h-5 w-5" />
+                <span className="text-sm font-semibold">Pagamento confirmado. Seu processo seguirá o fluxo normal.</span>
+              </div>
+              <p className="text-xs text-gray-500 ml-8">Redirecionando para lista de processos em {redirectCountdown}s...</p>
             </div>
           )}
 

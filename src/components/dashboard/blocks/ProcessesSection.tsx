@@ -11,6 +11,7 @@ import { useToast } from '../../../contexts/ToastContext';
 import { createCheckoutSession } from '../../../lib/stripe';
 import Card from '../../ui/Card';
 import Badge from '../../ui/Badge';
+import { CardSkeleton } from '../../ui/Skeleton';
 
 interface AdminProcessRow extends User {
   processRecordId?: string;
@@ -97,6 +98,7 @@ interface ProcessesSectionProps {
   newAdminOrgId: string;
   currentSection: string;
   locationSearch: string;
+  initialProcessesLoaded: boolean;
   ProcessesContainer: React.ComponentType<{ children: React.ReactNode }>;
 }
 
@@ -116,6 +118,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
   newAdminOrgId,
   currentSection,
   locationSearch,
+  initialProcessesLoaded,
   ProcessesContainer,
 }) => {
   const { showToast } = useToast();
@@ -674,7 +677,9 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
           </div>
 
           <div className="p-4 sm:p-6 space-y-4 bg-gray-50/70">
-            {visibleProcessRows.length === 0 ? (
+            {!initialProcessesLoaded && visibleProcessRows.length === 0 ? (
+              <CardSkeleton count={3} />
+            ) : visibleProcessRows.length === 0 ? (
               <div className="rounded-xl border border-gray-200 bg-white px-4 py-10 text-center">
                 <SearchX className="w-8 h-8 text-gray-300 mx-auto mb-3" />
                 <p className="text-sm font-bold text-gray-500">Nenhum resultado encontrado</p>

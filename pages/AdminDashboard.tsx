@@ -188,6 +188,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
   const [dbProcesses, setDbProcesses] = useState<DbProcess[]>([]);
   const [profileMap, setProfileMap] = useState<Map<string, Record<string, unknown>>>(new Map());
+  const [initialProcessesLoaded, setInitialProcessesLoaded] = useState(false);
   const [editingProfileForm, setEditingProfileForm] = useState({
     fullName: '',
     email: '',
@@ -340,6 +341,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       listProcesses(orgId).then(async (processes) => {
         const typed = processes as DbProcess[];
         setDbProcesses(typed);
+        setInitialProcessesLoaded(true);
         const userIds: string[] = [];
         const seen = new Set<string>();
         for (const p of typed) {
@@ -477,11 +479,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     return 'Cadastro';
   };
 
-  const fallbackUsersForRows = isClientScope
-    ? users.filter((user) => user.id === currentUser.id)
-    : users;
-
-  const baseProcessRows: AdminProcessRow[] = (dbProcesses.length > 0 ? dbProcesses.map((process) => {
+  const baseProcessRows: AdminProcessRow[] = dbProcesses.map((process) => {
       const unit = inferServiceUnit(process);
       const legacyStatus = mapDatabaseStatusToLegacy(process.status);
       const source = sanitizeDisplayValue(process.origem_canal);
@@ -555,24 +553,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         servicesSelected: (process.services_selected as AdminProcessRow['servicesSelected']) ?? null,
         associationFees: (process.association_fees as AdminProcessRow['associationFees']) ?? null,
       };
-    }) : fallbackUsersForRows.map((user) => {
-      const generatedValue = user.unit === ServiceUnit.ADMINISTRATIVO ? 5200 : 1800;
-      return {
-        ...user,
-        processRecordId: undefined,
-        profileUserId: user.id,
-        processType: user.unit === ServiceUnit.ADMINISTRATIVO ? 'Administrativo' : 'Jurídico',
-        startDate: user.registrationDate,
-        deadlineDate: user.deadline || '12/03/2026',
-        etapaAtual: user.status === ProcessStatus.CONCLUIDO ? 'Finalizado' : 'Documentos',
-        financeiro: user.status === ProcessStatus.CONCLUIDO ? 'Quitado' : 'Pendente',
-        prioridade: user.status === ProcessStatus.CONCLUIDO ? 'Média' : 'Baixa',
-        valor: generatedValue,
-        sourceLabel: 'PAINEL',
-        requestedOrganizationName: user.organizationName || 'Não informado',
-        contractedServiceName: user.unit === ServiceUnit.ADMINISTRATIVO ? 'Serviço administrativo' : 'Serviço jurídico',
-      };
-    })) as AdminProcessRow[];
+    }) as AdminProcessRow[];
 
   const clientPrimaryProcess: AdminProcessRow | null = isClientScope ? (baseProcessRows[0] ?? null) : null;
 
@@ -1390,6 +1371,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         newAdminOrgId={organizations[0]?.id || ''}
         currentSection={currentSection}
         locationSearch={location.search}
+        initialProcessesLoaded={initialProcessesLoaded}
         ProcessesContainer={ProcessesContainer}
       />
       )}
