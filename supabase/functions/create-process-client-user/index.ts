@@ -12,6 +12,14 @@ const jsonResponse = (status: number, body: Record<string, unknown>) =>
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 
+const escapeHtml = (value: string) =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -40,6 +48,7 @@ Deno.serve(async (request) => {
 
     let userId: string;
     let isNewUser = false;
+    let password = '';
 
     const { data: existingProfile } = await adminClient
       .from('profiles')
@@ -51,7 +60,7 @@ Deno.serve(async (request) => {
       userId = existingProfile.id;
     } else {
       isNewUser = true;
-      const password = crypto.randomUUID().slice(0, 12) + 'Aa1!';
+      password = crypto.randomUUID().slice(0, 12) + 'Aa1!';
 
       const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
         email,
@@ -105,46 +114,80 @@ Deno.serve(async (request) => {
       if (memberError) {
         return jsonResponse(400, { error: `Erro ao vincular cliente à organização: ${memberError.message}` });
       }
+    }
 
-      const { error: updateError } = await adminClient
-        .from('processes')
-        .update({ cliente_user_id: userId })
-        .eq('id', processId);
+    // Always link user to process
+    const { error: updateError } = await adminClient
+      .from('processes')
+      .update({ cliente_user_id: userId })
+      .eq('id', processId);
 
-      if (updateError) {
-        console.warn('[create-process-client-user] erro ao vincular cliente ao processo:', updateError.message);
+    if (updateError) {
+      console.warn('[create-process-client-user] erro ao vincular cliente ao processo:', updateError.message);
+    }
+
+    // Send email: credentials for new users, notification for existing
+    const appUrl = Deno.env.get('APP_URL') ?? Deno.env.get('SITE_URL') ?? 'https://sgi-fv-prod.vercel.app';
+    const resendApiKey = Deno.env.get('RESEND_API_KEY') ?? Deno.env.get('ACCESS_EMAIL_API_KEY') ?? '';
+    const fromEmail = Deno.env.get('FROM_EMAIL') ?? Deno.env.get('ACCESS_EMAIL_FROM') ?? '';
+
+    if (resendApiKey && fromEmail) {
+      const loginUrl = `${appUrl}/#/login`;
+      const recipientName = name?.trim() || 'cliente';
+
+      let subject: string;
+      let bodyLines: string[];
+
+      if (isNewUser) {
+        subject = 'Bem-vindo ao SIGA-FV - Dados de acesso';
+        bodyLines = [
+          `Olá, ${recipientName},`,
+          '',
+          'Você foi cadastrado no sistema SIGA-FV como CLIENTE.',
+          '',
+          'Para acessar o sistema e acompanhar seu processo, utilize os dados abaixo:',
+          '',
+          `Login: ${email}`,
+          `Senha provisória: ${password}`,
+          '',
+          'Acesse o sistema:',
+          loginUrl,
+          '',
+          '⚠️ Por segurança, altere sua senha no primeiro acesso.',
+        ];
+      } else {
+        subject = 'Novo processo aberto em seu nome - SIGA-FV';
+        bodyLines = [
+          `Olá, ${recipientName},`,
+          '',
+          'Um novo processo administrativo foi aberto em seu nome no sistema SIGA-FV.',
+          '',
+          'Acesse o sistema para acompanhar o andamento:',
+          loginUrl,
+          '',
+          'Caso tenha dúvidas, entre em contato com o administrador da organização.',
+        ];
       }
 
-      const appUrl = Deno.env.get('APP_URL') ?? Deno.env.get('SITE_URL') ?? 'https://sgi-fv-prod.vercel.app';
-      const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+      const html = `<div style="font-family:Arial,sans-serif;line-height:1.7;color:#0f172a;white-space:pre-line;">${bodyLines.map(l => escapeHtml(l)).join('\n')}</div>`;
 
-      if (supabaseAnonKey) {
-        try {
-          const emailResponse = await fetch(
-            `${supabaseUrl}/functions/v1/send-access-credentials`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                apikey: supabaseAnonKey,
-              },
-              body: JSON.stringify({
-                email,
-                fullName: name,
-                source: 'cadastro_processo',
-                profile: 'CLIENTE',
-                temporaryPassword: password,
-                loginUrl: `${appUrl}/#/login`,
-              }),
-            }
-          );
-          if (!emailResponse.ok) {
-            const emailBody = await emailResponse.text();
-            console.error('[create-process-client-user] erro ao enviar email:', emailResponse.status, emailBody);
-          }
-        } catch (e) {
-          console.error('[create-process-client-user] erro ao enviar email de credenciais:', e);
-        }
+      try {
+        await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${resendApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: `Formando Valores <${fromEmail}>`,
+            to: [email],
+            subject,
+            html,
+            text: bodyLines.join('\n'),
+          }),
+        });
+      } catch (e) {
+        console.error('[create-process-client-user] erro ao enviar email:', e);
       }
     }
 
