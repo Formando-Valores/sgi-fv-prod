@@ -1216,12 +1216,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         { body: { processId } }
       );
       if (response.error) {
-        alert(`Erro ao reenviar certificado: ${response.error.message || 'desconhecido'}`);
+        const detail = response.error.context ? JSON.stringify(response.error.context) : (response.error.message || 'desconhecido');
+        alert(`Erro ao reenviar certificado: ${detail}`);
       } else {
         alert('Certificado reenviado por e-mail com sucesso!');
       }
     } catch (err: any) {
-      alert(`Erro ao reenviar certificado: ${err?.message || 'desconhecido'}`);
+      const detail = err?.context ? JSON.stringify(err.context) : (err?.message || 'desconhecido');
+      alert(`Erro ao reenviar certificado: ${detail}`);
     } finally {
       setResendingCertificate(false);
     }
