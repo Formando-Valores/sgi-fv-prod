@@ -211,11 +211,6 @@ const PaymentSuccess: React.FC = () => {
         <h1 className="text-2xl font-black tracking-tight">Retorno de pagamento</h1>
         <p className="mt-2 text-sm text-gray-600">Seu checkout foi finalizado. Estamos sincronizando o status oficial.</p>
 
-        <div className="mt-6 rounded-xl border border-blue-200 bg-blue-50 p-4">
-          <p className="text-sm font-bold text-blue-800">Monitoramento ativo</p>
-          <p className="mt-1 text-sm text-blue-700">A liberação administrativa acontece no backend, mesmo se você fechar esta página.</p>
-        </div>
-
         <div className="mt-6 rounded-xl border border-gray-200 bg-gray-50 p-4">
           {(status === 'checking' || status === 'awaiting') && (
             <div className="flex items-center gap-3 text-gray-700">
