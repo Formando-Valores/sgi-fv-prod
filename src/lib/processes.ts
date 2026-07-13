@@ -263,6 +263,7 @@ export interface Process {
   cliente_nome: string | null;
   cliente_documento: string | null;
   cliente_contato: string | null;
+  cliente_email?: string | null;
   responsavel_user_id: string | null;
   data_prazo?: string | null;
   usage_deadline_at?: string | null;

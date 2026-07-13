@@ -40,6 +40,7 @@ interface NewProcessFormState {
   clientName: string;
   clientDocument: string;
   clientContact: string;
+  clientEmail: string;
   serviceUnit: ServiceUnit | null;
   selectedServiceIds: string[];
   osValue: number | undefined;
@@ -53,7 +54,7 @@ const statusBadgeVariant = (status: ProcessStatus): 'success' | 'warning' | 'dan
   return 'neutral';
 };
 
-const PROCESS_SELECT_BASE_COLUMNS = 'id,org_id,titulo,protocolo,status,cliente_nome,cliente_documento,cliente_contato,responsavel_user_id,created_at,updated_at,origem_canal,unidade_atendimento,org_nome_solicitado,payment_status,process_status,os_value,services_selected,association_fees';
+const PROCESS_SELECT_BASE_COLUMNS = 'id,org_id,titulo,protocolo,status,cliente_nome,cliente_documento,cliente_contato,cliente_email,responsavel_user_id,created_at,updated_at,origem_canal,unidade_atendimento,org_nome_solicitado,payment_status,process_status,os_value,services_selected,association_fees';
 
 const normalizeProcessOptionalFields = (process: Partial<DbProcess>): DbProcess => ({
   ...(process as DbProcess),
@@ -142,6 +143,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
     clientName: '',
     clientDocument: '',
     clientContact: '',
+    clientEmail: '',
     serviceUnit: null,
     selectedServiceIds: [],
     osValue: undefined,
@@ -198,6 +200,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
       clientName: '',
       clientDocument: '',
       clientContact: '',
+      clientEmail: '',
       serviceUnit: null,
       selectedServiceIds: [],
       osValue: undefined,
@@ -392,6 +395,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
       cliente_nome: sanitizeDisplayValue(newProcessForm.clientName),
       cliente_documento: sanitizeDisplayValue(newProcessForm.clientDocument) || null,
       cliente_contato: sanitizeDisplayValue(newProcessForm.clientContact) || null,
+      cliente_email: sanitizeDisplayValue(newProcessForm.clientEmail) || null,
       responsavel_user_id: currentUser.id,
       origem_canal: 'painel',
       unidade_atendimento: newProcessForm.serviceUnit,
@@ -440,6 +444,29 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
     });
 
     setDbProcesses((prev) => [normalizeProcessOptionalFields(processToAdd as DbProcess), ...prev]);
+
+    const clientEmail = sanitizeDisplayValue(newProcessForm.clientEmail);
+    if (clientEmail) {
+      try {
+        const supabaseUrl = String(import.meta.env.VITE_SUPABASE_URL ?? '').trim();
+        const anonKey = String(import.meta.env.VITE_SUPABASE_ANON_KEY ?? '').trim();
+        await fetch(`${supabaseUrl}/functions/v1/create-process-client-user`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', apikey: anonKey, Authorization: `Bearer ${anonKey}` },
+          body: JSON.stringify({
+            email: clientEmail,
+            name: sanitizeDisplayValue(newProcessForm.clientName),
+            document: sanitizeDisplayValue(newProcessForm.clientDocument) || null,
+            contact: sanitizeDisplayValue(newProcessForm.clientContact) || null,
+            processId: createdProcess.id,
+            orgId: selectedOrganization.id,
+          }),
+        });
+      } catch {
+        console.warn('[processes] falha ao criar usuário automático para o email:', clientEmail);
+      }
+    }
+
     showToast({ type: 'success', message: 'Processo criado com sucesso e adicionado à lista.' });
     setCreatingProcess(false);
     setCreatedProcessInfo({
@@ -871,6 +898,17 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                       onChange={(event) => setNewProcessForm((prev) => ({ ...prev, clientContact: event.target.value }))}
                       className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="E-mail, telefone ou WhatsApp"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Email do Cliente</label>
+                    <input
+                      type="email"
+                      value={newProcessForm.clientEmail}
+                      onChange={(event) => setNewProcessForm((prev) => ({ ...prev, clientEmail: event.target.value }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="cliente@exemplo.com"
                     />
                   </div>
 
