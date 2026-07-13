@@ -205,6 +205,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [editingProfileLoading, setEditingProfileLoading] = useState(false);
   const [editingProfileError, setEditingProfileError] = useState('');
   const [editingProfileSaving, setEditingProfileSaving] = useState(false);
+  const [formChanged, setFormChanged] = useState(false);
   const [processChecklist, setProcessChecklist] = useState<ProcessChecklistItem[]>([]);
   const [newChecklistText, setNewChecklistText] = useState('');
   const [editingChecklistItemId, setEditingChecklistItemId] = useState<string | null>(null);
@@ -614,8 +615,27 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
   useEffect(() => {
     if (!editingUser) return;
+    setFormChanged(false);
     void hydrateEditingProfileForm(editingUser);
   }, [editingUser]);
+
+  const handleCloseEditModal = () => {
+    if (formChanged) {
+      const confirmed = window.confirm('Você tem alterações não salvas. Deseja realmente sair?');
+      if (!confirmed) return;
+    }
+    setEditingUser(null);
+  };
+
+  useEffect(() => {
+    if (!formChanged || !editingUser) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [formChanged, editingUser]);
 
   useEffect(() => {
     const processId = getEditingProcessRecordId(editingUser);
@@ -1152,6 +1172,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     ));
 
     if (!processUpdateError && !profileUpdateError) {
+      setFormChanged(false);
       setEditingProfileSaving(false);
       setEditingUser(null);
       return;
@@ -1216,13 +1237,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         { body: { processId } }
       );
       if (response.error) {
-        const detail = response.error.context ? JSON.stringify(response.error.context) : (response.error.message || 'desconhecido');
+        let detail = response.error.message || 'desconhecido';
+        if (response.response) {
+          try {
+            const text = await response.response.clone().text();
+            detail = text || detail;
+          } catch {}
+        }
         alert(`Erro ao reenviar certificado: ${detail}`);
       } else {
         alert('Certificado reenviado por e-mail com sucesso!');
       }
     } catch (err: any) {
-      const detail = err?.context ? JSON.stringify(err.context) : (err?.message || 'desconhecido');
+      const detail = err?.message || 'desconhecido';
       alert(`Erro ao reenviar certificado: ${detail}`);
     } finally {
       setResendingCertificate(false);
@@ -1939,7 +1966,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           <div className="bg-white w-full max-w-3xl rounded-3xl border border-gray-100 shadow-2xl overflow-hidden animate-scaleIn">
              <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
                <h3 className="text-xl font-black uppercase">Editar Status: {editingUser.protocol}</h3>
-               <button onClick={() => setEditingUser(null)} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full">
+               <button type="button" onClick={handleCloseEditModal} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full">
                  <X className="w-5 h-5" />
                </button>
              </div>
@@ -1959,7 +1986,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <label className="text-[10px] font-black text-gray-500 uppercase mb-2 block">Alterar Status do Processo</label>
-                        <select name="status" defaultValue={editingUser.status} className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none ring-blue-500 focus:ring-2">
+                        <select name="status" defaultValue={editingUser.status} onChange={() => setFormChanged(true)} className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none ring-blue-500 focus:ring-2">
                           {Object.values(ProcessStatus).map(s => (
                             <option key={s} value={s}>{s}</option>
                           ))}
@@ -1969,7 +1996,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                         <label className="text-[10px] font-black text-gray-500 uppercase mb-2 block flex items-center gap-2">
                           <UserCheck className="w-3 h-3" /> Gestor do Serviço
                         </label>
-                        <select name="serviceManager" defaultValue={editingUser.serviceManager} className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none ring-blue-500 focus:ring-2">
+                        <select name="serviceManager" defaultValue={editingUser.serviceManager} onChange={() => setFormChanged(true)} className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none ring-blue-500 focus:ring-2">
                           <option value="">Selecione um gestor</option>
                           {SERVICE_MANAGERS.map(manager => (
                             <option key={manager} value={manager}>{manager}</option>
@@ -1982,13 +2009,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                       <label className="text-[10px] font-black text-gray-500 uppercase mb-2 block flex items-center gap-2">
                         <Calendar className="w-3 h-3" /> Data de Prazo
                       </label>
-                      <input name="deadline" type="date" defaultValue={editingUser.deadline} className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold" />
+                      <input name="deadline" type="date" defaultValue={editingUser.deadline} onChange={() => setFormChanged(true)} className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold" />
                     </div>
                     <div>
                       <label className="text-[10px] font-black text-gray-500 uppercase mb-2 block flex items-center gap-2">
                         <MessageSquare className="w-3 h-3" /> Nota de Observações
                       </label>
-                      <textarea name="notes" rows={4} defaultValue={editingUser.notes} className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold resize-none" placeholder="Digite as anotações do processo..."></textarea>
+                      <textarea name="notes" rows={4} defaultValue={editingUser.notes} onChange={() => setFormChanged(true)} className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold resize-none" placeholder="Digite as anotações do processo..."></textarea>
                     </div>
 
                     <div className="rounded-2xl border border-gray-200 bg-gray-50/70 p-4">
@@ -2110,8 +2137,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                           <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Nome Completo</label>
                           <input
                             type="text"
-                            value={editingProfileForm.fullName}
-                            onChange={(event) => setEditingProfileForm((prev) => ({ ...prev, fullName: event.target.value }))}
+                             value={editingProfileForm.fullName}
+                            onChange={(event) => { setEditingProfileForm((prev) => ({ ...prev, fullName: event.target.value })); setFormChanged(true); }}
                             className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
@@ -2119,8 +2146,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                           <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">E-mail</label>
                           <input
                             type="email"
-                            value={editingProfileForm.email}
-                            onChange={(event) => setEditingProfileForm((prev) => ({ ...prev, email: event.target.value }))}
+                             value={editingProfileForm.email}
+                            onChange={(event) => { setEditingProfileForm((prev) => ({ ...prev, email: event.target.value })); setFormChanged(true); }}
                             className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
@@ -2129,7 +2156,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                           <input
                             type="text"
                             value={editingProfileForm.documentId}
-                            onChange={(event) => setEditingProfileForm((prev) => ({ ...prev, documentId: event.target.value }))}
+                            onChange={(event) => { setEditingProfileForm((prev) => ({ ...prev, documentId: event.target.value })); setFormChanged(true); }}
                             className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
@@ -2138,7 +2165,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                           <input
                             type="text"
                             value={editingProfileForm.taxId}
-                            onChange={(event) => setEditingProfileForm((prev) => ({ ...prev, taxId: event.target.value }))}
+                            onChange={(event) => { setEditingProfileForm((prev) => ({ ...prev, taxId: event.target.value })); setFormChanged(true); }}
                             className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
@@ -2147,7 +2174,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                           <input
                             type="text"
                             value={editingProfileForm.phone}
-                            onChange={(event) => setEditingProfileForm((prev) => ({ ...prev, phone: event.target.value }))}
+                            onChange={(event) => { setEditingProfileForm((prev) => ({ ...prev, phone: event.target.value })); setFormChanged(true); }}
                             className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
@@ -2156,7 +2183,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                           <input
                             type="text"
                             value={editingProfileForm.maritalStatus}
-                            onChange={(event) => setEditingProfileForm((prev) => ({ ...prev, maritalStatus: event.target.value }))}
+                            onChange={(event) => { setEditingProfileForm((prev) => ({ ...prev, maritalStatus: event.target.value })); setFormChanged(true); }}
                             className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
@@ -2165,7 +2192,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                           <input
                             type="text"
                             value={editingProfileForm.country}
-                            onChange={(event) => setEditingProfileForm((prev) => ({ ...prev, country: event.target.value }))}
+                            onChange={(event) => { setEditingProfileForm((prev) => ({ ...prev, country: event.target.value })); setFormChanged(true); }}
                             className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
@@ -2174,7 +2201,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                           <input
                             type="text"
                             value={editingProfileForm.address}
-                            onChange={(event) => setEditingProfileForm((prev) => ({ ...prev, address: event.target.value }))}
+                            onChange={(event) => { setEditingProfileForm((prev) => ({ ...prev, address: event.target.value })); setFormChanged(true); }}
                             className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
