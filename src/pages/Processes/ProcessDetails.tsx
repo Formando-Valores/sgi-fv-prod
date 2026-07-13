@@ -11,7 +11,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { getProcessById, listProcessEvents, updateProcessStatus, addProcessEvent, listRequiredChecklistDocuments, listProcessAttachments, reviewProcessAttachment, type Process, type ProcessEvent, type ProcessDocumentAttachment, type ProcessDocumentChecklistItem } from '../../lib/processes';
 import { createCheckoutSession } from '../../lib/stripe';
 import { getPaymentStatusUi } from '../../lib/paymentStatus';
-import { formatEuro } from '../../lib/servicesCatalog';
+import { formatEuro, EUR_RATE } from '../../lib/servicesCatalog';
 
 const statusSteps = [
   { key: 'cadastro', label: 'CADASTRO', color: 'bg-slate-500' },
@@ -133,7 +133,7 @@ const ProcessDetails: React.FC = () => {
     setRedirectingCheckout(true);
     try {
       const session = await createCheckoutSession({
-        amount: Math.round(amount * 100),
+        amount: Math.round((amount / EUR_RATE) * 100),
         currency: 'brl',
         successUrl: `${window.location.origin}/#/payments/success?processId=${process.id}`,
         cancelUrl: `${window.location.origin}/#/payments/cancel?processId=${process.id}`,

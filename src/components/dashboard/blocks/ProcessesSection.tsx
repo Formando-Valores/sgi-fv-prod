@@ -383,7 +383,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
     const associationFees = servicesSelected && servicesSelected.length > 0 ? calcAssociationFees(servicesTotal) : [];
     const doacaoFee = newProcessForm.donation > 0 ? { type: 'doacao' as const, name: 'Doação Voluntária', price: newProcessForm.donation, destination: 'association' as const } : null;
     const allFees = doacaoFee ? [...(associationFees ?? []), doacaoFee] : associationFees;
-    const totalOsValue = hasOsValue ? newProcessForm.osValue! : (servicesTotal + newProcessForm.donation);
+    const totalOsValue = servicesTotal + newProcessForm.donation;
 
     const processPayload: Record<string, unknown> = {
       org_id: selectedOrganization.id,
@@ -415,9 +415,9 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
     }
 
     let processToAdd = createdProcess;
-    if (hasOsValue || servicesSelected || allFees.length > 0) {
+    if (servicesSelected || allFees.length > 0) {
       const updates: Record<string, unknown> = {};
-      if (hasOsValue) updates.process_status = 'aguardando_pagamento';
+      if (servicesSelected && servicesSelected.length > 0) updates.process_status = 'aguardando_pagamento';
       if (servicesSelected) updates.services_selected = servicesSelected;
       if (allFees.length > 0) updates.association_fees = allFees;
       const { data: updatedProcess } = await supabase
@@ -457,7 +457,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
     setRedirectingCheckout(true);
     try {
       const session = await createCheckoutSession({
-        amount: Math.round(createdProcessInfo.osValue * 100),
+        amount: Math.round((createdProcessInfo.osValue / EUR_RATE) * 100),
         currency: 'eur',
         successUrl: `${window.location.origin}/#/payments/success?processId=${createdProcessInfo.id}`,
         cancelUrl: `${window.location.origin}/#/payments/cancel?processId=${createdProcessInfo.id}`,
@@ -964,7 +964,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                                                       const s = adminCatalog.find((x) => x.id === id);
                                                       return sum + (s?.price ?? 0);
                                                     }, 0);
-                                                    return { ...prev, selectedServiceIds: next, osValue: svcTotal > 0 ? svcTotal : undefined };
+                                                    return { ...prev, selectedServiceIds: next };
                                                   });
                                                 }}
                                                 className="w-4 h-4 accent-blue-600"
