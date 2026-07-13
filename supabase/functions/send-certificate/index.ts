@@ -1,5 +1,4 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { Resend } from 'https://esm.sh/resend@2.0.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,7 +12,7 @@ const jsonResponse = (status: number, body: Record<string, unknown>) =>
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 
-function generateCertificateHtml(nome: string, protocolo: string, data: string, servicos: string): string {
+function generateCertificateHtml(nome: string, protocolo: string, data: string, servicos: string, appUrl: string, processId: string): string {
   return `
 <!DOCTYPE html>
 <html>
@@ -23,11 +22,6 @@ function generateCertificateHtml(nome: string, protocolo: string, data: string, 
     <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:24px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.12);">
       <tr>
         <td style="background:linear-gradient(135deg,#1e3a5f,#1e40af);padding:48px 32px;text-align:center;">
-          <table cellpadding="0" cellspacing="0" style="margin:0 auto;">
-            <tr><td align="center">
-              <div style="width:48px;height:48px;background:#34d399;border-radius:50%;display:inline-block;margin-bottom:16px;line-height:48px;font-size:24px;">&#10003;</div>
-            </td></tr>
-          </table>
           <h1 style="color:#ffffff;font-size:24px;font-weight:900;text-transform:uppercase;letter-spacing:2px;margin:0 0 4px;">Certificado de Filiação</h1>
           <p style="color:#93c5fd;font-size:13px;margin:0;">Associação Formando Valores</p>
         </td>
@@ -64,7 +58,7 @@ function generateCertificateHtml(nome: string, protocolo: string, data: string, 
       </tr>
       <tr>
         <td style="padding:0 32px 32px;text-align:center;">
-          <a href="{{APP_URL}}/#/certificate?processId={{PROCESS_ID}}"
+          <a href="${appUrl}/#/certificate?processId=${processId}"
              style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;padding:12px 32px;border-radius:12px;font-size:13px;font-weight:700;">
             Acessar Certificado Online
           </a>
@@ -143,22 +137,36 @@ Deno.serve(async (request) => {
     const protocolo = process.protocolo || 'N/A';
     const data = new Date(process.created_at).toLocaleDateString('pt-BR');
 
-    const certificateHtml = generateCertificateHtml(nome, protocolo, data, nomesServicos)
-      .replace('{{APP_URL}}', appUrl)
-      .replace('{{PROCESS_ID}}', processId);
+    const certificateHtml = generateCertificateHtml(nome, protocolo, data, nomesServicos, appUrl, processId);
+    const textBody = [
+      `Certificado de Filiação - ${nome}`,
+      '',
+      `Protocolo: ${protocolo}`,
+      `Data: ${data}`,
+      `Serviços: ${nomesServicos}`,
+      '',
+      `Acesse: ${appUrl}/#/certificate?processId=${processId}`,
+    ].join('\n');
 
-    const resend = new Resend(resendApiKey);
-
-    const { error: emailError } = await resend.emails.send({
-      from: `SGI FV <${fromEmail}>`,
-      to: userEmail,
-      subject: `Certificado de Filiação - ${nome}`,
-      html: certificateHtml,
+    const emailResponse = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${resendApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: `SGI FV <${fromEmail}>`,
+        to: [userEmail],
+        subject: `Certificado de Filiação - ${nome}`,
+        html: certificateHtml,
+        text: textBody,
+      }),
     });
 
-    if (emailError) {
-      console.error('[send-certificate] erro ao enviar email:', emailError);
-      return jsonResponse(500, { success: false, error: `Erro ao enviar email: ${emailError.message}` });
+    if (!emailResponse.ok) {
+      const errorText = await emailResponse.text();
+      console.error('[send-certificate] erro resend:', emailResponse.status, errorText);
+      return jsonResponse(500, { success: false, error: `Erro ao enviar email: ${errorText || emailResponse.statusText}` });
     }
 
     await supabase.from('process_events').insert({
