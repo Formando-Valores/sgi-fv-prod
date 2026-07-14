@@ -1229,7 +1229,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const handleResendCertificate = async () => {
     if (!selectedUser) return;
     const processId = (selectedUser as AdminProcessRow).processRecordId;
-    if (!processId) { alert('Usuário não possui um processo vinculado para reenviar certificado.'); return; }
+    if (!processId) { showToast({ type: 'error', message: 'Usuário não possui um processo vinculado para reenviar certificado.' }); return; }
     setResendingCertificate(true);
     try {
       const response = await supabase.functions.invoke(
@@ -1244,13 +1244,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
             detail = text || detail;
           } catch {}
         }
-        alert(`Erro ao reenviar certificado: ${detail}`);
+        showToast({ type: 'error', message: `Erro ao reenviar certificado: ${detail}` });
       } else {
-        alert('Certificado reenviado por e-mail com sucesso!');
+        showToast({ type: 'success', message: 'Certificado reenviado por e-mail com sucesso!' });
       }
     } catch (err: any) {
       const detail = err?.message || 'desconhecido';
-      alert(`Erro ao reenviar certificado: ${detail}`);
+      showToast({ type: 'error', message: `Erro ao reenviar certificado: ${detail}` });
     } finally {
       setResendingCertificate(false);
     }
