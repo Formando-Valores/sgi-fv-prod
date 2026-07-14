@@ -120,13 +120,26 @@ Deno.serve(async (request) => {
       return jsonResponse(404, { success: false, error: 'Processo não encontrado.' });
     }
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('nome_completo, email')
-      .eq('id', process.cliente_user_id)
-      .single();
+    let userEmail = process.cliente_email || '';
 
-    const userEmail = profile?.email || process.cliente_email || '';
+    if (process.cliente_user_id) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('nome_completo, email')
+        .eq('id', process.cliente_user_id)
+        .maybeSingle();
+      userEmail = profile?.email || userEmail;
+    }
+
+    if (!userEmail && process.cliente_nome) {
+      const { data: profileByName } = await supabase
+        .from('profiles')
+        .select('email')
+        .ilike('nome_completo', process.cliente_nome.trim())
+        .maybeSingle();
+      userEmail = profileByName?.email || '';
+    }
+
     if (!userEmail) {
       return jsonResponse(400, { success: false, error: 'E-mail do cliente não encontrado. Cadastre um e-mail no perfil do cliente ou no formulário de criação do processo.' });
     }
