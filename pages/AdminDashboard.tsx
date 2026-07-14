@@ -966,6 +966,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
   const handleUpdateStatus = async (userId: string, status: ProcessStatus, deadline?: string, notes?: string, serviceManager?: string) => {
     try {
+    window.alert('[DEBUG] handleUpdateStatus FOI CHAMADA userId=' + userId);
     const timestamp = new Date().toLocaleString('pt-BR');
     const currentEditingUser = editingUser;
     const profileUserId = sanitizeDisplayValue((currentEditingUser as AdminProcessRow | null)?.profileUserId || currentEditingUser?.id);
@@ -1185,6 +1186,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     setEditingUser(null);
     } catch (err) {
       console.error('[handleUpdateStatus]', err);
+      window.alert('[DEBUG] handleUpdateStatus CAUGHT EXCEPTION: ' + (err instanceof Error ? err.message : String(err)));
       setEditingProfileSaving(false);
     }
   };
