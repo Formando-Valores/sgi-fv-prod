@@ -422,6 +422,7 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
       );
 
       setClientEditSuccess('Cadastro do cliente atualizado com sucesso.');
+      showToast({ type: 'success', message: 'Cadastro do cliente atualizado com sucesso.' });
       setShowEditClientModal(false);
       setEditingClient(null);
       await fetchClients();
