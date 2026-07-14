@@ -394,11 +394,6 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
       return;
     }
 
-    if (!newProcessForm.serviceUnit) {
-      showToast({ type: 'error', message: 'Selecione o tipo do processo (Administrativo, Jurídico ou Tecnológico).' });
-      return;
-    }
-
     setCreatingProcess(true);
 
     const processTitle =
