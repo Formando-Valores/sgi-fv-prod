@@ -1173,16 +1173,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     ));
 
     setFormChanged(false);
-    setEditingProfileSaving(false);
-    setEditingUser(null);
 
     if (processUpdateError || profileUpdateError) {
       setEditingProfileError([processUpdateError, profileUpdateError].filter(Boolean).join(' '));
     } else {
-      setTimeout(() => {
-        showToast({ type: 'success', message: 'Dados do cliente atualizados com sucesso.' });
-      }, 50);
+      showToast({ type: 'success', message: 'Dados do cliente atualizados com sucesso.' });
     }
+
+    setEditingProfileSaving(false);
+    setEditingUser(null);
     } catch (err) {
       console.error('[handleUpdateStatus]', err);
       setEditingProfileSaving(false);
