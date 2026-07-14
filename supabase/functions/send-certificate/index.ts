@@ -112,7 +112,7 @@ Deno.serve(async (request) => {
 
     const { data: process, error: processError } = await supabase
       .from('processes')
-      .select('cliente_nome, protocolo, created_at, services_selected, cliente_user_id, org_id')
+      .select('cliente_nome, protocolo, created_at, services_selected, cliente_user_id, org_id, cliente_email')
       .eq('id', processId)
       .single();
 
@@ -126,9 +126,9 @@ Deno.serve(async (request) => {
       .eq('id', process.cliente_user_id)
       .single();
 
-    const userEmail = profile?.email || '';
+    const userEmail = profile?.email || process.cliente_email || '';
     if (!userEmail) {
-      return jsonResponse(400, { success: false, error: 'E-mail do cliente não encontrado.' });
+      return jsonResponse(400, { success: false, error: 'E-mail do cliente não encontrado. Cadastre um e-mail no perfil do cliente ou no formulário de criação do processo.' });
     }
 
     const servicos = (process.services_selected as any[]) || [];
