@@ -367,6 +367,38 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
       return;
     }
 
+    if (!sanitizeDisplayValue(newProcessForm.clientDocument)) {
+      showToast({ type: 'error', message: 'Informe o CPF (11 dígitos) ou NIF (9 dígitos) do cliente.' });
+      return;
+    }
+
+    const docDigits = newProcessForm.clientDocument.replace(/\D/g, '');
+    if (docDigits.length !== 11 && docDigits.length !== 9) {
+      showToast({ type: 'error', message: 'Documento inválido. CPF deve ter 11 dígitos, NIF deve ter 9 dígitos.' });
+      return;
+    }
+
+    if (!sanitizeDisplayValue(newProcessForm.clientContact)) {
+      showToast({ type: 'error', message: 'Informe um contato (telefone ou WhatsApp) do cliente.' });
+      return;
+    }
+
+    if (!sanitizeDisplayValue(newProcessForm.clientEmail)) {
+      showToast({ type: 'error', message: 'Informe o e-mail do cliente — ele receberá as notificações do processo.' });
+      return;
+    }
+
+    const email = sanitizeDisplayValue(newProcessForm.clientEmail) || '';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      showToast({ type: 'error', message: 'E-mail do cliente inválido. Informe um e-mail válido.' });
+      return;
+    }
+
+    if (!newProcessForm.serviceUnit) {
+      showToast({ type: 'error', message: 'Selecione o tipo do processo (Administrativo, Jurídico ou Tecnológico).' });
+      return;
+    }
+
     setCreatingProcess(true);
 
     const processTitle =
