@@ -112,7 +112,7 @@ Deno.serve(async (request) => {
 
     const { data: process, error: processError } = await supabase
       .from('processes')
-      .select('cliente_nome, protocolo, created_at, services_selected, cliente_user_id, org_id, cliente_email')
+      .select('cliente_nome, protocolo, created_at, services_selected, cliente_user_id, org_id, cliente_email, cliente_documento')
       .eq('id', processId)
       .single();
 
@@ -131,13 +131,25 @@ Deno.serve(async (request) => {
       userEmail = profile?.email || userEmail;
     }
 
-    if (!userEmail && process.cliente_nome) {
-      const { data: profileByName } = await supabase
-        .from('profiles')
-        .select('email')
-        .ilike('nome_completo', process.cliente_nome.trim())
-        .maybeSingle();
-      userEmail = profileByName?.email || '';
+    if (!userEmail) {
+      const queries: string[] = [];
+      if (process.cliente_nome) {
+        queries.push(`nome_completo.ilike.%${process.cliente_nome.trim()}%`);
+      }
+      if (process.cliente_documento) {
+        const doc = process.cliente_documento.trim();
+        queries.push(`nif_cpf.ilike.%${doc}%`);
+        queries.push(`documento_identidade.ilike.%${doc}%`);
+      }
+      if (queries.length > 0) {
+        const { data: profileFallback } = await supabase
+          .from('profiles')
+          .select('email')
+          .or(queries.join(','))
+          .limit(1)
+          .maybeSingle();
+        userEmail = profileFallback?.email || '';
+      }
     }
 
     if (!userEmail) {
