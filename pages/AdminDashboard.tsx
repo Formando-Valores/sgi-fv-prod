@@ -969,7 +969,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const timestamp = new Date().toLocaleString('pt-BR');
     const currentEditingUser = editingUser;
     const profileUserId = sanitizeDisplayValue((currentEditingUser as AdminProcessRow | null)?.profileUserId || currentEditingUser?.id);
-    const processRecordId = sanitizeDisplayValue((currentEditingUser as AdminProcessRow | null)?.processRecordId || currentEditingUser?.id);
+    const processRecordId = sanitizeDisplayValue((currentEditingUser as AdminProcessRow | null)?.processRecordId || null);
 
     const profilePayload = {
       nome_completo: sanitizeDisplayValue(editingProfileForm.fullName) || null,
