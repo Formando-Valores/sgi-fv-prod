@@ -1175,6 +1175,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       setFormChanged(false);
       setEditingProfileSaving(false);
       setEditingUser(null);
+      showToast({ type: 'success', message: 'Dados do cliente atualizados com sucesso.' });
       return;
     }
 
