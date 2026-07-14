@@ -1177,6 +1177,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     if (processUpdateError || profileUpdateError) {
       setEditingProfileError([processUpdateError, profileUpdateError].filter(Boolean).join(' '));
     } else {
+      window.alert('[DEBUG] showToast sera chamado agora');
       showToast({ type: 'success', message: 'Dados do cliente atualizados com sucesso.' });
     }
 
