@@ -1238,9 +1238,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     if (!processId) { showToast({ type: 'error', message: 'Usuário não possui um processo vinculado para reenviar certificado.' }); return; }
     setResendingCertificate(true);
     try {
+      const clientEmail = selectedUser.email !== '-' ? selectedUser.email : undefined;
       const response = await supabase.functions.invoke(
         SUPABASE_EDGE_FUNCTIONS.SEND_CERTIFICATE,
-        { body: { processId } }
+        { body: { processId, clientEmail } }
       );
       if (response.error) {
         let detail = response.error.message || 'desconhecido';

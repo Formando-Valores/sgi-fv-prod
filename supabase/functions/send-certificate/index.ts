@@ -86,7 +86,7 @@ Deno.serve(async (request) => {
   }
 
   try {
-    const { processId } = await request.json();
+    const { processId, clientEmail: bodyClientEmail } = await request.json();
 
     if (!processId) {
       return jsonResponse(400, { success: false, error: 'processId é obrigatório.' });
@@ -150,6 +150,10 @@ Deno.serve(async (request) => {
         .limit(1)
         .maybeSingle();
       userEmail = profileByName?.email || '';
+    }
+
+    if (!userEmail && bodyClientEmail) {
+      userEmail = bodyClientEmail;
     }
 
     if (!userEmail) {
