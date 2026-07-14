@@ -965,6 +965,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   };
 
   const handleUpdateStatus = async (userId: string, status: ProcessStatus, deadline?: string, notes?: string, serviceManager?: string) => {
+    try {
     const timestamp = new Date().toLocaleString('pt-BR');
     const currentEditingUser = editingUser;
     const profileUserId = sanitizeDisplayValue((currentEditingUser as AdminProcessRow | null)?.profileUserId || currentEditingUser?.id);
@@ -1171,16 +1172,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       } : u
     ));
 
-    if (!processUpdateError && !profileUpdateError) {
-      setFormChanged(false);
-      setEditingProfileSaving(false);
-      setEditingUser(null);
-      showToast({ type: 'success', message: 'Dados do cliente atualizados com sucesso.' });
-      return;
-    }
-
-    setEditingProfileError([processUpdateError, profileUpdateError].filter(Boolean).join(' '));
+    setFormChanged(false);
     setEditingProfileSaving(false);
+    setEditingUser(null);
+
+    if (processUpdateError || profileUpdateError) {
+      setEditingProfileError([processUpdateError, profileUpdateError].filter(Boolean).join(' '));
+    } else {
+      showToast({ type: 'success', message: 'Dados do cliente atualizados com sucesso.' });
+    }
+    } catch (err) {
+      console.error('[handleUpdateStatus]', err);
+      setEditingProfileSaving(false);
+    }
   };
 
 
