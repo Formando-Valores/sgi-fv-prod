@@ -1236,8 +1236,62 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     if (!selectedUser) return;
     const processId = (selectedUser as AdminProcessRow).processRecordId;
     if (!processId) { showToast({ type: 'error', message: 'Usuário não possui um processo vinculado para reenviar certificado.' }); return; }
+
     setResendingCertificate(true);
+
     try {
+      const userId = (selectedUser as AdminProcessRow).profileUserId || selectedUser.id;
+      let profileData: Record<string, string | null> = {};
+
+      if (userId) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('documento_identidade, nif_cpf, endereco, estado_civil, phone, pais')
+          .eq('id', userId)
+          .maybeSingle();
+        if (profile) profileData = profile as Record<string, string | null>;
+      }
+
+      const getVal = (key: string): string => {
+        const fromProfile = profileData[key];
+        if (fromProfile && fromProfile !== '---') return fromProfile;
+        const userVal = (selectedUser as any)[
+          key === 'documento_identidade' ? 'documentId' :
+          key === 'nif_cpf' ? 'taxId' :
+          key === 'endereco' ? 'address' :
+          key === 'estado_civil' ? 'maritalStatus' :
+          key === 'phone' ? 'phone' :
+          key === 'pais' ? 'country' : key
+        ];
+        return userVal || '';
+      };
+
+      const requiredFields = [
+        { key: 'documento_identidade', label: 'Documento de Identidade (Cartão de Cidadão)' },
+        { key: 'nif_cpf', label: 'NIF/CPF' },
+        { key: 'endereco', label: 'Endereço (Morada)' },
+        { key: 'estado_civil', label: 'Estado Civil' },
+        { key: 'phone', label: 'Telefone/WhatsApp' },
+        { key: 'pais', label: 'País' },
+      ];
+
+      const missingFields = requiredFields.filter(f => {
+        const val = getVal(f.key);
+        return !val || val === '---' || val === '-' || val === 'sem-email@nao-informado';
+      });
+
+      if (missingFields.length > 0) {
+        showToast({
+          type: 'warning',
+          message: `Cadastro do cliente incompleto. Para gerar o certificado completo, atualize: ${missingFields.map(f => f.label).join(', ')}`
+        });
+      }
+
+      if (!window.confirm('Deseja realmente gerar o certificado de filiação e enviá-lo por e-mail para o cliente?')) {
+        setResendingCertificate(false);
+        return;
+      }
+
       const clientEmail = selectedUser.email !== '-' ? selectedUser.email : undefined;
       const response = await supabase.functions.invoke(
         SUPABASE_EDGE_FUNCTIONS.SEND_CERTIFICATE,
