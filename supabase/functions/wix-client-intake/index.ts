@@ -185,31 +185,10 @@ Deno.serve(async (request) => {
         return buildResponse(400, { success: false, error: createUserError.message || 'Erro ao criar usuário.' });
       }
 
-      const { data: existingProfile, error: existingProfileError } = await adminClient
-        .from('profiles')
-        .select('id')
-        .eq('email', email)
-        .maybeSingle();
-
-      if (existingProfileError || !existingProfile?.id) {
-        return buildResponse(400, {
-          success: false,
-          error: 'E-mail já cadastrado e não foi possível localizar o perfil para vincular o processo.',
-        });
-      }
-
-      userId = existingProfile.id;
-
-      const { error: updatePwdError } = await adminClient.auth.admin.updateUserById(
-        userId,
-        { password }
-      );
-      if (updatePwdError) {
-        return buildResponse(400, {
-          success: false,
-          error: `E-mail já cadastrado. Não foi possível atualizar a senha: ${updatePwdError.message}. Utilize a opção "Esqueci minha senha" no login.`,
-        });
-      }
+      return buildResponse(400, {
+        success: false,
+        error: `O e-mail ${email} já está cadastrado no sistema. Cada cliente deve ter um e-mail único. Utilize um e-mail diferente para este cadastro.`,
+      });
     } else {
       userId = createdUser.user?.id ?? null;
     }
