@@ -515,7 +515,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       return {
         id: process.id,
         processRecordId: process.id,
-        profileUserId: process.responsavel_user_id,
+        profileUserId: process.cliente_user_id,
         name: sanitizeDisplayValue(process.cliente_nome) || sanitizeDisplayValue(process.titulo) || 'Solicitação sem nome',
         email: pEmail || email || '-',
         role: UserRole.CLIENT,
@@ -566,7 +566,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const hydrateEditingProfileForm = async (user: AdminProcessRow | User | null) => {
     if (!user) return;
 
-    const profileUserId = sanitizeDisplayValue((user as AdminProcessRow).profileUserId || user.id);
+    const isProcessRow = 'processRecordId' in (user || {});
+    const profileUserId = sanitizeDisplayValue(
+      isProcessRow
+        ? (user as AdminProcessRow).profileUserId
+        : user.id
+    );
     const fallbackForm = {
       fullName: sanitizeDisplayValue(user.name),
       email: sanitizeDisplayValue(user.email === '-' ? '' : user.email),
@@ -968,7 +973,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     try {
     const timestamp = new Date().toLocaleString('pt-BR');
     const currentEditingUser = editingUser;
-    const profileUserId = sanitizeDisplayValue((currentEditingUser as AdminProcessRow | null)?.profileUserId || currentEditingUser?.id);
+    const isProcessRow = 'processRecordId' in (currentEditingUser || {});
+    const profileUserId = sanitizeDisplayValue(
+      isProcessRow
+        ? (currentEditingUser as AdminProcessRow | null)?.profileUserId
+        : currentEditingUser?.id
+    );
     const processRecordId = sanitizeDisplayValue((currentEditingUser as AdminProcessRow | null)?.processRecordId || null);
 
     const profilePayload = {
