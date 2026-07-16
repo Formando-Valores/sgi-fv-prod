@@ -1283,8 +1283,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       if (missingFields.length > 0) {
         showToast({
           type: 'warning',
-          message: `Cadastro do cliente incompleto. Para gerar o certificado completo, atualize: ${missingFields.map(f => f.label).join(', ')}`
+          message: `Cadastro do cliente incompleto. Preencha os dados abaixo para gerar o certificado.`
         });
+        await hydrateEditingProfileForm(selectedUser);
+        setEditingUser(selectedUser);
+        setResendingCertificate(false);
+        return;
       }
 
       if (!window.confirm('Deseja realmente gerar o certificado de filiação e enviá-lo por e-mail para o cliente?')) {
