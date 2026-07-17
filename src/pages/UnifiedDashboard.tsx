@@ -12,6 +12,7 @@ interface UnifiedDashboardProps {
   users: User[];
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
   onLogout: () => void;
+  onSwitchOrg?: (orgId: string) => void;
   section?: 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes' | 'relatorios';
 }
 
@@ -20,6 +21,7 @@ const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({
   users,
   setUsers,
   onLogout,
+  onSwitchOrg,
   section = 'dashboard',
 }) => {
   const permissions = resolvePermissions(
@@ -34,6 +36,7 @@ const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({
       users={users}
       setUsers={setUsers}
       onLogout={onLogout}
+      onSwitchOrg={onSwitchOrg}
       section={section}
       blocks={{
         OverviewBlock,

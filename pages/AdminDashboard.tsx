@@ -100,6 +100,13 @@ type AdminDashboardLayoutProps = {
   onPrint: () => void;
   onSelectSection: (nextSection: string) => void;
   children: React.ReactNode;
+  /** Nome da organização ativa (para seletor multi-org) */
+  currentOrgName?: string;
+  /** Lista de organizações disponíveis para troca */
+  availableOrgs?: OrgMembership[];
+  /** Callback ao trocar de organização */
+  onSwitchOrg?: (orgId: string) => void;
+  activeOrgId?: string | null;
 };
 
 const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({
@@ -112,7 +119,26 @@ const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({
   onPrint,
   onSelectSection,
   children,
-}) => (
+  currentOrgName,
+  availableOrgs,
+  onSwitchOrg,
+  activeOrgId,
+}) => {
+  const [orgDropdownOpenLocal, setOrgDropdownOpenLocal] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const hasMultiOrg = (availableOrgs?.length ?? 0) > 1;
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (e.target instanceof Node && dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setOrgDropdownOpenLocal(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  return (
   <DashboardShell
     sidebarOpen={sidebarOpen}
     onCloseSidebar={() => setSidebarOpen(false)}
@@ -135,15 +161,61 @@ const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({
       />
     )}
   >
+    {hasMultiOrg && (
+      <div ref={dropdownRef} className="relative mb-2">
+        <button
+          type="button"
+          onClick={() => setOrgDropdownOpenLocal(prev => !prev)}
+          className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+        >
+          <Building2 className="w-3.5 h-3.5" />
+          <span className="truncate max-w-[180px]">{currentOrgName || 'Organização'}</span>
+          <ChevronDown className={`w-3.5 h-3.5 transition-transform ${orgDropdownOpenLocal ? 'rotate-180' : ''}`} />
+        </button>
+
+        {orgDropdownOpenLocal && (
+          <div className="absolute left-0 top-full mt-1 w-64 bg-white border border-gray-200 rounded-xl shadow-xl z-[60] py-1">
+            <div className="px-4 py-2 border-b border-gray-100">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Trocar Organização</p>
+            </div>
+            {availableOrgs?.map((membership) => {
+              const orgName = (membership.organizations as { name?: string } | undefined)?.name || membership.org_id;
+              const isActive = membership.org_id === activeOrgId;
+              return (
+                <button
+                  key={membership.org_id}
+                  type="button"
+                  onClick={() => {
+                    onSwitchOrg?.(membership.org_id);
+                    setOrgDropdownOpenLocal(false);
+                  }}
+                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-blue-50 ${
+                    isActive ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-700'
+                  }`}
+                >
+                  <Building2 className={`w-4 h-4 ${isActive ? 'text-blue-600' : 'text-gray-400'}`} />
+                  <span className="flex-1 truncate">{orgName}</span>
+                  {isActive && (
+                    <span className="text-[10px] font-bold uppercase text-blue-600">Ativo</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    )}
     {children}
   </DashboardShell>
-);
+  );
+};
 
 interface AdminDashboardProps {
   currentUser: User;
   users: User[];
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
   onLogout: () => void;
+  onSwitchOrg?: (orgId: string) => void;
   section?: 'dashboard' | 'processos' | 'clientes' | 'configuracoes' | 'organizacoes' | 'relatorios';
   blocks?: {
     OverviewBlock?: React.ComponentType<{ children: React.ReactNode }>;
@@ -152,7 +224,19 @@ interface AdminDashboardProps {
   };
 }
 
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, setUsers, onLogout, section = 'dashboard', blocks }) => {
+// Helper para obter orgId ativa
+const getActiveOrgId = (user: User): string | null => {
+  return user.activeOrgId || user.organizationId || user.org_id || null;
+};
+
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, setUsers, onLogout, onSwitchOrg, section = 'dashboard', blocks }) => {
+  // Estado do seletor de organização
+  const [orgSwitcherOpen, setOrgSwitcherOpen] = useState(false);
+  const orgSwitcherRef = useRef<HTMLDivElement>(null);
+  const activeOrgId = getActiveOrgId(currentUser);
+  const currentOrgName = currentUser.availableOrgs?.find(o => o.org_id === activeOrgId)?.organizations?.name
+    || currentUser.organizationName
+    || 'Selecionar Organização';
   const [activeTab, setActiveTab] = useState<'users' | 'management' | 'iban' | 'servicos'>('users');
   const [selectedUser, setSelectedUser] = useState<AdminProcessRow | User | null>(null);
   const [selectedUserTab, setSelectedUserTab] = useState<'cadastral' | 'financeiro' | 'documentos' | 'comunicacao'>('cadastral');
@@ -164,6 +248,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { showToast } = useToast();
+
+  // Fecha seletor de org ao clicar fora
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (orgSwitcherRef.current && !orgSwitcherRef.current.contains(e.target as Node)) {
+        setOrgSwitcherOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [processVisualOverrides, setProcessVisualOverrides] = useState<ProcessVisualOverrides>({});
   const [adminCatalog, setAdminCatalog] = useState<DbCatalogService[]>([]);
@@ -337,7 +432,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   }, [currentSection, location.search]);
 
   useEffect(() => {
-    const orgId = currentUser.organizationId || currentUser.org_id;
+    const orgId = getActiveOrgId(currentUser);
     if (orgId) {
       listProcesses(orgId).then(async (processes) => {
         const typed = processes as DbProcess[];
@@ -361,7 +456,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         }
       });
     }
-  }, [currentUser.organizationId, currentUser.org_id]);
+  }, [activeOrgId]);
 
   useEffect(() => {
     if (selectedUserTab === 'financeiro' && selectedUser) {
@@ -722,7 +817,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     setChecklistError('');
 
     const { error } = await supabase.from('process_events').insert({
-      org_id: (editingUser as AdminProcessRow | null)?.organizationId || currentUser.organizationId || null,
+      org_id: (editingUser as AdminProcessRow | null)?.organizationId || activeOrgId,
       process_id: processId,
       tipo: 'observacao',
       mensagem: `${CHECKLIST_EVENT_PREFIX}${JSON.stringify({ action: 'add', itemId, text: normalizedText, actorName: currentUser.name || 'Administrador' })}`,
@@ -747,7 +842,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     );
 
     const { error } = await supabase.from('process_events').insert({
-      org_id: (editingUser as AdminProcessRow | null)?.organizationId || currentUser.organizationId || null,
+      org_id: (editingUser as AdminProcessRow | null)?.organizationId || activeOrgId,
       process_id: processId,
       tipo: 'observacao',
       mensagem: `${CHECKLIST_EVENT_PREFIX}${JSON.stringify({ action: 'toggle', itemId, completed, actorName: currentUser.name || 'Administrador' })}`,
@@ -780,7 +875,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     );
 
     const { error } = await supabase.from('process_events').insert({
-      org_id: (editingUser as AdminProcessRow | null)?.organizationId || currentUser.organizationId || null,
+      org_id: (editingUser as AdminProcessRow | null)?.organizationId || activeOrgId,
       process_id: processId,
       tipo: 'observacao',
       mensagem: `${CHECKLIST_EVENT_PREFIX}${JSON.stringify({ action: 'edit', itemId, text: normalizedText, actorName: currentUser.name || 'Administrador' })}`,
@@ -816,7 +911,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     }
 
     const { error } = await supabase.from('process_events').insert({
-      org_id: (editingUser as AdminProcessRow | null)?.organizationId || currentUser.organizationId || null,
+      org_id: (editingUser as AdminProcessRow | null)?.organizationId || activeOrgId,
       process_id: processId,
       tipo: 'observacao',
       mensagem: `${CHECKLIST_EVENT_PREFIX}${JSON.stringify({ action: 'delete', itemId, actorName: currentUser.name || 'Administrador' })}`,
@@ -1072,7 +1167,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       });
 
       const processEventsPayload: Array<Record<string, unknown>> = [];
-      const processOrgId = (currentEditingUser as AdminProcessRow | null)?.organizationId || currentUser.organizationId || null;
+      const processOrgId = (currentEditingUser as AdminProcessRow | null)?.organizationId || activeOrgId;
 
       if (statusChanged) {
         processEventsPayload.push({
@@ -1233,7 +1328,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     if (!file || !selectedUser || !currentUser.id) return;
     const processId = (selectedUser as AdminProcessRow).processRecordId;
     if (!processId) { alert('Usuário não possui um processo vinculado para anexar documentos.'); return; }
-    const orgId = currentUser.organizationId;
+    const orgId = getActiveOrgId(currentUser);
     if (!orgId) return;
     setUploadingDocument(true);
     await uploadProcessDocument(orgId, processId, currentUser.id, file);
@@ -1382,6 +1477,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       onLogout={onLogout}
       onPrint={handlePrint}
       onSelectSection={(nextSection) => setCurrentSection(parseSectionCandidate(nextSection) || 'dashboard')}
+      currentOrgName={currentOrgName}
+      availableOrgs={currentUser.availableOrgs}
+      onSwitchOrg={onSwitchOrg}
+      activeOrgId={activeOrgId}
     >
 
       {currentSection === 'dashboard' && (
@@ -1485,7 +1584,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       {currentSection === 'relatorios' && (
         <section className="no-print">
           <ReportsPage
-            defaultOrgId={currentUser.organizationId ?? null}
+            defaultOrgId={activeOrgId}
             operationalOnly={!canViewAllReports}
           />
         </section>
@@ -1895,7 +1994,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                                 const file = e.target.files?.[0];
                                 if (!file || !selectedUser || !currentUser.id) return;
                                 const processId = (selectedUser as AdminProcessRow).processRecordId;
-                                const orgId = currentUser.organizationId;
+                                const orgId = getActiveOrgId(currentUser);
                                 if (!orgId || !processId) return;
                                 await uploadProcessDocument(orgId, processId, currentUser.id, file, 'Certificado - Upload Manual');
                                 if (e.target) e.target.value = '';

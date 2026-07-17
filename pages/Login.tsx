@@ -6,7 +6,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AlertCircle, Eye, EyeOff, Mail, Lock } from 'lucide-react';
-import { ProcessStatus, ServiceUnit, User, UserRole } from '../types';
+import { ProcessStatus, ServiceUnit, User, UserRole, type OrgMembership } from '../types';
 import { isSupabaseConfigured, supabase } from '../supabase';
 import { ADMIN_CREDENTIALS } from '../constants';
 import { SUPABASE_EDGE_FUNCTIONS } from '../src/lib/supabaseFunctions';
@@ -307,6 +307,12 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
         }
 
 
+        // Busca todas as organizações que o usuário pode acessar (multi-org)
+        const { data: loginOrgMemberships } = await supabase
+          .from('org_members')
+          .select('org_id, role, organizations(name, slug)')
+          .eq('user_id', userId);
+
         const contextOrganizationId = contextData?.org_id ?? contextByEmailData?.org_id;
         const contextOrganizationName = contextData?.org_name ?? contextByEmailData?.org_name;
         const contextOrganizationSlug = contextData?.org_slug ?? contextByEmailData?.org_slug;
@@ -340,6 +346,8 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
           serviceManager: existingUser?.serviceManager,
           organizationId: profileOrgId ?? existingUser?.organizationId ?? contextOrganizationId ?? undefined,
           organizationName: profile?.organization_name ?? existingUser?.organizationName ?? contextOrganizationName ?? defaultOrganization?.name ?? undefined,
+          activeOrgId: profileOrgId ?? existingUser?.organizationId ?? contextOrganizationId ?? undefined,
+          availableOrgs: (loginOrgMemberships || []) as OrgMembership[],
         };
 
         console.info('[login] profile carregado, redirecionando para dashboard', {

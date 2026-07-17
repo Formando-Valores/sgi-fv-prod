@@ -141,6 +141,10 @@ export interface User {
   org_name?: string;
   org_role?: OrgRole;
   profile_role?: string | null;
+  /** Organização ativa no momento (multi-org switching) */
+  activeOrgId?: string;
+  /** Lista de organizações que o usuário pode acessar */
+  availableOrgs?: OrgMembership[];
 }
 
 // ============================================

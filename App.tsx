@@ -9,7 +9,7 @@ console.log('[APP] ========================================');
 console.log('[APP] App.tsx module loading...', new Date().toISOString());
 console.log('[APP] ========================================');
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 console.log('[APP] ✅ React imported');
 
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
@@ -20,7 +20,7 @@ import UnifiedDashboard from './src/pages/UnifiedDashboard';
 import PaymentSuccess from './src/pages/Payments/PaymentSuccess';
 import PaymentCancel from './src/pages/Payments/PaymentCancel';
 import CertificatePage from './src/pages/Certificate/CertificatePage';
-import { ProcessStatus, ServiceUnit, User, UserRole } from './types';
+import { ProcessStatus, ServiceUnit, User, UserRole, type OrgMembership } from './types';
 import { supabase } from './supabase';
 import { getAllowedModules, resolvePermissions } from './src/lib/permissions';
 import { ToastProvider } from './src/contexts/ToastContext';
@@ -155,6 +155,12 @@ const RootApp: React.FC = () => {
           }
         }
 
+        // Busca todas as organizações que o usuário pode acessar (multi-org)
+        const { data: orgMembershipsData } = await supabase
+          .from('org_members')
+          .select('org_id, role, organizations(name, slug)')
+          .eq('user_id', sessionUser.id);
+
         const orgRole = contextData?.org_role ?? contextByEmailData?.org_role ?? profile?.role ?? null;
         const permissions = resolvePermissions(orgRole, { profileRole: profile?.role });
         const normalizedRole = permissions.hierarchy === 'cliente' ? UserRole.CLIENT : UserRole.ADMIN;
@@ -180,6 +186,8 @@ const RootApp: React.FC = () => {
           serviceManager: existingUser?.serviceManager,
           organizationId: contextData?.org_id ?? contextByEmailData?.org_id ?? profile?.org_id ?? existingUser?.organizationId,
           organizationName: contextData?.org_name ?? contextByEmailData?.org_name ?? existingUser?.organizationName,
+          activeOrgId: contextData?.org_id ?? contextByEmailData?.org_id ?? profile?.org_id ?? existingUser?.organizationId,
+          availableOrgs: (orgMembershipsData || []) as OrgMembership[],
         };
 
         if (mounted) {
@@ -220,6 +228,13 @@ const RootApp: React.FC = () => {
     setCurrentUser(null);
   };
 
+  const handleSwitchOrg = useCallback((orgId: string) => {
+    setCurrentUser(prev => prev ? {
+      ...prev,
+      activeOrgId: orgId,
+    } : null);
+  }, []);
+
   const authLoadingScreen = (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="text-center">
@@ -253,6 +268,7 @@ const RootApp: React.FC = () => {
         users={users}
         setUsers={setUsers}
         onLogout={handleLogout}
+        onSwitchOrg={handleSwitchOrg}
         section={section}
       />
     );
@@ -273,6 +289,7 @@ const RootApp: React.FC = () => {
         users={users}
         setUsers={setUsers}
         onLogout={handleLogout}
+        onSwitchOrg={handleSwitchOrg}
       />
     );
   };
