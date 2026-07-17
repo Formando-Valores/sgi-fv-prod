@@ -633,6 +633,26 @@ export async function listClientPaidProcessesFinance(
 
 
 
+export async function listProcessesByUserId(userId: string): Promise<Process[]> {
+  log('listProcessesByUserId() starting for userId:', userId);
+  try {
+    const { data, error } = await supabase
+      .from('processes')
+      .select('*')
+      .eq('cliente_user_id', userId)
+      .order('created_at', { ascending: false });
+    if (error) {
+      logError('Error listing processes by userId:', error);
+      return [];
+    }
+    log('listProcessesByUserId returned', data?.length || 0, 'processes');
+    return data || [];
+  } catch (err) {
+    logError('Unexpected error in listProcessesByUserId:', err);
+    return [];
+  }
+}
+
 export async function listClientDashboardProcesses(org_id: string, client_user_id: string): Promise<Process[]> {
   const startTime = performance.now();
   log('listClientDashboardProcesses() starting for org_id:', org_id, 'client_user_id:', client_user_id);

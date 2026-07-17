@@ -7,7 +7,7 @@ import { SERVICE_MANAGERS } from '../constants';
 import { loadOrganizations } from '../organizationRepository';
 import { supabase } from '../supabase';
 import type { Process as DbProcess } from '../src/lib/processes';
-import { listProcesses } from '../src/lib/processes';
+import { listProcesses, listProcessesByUserId } from '../src/lib/processes';
 import Card from '../src/components/ui/Card';
 import Badge from '../src/components/ui/Badge';
 import Skeleton from '../src/components/ui/Skeleton';
@@ -245,6 +245,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [uploadingProof, setUploadingProof] = useState(false);
   const [validatingProof, setValidatingProof] = useState(false);
   const [paymentProofs, setPaymentProofs] = useState<PaymentProof[]>([]);
+  const [impersonatingUserId, setImpersonatingUserId] = useState<string | null>(null);
+  const [impersonatingProfile, setImpersonatingProfile] = useState<Record<string, unknown> | null>(null);
+  const [profileSearchQuery, setProfileSearchQuery] = useState('');
+  const [profileSearchResults, setProfileSearchResults] = useState<any[]>([]);
+  const [profileSearchOpen, setProfileSearchOpen] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const profileSearchRef = useRef<HTMLDivElement>(null);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { showToast } = useToast();
@@ -254,6 +261,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const handleClick = (e: MouseEvent) => {
       if (orgSwitcherRef.current && !orgSwitcherRef.current.contains(e.target as Node)) {
         setOrgSwitcherOpen(false);
+      }
+      if (profileSearchRef.current && !profileSearchRef.current.contains(e.target as Node)) {
+        setProfileSearchOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClick);
@@ -1427,6 +1437,73 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   };
 
 
+  const searchProfiles = async (query: string) => {
+    if (query.length < 3) {
+      setProfileSearchResults([]);
+      setProfileSearchOpen(false);
+      return;
+    }
+    setIsSearching(true);
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, nome_completo, email, nif_cpf, documento_identidade, phone, pais, endereco, estado_civil')
+      .or(`nome_completo.ilike.%${query}%,email.ilike.%${query}%,nif_cpf.ilike.%${query}%,documento_identidade.ilike.%${query}%`)
+      .limit(10);
+    setProfileSearchResults(data || []);
+    setProfileSearchOpen(true);
+    setIsSearching(false);
+  };
+
+  const handleSelectProfileToImpersonate = async (profile: Record<string, unknown>) => {
+    const uid = profile.id as string;
+    setImpersonatingUserId(uid);
+    setImpersonatingProfile(profile);
+    setProfileSearchQuery('');
+    setProfileSearchResults([]);
+    setProfileSearchOpen(false);
+    const processes = await listProcessesByUserId(uid);
+    const typed = processes as DbProcess[];
+    setDbProcesses(typed);
+    setInitialProcessesLoaded(true);
+    setProfileMap(new Map([[uid, profile]]));
+    setSelectedUser(null);
+    setEditingUser(null);
+    showToast({ type: 'success', message: `Visualizando como ${profile.nome_completo || profile.email}` });
+  };
+
+  const handleClearImpersonation = () => {
+    setImpersonatingUserId(null);
+    setImpersonatingProfile(null);
+    setProfileSearchQuery('');
+    setProfileSearchResults([]);
+    setProfileSearchOpen(false);
+    const orgId = getActiveOrgId(currentUser);
+    if (orgId) {
+      listProcesses(orgId).then(async (processes) => {
+        const typed = processes as DbProcess[];
+        setDbProcesses(typed);
+        setInitialProcessesLoaded(true);
+        const userIds: string[] = [];
+        const seen = new Set<string>();
+        for (const p of typed) {
+          const uid = (p as Record<string, unknown>).cliente_user_id;
+          if (typeof uid === 'string' && uid && !seen.has(uid)) {
+            seen.add(uid);
+            userIds.push(uid);
+          }
+        }
+        if (userIds.length > 0) {
+          const { data: rows } = await supabase
+            .from('profiles')
+            .select('*')
+            .in('id', userIds);
+          setProfileMap(new Map((rows || []).map(r => [r.id, r as Record<string, unknown>])));
+        }
+      });
+    }
+    showToast({ type: 'info', message: 'Visualização normal restaurada.' });
+  };
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingForProcess, setUploadingForProcess] = useState<string | null>(null);
 
@@ -1482,6 +1559,72 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       onSwitchOrg={onSwitchOrg}
       activeOrgId={activeOrgId}
     >
+      {impersonatingUserId && impersonatingProfile ? (
+        <div className="mb-4 p-3 bg-amber-50 border border-amber-300 rounded-xl flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <Eye className="w-5 h-5 text-amber-600 shrink-0" />
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-amber-800 truncate">
+                Visualizando como {String(impersonatingProfile.nome_completo || impersonatingProfile.email || '')}
+              </p>
+              <p className="text-xs text-amber-600 truncate">
+                {String(impersonatingProfile.email || '')}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleClearImpersonation}
+            className="shrink-0 px-3 py-1.5 text-xs font-bold text-amber-800 bg-amber-200 hover:bg-amber-300 rounded-lg transition-colors"
+          >
+            Voltar
+          </button>
+        </div>
+      ) : (
+        <div ref={profileSearchRef} className="relative mb-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Buscar perfil de cliente por nome, email, CPF ou documento..."
+              value={profileSearchQuery}
+              onChange={(e) => {
+                setProfileSearchQuery(e.target.value);
+                searchProfiles(e.target.value);
+              }}
+              className="w-full pl-9 pr-4 py-2 text-sm bg-white border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+          {profileSearchOpen && profileSearchResults.length > 0 && (
+            <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-[60] max-h-72 overflow-y-auto">
+              {profileSearchResults.map((profile) => (
+                <button
+                  key={profile.id}
+                  type="button"
+                  onClick={() => handleSelectProfileToImpersonate(profile)}
+                  className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-blue-50 transition-colors border-b border-gray-100 last:border-b-0"
+                >
+                  <UserIcon className="w-5 h-5 text-gray-400 mt-0.5 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 truncate">{profile.nome_completo || 'Sem nome'}</p>
+                    <p className="text-xs text-gray-500 truncate">{profile.email}</p>
+                    <p className="text-xs text-gray-400 truncate">
+                      {profile.nif_cpf && `CPF/NIF: ${profile.nif_cpf}`}
+                      {profile.nif_cpf && profile.documento_identidade && ' | '}
+                      {profile.documento_identidade && `Doc: ${profile.documento_identidade}`}
+                    </p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+          {profileSearchOpen && profileSearchQuery.length >= 3 && profileSearchResults.length === 0 && !isSearching && (
+            <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-[60] p-4 text-center text-sm text-gray-500">
+              Nenhum perfil encontrado para &quot;{profileSearchQuery}&quot;
+            </div>
+          )}
+        </div>
+      )}
 
       {currentSection === 'dashboard' && (
         <DashboardSection
