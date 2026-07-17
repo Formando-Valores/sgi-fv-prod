@@ -15,14 +15,24 @@ interface DashboardSidebarProps {
   onLogout?: () => void;
   userName: string;
   hierarchyLabel: string;
+  orgName?: string;
   links: SidebarLink[];
 }
 
-const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ sidebarOpen, onNavigate, onSelectSection, onLogout, userName, hierarchyLabel, links }) => {
+const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ sidebarOpen, onNavigate, onSelectSection, onLogout, userName, hierarchyLabel, orgName, links }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const currentPath = location.pathname;
   console.log('[DashboardSidebar] links:', links.map(l => l.to).join(', '));
+
+  const renderUserInfo = () => (
+    <div className="mb-6 p-3 rounded-xl bg-gray-50 border border-gray-200">
+      <p className="font-bold text-gray-800">{userName}</p>
+      <p className="text-[10px] uppercase tracking-widest text-gray-500">
+        {hierarchyLabel.toUpperCase()}{orgName ? ` | ${orgName.toUpperCase()}` : ''}
+      </p>
+    </div>
+  );
 
   return (
     <aside
@@ -31,10 +41,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ sidebarOpen, onNavi
       <h2 className="text-xl font-black mb-1 text-gray-800">SGI FV</h2>
       <p className="text-gray-500 text-xs font-bold uppercase mb-6">Formando Valores</p>
 
-      <div className="mb-6 p-3 rounded-xl bg-gray-50 border border-gray-200">
-        <p className="font-bold text-gray-800">{userName}</p>
-        <p className="text-[10px] uppercase tracking-widest text-gray-500">{hierarchyLabel.toUpperCase()}</p>
-      </div>
+      {renderUserInfo()}
 
       <nav className="space-y-2">
         {links.map((item) => {

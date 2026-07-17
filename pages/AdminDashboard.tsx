@@ -150,6 +150,7 @@ const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({
         onLogout={onLogout}
         userName={currentUserName}
         hierarchyLabel={hierarchyLabel}
+        orgName={currentOrgName}
         links={sidebarLinks}
       />
     )}
