@@ -1,242 +1,198 @@
-<div id="sgi-external-form-wrap" style="max-width:720px;margin:0 auto;padding:20px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;font-family:Arial,sans-serif;">
-  <h2 style="margin:0 0 12px;color:#0f172a;">Cadastro do Cliente</h2>
-  <p style="margin:0 0 20px;color:#475569;font-size:14px;">
-    Preencha os dados para criar seu acesso na plataforma SGI-FV a partir deste site/portal.
-  </p>
-
-  <form id="sgiExternalForm" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-    <div style="grid-column:1 / -1;">
-      <label>Nome completo</label>
-      <input name="fullName" required style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;" />
+<div id="vainaai-form-wrap" style="max-width:800px;margin:0 auto;padding:24px;background:#fff;border:1px solid #e5e7eb;border-radius:16px;font-family:Arial,sans-serif;">
+  <div style="text-align:center;margin-bottom:32px;">
+    <div style="width:64px;height:64px;background:#d1fae5;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>
     </div>
-
+    <h2 style="margin:0 0 8px;color:#111827;font-size:24px;">Formulário de Associação</h2>
+    <p style="margin:0;color:#0369a1;font-size:14px;line-height:1.5;text-align:justify;">Preencha o formulário abaixo para se tornar membro da AI - Associação contra as Injustiças.</p>
+  </div>
+  <div id="vainaaiMessage" style="margin-bottom:16px;padding:12px 16px;border-radius:8px;font-size:14px;font-weight:bold;display:none;"></div>
+  <form id="vainaaiForm" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
     <div style="grid-column:1 / -1;">
-      <label>E-mail</label>
-      <input type="email" name="email" required style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;" />
+      <label style="display:block;font-size:14px;font-weight:600;color:#0369a1;margin-bottom:8px;">Nome Completo <span style="color:#ef4444;">*</span></label>
+      <input name="fullName" required style="width:100%;padding:12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;box-sizing:border-box;" />
     </div>
-
+    <div style="grid-column:1 / -1;">
+      <label style="display:block;font-size:14px;font-weight:600;color:#0369a1;margin-bottom:8px;">Correio Eletrónico <span style="color:#ef4444;">*</span></label>
+      <input type="email" name="email" required style="width:100%;padding:12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;box-sizing:border-box;" />
+    </div>
     <div>
-      <label>Senha</label>
-      <input type="password" id="passwordField" name="password" required style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;" />
-      <ul id="passwordRules" style="list-style:none;padding:4px 0 0;margin:4px 0 0;font-size:12px;color:#64748b;display:none;">
+      <label style="display:block;font-size:14px;font-weight:600;color:#0369a1;margin-bottom:8px;">Senha <span style="color:#ef4444;">*</span></label>
+      <input type="password" id="vainaaiSenha" name="password" required style="width:100%;padding:12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;box-sizing:border-box;" />
+      <ul id="vainaaiPasswordRules" style="list-style:none;padding:4px 0 0;margin:4px 0 0;font-size:12px;color:#64748b;display:none;">
         <li id="ruleLength">✗ Mínimo 8 caracteres</li>
         <li id="ruleUpper">✗ Uma letra maiúscula</li>
         <li id="ruleNumber">✗ Um número</li>
-        <li id="ruleSpecial">✗ Um caractere especial (!@#$%^&*(),.?":{}|&lt;&gt;)</li>
+        <li id="ruleSpecial">✗ Um carácter especial (!@#$%^&*...)</li>
       </ul>
     </div>
-
     <div>
-      <label>Confirmar senha</label>
-      <input type="password" id="confirmPasswordField" name="confirmPassword" required style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;" />
-      <p id="confirmMatch" style="margin:4px 0 0;font-size:12px;color:#64748b;"></p>
+      <label style="display:block;font-size:14px;font-weight:600;color:#0369a1;margin-bottom:8px;">Confirmar Senha <span style="color:#ef4444;">*</span></label>
+      <input type="password" id="vainaaiConfirmaSenha" name="confirmPassword" required style="width:100%;padding:12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;box-sizing:border-box;" />
+      <p id="vainaaiSenhaMatch" style="margin:4px 0 0;font-size:12px;color:#64748b;"></p>
     </div>
-
     <div>
-      <label>Documento de identidade</label>
-      <input name="documentId" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;" />
-    </div>
-
-    <div>
-      <label>NIF / CPF</label>
-      <input name="taxId" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;" />
-    </div>
-
-    <div>
-      <label>Telefone</label>
-      <input name="phone" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;" />
-    </div>
-
-    <div>
-      <label>Estado civil</label>
-      <select name="maritalStatus" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;">
-        <option>Solteiro</option>
-        <option>Casado</option>
-        <option>Divorciado</option>
-        <option>Viúvo</option>
+      <label style="display:block;font-size:14px;font-weight:600;color:#0369a1;margin-bottom:8px;">Tipo de Documento</label>
+      <select name="documentType" style="width:100%;padding:12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;box-sizing:border-box;">
+        <option value="">Selecione o tipo</option>
+        <option value="BI">Bilhete de Identidade</option>
+        <option value="CC">Cartão de Cidadão</option>
+        <option value="Passaporte">Passaporte</option>
       </select>
     </div>
-
     <div>
-      <label>País</label>
-      <input name="country" value="Brasil" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;" />
+      <label style="display:block;font-size:14px;font-weight:600;color:#0369a1;margin-bottom:8px;">Número do Documento</label>
+      <input name="documentId" style="width:100%;padding:12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;box-sizing:border-box;" />
     </div>
-
     <div>
-      <label>Título do processo (opcional)</label>
-      <input name="processTitle" placeholder="Ex.: Solicitação inicial" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;" />
+      <label style="display:block;font-size:14px;font-weight:600;color:#0369a1;margin-bottom:8px;">NIF</label>
+      <input name="taxId" style="width:100%;padding:12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;box-sizing:border-box;" />
     </div>
-
-    <div style="grid-column:1 / -1;">
-      <label>Endereço</label>
-      <input name="address" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;" />
+    <div>
+      <label style="display:block;font-size:14px;font-weight:600;color:#0369a1;margin-bottom:8px;">Telemóvel</label>
+      <input name="phone" placeholder="+351 XXX XXX XXX" style="width:100%;padding:12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;box-sizing:border-box;" />
     </div>
-
-    <div style="grid-column:1 / -1;">
-      <label>Nome da organização para cadastro futuro</label>
-      <input name="organizationRequestedName" placeholder="Ex.: Associação XPTO" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;" />
+    <div>
+      <label style="display:block;font-size:14px;font-weight:600;color:#0369a1;margin-bottom:8px;">Estado Civil</label>
+      <select name="maritalStatus" style="width:100%;padding:12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;box-sizing:border-box;">
+        <option value="">Selecione</option>
+        <option value="Solteiro">Solteiro(a)</option>
+        <option value="Casado">Casado(a)</option>
+        <option value="Divorciado">Divorciado(a)</option>
+        <option value="Viúvo">Viúvo(a)</option>
+      </select>
     </div>
-
+    <div>
+      <label style="display:block;font-size:14px;font-weight:600;color:#0369a1;margin-bottom:8px;">País</label>
+      <input name="country" value="Portugal" style="width:100%;padding:12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;box-sizing:border-box;" />
+    </div>
     <div style="grid-column:1 / -1;">
-      <label>Área de atendimento</label>
-      <div style="display:grid;grid-template-columns:repeat(3, minmax(0,1fr));gap:8px;margin-top:8px;">
-        <label style="border:1px solid #cbd5e1;border-radius:8px;padding:10px;display:flex;gap:8px;align-items:center;justify-content:center;">
-          <input type="radio" name="serviceUnit" value="JURÍDICO / ADVOCACIA" checked />
-          JURÍDICO / ADVOCACIA
+      <label style="display:block;font-size:14px;font-weight:600;color:#0369a1;margin-bottom:8px;">Morada</label>
+      <input name="address" placeholder="Rua, número, andar..." style="width:100%;padding:12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;box-sizing:border-box;" />
+    </div>
+    <div>
+      <label style="display:block;font-size:14px;font-weight:600;color:#0369a1;margin-bottom:8px;">Código Postal</label>
+      <input name="postalCode" placeholder="0000-000" style="width:100%;padding:12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;box-sizing:border-box;" />
+    </div>
+    <div>
+      <label style="display:block;font-size:14px;font-weight:600;color:#0369a1;margin-bottom:8px;">Profissão</label>
+      <input name="profession" style="width:100%;padding:12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;box-sizing:border-box;" />
+    </div>
+    <div>
+      <label style="display:block;font-size:14px;font-weight:600;color:#0369a1;margin-bottom:8px;">Nacionalidade</label>
+      <input name="nationality" style="width:100%;padding:12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;box-sizing:border-box;" />
+    </div>
+    <div style="grid-column:1 / -1;">
+      <label style="display:block;font-size:14px;font-weight:600;color:#0369a1;margin-bottom:12px;">Área de Atendimento <span style="color:#ef4444;">*</span></label>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+        <label style="display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border:2px solid #0284c7;border-radius:12px;cursor:pointer;background:#f0f9ff;font-weight:600;font-size:14px;color:#0369a1;">
+          <input type="radio" name="serviceUnit" value="JURÍDICO / ADVOCACIA" checked style="accent-color:#0284c7;" /> Jurídico / Advocacia
         </label>
-        <label style="border:1px solid #cbd5e1;border-radius:8px;padding:10px;display:flex;gap:8px;align-items:center;justify-content:center;">
-          <input type="radio" name="serviceUnit" value="ADMINISTRATIVO" />
-          ADMINISTRATIVO
+        <label style="display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border:2px solid #d1d5db;border-radius:12px;cursor:pointer;font-weight:600;font-size:14px;color:#0369a1;">
+          <input type="radio" name="serviceUnit" value="ADMINISTRATIVO" style="accent-color:#0284c7;" /> Administrativo
         </label>
-        <label style="border:1px solid #cbd5e1;border-radius:8px;padding:10px;display:flex;gap:8px;align-items:center;justify-content:center;">
-          <input type="radio" name="serviceUnit" value="TECNOLÓGICO / AI" />
-          TECNOLÓGICO / AI
+        <label style="display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border:2px solid #d1d5db;border-radius:12px;cursor:pointer;font-weight:600;font-size:14px;color:#0369a1;">
+          <input type="radio" name="serviceUnit" value="TECNOLÓGICO / AI" style="accent-color:#0284c7;" /> Tecnológico / AI
         </label>
       </div>
     </div>
-
-    <div style="grid-column:1 / -1;display:flex;align-items:center;gap:8px;">
-      <input id="consentExternal" type="checkbox" required />
-      <label for="consentExternal" style="font-size:13px;color:#334155;">Autorizo o cadastro dos meus dados para acesso à plataforma.</label>
+    <div style="grid-column:1 / -1;background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;padding:24px;">
+      <div style="display:flex;align-items:flex-start;gap:12px;">
+        <input id="vainaaiConsent" type="checkbox" required style="width:20px;height:20px;accent-color:#0284c7;margin-top:4px;flex-shrink:0;" />
+        <div>
+          <label for="vainaaiConsent" style="font-size:14px;font-weight:600;color:#075985;">Concordo com os termos <span style="color:#ef4444;">*</span></label>
+          <p style="font-size:14px;color:#0369a1;margin:8px 0 0;line-height:1.5;text-align:justify;">
+            <strong>AVISO:</strong> Concorda com os termos do Estatuto Social da entidade e com o pagamento da taxa de adesão para associado efetivo, estando isento das jóias enquanto cliente ou prestador de serviços junto à AI, para fazer jus aos benefícios, serviços e valores aplicados na tabela de valores mínimos da entidade.
+          </p>
+        </div>
+      </div>
     </div>
-
-    <button type="submit" style="grid-column:1 / -1;background:#1d4ed8;color:white;border:none;padding:12px 16px;border-radius:10px;font-weight:bold;cursor:pointer;">
-      Criar meu acesso
-    </button>
-
-    <div id="sgiExternalMessage" style="grid-column:1 / -1;font-size:14px;"></div>
+    <button type="submit" id="vainaaiSubmitBtn" style="grid-column:1 / -1;width:100%;background:#0284c7;color:white;border:none;padding:16px;border-radius:12px;font-size:18px;font-weight:700;cursor:pointer;">Enviar Formulário de Associação</button>
   </form>
 </div>
-
 <script>
-  (function () {
-    const SUPABASE_URL = `https://SEU_PROJECT_REF.supabase.co`.trim();
-    const ENDPOINT = `${SUPABASE_URL.replace(/\/$/, "")}/functions/v1/wix-client-intake`;
-    const API_KEY = `SUA_CHAVE_PRIVADA_DA_INTEGRACAO`.trim();
-    const SUPABASE_ANON_KEY = `SUA_SUPABASE_ANON_KEY`.trim();
+(function () {
+  const ORG_ID = 'd535afe4-6279-40a9-aaa9-f5a7f6ee4825';
+  const EDGE_URL = 'https://ktrrrqaqaljdcmxqdcff.supabase.co/functions/v1/create-user';
+  const ANON_KEY = 'sb_publishable_ZcEU2_K18A4NU43hO4zPmA_N5SkuqO_';
 
-    const INTEGRATION_SOURCE = `portal-parceiro`.trim();
-    const INTEGRATION_SITE_NAME = `Portal Parceiro XPTO`.trim();
-    const DEFAULT_ORGANIZATION_SLUG = `default`.trim();
+  const form = document.getElementById('vainaaiForm');
+  const message = document.getElementById('vainaaiMessage');
+  const senhaInput = document.getElementById('vainaaiSenha');
+  const confirmaInput = document.getElementById('vainaaiConfirmaSenha');
+  const senhaMatch = document.getElementById('vainaaiSenhaMatch');
+  const btn = document.getElementById('vainaaiSubmitBtn');
 
-    const form = document.getElementById("sgiExternalForm");
-    const message = document.getElementById("sgiExternalMessage");
-    const passwordField = document.getElementById("passwordField");
-    const confirmField = document.getElementById("confirmPasswordField");
-    const ruleLength = document.getElementById("ruleLength");
-    const ruleUpper = document.getElementById("ruleUpper");
-    const ruleNumber = document.getElementById("ruleNumber");
-    const ruleSpecial = document.getElementById("ruleSpecial");
-    const confirmMatch = document.getElementById("confirmMatch");
+  const setMessage = (text, ok) => {
+    message.textContent = text;
+    message.style.display = 'block';
+    message.style.color = ok ? '#166534' : '#b91c1c';
+    message.style.background = ok ? '#f0fdf4' : '#fef2f2';
+    message.style.border = ok ? '1px solid #bbf7d0' : '1px solid #fecaca';
+  };
 
-    const setMessage = (text, ok) => {
-      message.textContent = text;
-      message.style.color = ok ? "#166534" : "#b91c1c";
-    };
+  const checkPassword = () => {
+    const val = senhaInput.value;
+    const hL = val.length >= 8, hU = /[A-Z]/.test(val), hN = /[0-9]/.test(val), hS = /[!@#$%^&*(),.?":{}|<>]/.test(val);
+    const rules = document.getElementById('vainaaiPasswordRules');
+    rules.style.display = val.length > 0 || senhaInput === document.activeElement ? 'block' : 'none';
+    document.getElementById('ruleLength').textContent = (hL ? '✓' : '✗') + ' Mínimo 8 caracteres'; document.getElementById('ruleLength').style.color = hL ? '#16a34a' : '#b91c1c';
+    document.getElementById('ruleUpper').textContent = (hU ? '✓' : '✗') + ' Uma letra maiúscula'; document.getElementById('ruleUpper').style.color = hU ? '#16a34a' : '#b91c1c';
+    document.getElementById('ruleNumber').textContent = (hN ? '✓' : '✗') + ' Um número'; document.getElementById('ruleNumber').style.color = hN ? '#16a34a' : '#b91c1c';
+    document.getElementById('ruleSpecial').textContent = (hS ? '✓' : '✗') + ' Um carácter especial'; document.getElementById('ruleSpecial').style.color = hS ? '#16a34a' : '#b91c1c';
+    return hL && hU && hN && hS;
+  };
 
-    const checkPassword = () => {
-      const val = passwordField.value;
-      const hasLength = val.length >= 8;
-      const hasUpper = /[A-Z]/.test(val);
-      const hasNumber = /[0-9]/.test(val);
-      const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(val);
-      const rules = document.getElementById("passwordRules");
-      rules.style.display = val.length > 0 || passwordField === document.activeElement ? "block" : "none";
-      ruleLength.textContent = (hasLength ? "\u2713" : "\u2717") + " M\u00ednimo 8 caracteres";
-      ruleLength.style.color = hasLength ? "#166534" : "#b91c1c";
-      ruleUpper.textContent = (hasUpper ? "\u2713" : "\u2717") + " Uma letra mai\u00fascula";
-      ruleUpper.style.color = hasUpper ? "#166534" : "#b91c1c";
-      ruleNumber.textContent = (hasNumber ? "\u2713" : "\u2717") + " Um n\u00famero";
-      ruleNumber.style.color = hasNumber ? "#166534" : "#b91c1c";
-      ruleSpecial.textContent = (hasSpecial ? "\u2713" : "\u2717") + " Um caractere especial (!@#$%^&*(),.?\":{}|&lt;&gt;)";
-      ruleSpecial.style.color = hasSpecial ? "#166534" : "#b91c1c";
-      return hasLength && hasUpper && hasNumber && hasSpecial;
-    };
+  const checkConfirm = () => {
+    if (!confirmaInput.value) { senhaMatch.textContent = ''; return; }
+    const m = senhaInput.value === confirmaInput.value;
+    senhaMatch.textContent = m ? '✓ Senhas coincidem' : '✗ Senhas não coincidem';
+    senhaMatch.style.color = m ? '#16a34a' : '#b91c1c';
+  };
 
-    const checkConfirm = () => {
-      if (!confirmField.value) {
-        confirmMatch.textContent = "";
-        return;
-      }
-      confirmMatch.textContent = passwordField.value === confirmField.value ? "\u2713 Senhas coincidem" : "\u2717 Senhas n\u00e3o coincidem";
-      confirmMatch.style.color = passwordField.value === confirmField.value ? "#166534" : "#b91c1c";
-    };
+  const showRules = () => document.getElementById('vainaaiPasswordRules').style.display = 'block';
+  const hideRules = () => { if (!senhaInput.value) document.getElementById('vainaaiPasswordRules').style.display = 'none'; };
 
-    const showRules = () => { document.getElementById("passwordRules").style.display = "block"; };
-    const hideRules = () => {
-      if (!passwordField.value) document.getElementById("passwordRules").style.display = "none";
-    };
+  senhaInput.addEventListener('focus', function () { showRules(); checkPassword(); });
+  senhaInput.addEventListener('blur', hideRules);
+  senhaInput.addEventListener('input', function () { checkPassword(); if (confirmaInput.value) checkConfirm(); });
+  confirmaInput.addEventListener('input', checkConfirm);
 
-    passwordField.addEventListener("focus", function () { showRules(); checkPassword(); });
-    passwordField.addEventListener("blur", hideRules);
-    passwordField.addEventListener("input", function () {
-      checkPassword();
-      if (confirmField.value) checkConfirm();
-    });
-    confirmField.addEventListener("input", checkConfirm);
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    if (!checkPassword()) { setMessage('A senha deve ter 8 caracteres, uma letra maiúscula, um número e um carácter especial.', false); return; }
+    if (senhaInput.value !== confirmaInput.value) { setMessage('As senhas não coincidem.', false); return; }
+    if (!document.getElementById('vainaaiConsent').checked) { setMessage('É obrigatório concordar com os termos.', false); return; }
 
-    form.addEventListener("submit", async (event) => {
-      event.preventDefault();
+    const data = new FormData(form);
+    btn.disabled = true; btn.textContent = 'A enviar...';
+    setMessage('A enviar o seu cadastro...', true);
 
-      if (!checkPassword()) {
-        setMessage("A senha deve ter 8 caracteres, uma letra maiúscula, um caractere especial e um número.", false);
-        return;
-      }
-
-      if (passwordField.value !== confirmField.value) {
-        setMessage("As senhas não coincidem.", false);
-        return;
-      }
-
-      const consentCheckboxExternal = document.getElementById("consentExternal");
-      const data = new FormData(form);
-      const payload = {
-        organizationSlug: DEFAULT_ORGANIZATION_SLUG || "default",
-        source: INTEGRATION_SOURCE || "site-externo",
-        siteName: INTEGRATION_SITE_NAME || "Site Externo",
-        fullName: data.get("fullName") || "",
-        email: data.get("email") || "",
-        password: data.get("password") || "",
-        confirmPassword: data.get("confirmPassword") || "",
-        documentId: data.get("documentId") || "",
-        taxId: data.get("taxId") || "",
-        address: data.get("address") || "",
-        maritalStatus: data.get("maritalStatus") || "Solteiro",
-        country: data.get("country") || "Brasil",
-        phone: data.get("phone") || "",
-        processTitle: data.get("processTitle") || "",
-        serviceUnit: data.get("serviceUnit") || "JURÍDICO / ADVOCACIA",
-        organizationRequestedName: data.get("organizationRequestedName") || "",
-        consentPrivacyPolicy: consentCheckboxExternal ? consentCheckboxExternal.checked : false
-      };
-
-      setMessage("Enviando cadastro...", true);
-
-      try {
-        const response = await fetch(ENDPOINT, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "apikey": SUPABASE_ANON_KEY,
-            "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
-            "x-api-key": API_KEY
-          },
-          body: JSON.stringify(payload)
-        });
-
-        const result = await response.json();
-
-        if (!response.ok || !result.success) {
-          setMessage(result.error || "Não foi possível concluir o cadastro.", false);
-          return;
-        }
-
-        setMessage("Cadastro realizado com sucesso! O sistema registrou a origem e o nome deste site/portal.", true);
+    try {
+      const r = await fetch(EDGE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: ANON_KEY, 'Authorization': 'Bearer ' + ANON_KEY },
+        body: JSON.stringify({
+          email: data.get('email'),
+          password: data.get('password'),
+          name: data.get('fullName'),
+          org_id: ORG_ID,
+          role: 'Cliente',
+          unit: data.get('serviceUnit')
+        })
+      });
+      const res = await r.json();
+      if (res.success) {
+        setMessage('✓ Cadastro realizado com sucesso! Enviamos um e-mail com as suas credenciais e o link de pagamento.', true);
         form.reset();
-      } catch (error) {
-        console.error("Falha ao chamar wix-client-intake", { endpoint: ENDPOINT, error });
-        setMessage("Erro de conexão ao enviar cadastro.", false);
+      } else {
+        setMessage(res.error || 'Erro ao realizar cadastro.', false);
       }
-    });
-  })();
+    } catch (err) {
+      setMessage('Erro de conexão. Tente novamente.', false);
+    } finally {
+      btn.disabled = false; btn.textContent = 'Enviar Formulário de Associação';
+    }
+  });
+})();
 </script>
