@@ -212,6 +212,7 @@ const ProcessList: React.FC = () => {
     if (!source) return 'Painel interno';
     const normalized = source.toLowerCase();
     if (normalized === 'wix') return 'Wix';
+    if (normalized === 'vainaai') return 'VAINAAI';
     return source;
   };
 

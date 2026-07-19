@@ -178,7 +178,9 @@
           name: data.get('fullName'),
           org_id: ORG_ID,
           role: 'Cliente',
-          unit: data.get('serviceUnit')
+          unit: data.get('serviceUnit'),
+          source: 'vainaai',
+          siteName: 'VAINAAI'
         })
       });
       const res = await r.json();

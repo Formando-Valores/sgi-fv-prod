@@ -1,0 +1,14 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": ["AGENTS.md"],
+  "agent": {
+    "explore": {
+      "description": "Navega rapidamente pelo código para encontrar arquivos, classes, funções e padrões.",
+      "mode": "subagent"
+    },
+    "general": {
+      "description": "Agente genérico para pesquisar e executar tarefas multi-etapas.",
+      "mode": "subagent"
+    }
+  }
+}

@@ -22,7 +22,7 @@ Deno.serve(async (request) => {
   }
 
   try {
-    const { email, password, name, role, org_id, unit, action } = await request.json();
+    const { email, password, name, role, org_id, unit, action, source, siteName } = await request.json();
 
     // --- DELETE action: remove auth user and cascade ---
     if (action === 'delete') {
@@ -170,7 +170,7 @@ Deno.serve(async (request) => {
           status: 'cadastro',
           cliente_user_id: userId,
           cliente_nome: name,
-          origem_canal: 'painel',
+          origem_canal: source || 'painel',
           os_value: 180,
           process_status: 'aguardando_pagamento',
           association_fees: [

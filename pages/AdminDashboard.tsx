@@ -579,7 +579,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
   const buildProcessStage = (process: DbProcess) => {
     const source = sanitizeDisplayValue(process.origem_canal).toLowerCase();
-    if (source === 'wix') return 'Solicitação recebida';
+    if (source === 'wix' || source === 'vainaai') return 'Solicitação recebida';
     if (process.status === 'concluido') return 'Finalizado';
     if (process.status === 'analise') return 'Em análise';
     if (process.status === 'triagem') return 'Triagem';
@@ -593,7 +593,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       const contact = sanitizeDisplayValue(process.cliente_contato);
       const email = contact.includes('@') ? contact : '';
       const requestedOrganizationName = sanitizeDisplayValue(process.org_nome_solicitado) || 'Não informado';
-      const isExternalRequest = source.toLowerCase() === 'wix';
+      const isExternalRequest = source.toLowerCase() === 'wix' || source.toLowerCase() === 'vainaai';
       const generatedValue = unit === ServiceUnit.ADMINISTRATIVO ? 5200 : unit === ServiceUnit.TECNOLOGICO ? 8200 : 1800;
       const processOverrides = processVisualOverrides[process.id] || {};
       const persistedDeadline = sanitizeDisplayValue(process.data_prazo);
@@ -640,7 +640,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         hierarchy: Hierarchy.STATUS_ONLY,
         notes:
           resolvedNotes ||
-          (isExternalRequest ? `Origem: Wix${requestedOrganizationName !== 'Não informado' ? ` · Organização solicitada: ${requestedOrganizationName}` : ''}` : undefined),
+          (isExternalRequest ? `Origem: ${source.toLowerCase() === 'wix' ? 'Wix' : 'VAINAAI'}${requestedOrganizationName !== 'Não informado' ? ` · Organização solicitada: ${requestedOrganizationName}` : ''}` : undefined),
         deadline: resolvedDeadline,
         serviceManager: resolvedServiceManager || (isExternalRequest ? 'Aguardando aprovação' : 'Não definido'),
         organizationId: process.org_id,
