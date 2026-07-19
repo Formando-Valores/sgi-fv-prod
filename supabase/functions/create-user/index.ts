@@ -87,6 +87,11 @@ Deno.serve(async (request) => {
 
     if (existingProfile?.id) {
       userId = existingProfile.id;
+      // Reset password for existing auth user
+      const { error: updatePwdError } = await adminClient.auth.admin.updateUserById(userId, { password });
+      if (updatePwdError) {
+        console.error('[create-user] erro ao atualizar senha do usuário existente:', updatePwdError.message);
+      }
     } else {
       // 2. Try to create auth user
       const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
@@ -104,6 +109,11 @@ Deno.serve(async (request) => {
           const found = usersList?.users?.find(u => u.email === email);
           if (found) {
             userId = found.id;
+            // Reset password for existing auth user
+            const { error: updatePwdError } = await adminClient.auth.admin.updateUserById(userId, { password });
+            if (updatePwdError) {
+              console.error('[create-user] erro ao atualizar senha do usuário existente:', updatePwdError.message);
+            }
           } else {
             return jsonResponse(400, { error: `Usuário já existe mas não foi possível localizá-lo: ${authErrMsg}` });
           }
