@@ -107,6 +107,14 @@ type AdminDashboardLayoutProps = {
   /** Callback ao trocar de organização */
   onSwitchOrg?: (orgId: string) => void;
   activeOrgId?: string | null;
+  showProfileSearch: boolean;
+  profileSearchQuery: string;
+  onProfileSearchChange: (q: string) => void;
+  profileSearchResults: Profile[];
+  profileSearchOpen: boolean;
+  isSearching: boolean;
+  profileSearchRef: React.RefObject<HTMLDivElement | null>;
+  onSelectProfile: (profile: Profile) => void;
 };
 
 const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({
@@ -123,6 +131,14 @@ const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({
   availableOrgs,
   onSwitchOrg,
   activeOrgId,
+  showProfileSearch,
+  profileSearchQuery,
+  onProfileSearchChange,
+  profileSearchResults,
+  profileSearchOpen,
+  isSearching,
+  profileSearchRef,
+  onSelectProfile,
 }) => {
   const [orgDropdownOpenLocal, setOrgDropdownOpenLocal] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -152,14 +168,14 @@ const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({
         hierarchyLabel={hierarchyLabel}
         orgName={currentOrgName}
         links={sidebarLinks}
-        showProfileSearch={permissions.isAdminHierarchy}
+        showProfileSearch={showProfileSearch}
         profileSearchQuery={profileSearchQuery}
-        onProfileSearchChange={(q) => { setProfileSearchQuery(q); searchProfiles(q); }}
+        onProfileSearchChange={onProfileSearchChange}
         profileSearchResults={profileSearchResults}
         profileSearchOpen={profileSearchOpen}
         isSearching={isSearching}
         profileSearchRef={profileSearchRef}
-        onSelectProfile={handleSelectProfileToImpersonate}
+        onSelectProfile={onSelectProfile}
       />
     )}
     topbar={(
@@ -1567,6 +1583,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       availableOrgs={currentUser.availableOrgs}
       onSwitchOrg={onSwitchOrg}
       activeOrgId={activeOrgId}
+      showProfileSearch={permissions.isAdminHierarchy}
+      profileSearchQuery={profileSearchQuery}
+      onProfileSearchChange={(q) => { setProfileSearchQuery(q); searchProfiles(q); }}
+      profileSearchResults={profileSearchResults}
+      profileSearchOpen={profileSearchOpen}
+      isSearching={isSearching}
+      profileSearchRef={profileSearchRef}
+      onSelectProfile={handleSelectProfileToImpersonate}
     >
       {impersonatingUserId && impersonatingProfile && (
         <div className="mb-4 p-3 bg-amber-50 border border-amber-300 rounded-xl flex items-center justify-between gap-3">
