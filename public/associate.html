@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Formulário de Associação - SGI FV</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;background:#f0f9ff;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
+#app{max-width:800px;width:100%;background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:24px;box-shadow:0 4px 24px rgba(0,0,0,.06)}
+.header{text-align:center;margin-bottom:32px}
+.header .icon{width:64px;height:64px;background:#d1fae5;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px}
+.header h1{margin:0 0 8px;color:#111827;font-size:24px}
+.header p{margin:0;color:#0369a1;font-size:14px;line-height:1.5}
+.msg{margin-bottom:16px;padding:12px 16px;border-radius:8px;font-size:14px;font-weight:700;display:none}
+form{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.full{grid-column:1/-1}
+label{display:block;font-size:14px;font-weight:600;color:#0369a1;margin-bottom:8px}
+label .req{color:#ef4444}
+input,select{width:100%;padding:12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px}
+input:focus,select:focus{outline:2px solid #0284c7;outline-offset:-1px}
+.pw-rules{list-style:none;padding:4px 0 0;margin:4px 0 0;font-size:12px;color:#64748b;display:none}
+.pw-match{margin:4px 0 0;font-size:12px;color:#64748b}
+.radio-group{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.radio-group label{display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border:2px solid #d1d5db;border-radius:12px;cursor:pointer;font-weight:600;font-size:14px;color:#0369a1;margin:0;transition:all .15s}
+.radio-group label.selected{border-color:#0284c7;background:#f0f9ff}
+.radio-group input[type=radio]{display:none}
+.consent-box{background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;padding:24px}
+.consent-box .row{display:flex;align-items:flex-start;gap:12px}
+.consent-box input[type=checkbox]{width:20px;height:20px;accent-color:#0284c7;margin-top:4px;flex-shrink:0}
+.consent-box .label{font-size:14px;font-weight:600;color:#075985}
+.consent-box .desc{font-size:14px;color:#0369a1;margin:8px 0 0;line-height:1.5;text-align:justify}
+.btn-submit{grid-column:1/-1;width:100%;background:#0284c7;color:#fff;border:none;padding:16px;border-radius:12px;font-size:18px;font-weight:700;cursor:pointer;transition:background .15s}
+.btn-submit:hover{background:#0369a1}
+.btn-submit:disabled{background:#93c5fd;cursor:not-allowed}
+@media(max-width:640px){form{grid-template-columns:1fr}.radio-group{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="app">
+<div class="header">
+<div class="icon"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg></div>
+<h1>Formulário de Associação</h1>
+<p>Preencha o formulário abaixo para se tornar membro.</p>
+</div>
+<div id="msg" class="msg"></div>
+<form id="form">
+<div class="full">
+<label>Nome Completo <span class="req">*</span></label>
+<input name="fullName" required>
+</div>
+<div class="full">
+<label>Correio Eletrónico <span class="req">*</span></label>
+<input type="email" name="email" required>
+</div>
+<div>
+<label>Senha <span class="req">*</span></label>
+<input type="password" id="pw" name="password" required>
+<ul class="pw-rules" id="pwRules">
+<li id="rLen">✗ Mínimo 8 caracteres</li>
+<li id="rUp">✗ Uma letra maiúscula</li>
+<li id="rNum">✗ Um número</li>
+<li id="rSpec">✗ Um carácter especial (!@#$%^&*...)</li>
+</ul>
+</div>
+<div>
+<label>Confirmar Senha <span class="req">*</span></label>
+<input type="password" id="pwConf" name="confirmPassword" required>
+<p class="pw-match" id="pwMatch"></p>
+</div>
+<div>
+<label>Tipo de Documento</label>
+<select name="documentType"><option value="">Selecione</option><option value="BI">Bilhete de Identidade</option><option value="CC">Cartão de Cidadão</option><option value="Passaporte">Passaporte</option></select>
+</div>
+<div>
+<label>Número do Documento</label>
+<input name="documentId">
+</div>
+<div>
+<label>Data de Nascimento <span class="req">*</span></label>
+<input type="date" name="birthDate" required>
+</div>
+<div>
+<label>Naturalidade</label>
+<input name="naturalidade" placeholder="Cidade, País">
+</div>
+<div>
+<label>NIF</label>
+<input name="taxId">
+</div>
+<div>
+<label>NISS</label>
+<input name="niss" placeholder="Nº Segurança Social">
+</div>
+<div>
+<label>Validade do Documento</label>
+<input type="date" name="docExpiry">
+</div>
+<div>
+<label>Telemóvel</label>
+<input name="phone" placeholder="+351 XXX XXX XXX">
+</div>
+<div>
+<label>Estado Civil</label>
+<select name="maritalStatus"><option value="">Selecione</option><option value="Solteiro">Solteiro(a)</option><option value="Casado">Casado(a)</option><option value="Divorciado">Divorciado(a)</option><option value="Viúvo">Viúvo(a)</option></select>
+</div>
+<div>
+<label>País</label>
+<input name="country" value="Portugal">
+</div>
+<div>
+<label>Profissão</label>
+<input name="profession">
+</div>
+<div>
+<label>Nacionalidade</label>
+<input name="nationality">
+</div>
+<div class="full">
+<label>Código Postal</label>
+<input name="postalCode" placeholder="0000-000">
+</div>
+<div class="full">
+<label>Morada</label>
+<input name="address" placeholder="Rua, número, andar...">
+</div>
+<div class="full">
+<label>Área de Atendimento <span class="req">*</span></label>
+<div class="radio-group">
+<label class="selected"><input type="radio" name="serviceUnit" value="JURÍDICO / ADVOCACIA" checked> Jurídico / Advocacia</label>
+<label><input type="radio" name="serviceUnit" value="ADMINISTRATIVO"> Administrativo</label>
+<label><input type="radio" name="serviceUnit" value="TECNOLÓGICO / AI"> Tecnológico / AI</label>
+</div>
+</div>
+<div class="full consent-box">
+<div class="row">
+<input type="checkbox" id="consent" required>
+<div>
+<label for="consent" class="label">Concordo com os termos <span class="req">*</span></label>
+<p class="desc"><strong>AVISO:</strong> Concorda com os termos do Estatuto Social da entidade e com o pagamento da taxa de adesão para associado efetivo, estando isento das jóias enquanto cliente ou prestador de serviços junto à entidade, para fazer jus aos benefícios, serviços e valores aplicados na tabela de valores mínimos da entidade.</p>
+</div>
+</div>
+</div>
+<button type="submit" class="btn-submit" id="btn">Enviar Formulário de Associação</button>
+</form>
+</div>
+<script>
+(function(){
+const ORG_ID = new URLSearchParams(location.search).get('org_id') || 'd535afe4-6279-40a9-aaa9-f5a7f6ee4825';
+const SRC = new URLSearchParams(location.search).get('source') || 'associate-page';
+const SITE = new URLSearchParams(location.search).get('site') || 'SGI-FV';
+const EDGE_URL = 'https://ktrrrqaqaljdcmxqdcff.supabase.co/functions/v1/create-user';
+const ANON_KEY = 'sb_publishable_ZcEU2_K18A4NU43hO4zPmA_N5SkuqO_';
+const form=document.getElementById('form'),msg=document.getElementById('msg'),pw=document.getElementById('pw'),pwC=document.getElementById('pwConf'),pwM=document.getElementById('pwMatch'),btn=document.getElementById('btn');
+const setMsg=(t,ok)=>{msg.textContent=t;msg.style.display='block';msg.style.color=ok?'#166534':'#b91c1c';msg.style.background=ok?'#f0fdf4':'#fef2f2';msg.style.border=ok?'1px solid #bbf7d0':'1px solid #fecaca'};
+const checkPW=()=>{const v=pw.value;const hL=v.length>=8,hU=/[A-Z]/.test(v),hN=/[0-9]/.test(v),hS=/[!@#$%^&*(),.?":{}|<>]/.test(v);const r=document.getElementById('pwRules');r.style.display=v.length?'block':'none';document.getElementById('rLen').textContent=(hL?'✓':'✗')+' Mínimo 8 caracteres';document.getElementById('rLen').style.color=hL?'#16a34a':'#b91c1c';document.getElementById('rUp').textContent=(hU?'✓':'✗')+' Uma letra maiúscula';document.getElementById('rUp').style.color=hU?'#16a34a':'#b91c1c';document.getElementById('rNum').textContent=(hN?'✓':'✗')+' Um número';document.getElementById('rNum').style.color=hN?'#16a34a':'#b91c1c';document.getElementById('rSpec').textContent=(hS?'✓':'✗')+' Um carácter especial';document.getElementById('rSpec').style.color=hS?'#16a34a':'#b91c1c';return hL&&hU&&hN&&hS};
+const checkCnf=()=>{if(!pwC.value){pwM.textContent='';return}const m=pw.value===pwC.value;pwM.textContent=m?'✓ Senhas coincidem':'✗ Senhas não coincidem';pwM.style.color=m?'#16a34a':'#b91c1c'};
+pw.addEventListener('focus',()=>{document.getElementById('pwRules').style.display='block';checkPW()});
+pw.addEventListener('blur',()=>{if(!pw.value)document.getElementById('pwRules').style.display='none'});
+pw.addEventListener('input',function(){checkPW();if(pwC.value)checkCnf()});
+pwC.addEventListener('input',checkCnf);
+document.querySelectorAll('.radio-group label').forEach(l=>l.addEventListener('click',function(){document.querySelectorAll('.radio-group label').forEach(x=>x.classList.remove('selected'));this.classList.add('selected')}));
+form.addEventListener('submit',async function(e){
+e.preventDefault();
+if(!checkPW()){setMsg('A senha deve ter 8 caracteres, uma letra maiúscula, um número e um carácter especial.',false);return}
+if(pw.value!==pwC.value){setMsg('As senhas não coincidem.',false);return}
+if(!document.getElementById('consent').checked){setMsg('É obrigatório concordar com os termos.',false);return}
+const d=new FormData(form);btn.disabled=true;btn.textContent='A enviar...';setMsg('A enviar o seu cadastro...',true);
+try{
+const r=await fetch(EDGE_URL,{method:'POST',headers:{'Content-Type':'application/json',apikey:ANON_KEY,'Authorization':'Bearer '+ANON_KEY},body:JSON.stringify({
+email:d.get('email'),password:d.get('password'),name:d.get('fullName'),org_id:ORG_ID,role:'Cliente',
+source:SRC,siteName:SITE,unit:d.get('serviceUnit'),
+documentType:d.get('documentType'),documentId:d.get('documentId'),taxId:d.get('taxId'),
+phone:d.get('phone'),maritalStatus:d.get('maritalStatus'),country:d.get('country'),
+address:d.get('address'),postalCode:d.get('postalCode'),profession:d.get('profession'),
+nationality:d.get('nationality'),birthDate:d.get('birthDate'),naturalidade:d.get('naturalidade'),
+niss:d.get('niss'),docExpiry:d.get('docExpiry')
+})});const res=await r.json();
+if(res.success){setMsg('✓ Cadastro realizado com sucesso! Enviamos um e-mail com as suas credenciais e o link de pagamento.',true);form.reset()}else{setMsg(res.error||'Erro ao realizar cadastro.',false)}
+}catch(err){setMsg('Erro de conexão. Tente novamente.',false)}finally{btn.disabled=false;btn.textContent='Enviar Formulário de Associação'}
+});
+})();
+</script>
+</body>
+</html>
