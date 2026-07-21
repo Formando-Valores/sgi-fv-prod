@@ -82,6 +82,22 @@
       <label style="display:block;font-size:14px;font-weight:600;color:#0369a1;margin-bottom:8px;">Nacionalidade</label>
       <input name="nationality" style="width:100%;padding:12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;box-sizing:border-box;" />
     </div>
+    <div>
+      <label style="display:block;font-size:14px;font-weight:600;color:#0369a1;margin-bottom:8px;">Data de Nascimento <span style="color:#ef4444;">*</span></label>
+      <input type="date" name="birthDate" required style="width:100%;padding:12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;box-sizing:border-box;" />
+    </div>
+    <div>
+      <label style="display:block;font-size:14px;font-weight:600;color:#0369a1;margin-bottom:8px;">Naturalidade</label>
+      <input name="naturalidade" placeholder="Cidade, País" style="width:100%;padding:12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;box-sizing:border-box;" />
+    </div>
+    <div>
+      <label style="display:block;font-size:14px;font-weight:600;color:#0369a1;margin-bottom:8px;">NISS</label>
+      <input name="niss" placeholder="Número de Segurança Social" style="width:100%;padding:12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;box-sizing:border-box;" />
+    </div>
+    <div>
+      <label style="display:block;font-size:14px;font-weight:600;color:#0369a1;margin-bottom:8px;">Validade do Documento</label>
+      <input type="date" name="docExpiry" style="width:100%;padding:12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;box-sizing:border-box;" />
+    </div>
     <div style="grid-column:1 / -1;">
       <label style="display:block;font-size:14px;font-weight:600;color:#0369a1;margin-bottom:12px;">Área de Atendimento <span style="color:#ef4444;">*</span></label>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
@@ -180,7 +196,21 @@
           role: 'Cliente',
           unit: data.get('serviceUnit'),
           source: 'vainaai',
-          siteName: 'VAINAAI'
+          siteName: 'VAINAAI',
+          documentType: data.get('documentType'),
+          documentId: data.get('documentId'),
+          taxId: data.get('taxId'),
+          phone: data.get('phone'),
+          maritalStatus: data.get('maritalStatus'),
+          country: data.get('country'),
+          address: data.get('address'),
+          postalCode: data.get('postalCode'),
+          profession: data.get('profession'),
+          nationality: data.get('nationality'),
+          birthDate: data.get('birthDate'),
+          naturalidade: data.get('naturalidade'),
+          niss: data.get('niss'),
+          docExpiry: data.get('docExpiry')
         })
       });
       const res = await r.json();

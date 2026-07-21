@@ -22,7 +22,7 @@ Deno.serve(async (request) => {
   }
 
   try {
-    const { email, password, name, role, org_id, unit, action, source, siteName } = await request.json();
+    const { email, password, name, role, org_id, unit, action, source, siteName, documentType, documentId, taxId, phone, maritalStatus, country, address, postalCode, profession, nationality, birthDate, naturalidade, niss, docExpiry } = await request.json();
 
     // --- DELETE action: remove auth user and cascade ---
     if (action === 'delete') {
@@ -139,6 +139,19 @@ Deno.serve(async (request) => {
         name,
         role: normalizedRole,
         org_id,
+        documento_identidade: documentId || null,
+        nif_cpf: taxId || null,
+        phone: phone || null,
+        estado_civil: maritalStatus || null,
+        pais: country || null,
+        endereco: address || null,
+        codigo_postal: postalCode || null,
+        profissao: profession || null,
+        nacionalidade: nationality || null,
+        data_nascimento: birthDate || null,
+        naturalidade: naturalidade || null,
+        niss: niss || null,
+        validade_documento: docExpiry || null,
       }, { onConflict: 'id' });
 
     if (profileError) {
