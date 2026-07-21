@@ -12,7 +12,7 @@ body{font-family:Arial,sans-serif;background:#f0f9ff;min-height:100vh;display:fl
 .header .icon{width:64px;height:64px;background:#d1fae5;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px}
 .header h1{margin:0 0 8px;color:#111827;font-size:24px}
 .header p{margin:0;color:#0369a1;font-size:14px;line-height:1.5}
-.msg{margin-bottom:16px;padding:12px 16px;border-radius:8px;font-size:14px;font-weight:700;display:none}
+.msg{margin-top:16px;padding:12px 16px;border-radius:8px;font-size:14px;font-weight:700;display:none}
 form{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 .full{grid-column:1/-1}
 label{display:block;font-size:14px;font-weight:600;color:#0369a1;margin-bottom:8px}
@@ -43,7 +43,6 @@ input:focus,select:focus{outline:2px solid #0284c7;outline-offset:-1px}
 <h1>Formulário de Associação</h1>
 <p>Preencha o formulário abaixo para se tornar membro.</p>
 </div>
-<div id="msg" class="msg"></div>
 <form id="form">
 <div class="full">
 <label>Nome Completo <span class="req">*</span></label>
@@ -142,6 +141,7 @@ input:focus,select:focus{outline:2px solid #0284c7;outline-offset:-1px}
 </div>
 </div>
 <button type="submit" class="btn-submit" id="btn">Enviar Formulário de Associação</button>
+<div id="msg" class="msg"></div>
 </form>
 </div>
 <script>
