@@ -1568,7 +1568,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       onSwitchOrg={onSwitchOrg}
       activeOrgId={activeOrgId}
     >
-      {impersonatingUserId && impersonatingProfile ? (
+      {impersonatingUserId && impersonatingProfile && (
         <div className="mb-4 p-3 bg-amber-50 border border-amber-300 rounded-xl flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
             <Eye className="w-5 h-5 text-amber-600 shrink-0" />
