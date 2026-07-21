@@ -38,23 +38,34 @@ const CertificatePage: React.FC = () => {
       }
 
       if (process.cliente_user_id !== currentUserId) {
-        if (!process.org_id) {
-          setError('Processo sem organização vinculada.');
-          setLoading(false);
-          return;
-        }
-        const { data: membership } = await supabase
-          .from('org_members')
+        // Check if user is admin of the process org OR a global super admin
+        const { data: viewerProfile } = await supabase
+          .from('profiles')
           .select('role')
-          .eq('user_id', currentUserId)
-          .eq('org_id', process.org_id)
-          .in('role', ['owner', 'admin'])
+          .eq('id', currentUserId)
           .maybeSingle();
 
-        if (!membership) {
-          setError('Você não tem permissão para acessar este certificado.');
-          setLoading(false);
-          return;
+        const isGlobalAdmin = viewerProfile?.role === 'admin';
+
+        if (!isGlobalAdmin) {
+          if (!process.org_id) {
+            setError('Processo sem organização vinculada.');
+            setLoading(false);
+            return;
+          }
+          const { data: membership } = await supabase
+            .from('org_members')
+            .select('role')
+            .eq('user_id', currentUserId)
+            .eq('org_id', process.org_id)
+            .in('role', ['owner', 'admin'])
+            .maybeSingle();
+
+          if (!membership) {
+            setError('Você não tem permissão para acessar este certificado.');
+            setLoading(false);
+            return;
+          }
         }
       }
 
