@@ -1,6 +1,6 @@
 ﻿
 import React, { useEffect, useState, useRef } from 'react';
-import { Eye, Pencil, Search, Users, ShieldCheck, X, Plus, Trash2, Calendar, MessageSquare, Check, User as UserIcon, UserCheck, LayoutDashboard, FolderKanban, Users2, Settings, Building2, Flag, FileBarChart2, ExternalLink, Loader2, CreditCard, ChevronDown, Upload, FileDown, Mail, SearchX, BarChart3, FilePlus } from 'lucide-react';
+import { Eye, Pencil, Users, ShieldCheck, X, Plus, Trash2, Calendar, MessageSquare, Check, UserCheck, LayoutDashboard, FolderKanban, Users2, Settings, Building2, Flag, FileBarChart2, ExternalLink, Loader2, CreditCard, ChevronDown, Upload, FileDown, Mail, SearchX, BarChart3, FilePlus } from 'lucide-react';
 import { User, ProcessStatus, UserRole, Hierarchy, ServiceUnit, Organization } from '../types';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { SERVICE_MANAGERS } from '../constants';
@@ -152,6 +152,14 @@ const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({
         hierarchyLabel={hierarchyLabel}
         orgName={currentOrgName}
         links={sidebarLinks}
+        showProfileSearch={permissions.isAdminHierarchy}
+        profileSearchQuery={profileSearchQuery}
+        onProfileSearchChange={(q) => { setProfileSearchQuery(q); searchProfiles(q); }}
+        profileSearchResults={profileSearchResults}
+        profileSearchOpen={profileSearchOpen}
+        isSearching={isSearching}
+        profileSearchRef={profileSearchRef}
+        onSelectProfile={handleSelectProfileToImpersonate}
       />
     )}
     topbar={(
@@ -1580,50 +1588,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           >
             Voltar
           </button>
-        </div>
-      ) : permissions.isAdminHierarchy && (
-        <div ref={profileSearchRef} className="relative mb-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Buscar perfil de cliente por nome, email, CPF ou documento..."
-              value={profileSearchQuery}
-              onChange={(e) => {
-                setProfileSearchQuery(e.target.value);
-                searchProfiles(e.target.value);
-              }}
-              className="w-full pl-9 pr-4 py-2 text-sm bg-white border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-          {profileSearchOpen && profileSearchResults.length > 0 && (
-            <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-[60] max-h-72 overflow-y-auto">
-              {profileSearchResults.map((profile) => (
-                <button
-                  key={profile.id}
-                  type="button"
-                  onClick={() => handleSelectProfileToImpersonate(profile)}
-                  className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-blue-50 transition-colors border-b border-gray-100 last:border-b-0"
-                >
-                  <UserIcon className="w-5 h-5 text-gray-400 mt-0.5 shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-gray-900 truncate">{profile.nome_completo || 'Sem nome'}</p>
-                    <p className="text-xs text-gray-500 truncate">{profile.email}</p>
-                    <p className="text-xs text-gray-400 truncate">
-                      {profile.nif_cpf && `CPF/NIF: ${profile.nif_cpf}`}
-                      {profile.nif_cpf && profile.documento_identidade && ' | '}
-                      {profile.documento_identidade && `Doc: ${profile.documento_identidade}`}
-                    </p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-          {profileSearchOpen && profileSearchQuery.length >= 3 && profileSearchResults.length === 0 && !isSearching && (
-            <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-[60] p-4 text-center text-sm text-gray-500">
-              Nenhum perfil encontrado para &quot;{profileSearchQuery}&quot;
-            </div>
-          )}
         </div>
       )}
 

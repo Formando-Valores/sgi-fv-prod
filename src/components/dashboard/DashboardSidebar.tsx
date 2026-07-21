@@ -1,12 +1,14 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { LogOut } from 'lucide-react';
+import { LogOut, Search, User as UserIcon } from 'lucide-react';
 
 type SidebarLink = {
   to: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
 };
+
+type ProfileSearchResult = Record<string, unknown>;
 
 interface DashboardSidebarProps {
   sidebarOpen: boolean;
@@ -17,22 +19,83 @@ interface DashboardSidebarProps {
   hierarchyLabel: string;
   orgName?: string;
   links: SidebarLink[];
+  /** Profile search for impersonation (admin only) */
+  showProfileSearch?: boolean;
+  profileSearchQuery?: string;
+  onProfileSearchChange?: (query: string) => void;
+  profileSearchResults?: ProfileSearchResult[];
+  profileSearchOpen?: boolean;
+  isSearching?: boolean;
+  profileSearchRef?: React.RefObject<HTMLDivElement>;
+  onSelectProfile?: (profile: ProfileSearchResult) => void;
 }
 
-const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ sidebarOpen, onNavigate, onSelectSection, onLogout, userName, hierarchyLabel, orgName, links }) => {
+const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
+  sidebarOpen, onNavigate, onSelectSection, onLogout,
+  userName, hierarchyLabel, orgName, links,
+  showProfileSearch, profileSearchQuery, onProfileSearchChange,
+  profileSearchResults, profileSearchOpen, isSearching,
+  profileSearchRef, onSelectProfile,
+}) => {
   const navigate = useNavigate();
   const location = useLocation();
   const currentPath = location.pathname;
   console.log('[DashboardSidebar] links:', links.map(l => l.to).join(', '));
 
   const renderUserInfo = () => (
-    <div className="mb-6 p-3 rounded-xl bg-gray-50 border border-gray-200">
+    <div className="mb-3 p-3 rounded-xl bg-gray-50 border border-gray-200">
       <p className="font-bold text-gray-800">{userName}</p>
       <p className="text-[10px] uppercase tracking-widest text-gray-500">
         {hierarchyLabel.toUpperCase()}{orgName ? ` | ${orgName.toUpperCase()}` : ''}
       </p>
     </div>
   );
+
+  const renderProfileSearch = () => {
+    if (!showProfileSearch) return null;
+    return (
+      <div ref={profileSearchRef as React.RefObject<HTMLDivElement>} className="relative mb-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Buscar perfil..."
+            value={profileSearchQuery || ''}
+            onChange={(e) => onProfileSearchChange?.(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 text-sm bg-white border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+        {profileSearchOpen && profileSearchResults && profileSearchResults.length > 0 && (
+          <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-[60] max-h-72 overflow-y-auto">
+            {profileSearchResults.map((profile) => (
+              <button
+                key={profile.id as string}
+                type="button"
+                onClick={() => onSelectProfile?.(profile)}
+                className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-blue-50 transition-colors border-b border-gray-100 last:border-b-0"
+              >
+                <UserIcon className="w-5 h-5 text-gray-400 mt-0.5 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-gray-900 truncate">{profile.nome_completo as string || 'Sem nome'}</p>
+                  <p className="text-xs text-gray-500 truncate">{profile.email as string}</p>
+                  <p className="text-xs text-gray-400 truncate">
+                    {profile.nif_cpf as string && `CPF/NIF: ${profile.nif_cpf as string}`}
+                    {profile.nif_cpf as string && profile.documento_identidade as string && ' | '}
+                    {profile.documento_identidade as string && `Doc: ${profile.documento_identidade as string}`}
+                  </p>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+        {profileSearchOpen && (profileSearchQuery?.length ?? 0) >= 3 && (profileSearchResults?.length ?? 0) === 0 && !isSearching && (
+          <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-[60] p-4 text-center text-sm text-gray-500">
+            Nenhum perfil encontrado para &quot;{profileSearchQuery}&quot;
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <aside
@@ -42,6 +105,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ sidebarOpen, onNavi
       <p className="text-gray-500 text-xs font-bold uppercase mb-6">Formando Valores</p>
 
       {renderUserInfo()}
+      {renderProfileSearch()}
 
       <nav className="space-y-2">
         {links.map((item) => {
