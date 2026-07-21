@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Eye, Pencil, Search, X, Plus, Trash2, ChevronDown, SearchX } from 'lucide-react';
+import { Eye, Pencil, Search, X, Plus, Trash2, ChevronDown, SearchX, Filter, ChevronUp } from 'lucide-react';
 import type { Process as DbProcess } from '../../../lib/processes';
 import { ProcessStatus, ServiceUnit, type User, type Organization } from '../../../../types';
 import { sanitizeDisplayValue } from '../../../lib/clientUtils';
@@ -129,6 +129,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
   const [processResponsibleFilter, setProcessResponsibleFilter] = useState('all');
   const [processTypeFilter, setProcessTypeFilter] = useState<'all' | ServiceUnit>('all');
   const [processPeriodFilter, setProcessPeriodFilter] = useState<'all' | 'today' | '7d' | '30d'>('all');
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [processOverdueFilter, setProcessOverdueFilter] = useState(false);
   const [activeProcessQuickPreset, setActiveProcessQuickPreset] = useState<ProcessQuickPreset | null>(null);
   const [processRowsLimit, setProcessRowsLimit] = useState(10);
@@ -596,7 +597,80 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
             <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">Modo somente leitura neste escopo: visualização habilitada, ações de criação/remoção bloqueadas.</p>
           )}
 
-          <div className="mt-4 grid min-w-0 grid-cols-1 md:grid-cols-2 2xl:grid-cols-4 gap-2.5 sm:gap-3">
+          {/* Filters - mobile accordion */}
+          <div className="mt-4 md:hidden">
+            <button
+              type="button"
+              onClick={() => setFiltersOpen((prev) => !prev)}
+              className="w-full flex items-center justify-between gap-2 px-4 py-3 bg-white border border-gray-200 rounded-lg text-gray-700 font-semibold hover:bg-gray-50 transition-colors"
+            >
+              <span className="flex items-center gap-2 text-sm">
+                <Filter className="w-4 h-4" />
+                Filtros
+              </span>
+              <ChevronDown className={`w-4 h-4 transition-transform ${filtersOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {filtersOpen && (
+              <div className="mt-2 space-y-2.5">
+                <div className="relative min-w-0">
+                  <Search className="absolute left-3 top-3 text-gray-500 w-5 h-5" />
+                  <input
+                    value={processSearch}
+                    onChange={(event) => setProcessSearch(event.target.value)}
+                    placeholder="Buscar processo, título, cliente, responsável..."
+                    className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+                <select
+                  value={processStatusFilter}
+                  onChange={(event) => {
+                    setProcessStatusFilter(event.target.value as 'all' | ProcessStatus);
+                    setProcessStatusPreset('all');
+                  }}
+                  className="w-full py-3 px-4 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  <option value="all">Todos os status</option>
+                  <option value={ProcessStatus.PENDENTE}>Cadastro</option>
+                  <option value={ProcessStatus.TRIAGEM}>Triagem</option>
+                  <option value={ProcessStatus.ANALISE}>Análise</option>
+                  <option value={ProcessStatus.CONCLUIDO}>Concluído</option>
+                </select>
+                <select
+                  value={processResponsibleFilter}
+                  onChange={(event) => setProcessResponsibleFilter(event.target.value)}
+                  className="w-full py-3 px-4 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  <option value="all">Todos os responsáveis</option>
+                  {processResponsibles.map((responsible) => (
+                    <option key={responsible} value={responsible}>{responsible}</option>
+                  ))}
+                </select>
+                <select
+                  value={processTypeFilter}
+                  onChange={(event) => setProcessTypeFilter(event.target.value as 'all' | ServiceUnit)}
+                  className="w-full py-3 px-4 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  <option value="all">Todos os tipos</option>
+                  <option value={ServiceUnit.ADMINISTRATIVO}>Administrativo</option>
+                  <option value={ServiceUnit.JURIDICO}>Jurídico / Advocacia</option>
+                  <option value={ServiceUnit.TECNOLOGICO}>Tecnológico / AI</option>
+                </select>
+                <select
+                  value={processPeriodFilter}
+                  onChange={(event) => setProcessPeriodFilter(event.target.value as 'all' | 'today' | '7d' | '30d')}
+                  className="w-full py-3 px-4 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  <option value="all">Todo período</option>
+                  <option value="today">Hoje</option>
+                  <option value="7d">Últimos 7 dias</option>
+                  <option value="30d">Últimos 30 dias</option>
+                </select>
+              </div>
+            )}
+          </div>
+
+          {/* Filters - desktop grid */}
+          <div className="hidden mt-4 md:grid min-w-0 grid-cols-1 md:grid-cols-2 2xl:grid-cols-4 gap-2.5 sm:gap-3">
             <div className="relative min-w-0 md:col-span-2 2xl:col-span-4">
               <Search className="absolute left-3 top-3 text-gray-500 w-5 h-5" />
               <input
@@ -742,87 +816,87 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
             ) : visibleProcessRows.map((process) => (
               <article
                 key={process.id}
-                className="rounded-2xl border border-gray-100 bg-white px-4 py-4 sm:px-5 sm:py-5 hover:border-blue-200 hover:bg-gray-50 transition-all shadow-sm"
+                className="rounded-xl sm:rounded-2xl border border-gray-100 bg-white px-3 py-3 sm:px-5 sm:py-5 hover:border-blue-200 hover:bg-gray-50 transition-all shadow-sm"
               >
-                <div className="flex flex-col gap-4">
-                  <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                <div className="flex flex-col gap-2 sm:gap-4">
+                  <div className="flex flex-col gap-2 sm:gap-3 xl:flex-row xl:items-start xl:justify-between">
                     <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-gray-800 font-black text-lg tracking-tight break-words">{process.protocol}</p>
-                        <Badge variant={process.sourceLabel === 'WIX' ? 'info' : 'neutral'} className="text-xs px-2.5 py-1">{process.sourceLabel}</Badge>
-                        <Badge variant={statusBadgeVariant(process.status)} className="text-xs px-2.5 py-1">{process.status}</Badge>
+                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                        <p className="text-gray-800 font-black text-sm sm:text-lg tracking-tight break-words">{process.protocol}</p>
+                        <Badge variant={process.sourceLabel === 'WIX' ? 'info' : 'neutral'} className="text-[10px] sm:text-xs px-2 sm:px-2.5 py-0.5 sm:py-1">{process.sourceLabel}</Badge>
+                        <Badge variant={statusBadgeVariant(process.status)} className="text-[10px] sm:text-xs px-2 sm:px-2.5 py-0.5 sm:py-1">{process.status}</Badge>
                       </div>
-                      <p className="text-gray-800 text-base font-semibold mt-1 break-words">{process.contractedServiceName}</p>
-                      <p className="text-gray-700 text-sm mt-1 break-words"><span className="font-black uppercase tracking-wide text-[10px] text-gray-500 mr-1">Cliente:</span>{process.name}</p>
-                      <p className="text-gray-500 text-xs mt-1">Etapa: {process.etapaAtual}{process.requestedOrganizationName !== 'Não informado' ? ` · ${process.requestedOrganizationName}` : ''}</p>
+                      <p className="text-gray-800 text-sm sm:text-base font-semibold mt-0.5 sm:mt-1 break-words">{process.contractedServiceName}</p>
+                      <p className="text-gray-700 text-xs sm:text-sm mt-0.5 sm:mt-1 break-words"><span className="font-black uppercase tracking-wide text-[9px] sm:text-[10px] text-gray-500 mr-1">Cliente:</span>{process.name}</p>
+                      <p className="text-gray-500 text-[11px] sm:text-xs mt-0.5">Etapa: {process.etapaAtual}{process.requestedOrganizationName !== 'Não informado' ? ` · ${process.requestedOrganizationName}` : ''}</p>
                     </div>
 
-                    <div className="flex items-center gap-2 self-start xl:self-auto">
+                    <div className="flex items-center gap-1.5 sm:gap-2 self-start xl:self-auto">
                       <button
                         onClick={() => setSelectedUser(process)}
-                        className="p-2 bg-blue-500 hover:bg-blue-600 rounded-lg text-white"
+                        className="p-1.5 sm:p-2 bg-blue-500 hover:bg-blue-600 rounded-lg text-white"
                         title="Visualizar"
                       >
-                        <Eye className="w-4 h-4" />
+                        <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       </button>
                       {!isClientScope && (
                         <button
                           onClick={() => setEditingUser(process)}
-                          className="p-2 bg-yellow-500 hover:bg-yellow-600 rounded-lg text-white"
+                          className="p-1.5 sm:p-2 bg-yellow-500 hover:bg-yellow-600 rounded-lg text-white"
                           title="Editar"
                         >
-                          <Pencil className="w-4 h-4" />
+                          <Pencil className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         </button>
                       )}
                       {!isClientScope && (
                         <button
                           onClick={() => void handleDeleteProcess(process)}
-                          className="p-2 bg-red-500 hover:bg-red-600 rounded-lg text-white"
+                          className="p-1.5 sm:p-2 bg-red-500 hover:bg-red-600 rounded-lg text-white"
                           title="Excluir processo"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         </button>
                       )}
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-3 text-sm">
-                    <div className="rounded-xl border border-gray-100 bg-white p-3">
-                      <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Tipo</p>
-                      <p className="text-gray-800 font-semibold mt-1">{process.processType}</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-1.5 sm:gap-3 text-xs sm:text-sm">
+                    <div className="rounded-lg sm:rounded-xl border border-gray-100 bg-gray-50/50 sm:bg-white p-2 sm:p-3">
+                      <p className="text-[9px] sm:text-[10px] uppercase tracking-widest text-gray-500 font-black">Tipo</p>
+                      <p className="text-gray-800 font-semibold mt-0.5 sm:mt-1 truncate">{process.processType}</p>
                     </div>
-                    <div className="rounded-xl border border-gray-100 bg-white p-3">
-                      <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Responsável</p>
-                      <p className="text-gray-800 font-semibold mt-1">{process.serviceManager || 'Não definido'}</p>
+                    <div className="rounded-lg sm:rounded-xl border border-gray-100 bg-gray-50/50 sm:bg-white p-2 sm:p-3">
+                      <p className="text-[9px] sm:text-[10px] uppercase tracking-widest text-gray-500 font-black">Responsável</p>
+                      <p className="text-gray-800 font-semibold mt-0.5 sm:mt-1 truncate">{process.serviceManager || 'Não definido'}</p>
                     </div>
-                    <div className="rounded-xl border border-gray-100 bg-white p-3">
-                      <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Início</p>
-                      <p className="text-gray-800 font-semibold mt-1">{process.startDate}</p>
+                    <div className="rounded-lg sm:rounded-xl border border-gray-100 bg-gray-50/50 sm:bg-white p-2 sm:p-3">
+                      <p className="text-[9px] sm:text-[10px] uppercase tracking-widest text-gray-500 font-black">Início</p>
+                      <p className="text-gray-800 font-semibold mt-0.5 sm:mt-1 truncate">{process.startDate}</p>
                     </div>
-                    <div className="rounded-xl border border-gray-100 bg-white p-3">
-                      <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Prazo</p>
-                      <p className="text-gray-800 font-semibold mt-1">{process.deadlineDate}</p>
+                    <div className="rounded-lg sm:rounded-xl border border-gray-100 bg-gray-50/50 sm:bg-white p-2 sm:p-3">
+                      <p className="text-[9px] sm:text-[10px] uppercase tracking-widest text-gray-500 font-black">Prazo</p>
+                      <p className="text-gray-800 font-semibold mt-0.5 sm:mt-1 truncate">{process.deadlineDate}</p>
                     </div>
-                    <div className="rounded-xl border border-gray-100 bg-white p-3">
-                      <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Financeiro</p>
-                      <p className="mt-1">
+                    <div className="rounded-lg sm:rounded-xl border border-gray-100 bg-gray-50/50 sm:bg-white p-2 sm:p-3">
+                      <p className="text-[9px] sm:text-[10px] uppercase tracking-widest text-gray-500 font-black">Financeiro</p>
+                      <p className="mt-0.5 sm:mt-1">
                         {(() => {
                           const paymentUi = getPaymentStatusUi(process.paymentStatus);
                           return paymentUi ? (
-                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${paymentUi.color} text-white text-xs px-2.5 py-1`}>
+                            <span className={`inline-flex items-center px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-sm font-medium ${paymentUi.color} text-white`}>
                               {paymentUi.label}
                             </span>
                           ) : (
-                            <Badge variant="warning" className="text-xs px-2.5 py-1">{process.financeiro}</Badge>
+                            <Badge variant="warning" className="text-[10px] sm:text-xs px-1.5 sm:px-2.5 py-0.5 sm:py-1">{process.financeiro}</Badge>
                           );
                         })()}
                       </p>
                     </div>
-                    <div className="rounded-xl border border-gray-100 bg-white p-3">
-                      <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Prioridade & Valor</p>
-                      <p className="mt-1 flex flex-wrap items-center gap-2">
-                        <Badge variant="success" className="text-xs px-2.5 py-1">{process.prioridade}</Badge>
-                        <span className="text-gray-800 font-black">{formatEuro(process.valor)}</span>
+                    <div className="rounded-lg sm:rounded-xl border border-gray-100 bg-gray-50/50 sm:bg-white p-2 sm:p-3">
+                      <p className="text-[9px] sm:text-[10px] uppercase tracking-widest text-gray-500 font-black">Prioridade & Valor</p>
+                      <p className="mt-0.5 sm:mt-1 flex flex-wrap items-center gap-1.5 sm:gap-2">
+                        <Badge variant="success" className="text-[10px] sm:text-xs px-1.5 sm:px-2.5 py-0.5 sm:py-1">{process.prioridade}</Badge>
+                        <span className="text-gray-800 font-black text-[11px] sm:text-base">{formatEuro(process.valor)}</span>
                       </p>
                     </div>
                   </div>
