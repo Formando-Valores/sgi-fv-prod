@@ -39,8 +39,10 @@ export default defineConfig(({ mode }) => {
         {
           name: 'generate-version-json',
           closeBundle() {
+            const outDir = path.resolve(__dirname, 'dist');
+            if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
             fs.writeFileSync(
-              path.resolve(__dirname, 'dist', 'version.json'),
+              path.join(outDir, 'version.json'),
               JSON.stringify({ buildTime: Date.now() }, null, 2)
             );
           },
