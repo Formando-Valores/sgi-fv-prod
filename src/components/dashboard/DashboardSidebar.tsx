@@ -1,14 +1,12 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { LogOut, Search, User as UserIcon, Building2, X, Check, Loader2 } from 'lucide-react';
+import { LogOut, Eye, EyeOff, Shield } from 'lucide-react';
 
 type SidebarLink = {
   to: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
 };
-
-type ProfileSearchResult = Record<string, unknown>;
 
 const ACCESS_LEVELS = ['Administrador', 'Usuário Sênior', 'Usuário Pleno', 'Operador', 'Cliente'] as const;
 
@@ -21,39 +19,21 @@ interface DashboardSidebarProps {
   hierarchyLabel: string;
   orgName?: string;
   links: SidebarLink[];
-  showProfileSearch?: boolean;
-  profileSearchQuery?: string;
-  onProfileSearchChange?: (query: string) => void;
-  profileSearchResults?: ProfileSearchResult[];
-  profileSearchOpen?: boolean;
-  isSearching?: boolean;
-  profileSearchRef?: React.RefObject<HTMLDivElement>;
-  onSelectProfile?: (profile: ProfileSearchResult) => void;
-  impersonateAvailableOrgs?: Array<{ id: string; name?: string; slug?: string }>;
-  impersonatingOrgId?: string | null;
-  onSwitchImpersonatedOrg?: (orgId: string) => void;
-  selectedProfile?: ProfileSearchResult | null;
-  onClearSelectedProfile?: () => void;
+  showRoleSwitcher?: boolean;
   accessLevel?: string;
   onAccessLevelChange?: (level: string) => void;
-  onLinkProfile?: () => void;
-  isLinkingProfile?: boolean;
+  originalRoleLabel?: string;
 }
 
 const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
   sidebarOpen, onNavigate, onSelectSection, onLogout,
   userName, hierarchyLabel, orgName, links,
-  showProfileSearch, profileSearchQuery, onProfileSearchChange,
-  profileSearchResults, profileSearchOpen, isSearching,
-  profileSearchRef, onSelectProfile,
-  impersonateAvailableOrgs, impersonatingOrgId, onSwitchImpersonatedOrg,
-  selectedProfile, onClearSelectedProfile,
-  accessLevel, onAccessLevelChange,
-  onLinkProfile, isLinkingProfile,
+  showRoleSwitcher, accessLevel, onAccessLevelChange, originalRoleLabel,
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const currentPath = location.pathname;
+  const isViewingAsDifferent = showRoleSwitcher && accessLevel && originalRoleLabel && accessLevel !== originalRoleLabel;
 
   const renderUserInfo = () => (
     <div className="mb-3 p-3 rounded-xl bg-gray-50 border border-gray-200">
@@ -64,115 +44,28 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
     </div>
   );
 
-  const renderProfileSearch = () => {
-    if (!showProfileSearch) return null;
-
-    if (selectedProfile) {
-      const profileName = selectedProfile.nome_completo as string || selectedProfile.email as string || 'Sem nome';
-      const profileEmail = selectedProfile.email as string || '';
-
-      return (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-xl">
-          <div className="flex items-start justify-between gap-2 mb-3">
-            <div className="flex items-center gap-2 min-w-0">
-              <UserIcon className="w-4 h-4 text-blue-500 shrink-0" />
-              <div className="min-w-0">
-                <p className="text-sm font-bold text-blue-800 truncate">{profileName}</p>
-                {profileEmail && <p className="text-[11px] text-blue-500 truncate">{profileEmail}</p>}
-              </div>
-            </div>
-            <button type="button" onClick={onClearSelectedProfile} className="shrink-0 p-1 text-blue-400 hover:text-red-500 transition-colors" title="Limpar seleção">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-
-          <div className="mb-2.5">
-            <label className="block text-[10px] font-bold uppercase tracking-wider text-blue-600 mb-1">Nível de Acesso</label>
-            <select
-              value={accessLevel || 'Cliente'}
-              onChange={(e) => onAccessLevelChange?.(e.target.value)}
-              className="w-full px-3 py-2 text-sm bg-white border border-blue-200 rounded-lg font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer"
-            >
-              {ACCESS_LEVELS.map((level) => (
-                <option key={level} value={level}>{level}</option>
-              ))}
-            </select>
-          </div>
-
-          {impersonateAvailableOrgs && impersonateAvailableOrgs.length > 0 && (
-            <div className="mb-2.5">
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-blue-600 mb-1">Organização</label>
-              <div className="relative">
-                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-                <select
-                  value={impersonatingOrgId || ''}
-                  onChange={(e) => onSwitchImpersonatedOrg?.(e.target.value)}
-                  className="w-full pl-8 pr-3 py-2 text-sm bg-white border border-blue-200 rounded-lg font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer"
-                >
-                  <option value="">Selecione uma organização</option>
-                  {impersonateAvailableOrgs.map((org) => (
-                    <option key={org.id} value={org.id}>{org.name || org.id}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          )}
-
-          <button
-            type="button"
-            onClick={onLinkProfile}
-            disabled={isLinkingProfile || !impersonatingOrgId}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed rounded-lg transition-colors"
-          >
-            {isLinkingProfile ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Vinculando...
-              </>
-            ) : (
-              <>
-                <Check className="w-4 h-4" />
-                Vincular
-              </>
-            )}
-          </button>
-        </div>
-      );
-    }
+  const renderRoleSwitcher = () => {
+    if (!showRoleSwitcher) return null;
 
     return (
-      <div ref={profileSearchRef as React.RefObject<HTMLDivElement>} className="relative mb-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Buscar perfil para vincular..."
-            value={profileSearchQuery || ''}
-            onChange={(e) => onProfileSearchChange?.(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-sm bg-white border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
+      <div className={`mb-4 p-3 rounded-xl border transition-colors ${isViewingAsDifferent ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 border-gray-200'}`}>
+        <div className="flex items-center gap-2 mb-2">
+          <Shield className="w-3.5 h-3.5 text-gray-500" />
+          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Visualizar como</span>
         </div>
-        {profileSearchOpen && profileSearchResults && profileSearchResults.length > 0 && (
-          <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-[60] max-h-72 overflow-y-auto">
-            {profileSearchResults.map((profile) => (
-              <button
-                key={profile.id as string}
-                type="button"
-                onClick={() => onSelectProfile?.(profile)}
-                className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-blue-50 transition-colors border-b border-gray-100 last:border-b-0"
-              >
-                <UserIcon className="w-5 h-5 text-gray-400 mt-0.5 shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-gray-900 truncate">{profile.nome_completo as string || 'Sem nome'}</p>
-                  <p className="text-xs text-gray-500 truncate">{profile.email as string}</p>
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
-        {profileSearchOpen && (profileSearchQuery?.length ?? 0) >= 3 && (profileSearchResults?.length ?? 0) === 0 && !isSearching && (
-          <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-[60] p-4 text-center text-sm text-gray-500">
-            Nenhum perfil encontrado para &quot;{profileSearchQuery}&quot;
+        <select
+          value={accessLevel || 'Administrador'}
+          onChange={(e) => onAccessLevelChange?.(e.target.value)}
+          className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer"
+        >
+          {ACCESS_LEVELS.map((level) => (
+            <option key={level} value={level}>{level}</option>
+          ))}
+        </select>
+        {isViewingAsDifferent && (
+          <div className="flex items-center gap-2 mt-2">
+            <Eye className="w-3.5 h-3.5 text-amber-600" />
+            <span className="text-xs text-amber-700 font-medium">Visualizando como {accessLevel}</span>
           </div>
         )}
       </div>
@@ -187,7 +80,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
       <p className="text-gray-500 text-xs font-bold uppercase mb-6">Formando Valores</p>
 
       {renderUserInfo()}
-      {renderProfileSearch()}
+      {renderRoleSwitcher()}
 
       <nav className="space-y-2 mt-auto">
         {links.map((item) => {
