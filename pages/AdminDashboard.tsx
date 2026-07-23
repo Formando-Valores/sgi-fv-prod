@@ -42,7 +42,7 @@ import { loadServicesCatalog, filterServicesByUnit, filterGroupsByUnit, filterSe
 import { uploadPaymentProof, validatePaymentProof, getPaymentProofs, type PaymentProof } from '../src/lib/paymentProofs';
 import { uploadProcessDocument, listProcessDocuments, reviewProcessDocument, deleteProcessDocument, type ProcessDocument } from '../src/lib/processDocuments';
 import { SUPABASE_EDGE_FUNCTIONS } from '../src/lib/supabaseFunctions';
-import { sanitizeDisplayValue } from '../src/lib/clientUtils';
+import { sanitizeDisplayValue, mapAccessLevelToOrgRole, type AccessLevel } from '../src/lib/clientUtils';
 
 interface AdminProcessRow extends User {
   processRecordId?: string;
@@ -121,6 +121,18 @@ type AdminDashboardLayoutProps = {
   impersonatingOrgId?: string | null;
   /** Callback ao trocar de org no modo impersonation */
   onSwitchImpersonatedOrg?: (orgId: string) => void;
+  /** Perfil selecionado para vinculação */
+  selectedProfile?: Record<string, unknown> | null;
+  /** Callback para limpar perfil selecionado */
+  onClearSelectedProfile?: () => void;
+  /** Nível de acesso selecionado */
+  accessLevel?: string;
+  /** Callback ao alterar nível de acesso */
+  onAccessLevelChange?: (level: string) => void;
+  /** Callback para vincular perfil */
+  onLinkProfile?: () => void;
+  /** Indica se está vinculando */
+  isLinkingProfile?: boolean;
 };
 
 const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({
@@ -148,6 +160,12 @@ const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({
   impersonateAvailableOrgs,
   impersonatingOrgId,
   onSwitchImpersonatedOrg,
+  selectedProfile,
+  onClearSelectedProfile,
+  accessLevel,
+  onAccessLevelChange,
+  onLinkProfile,
+  isLinkingProfile,
 }) => {
   const [orgDropdownOpenLocal, setOrgDropdownOpenLocal] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -188,6 +206,12 @@ const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({
         impersonateAvailableOrgs={impersonateAvailableOrgs}
         impersonatingOrgId={impersonatingOrgId}
         onSwitchImpersonatedOrg={onSwitchImpersonatedOrg}
+        selectedProfile={selectedProfile}
+        onClearSelectedProfile={onClearSelectedProfile}
+        accessLevel={accessLevel}
+        onAccessLevelChange={onAccessLevelChange}
+        onLinkProfile={onLinkProfile}
+        isLinkingProfile={isLinkingProfile}
       />
     )}
     topbar={(
@@ -287,6 +311,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [impersonatingOrgId, setImpersonatingOrgId] = useState<string | null>(null);
   const [impersonatingOrgName, setImpersonatingOrgName] = useState<string | null>(null);
   const [impersonatingOrgRole, setImpersonatingOrgRole] = useState<string | null>(null);
+  const [impersonatingAccessLevel, setImpersonatingAccessLevel] = useState('Cliente');
+  const [isLinkingProfile, setIsLinkingProfile] = useState(false);
   const [allOrganizations, setAllOrganizations] = useState<Organization[]>([]);
   const [profileSearchQuery, setProfileSearchQuery] = useState('');
   const [profileSearchResults, setProfileSearchResults] = useState<any[]>([]);
@@ -1543,19 +1569,39 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     }
   };
 
-  useEffect(() => {
-    if (!impersonatingUserId || !impersonatingProfile || !impersonatingOrgId) return;
+  const handleLinkProfile = async () => {
+    if (!impersonatingUserId || !impersonatingProfile || !impersonatingOrgId) {
+      showToast({ type: 'error', message: 'Selecione um perfil e uma organização.' });
+      return;
+    }
 
-    const applyContext = async () => {
-      const { data: member } = await supabase
-        .from('org_members')
-        .select('role')
-        .eq('user_id', impersonatingUserId)
-        .eq('org_id', impersonatingOrgId)
-        .single();
+    setIsLinkingProfile(true);
 
-      const resolvedRole = member?.role || 'client';
-      setImpersonatingOrgRole(resolvedRole);
+    try {
+      const supabaseUrl = String(import.meta.env.VITE_SUPABASE_URL ?? '').trim();
+      const sessionRes = await supabase.auth.getSession();
+      const accessToken = sessionRes?.data?.session?.access_token ?? '';
+      const orgRole = mapAccessLevelToOrgRole(impersonatingAccessLevel as AccessLevel);
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/update-user-org-membership`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}`, apikey: String(import.meta.env.VITE_SUPABASE_ANON_KEY ?? '') },
+        body: JSON.stringify({
+          user_id: impersonatingUserId,
+          org_id: impersonatingOrgId,
+          role: orgRole,
+          name: impersonatingProfile.nome_completo as string || impersonatingProfile.name as string || '',
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || result.error) {
+        showToast({ type: 'error', message: `Erro ao vincular: ${result.error || response.statusText}` });
+        return;
+      }
+
+      setImpersonatingOrgRole(orgRole);
 
       const processes = await supabase
         .from('processes')
@@ -1569,13 +1615,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       setInitialProcessesLoaded(true);
       setProfileMap(new Map([[impersonatingUserId, impersonatingProfile]]));
 
-      const roleLabel = resolvedRole === 'client' ? 'Cliente' : resolvedRole === 'admin' ? 'Administrador' : resolvedRole === 'owner' ? 'Proprietário' : resolvedRole === 'staff' ? 'Staff' : String(resolvedRole);
-      const orgLabel = impersonatingOrgName || impersonatingOrgId;
-      showToast({ type: 'success', message: `Contexto alterado: ${roleLabel} em ${orgLabel}` });
-    };
-
-    applyContext();
-  }, [impersonatingUserId, impersonatingProfile, impersonatingOrgId]);
+      showToast({ type: 'success', message: `${impersonatingProfile.nome_completo || 'Perfil'} vinculado como ${impersonatingAccessLevel} em ${impersonatingOrgName || 'organização'}` });
+    } catch (err) {
+      showToast({ type: 'error', message: `Erro ao vincular: ${String(err)}` });
+    } finally {
+      setIsLinkingProfile(false);
+    }
+  };
 
   const handleSwitchImpersonatedOrg = async (orgId: string) => {
     setImpersonatingOrgId(orgId);
@@ -1589,6 +1635,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     setImpersonatingOrgId(null);
     setImpersonatingOrgName(null);
     setImpersonatingOrgRole(null);
+    setImpersonatingAccessLevel('Cliente');
     setProfileSearchQuery('');
     setProfileSearchResults([]);
     setProfileSearchOpen(false);
@@ -1684,6 +1731,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       impersonateAvailableOrgs={organizations}
       impersonatingOrgId={impersonatingOrgId}
       onSwitchImpersonatedOrg={handleSwitchImpersonatedOrg}
+      selectedProfile={impersonatingProfile}
+      onClearSelectedProfile={handleClearImpersonation}
+      accessLevel={impersonatingAccessLevel}
+      onAccessLevelChange={setImpersonatingAccessLevel}
+      onLinkProfile={handleLinkProfile}
+      isLinkingProfile={isLinkingProfile}
     >
       {impersonatingUserId && impersonatingProfile && (
         <div className="mb-4 p-3 bg-amber-50 border border-amber-300 rounded-xl flex items-center justify-between gap-3">
@@ -1691,11 +1744,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
             <Eye className="w-5 h-5 text-amber-600 shrink-0" />
             <div className="min-w-0">
               <p className="text-sm font-bold text-amber-800 truncate">
-                Visão: {impersonatingOrgRole === 'client' ? 'Cliente' : impersonatingOrgRole === 'admin' ? 'Admin' : impersonatingOrgRole === 'owner' ? 'Proprietário' : impersonatingOrgRole === 'staff' ? 'Staff' : impersonatingOrgRole || 'Cliente'} — {String(impersonatingProfile.nome_completo || impersonatingProfile.email || '')}
+                Vinculado: {impersonatingProfile.nome_completo || impersonatingProfile.email || 'Perfil'} — {impersonatingAccessLevel}
               </p>
               <p className="text-xs text-amber-600 truncate">
-                {String(impersonatingProfile.email || '')}
-                {impersonatingOrgName ? ` · ${impersonatingOrgName}` : impersonatingOrgId ? ` · Org: ${impersonatingOrgId}` : ''}
+                {impersonatingOrgName || impersonatingOrgId || ''}
+                {impersonatingOrgRole ? ` · Nível: ${impersonatingOrgRole}` : ''}
               </p>
             </div>
           </div>

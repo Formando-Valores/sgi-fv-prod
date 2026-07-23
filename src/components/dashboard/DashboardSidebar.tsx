@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { LogOut, Search, User as UserIcon, Building2 } from 'lucide-react';
+import { LogOut, Search, User as UserIcon, Building2, X, Check, Loader2 } from 'lucide-react';
 
 type SidebarLink = {
   to: string;
@@ -9,6 +9,8 @@ type SidebarLink = {
 };
 
 type ProfileSearchResult = Record<string, unknown>;
+
+const ACCESS_LEVELS = ['Administrador', 'Usuário Sênior', 'Usuário Pleno', 'Operador', 'Cliente'] as const;
 
 interface DashboardSidebarProps {
   sidebarOpen: boolean;
@@ -19,7 +21,6 @@ interface DashboardSidebarProps {
   hierarchyLabel: string;
   orgName?: string;
   links: SidebarLink[];
-  /** Profile search for impersonation (admin only) */
   showProfileSearch?: boolean;
   profileSearchQuery?: string;
   onProfileSearchChange?: (query: string) => void;
@@ -28,12 +29,15 @@ interface DashboardSidebarProps {
   isSearching?: boolean;
   profileSearchRef?: React.RefObject<HTMLDivElement>;
   onSelectProfile?: (profile: ProfileSearchResult) => void;
-  /** Organizações disponíveis para seleção de contexto (admin) */
   impersonateAvailableOrgs?: Array<{ id: string; name?: string; slug?: string }>;
-  /** ID da org selecionada no modo impersonation */
   impersonatingOrgId?: string | null;
-  /** Callback ao trocar de org no modo impersonation */
   onSwitchImpersonatedOrg?: (orgId: string) => void;
+  selectedProfile?: ProfileSearchResult | null;
+  onClearSelectedProfile?: () => void;
+  accessLevel?: string;
+  onAccessLevelChange?: (level: string) => void;
+  onLinkProfile?: () => void;
+  isLinkingProfile?: boolean;
 }
 
 const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
@@ -43,11 +47,13 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
   profileSearchResults, profileSearchOpen, isSearching,
   profileSearchRef, onSelectProfile,
   impersonateAvailableOrgs, impersonatingOrgId, onSwitchImpersonatedOrg,
+  selectedProfile, onClearSelectedProfile,
+  accessLevel, onAccessLevelChange,
+  onLinkProfile, isLinkingProfile,
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const currentPath = location.pathname;
-  console.log('[DashboardSidebar] links:', links.map(l => l.to).join(', '));
 
   const renderUserInfo = () => (
     <div className="mb-3 p-3 rounded-xl bg-gray-50 border border-gray-200">
@@ -60,13 +66,87 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
 
   const renderProfileSearch = () => {
     if (!showProfileSearch) return null;
+
+    if (selectedProfile) {
+      const profileName = selectedProfile.nome_completo as string || selectedProfile.email as string || 'Sem nome';
+      const profileEmail = selectedProfile.email as string || '';
+
+      return (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-xl">
+          <div className="flex items-start justify-between gap-2 mb-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <UserIcon className="w-4 h-4 text-blue-500 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-blue-800 truncate">{profileName}</p>
+                {profileEmail && <p className="text-[11px] text-blue-500 truncate">{profileEmail}</p>}
+              </div>
+            </div>
+            <button type="button" onClick={onClearSelectedProfile} className="shrink-0 p-1 text-blue-400 hover:text-red-500 transition-colors" title="Limpar seleção">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="mb-2.5">
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-blue-600 mb-1">Nível de Acesso</label>
+            <select
+              value={accessLevel || 'Cliente'}
+              onChange={(e) => onAccessLevelChange?.(e.target.value)}
+              className="w-full px-3 py-2 text-sm bg-white border border-blue-200 rounded-lg font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer"
+            >
+              {ACCESS_LEVELS.map((level) => (
+                <option key={level} value={level}>{level}</option>
+              ))}
+            </select>
+          </div>
+
+          {impersonateAvailableOrgs && impersonateAvailableOrgs.length > 0 && (
+            <div className="mb-2.5">
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-blue-600 mb-1">Organização</label>
+              <div className="relative">
+                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                <select
+                  value={impersonatingOrgId || ''}
+                  onChange={(e) => onSwitchImpersonatedOrg?.(e.target.value)}
+                  className="w-full pl-8 pr-3 py-2 text-sm bg-white border border-blue-200 rounded-lg font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer"
+                >
+                  <option value="">Selecione uma organização</option>
+                  {impersonateAvailableOrgs.map((org) => (
+                    <option key={org.id} value={org.id}>{org.name || org.id}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={onLinkProfile}
+            disabled={isLinkingProfile || !impersonatingOrgId}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed rounded-lg transition-colors"
+          >
+            {isLinkingProfile ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Vinculando...
+              </>
+            ) : (
+              <>
+                <Check className="w-4 h-4" />
+                Vincular
+              </>
+            )}
+          </button>
+        </div>
+      );
+    }
+
     return (
       <div ref={profileSearchRef as React.RefObject<HTMLDivElement>} className="relative mb-4">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Buscar perfil..."
+            placeholder="Buscar perfil para vincular..."
             value={profileSearchQuery || ''}
             onChange={(e) => onProfileSearchChange?.(e.target.value)}
             className="w-full pl-9 pr-4 py-2 text-sm bg-white border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -85,14 +165,6 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-gray-900 truncate">{profile.nome_completo as string || 'Sem nome'}</p>
                   <p className="text-xs text-gray-500 truncate">{profile.email as string}</p>
-                  <div className="flex items-center gap-1.5 mt-1">
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700">
-                      {profile.org_role === 'owner' ? 'Proprietário' : profile.org_role === 'admin' ? 'Admin' : profile.org_role === 'staff' ? 'Staff' : 'Cliente'}
-                    </span>
-                    {profile.org_name && (
-                      <span className="text-[10px] text-gray-400 truncate">{profile.org_name as string}</span>
-                    )}
-                  </div>
                 </div>
               </button>
             ))}
@@ -116,29 +188,8 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
 
       {renderUserInfo()}
       {renderProfileSearch()}
-      {showProfileSearch && impersonateAvailableOrgs && impersonateAvailableOrgs.length > 0 && (
-        <div className="mb-4">
-          <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1.5">Organização</label>
-          <div className="relative">
-            <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <select
-              value={impersonatingOrgId || ''}
-              onChange={(e) => onSwitchImpersonatedOrg?.(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 text-sm bg-white border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-semibold text-gray-700 appearance-none cursor-pointer"
-            >
-              <option value="">Selecione uma organização</option>
-              {impersonateAvailableOrgs.map((org) => {
-                const orgLabel = org.name || org.id;
-                return (
-                  <option key={org.id} value={org.id}>{orgLabel}</option>
-                );
-              })}
-            </select>
-          </div>
-        </div>
-      )}
 
-      <nav className="space-y-2">
+      <nav className="space-y-2 mt-auto">
         {links.map((item) => {
           const isActive = currentPath === item.to || (item.to !== '/dashboard' && currentPath.startsWith(item.to));
           return (
@@ -146,11 +197,8 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
               key={item.to}
               type="button"
               onClick={() => {
-                console.log('[Sidebar] clicked:', item.label, 'to:', item.to);
                 const sectionFromPath = item.to.split('/')[2] || 'dashboard';
-                console.log('[Sidebar] calling onSelectSection:', sectionFromPath);
                 onSelectSection?.(sectionFromPath);
-                console.log('[Sidebar] calling navigate:', item.to);
                 navigate(item.to);
                 onNavigate();
               }}
