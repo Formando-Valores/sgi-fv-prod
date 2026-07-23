@@ -450,30 +450,16 @@ const ManagementSection: React.FC<ManagementSectionProps> = ({ users, setUsers, 
       const response = await fetch(`${supabaseUrl}/functions/v1/${SUPABASE_EDGE_FUNCTIONS.UPDATE_USER_ORG_MEMBERSHIP}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}`, apikey: String(import.meta.env.VITE_SUPABASE_ANON_KEY ?? '') },
-        body: JSON.stringify({ user_id: targetUserId, org_id: newAdminOrgId, role: orgRole }),
+        body: JSON.stringify({ user_id: targetUserId, org_id: newAdminOrgId, role: orgRole, name: sanitizeDisplayValue(newAdminName) }),
       });
       const result = await response.json();
       if (!response.ok || result.error) {
-        membershipWarning = 'Nível atualizado no perfil, mas o vínculo em org_members falhou: ' + (result.error || response.statusText);
+        membershipWarning = 'Vínculo org_members falhou: ' + (result.error || response.statusText);
+      } else if (result.profile_warning) {
+        membershipWarning = result.profile_warning;
       }
     } catch (fnErr) {
-      membershipWarning = 'Nível atualizado no perfil, mas o vínculo em org_members falhou: ' + String(fnErr);
-    }
-
-    setUserCreationStatus('Atualizando perfil…');
-
-    const { error: profileUpdateError } = await supabase
-      .from('profiles')
-      .update({
-        nome_completo: sanitizeDisplayValue(newAdminName),
-        name: sanitizeDisplayValue(newAdminName),
-        role: newAccessLevel,
-        org_id: newAdminOrgId,
-      })
-      .eq('id', targetUserId);
-
-    if (profileUpdateError) {
-      console.warn('handleCreateUser: profiles.update() falhou —', profileUpdateError.message);
+      membershipWarning = 'Vínculo org_members falhou: ' + String(fnErr);
     }
 
     setUserCreationStatus('Finalizando…');

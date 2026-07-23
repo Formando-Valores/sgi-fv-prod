@@ -19,7 +19,7 @@ Deno.serve(async (request) => {
   }
 
   try {
-    const { user_id, org_id, role } = await request.json();
+    const { user_id, org_id, role, name } = await request.json();
 
     if (!user_id || !org_id || !role) {
       return new Response(JSON.stringify({ error: 'user_id, org_id e role são obrigatórios.' }), {
@@ -56,7 +56,24 @@ Deno.serve(async (request) => {
       });
     }
 
-    return new Response(JSON.stringify({ success: true, user_id, org_id, role }), {
+    const profileUpdate: Record<string, unknown> = { org_id };
+    if (name) {
+      profileUpdate.nome_completo = name;
+      profileUpdate.name = name;
+    }
+    profileUpdate.role = role === 'admin' ? 'Administrador' : role === 'owner' ? 'Administrador' : 'Cliente';
+
+    const { error: profileError } = await adminClient
+      .from('profiles')
+      .update(profileUpdate)
+      .eq('id', user_id);
+
+    let profile_warning = '';
+    if (profileError) {
+      profile_warning = `Perfil não atualizado: ${profileError.message}`;
+    }
+
+    return new Response(JSON.stringify({ success: true, user_id, org_id, role, profile_warning: profile_warning || undefined }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
