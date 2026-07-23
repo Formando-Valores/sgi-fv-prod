@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { LogOut, Eye, EyeOff, Shield } from 'lucide-react';
+import { LogOut, Eye, Shield, Building2 } from 'lucide-react';
 
 type SidebarLink = {
   to: string;
@@ -23,17 +23,22 @@ interface DashboardSidebarProps {
   accessLevel?: string;
   onAccessLevelChange?: (level: string) => void;
   originalRoleLabel?: string;
+  availableOrgs?: Array<{ org_id: string; organizations?: { name?: string } }>;
+  activeOrgId?: string | null;
+  onSwitchOrg?: (orgId: string) => void;
 }
 
 const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
   sidebarOpen, onNavigate, onSelectSection, onLogout,
   userName, hierarchyLabel, orgName, links,
   showRoleSwitcher, accessLevel, onAccessLevelChange, originalRoleLabel,
+  availableOrgs, activeOrgId, onSwitchOrg,
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const currentPath = location.pathname;
   const isViewingAsDifferent = showRoleSwitcher && accessLevel && originalRoleLabel && accessLevel !== originalRoleLabel;
+  const hasMultiOrg = (availableOrgs?.length ?? 0) > 1;
 
   const renderUserInfo = () => (
     <div className="mb-3 p-3 rounded-xl bg-gray-50 border border-gray-200">
@@ -72,6 +77,30 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
     );
   };
 
+  const renderOrgSelector = () => {
+    if (!showRoleSwitcher || !hasMultiOrg) return null;
+
+    return (
+      <div className="mb-4 p-3 rounded-xl border bg-gray-50 border-gray-200">
+        <div className="flex items-center gap-2 mb-2">
+          <Building2 className="w-3.5 h-3.5 text-gray-500" />
+          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Organização</span>
+        </div>
+        <select
+          value={activeOrgId || ''}
+          onChange={(e) => onSwitchOrg?.(e.target.value)}
+          className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer"
+        >
+          {availableOrgs?.map((membership) => (
+            <option key={membership.org_id} value={membership.org_id}>
+              {membership.organizations?.name || membership.org_id}
+            </option>
+          ))}
+        </select>
+      </div>
+    );
+  };
+
   return (
     <aside
       className={`fixed lg:static inset-y-0 left-0 z-50 lg:z-auto w-72 shrink-0 bg-white border border-gray-100 rounded-r-2xl lg:rounded-2xl p-5 h-full lg:h-fit transition-transform duration-300 shadow-sm flex flex-col overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
@@ -81,6 +110,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
 
       {renderUserInfo()}
       {renderRoleSwitcher()}
+      {renderOrgSelector()}
 
       <nav className="space-y-2 mt-auto">
         {links.map((item) => {

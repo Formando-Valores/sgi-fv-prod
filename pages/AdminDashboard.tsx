@@ -161,6 +161,9 @@ const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({
         accessLevel={accessLevel}
         onAccessLevelChange={onAccessLevelChange}
         originalRoleLabel={originalRoleLabel}
+        availableOrgs={availableOrgs}
+        activeOrgId={activeOrgId}
+        onSwitchOrg={onSwitchOrg}
       />
     )}
     topbar={(
