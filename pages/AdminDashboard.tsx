@@ -1504,7 +1504,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       onPrint={handlePrint}
       onSelectSection={(nextSection) => setCurrentSection(parseSectionCandidate(nextSection) || 'dashboard')}
       currentOrgName={currentOrgName}
-      availableOrgs={currentUser.availableOrgs}
+      availableOrgs={organizations.map(o => ({ org_id: o.id, organizations: { name: o.name, is_active: o.isActive } }))}
       onSwitchOrg={onSwitchOrg}
       activeOrgId={activeOrgId}
       showRoleSwitcher={realPermissions.isAdminHierarchy}

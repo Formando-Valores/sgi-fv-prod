@@ -38,7 +38,6 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
   const location = useLocation();
   const currentPath = location.pathname;
   const isViewingAsDifferent = showRoleSwitcher && accessLevel && originalRoleLabel && accessLevel !== originalRoleLabel;
-  const hasMultiOrg = (availableOrgs?.length ?? 0) > 1;
 
   const renderUserInfo = () => (
     <div className="mb-3 p-3 rounded-xl bg-gray-50 border border-gray-200">
@@ -78,7 +77,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
   };
 
   const renderOrgSelector = () => {
-    if (!showRoleSwitcher || !hasMultiOrg) return null;
+    if (!showRoleSwitcher) return null;
 
     return (
       <div className="mb-4 p-3 rounded-xl border bg-gray-50 border-gray-200">
