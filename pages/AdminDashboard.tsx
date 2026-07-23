@@ -116,7 +116,7 @@ type AdminDashboardLayoutProps = {
   profileSearchRef: React.RefObject<HTMLDivElement | null>;
   onSelectProfile: (profile: Profile) => void;
   /** Lista de organizações do admin para o seletor de contexto */
-  impersonateAvailableOrgs?: OrgMembership[];
+  impersonateAvailableOrgs?: Organization[];
   /** ID da org selecionada no modo impersonation */
   impersonatingOrgId?: string | null;
   /** Callback ao trocar de org no modo impersonation */
@@ -287,6 +287,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [impersonatingOrgId, setImpersonatingOrgId] = useState<string | null>(null);
   const [impersonatingOrgName, setImpersonatingOrgName] = useState<string | null>(null);
   const [impersonatingOrgRole, setImpersonatingOrgRole] = useState<string | null>(null);
+  const [allOrganizations, setAllOrganizations] = useState<Organization[]>([]);
   const [profileSearchQuery, setProfileSearchQuery] = useState('');
   const [profileSearchResults, setProfileSearchResults] = useState<any[]>([]);
   const [profileSearchOpen, setProfileSearchOpen] = useState(false);
@@ -1532,11 +1533,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     setSelectedUser(null);
     setEditingUser(null);
 
-    const availableOrgIds = (currentUser.availableOrgs || []).map(o => o.org_id);
+    const availableOrgIds = organizations.map(o => o.id);
     if (availableOrgIds.length === 1) {
       setImpersonatingOrgId(availableOrgIds[0]);
-      const org = currentUser.availableOrgs?.find(o => o.org_id === availableOrgIds[0]);
-      setImpersonatingOrgName((org?.organizations as { name?: string } | undefined)?.name || null);
+      setImpersonatingOrgName(organizations[0]?.name || null);
     } else if (!availableOrgIds.includes(impersonatingOrgId || '')) {
       setImpersonatingOrgId(null);
       setImpersonatingOrgName(null);
@@ -1579,8 +1579,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
   const handleSwitchImpersonatedOrg = async (orgId: string) => {
     setImpersonatingOrgId(orgId);
-    const org = currentUser.availableOrgs?.find(o => o.org_id === orgId);
-    setImpersonatingOrgName((org?.organizations as { name?: string } | undefined)?.name || null);
+    const org = organizations.find(o => o.id === orgId);
+    setImpersonatingOrgName(org?.name || null);
   };
 
   const handleClearImpersonation = () => {
@@ -1681,7 +1681,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       isSearching={isSearching}
       profileSearchRef={profileSearchRef}
       onSelectProfile={handleSelectProfileToImpersonate}
-      impersonateAvailableOrgs={currentUser.availableOrgs}
+      impersonateAvailableOrgs={organizations}
       impersonatingOrgId={impersonatingOrgId}
       onSwitchImpersonatedOrg={handleSwitchImpersonatedOrg}
     >

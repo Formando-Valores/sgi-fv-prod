@@ -29,7 +29,7 @@ interface DashboardSidebarProps {
   profileSearchRef?: React.RefObject<HTMLDivElement>;
   onSelectProfile?: (profile: ProfileSearchResult) => void;
   /** Organizações disponíveis para seleção de contexto (admin) */
-  impersonateAvailableOrgs?: Array<{ org_id: string; role?: string; organizations?: unknown }>;
+  impersonateAvailableOrgs?: Array<{ id: string; name?: string; slug?: string }>;
   /** ID da org selecionada no modo impersonation */
   impersonatingOrgId?: string | null;
   /** Callback ao trocar de org no modo impersonation */
@@ -127,10 +127,10 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
               className="w-full pl-9 pr-4 py-2 text-sm bg-white border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-semibold text-gray-700 appearance-none cursor-pointer"
             >
               <option value="">Selecione uma organização</option>
-              {impersonateAvailableOrgs.map((membership) => {
-                const orgName = (membership.organizations as { name?: string } | undefined)?.name || membership.org_id;
+              {impersonateAvailableOrgs.map((org) => {
+                const orgLabel = org.name || org.id;
                 return (
-                  <option key={membership.org_id} value={membership.org_id}>{orgName}</option>
+                  <option key={org.id} value={org.id}>{orgLabel}</option>
                 );
               })}
             </select>

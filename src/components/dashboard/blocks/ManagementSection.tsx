@@ -441,35 +441,23 @@ const ManagementSection: React.FC<ManagementSectionProps> = ({ users, setUsers, 
 
     const orgRole = mapAccessLevelToOrgRole(newAccessLevel);
 
-    await supabase.from('org_members').delete().eq('user_id', targetUserId);
-
-    const { error: upsertMemberError } = await supabase
-      .from('org_members')
-      .insert(
-        { org_id: newAdminOrgId, user_id: targetUserId, role: orgRole }
-      );
-
     let membershipWarning = '';
 
-    if (upsertMemberError) {
-      const errorMessage = String(upsertMemberError.message || '').toLowerCase();
-      const errorCode = String((upsertMemberError as { code?: string }).code || '').toLowerCase();
-      const errorStatus = String((upsertMemberError as { status?: number }).status || '');
-
-      const isPermissionError =
-        errorStatus === '403' ||
-        errorCode === '42501' ||
-        errorMessage.includes('permission denied') ||
-        errorMessage.includes('row-level security') ||
-        errorMessage.includes('not allowed');
-
-      if (isPermissionError) {
-        membershipWarning = 'Nível atualizado no perfil, mas o vínculo em org_members foi bloqueado por permissão.';
-      } else {
-        setUserCreationStatus(null);
-        showToast({ type: 'error', message: 'Erro ao salvar vínculo na tabela org_members.' });
-        return;
+    try {
+      const supabaseUrl = String(import.meta.env.VITE_SUPABASE_URL ?? '').trim();
+      const sessionRes = await supabase.auth.getSession();
+      const accessToken = sessionRes?.data?.session?.access_token ?? '';
+      const response = await fetch(`${supabaseUrl}/functions/v1/${SUPABASE_EDGE_FUNCTIONS.UPDATE_USER_ORG_MEMBERSHIP}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}`, apikey: String(import.meta.env.VITE_SUPABASE_ANON_KEY ?? '') },
+        body: JSON.stringify({ user_id: targetUserId, org_id: newAdminOrgId, role: orgRole }),
+      });
+      const result = await response.json();
+      if (!response.ok || result.error) {
+        membershipWarning = 'Nível atualizado no perfil, mas o vínculo em org_members falhou: ' + (result.error || response.statusText);
       }
+    } catch (fnErr) {
+      membershipWarning = 'Nível atualizado no perfil, mas o vínculo em org_members falhou: ' + String(fnErr);
     }
 
     setUserCreationStatus('Atualizando perfil…');
