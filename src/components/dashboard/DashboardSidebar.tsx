@@ -78,11 +78,14 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-gray-900 truncate">{profile.nome_completo as string || 'Sem nome'}</p>
                   <p className="text-xs text-gray-500 truncate">{profile.email as string}</p>
-                  <p className="text-xs text-gray-400 truncate">
-                    {profile.nif_cpf as string && `CPF/NIF: ${profile.nif_cpf as string}`}
-                    {profile.nif_cpf as string && profile.documento_identidade as string && ' | '}
-                    {profile.documento_identidade as string && `Doc: ${profile.documento_identidade as string}`}
-                  </p>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700">
+                      {profile.org_role === 'owner' ? 'Proprietário' : profile.org_role === 'admin' ? 'Admin' : profile.org_role === 'staff' ? 'Staff' : 'Cliente'}
+                    </span>
+                    {profile.org_name && (
+                      <span className="text-[10px] text-gray-400 truncate">{profile.org_name as string}</span>
+                    )}
+                  </div>
                 </div>
               </button>
             ))}

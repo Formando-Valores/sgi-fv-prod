@@ -1,7 +1,7 @@
 ﻿
 import React, { useEffect, useState, useRef } from 'react';
 import { Eye, Pencil, Users, ShieldCheck, X, Plus, Trash2, Calendar, MessageSquare, Check, UserCheck, LayoutDashboard, FolderKanban, Users2, Settings, Building2, Flag, FileBarChart2, ExternalLink, Loader2, CreditCard, ChevronDown, Upload, FileDown, Mail, SearchX, BarChart3, FilePlus } from 'lucide-react';
-import { User, ProcessStatus, UserRole, Hierarchy, ServiceUnit, Organization } from '../types';
+import { User, ProcessStatus, UserRole, Hierarchy, ServiceUnit, Organization, type OrgRole } from '../types';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { SERVICE_MANAGERS } from '../constants';
 import { loadOrganizations } from '../organizationRepository';
@@ -384,10 +384,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
 
 
-  const permissions = resolvePermissions(currentUser.org_role ?? (currentUser.role === UserRole.ADMIN ? 'admin' : 'client'), {
+  const realPermissions = resolvePermissions(currentUser.org_role ?? (currentUser.role === UserRole.ADMIN ? 'admin' : 'client'), {
     profileRole: currentUser.profile_role ?? null,
   });
-  const permissionSubject = { org_role: currentUser.org_role ?? null, hierarchy: permissions.hierarchy };
+
+  const effectiveOrgRole = impersonatingProfile
+    ? (String(impersonatingProfile.org_role || 'client') as OrgRole)
+    : (currentUser.org_role ?? (currentUser.role === UserRole.ADMIN ? 'admin' : 'client'));
+  const effectiveProfileRole = impersonatingProfile
+    ? (impersonatingProfile.profile_role as string | null ?? null)
+    : (currentUser.profile_role ?? null);
+
+  const permissions = resolvePermissions(effectiveOrgRole, {
+    profileRole: effectiveProfileRole,
+  });
+  const permissionSubject = { org_role: effectiveOrgRole, hierarchy: permissions.hierarchy };
   const allowedModules = getAllowedModules(permissionSubject);
   const canCreateProcess = can('create', 'processos', permissionSubject);
   const canViewAllReports = can('view_all', 'relatorios', permissionSubject);
@@ -1471,10 +1482,26 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     setIsSearching(true);
     const { data } = await supabase
       .from('profiles')
-      .select('id, nome_completo, email, nif_cpf, documento_identidade, phone, pais, endereco, estado_civil')
+      .select('id, nome_completo, email, nif_cpf, documento_identidade, phone, pais, endereco, estado_civil, org_id')
       .or(`nome_completo.ilike.%${query}%,email.ilike.%${query}%,nif_cpf.ilike.%${query}%,documento_identidade.ilike.%${query}%`)
       .limit(10);
-    setProfileSearchResults(data || []);
+
+    const enriched = await Promise.all((data || []).map(async (profile) => {
+      if (!profile.org_id) return { ...profile, org_role: 'client', org_name: null };
+      const { data: member } = await supabase
+        .from('org_members')
+        .select('role, organizations(name)')
+        .eq('user_id', profile.id)
+        .eq('org_id', profile.org_id)
+        .single();
+      return {
+        ...profile,
+        org_role: member?.role || 'client',
+        org_name: (member?.organizations as { name?: string } | undefined)?.name || null,
+      };
+    }));
+
+    setProfileSearchResults(enriched);
     setProfileSearchOpen(true);
     setIsSearching(false);
   };
@@ -1486,6 +1513,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     setProfileSearchQuery('');
     setProfileSearchResults([]);
     setProfileSearchOpen(false);
+
     const processes = await listProcessesByUserId(uid);
     const typed = processes as DbProcess[];
     setDbProcesses(typed);
@@ -1493,7 +1521,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     setProfileMap(new Map([[uid, profile]]));
     setSelectedUser(null);
     setEditingUser(null);
-    showToast({ type: 'success', message: `Visualizando como ${profile.nome_completo || profile.email}` });
+
+    const roleLabel = profile.org_role === 'client' ? 'Cliente' : profile.org_role === 'admin' ? 'Administrador' : profile.org_role === 'owner' ? 'Proprietário' : String(profile.org_role || 'Cliente');
+    showToast({ type: 'success', message: `Visão alterada para ${roleLabel}: ${profile.nome_completo || profile.email}` });
   };
 
   const handleClearImpersonation = () => {
@@ -1574,16 +1604,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       sidebarOpen={sidebarOpen}
       setSidebarOpen={setSidebarOpen}
       currentUserName={currentUser.name}
-      hierarchyLabel={permissions.hierarchy}
+      hierarchyLabel={impersonatingProfile ? String(impersonatingProfile.org_role || 'client') : permissions.hierarchy}
       sidebarLinks={sidebarLinks}
       onLogout={onLogout}
       onPrint={handlePrint}
       onSelectSection={(nextSection) => setCurrentSection(parseSectionCandidate(nextSection) || 'dashboard')}
-      currentOrgName={currentOrgName}
+      currentOrgName={impersonatingProfile ? String(impersonatingProfile.org_name || currentOrgName || '') : currentOrgName}
       availableOrgs={currentUser.availableOrgs}
       onSwitchOrg={onSwitchOrg}
-      activeOrgId={activeOrgId}
-      showProfileSearch={permissions.isAdminHierarchy}
+      activeOrgId={impersonatingProfile ? (impersonatingProfile.org_id as string || null) : activeOrgId}
+      showProfileSearch={realPermissions.isAdminHierarchy}
       profileSearchQuery={profileSearchQuery}
       onProfileSearchChange={(q) => { setProfileSearchQuery(q); searchProfiles(q); }}
       profileSearchResults={profileSearchResults}
@@ -1598,10 +1628,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
             <Eye className="w-5 h-5 text-amber-600 shrink-0" />
             <div className="min-w-0">
               <p className="text-sm font-bold text-amber-800 truncate">
-                Visualizando como {String(impersonatingProfile.nome_completo || impersonatingProfile.email || '')}
+                Visão: {String(impersonatingProfile.org_role === 'client' ? 'Cliente' : impersonatingProfile.org_role === 'admin' ? 'Admin' : impersonatingProfile.org_role === 'owner' ? 'Proprietário' : impersonatingProfile.org_role || 'Cliente')} — {String(impersonatingProfile.nome_completo || impersonatingProfile.email || '')}
               </p>
               <p className="text-xs text-amber-600 truncate">
                 {String(impersonatingProfile.email || '')}
+                {impersonatingProfile.org_name ? ` · ${impersonatingProfile.org_name}` : ''}
               </p>
             </div>
           </div>
