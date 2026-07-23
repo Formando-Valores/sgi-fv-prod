@@ -307,10 +307,10 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
         }
 
 
-        // Busca todas as organizações que o usuário pode acessar (multi-org)
+        // Busca todas as organizações ativas que o usuário pode acessar (multi-org)
         const { data: loginOrgMemberships } = await supabase
           .from('org_members')
-          .select('org_id, role, organizations(name, slug)')
+          .select('org_id, role, organizations(name, slug, is_active)')
           .eq('user_id', userId);
 
         const contextOrganizationId = contextData?.org_id ?? contextByEmailData?.org_id;
@@ -347,7 +347,10 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
           organizationId: profileOrgId ?? existingUser?.organizationId ?? contextOrganizationId ?? undefined,
           organizationName: profile?.organization_name ?? existingUser?.organizationName ?? contextOrganizationName ?? defaultOrganization?.name ?? undefined,
           activeOrgId: profileOrgId ?? existingUser?.organizationId ?? contextOrganizationId ?? undefined,
-          availableOrgs: (loginOrgMemberships || []) as OrgMembership[],
+          availableOrgs: (loginOrgMemberships || []).filter((m: Record<string, unknown>) => {
+            const org = m.organizations as Record<string, unknown> | undefined;
+            return org?.is_active !== false;
+          }) as OrgMembership[],
         };
 
         console.info('[login] profile carregado, redirecionando para dashboard', {

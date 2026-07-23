@@ -191,7 +191,10 @@ const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({
             <div className="px-4 py-2 border-b border-gray-100">
               <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Trocar Organização</p>
             </div>
-            {availableOrgs?.map((membership) => {
+            {availableOrgs?.filter((membership) => {
+              const org = membership.organizations as Record<string, unknown> | undefined;
+              return org?.is_active !== false;
+            }).map((membership) => {
               const orgName = (membership.organizations as { name?: string } | undefined)?.name || membership.org_id;
               const isActive = membership.org_id === activeOrgId;
               return (

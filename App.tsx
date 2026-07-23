@@ -155,10 +155,10 @@ const RootApp: React.FC = () => {
           }
         }
 
-        // Busca todas as organizações que o usuário pode acessar (multi-org)
+        // Busca todas as organizações ativas que o usuário pode acessar (multi-org)
         const { data: orgMembershipsData } = await supabase
           .from('org_members')
-          .select('org_id, role, organizations(name, slug)')
+          .select('org_id, role, organizations(name, slug, is_active)')
           .eq('user_id', sessionUser.id);
 
         const orgRole = contextData?.org_role ?? contextByEmailData?.org_role ?? profile?.role ?? null;
@@ -187,7 +187,10 @@ const RootApp: React.FC = () => {
           organizationId: contextData?.org_id ?? contextByEmailData?.org_id ?? profile?.org_id ?? existingUser?.organizationId,
           organizationName: contextData?.org_name ?? contextByEmailData?.org_name ?? existingUser?.organizationName,
           activeOrgId: contextData?.org_id ?? contextByEmailData?.org_id ?? profile?.org_id ?? existingUser?.organizationId,
-          availableOrgs: (orgMembershipsData || []) as OrgMembership[],
+          availableOrgs: (orgMembershipsData || []).filter((m: Record<string, unknown>) => {
+            const org = m.organizations as Record<string, unknown> | undefined;
+            return org?.is_active !== false;
+          }) as OrgMembership[],
         };
 
         if (mounted) {

@@ -91,7 +91,10 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
           onChange={(e) => onSwitchOrg?.(e.target.value)}
           className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer"
         >
-          {availableOrgs?.map((membership) => (
+          {availableOrgs?.filter((membership) => {
+            const org = membership.organizations as Record<string, unknown> | undefined;
+            return org?.is_active !== false;
+          }).map((membership) => (
             <option key={membership.org_id} value={membership.org_id}>
               {membership.organizations?.name || membership.org_id}
             </option>
