@@ -251,7 +251,7 @@ const DashboardSection: React.FC<DashboardSectionProps> = ({
           </>
         ) : (
           <>
-            <section className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5 no-print">
+            <section className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-2 xl:grid-cols-5 no-print">
               {dashboardHighlights.map((item) => {
                 const canNavigateToHighlight = canAccessSection(item.targetSection);
                 return (
