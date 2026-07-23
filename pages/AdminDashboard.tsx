@@ -115,6 +115,12 @@ type AdminDashboardLayoutProps = {
   isSearching: boolean;
   profileSearchRef: React.RefObject<HTMLDivElement | null>;
   onSelectProfile: (profile: Profile) => void;
+  /** Lista de organizações do admin para o seletor de contexto */
+  impersonateAvailableOrgs?: OrgMembership[];
+  /** ID da org selecionada no modo impersonation */
+  impersonatingOrgId?: string | null;
+  /** Callback ao trocar de org no modo impersonation */
+  onSwitchImpersonatedOrg?: (orgId: string) => void;
 };
 
 const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({
@@ -139,6 +145,9 @@ const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({
   isSearching,
   profileSearchRef,
   onSelectProfile,
+  impersonateAvailableOrgs,
+  impersonatingOrgId,
+  onSwitchImpersonatedOrg,
 }) => {
   const [orgDropdownOpenLocal, setOrgDropdownOpenLocal] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -176,6 +185,9 @@ const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({
         isSearching={isSearching}
         profileSearchRef={profileSearchRef}
         onSelectProfile={onSelectProfile}
+        impersonateAvailableOrgs={impersonateAvailableOrgs}
+        impersonatingOrgId={impersonatingOrgId}
+        onSwitchImpersonatedOrg={onSwitchImpersonatedOrg}
       />
     )}
     topbar={(
@@ -272,6 +284,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [paymentProofs, setPaymentProofs] = useState<PaymentProof[]>([]);
   const [impersonatingUserId, setImpersonatingUserId] = useState<string | null>(null);
   const [impersonatingProfile, setImpersonatingProfile] = useState<Record<string, unknown> | null>(null);
+  const [impersonatingOrgId, setImpersonatingOrgId] = useState<string | null>(null);
+  const [impersonatingOrgName, setImpersonatingOrgName] = useState<string | null>(null);
+  const [impersonatingOrgRole, setImpersonatingOrgRole] = useState<string | null>(null);
   const [profileSearchQuery, setProfileSearchQuery] = useState('');
   const [profileSearchResults, setProfileSearchResults] = useState<any[]>([]);
   const [profileSearchOpen, setProfileSearchOpen] = useState(false);
@@ -388,9 +403,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     profileRole: currentUser.profile_role ?? null,
   });
 
-  const effectiveOrgRole = impersonatingProfile
-    ? (String(impersonatingProfile.org_role || 'client') as OrgRole)
-    : (currentUser.org_role ?? (currentUser.role === UserRole.ADMIN ? 'admin' : 'client'));
+  const effectiveOrgRole = impersonatingOrgRole
+    ? (String(impersonatingOrgRole || 'client') as OrgRole)
+    : impersonatingProfile
+      ? (String(impersonatingProfile.org_role || 'client') as OrgRole)
+      : (currentUser.org_role ?? (currentUser.role === UserRole.ADMIN ? 'admin' : 'client'));
   const effectiveProfileRole = impersonatingProfile
     ? (impersonatingProfile.profile_role as string | null ?? null)
     : (currentUser.profile_role ?? null);
@@ -1507,28 +1524,71 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   };
 
   const handleSelectProfileToImpersonate = async (profile: Record<string, unknown>) => {
-    const uid = profile.id as string;
-    setImpersonatingUserId(uid);
+    setImpersonatingUserId(profile.id as string);
     setImpersonatingProfile(profile);
     setProfileSearchQuery('');
     setProfileSearchResults([]);
     setProfileSearchOpen(false);
-
-    const processes = await listProcessesByUserId(uid);
-    const typed = processes as DbProcess[];
-    setDbProcesses(typed);
-    setInitialProcessesLoaded(true);
-    setProfileMap(new Map([[uid, profile]]));
     setSelectedUser(null);
     setEditingUser(null);
 
-    const roleLabel = profile.org_role === 'client' ? 'Cliente' : profile.org_role === 'admin' ? 'Administrador' : profile.org_role === 'owner' ? 'Proprietário' : String(profile.org_role || 'Cliente');
-    showToast({ type: 'success', message: `Visão alterada para ${roleLabel}: ${profile.nome_completo || profile.email}` });
+    const availableOrgIds = (currentUser.availableOrgs || []).map(o => o.org_id);
+    if (availableOrgIds.length === 1) {
+      setImpersonatingOrgId(availableOrgIds[0]);
+      const org = currentUser.availableOrgs?.find(o => o.org_id === availableOrgIds[0]);
+      setImpersonatingOrgName((org?.organizations as { name?: string } | undefined)?.name || null);
+    } else if (!availableOrgIds.includes(impersonatingOrgId || '')) {
+      setImpersonatingOrgId(null);
+      setImpersonatingOrgName(null);
+    }
+  };
+
+  useEffect(() => {
+    if (!impersonatingUserId || !impersonatingProfile || !impersonatingOrgId) return;
+
+    const applyContext = async () => {
+      const { data: member } = await supabase
+        .from('org_members')
+        .select('role')
+        .eq('user_id', impersonatingUserId)
+        .eq('org_id', impersonatingOrgId)
+        .single();
+
+      const resolvedRole = member?.role || 'client';
+      setImpersonatingOrgRole(resolvedRole);
+
+      const processes = await supabase
+        .from('processes')
+        .select('*')
+        .eq('org_id', impersonatingOrgId)
+        .eq('cliente_user_id', impersonatingUserId)
+        .order('created_at', { ascending: false });
+
+      const typed = (processes.data || []) as DbProcess[];
+      setDbProcesses(typed);
+      setInitialProcessesLoaded(true);
+      setProfileMap(new Map([[impersonatingUserId, impersonatingProfile]]));
+
+      const roleLabel = resolvedRole === 'client' ? 'Cliente' : resolvedRole === 'admin' ? 'Administrador' : resolvedRole === 'owner' ? 'Proprietário' : resolvedRole === 'staff' ? 'Staff' : String(resolvedRole);
+      const orgLabel = impersonatingOrgName || impersonatingOrgId;
+      showToast({ type: 'success', message: `Contexto alterado: ${roleLabel} em ${orgLabel}` });
+    };
+
+    applyContext();
+  }, [impersonatingUserId, impersonatingProfile, impersonatingOrgId]);
+
+  const handleSwitchImpersonatedOrg = async (orgId: string) => {
+    setImpersonatingOrgId(orgId);
+    const org = currentUser.availableOrgs?.find(o => o.org_id === orgId);
+    setImpersonatingOrgName((org?.organizations as { name?: string } | undefined)?.name || null);
   };
 
   const handleClearImpersonation = () => {
     setImpersonatingUserId(null);
     setImpersonatingProfile(null);
+    setImpersonatingOrgId(null);
+    setImpersonatingOrgName(null);
+    setImpersonatingOrgRole(null);
     setProfileSearchQuery('');
     setProfileSearchResults([]);
     setProfileSearchOpen(false);
@@ -1556,7 +1616,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         }
       });
     }
-    showToast({ type: 'info', message: 'Visualização normal restaurada.' });
+    showToast({ type: 'info', message: 'Contexto normal restaurado.' });
   };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1604,15 +1664,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       sidebarOpen={sidebarOpen}
       setSidebarOpen={setSidebarOpen}
       currentUserName={currentUser.name}
-      hierarchyLabel={impersonatingProfile ? String(impersonatingProfile.org_role || 'client') : permissions.hierarchy}
+      hierarchyLabel={impersonatingProfile ? String(impersonatingOrgRole || impersonatingProfile.org_role || 'client') : permissions.hierarchy}
       sidebarLinks={sidebarLinks}
       onLogout={onLogout}
       onPrint={handlePrint}
       onSelectSection={(nextSection) => setCurrentSection(parseSectionCandidate(nextSection) || 'dashboard')}
-      currentOrgName={impersonatingProfile ? String(impersonatingProfile.org_name || currentOrgName || '') : currentOrgName}
+      currentOrgName={impersonatingProfile && impersonatingOrgName ? impersonatingOrgName : impersonatingProfile ? String(impersonatingProfile.org_name || currentOrgName || '') : currentOrgName}
       availableOrgs={currentUser.availableOrgs}
       onSwitchOrg={onSwitchOrg}
-      activeOrgId={impersonatingProfile ? (impersonatingProfile.org_id as string || null) : activeOrgId}
+      activeOrgId={impersonatingProfile && impersonatingOrgId ? impersonatingOrgId : impersonatingProfile ? (impersonatingProfile.org_id as string || null) : activeOrgId}
       showProfileSearch={realPermissions.isAdminHierarchy}
       profileSearchQuery={profileSearchQuery}
       onProfileSearchChange={(q) => { setProfileSearchQuery(q); searchProfiles(q); }}
@@ -1621,6 +1681,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       isSearching={isSearching}
       profileSearchRef={profileSearchRef}
       onSelectProfile={handleSelectProfileToImpersonate}
+      impersonateAvailableOrgs={currentUser.availableOrgs}
+      impersonatingOrgId={impersonatingOrgId}
+      onSwitchImpersonatedOrg={handleSwitchImpersonatedOrg}
     >
       {impersonatingUserId && impersonatingProfile && (
         <div className="mb-4 p-3 bg-amber-50 border border-amber-300 rounded-xl flex items-center justify-between gap-3">
@@ -1628,11 +1691,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
             <Eye className="w-5 h-5 text-amber-600 shrink-0" />
             <div className="min-w-0">
               <p className="text-sm font-bold text-amber-800 truncate">
-                Visão: {String(impersonatingProfile.org_role === 'client' ? 'Cliente' : impersonatingProfile.org_role === 'admin' ? 'Admin' : impersonatingProfile.org_role === 'owner' ? 'Proprietário' : impersonatingProfile.org_role || 'Cliente')} — {String(impersonatingProfile.nome_completo || impersonatingProfile.email || '')}
+                Visão: {impersonatingOrgRole === 'client' ? 'Cliente' : impersonatingOrgRole === 'admin' ? 'Admin' : impersonatingOrgRole === 'owner' ? 'Proprietário' : impersonatingOrgRole === 'staff' ? 'Staff' : impersonatingOrgRole || 'Cliente'} — {String(impersonatingProfile.nome_completo || impersonatingProfile.email || '')}
               </p>
               <p className="text-xs text-amber-600 truncate">
                 {String(impersonatingProfile.email || '')}
-                {impersonatingProfile.org_name ? ` · ${impersonatingProfile.org_name}` : ''}
+                {impersonatingOrgName ? ` · ${impersonatingOrgName}` : impersonatingOrgId ? ` · Org: ${impersonatingOrgId}` : ''}
               </p>
             </div>
           </div>

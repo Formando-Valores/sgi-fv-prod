@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { LogOut, Search, User as UserIcon } from 'lucide-react';
+import { LogOut, Search, User as UserIcon, Building2 } from 'lucide-react';
 
 type SidebarLink = {
   to: string;
@@ -28,6 +28,12 @@ interface DashboardSidebarProps {
   isSearching?: boolean;
   profileSearchRef?: React.RefObject<HTMLDivElement>;
   onSelectProfile?: (profile: ProfileSearchResult) => void;
+  /** Organizações disponíveis para seleção de contexto (admin) */
+  impersonateAvailableOrgs?: Array<{ org_id: string; role?: string; organizations?: unknown }>;
+  /** ID da org selecionada no modo impersonation */
+  impersonatingOrgId?: string | null;
+  /** Callback ao trocar de org no modo impersonation */
+  onSwitchImpersonatedOrg?: (orgId: string) => void;
 }
 
 const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
@@ -36,6 +42,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
   showProfileSearch, profileSearchQuery, onProfileSearchChange,
   profileSearchResults, profileSearchOpen, isSearching,
   profileSearchRef, onSelectProfile,
+  impersonateAvailableOrgs, impersonatingOrgId, onSwitchImpersonatedOrg,
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -109,6 +116,27 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
 
       {renderUserInfo()}
       {renderProfileSearch()}
+      {showProfileSearch && impersonateAvailableOrgs && impersonateAvailableOrgs.length > 0 && (
+        <div className="mb-4">
+          <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1.5">Organização</label>
+          <div className="relative">
+            <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <select
+              value={impersonatingOrgId || ''}
+              onChange={(e) => onSwitchImpersonatedOrg?.(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 text-sm bg-white border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-semibold text-gray-700 appearance-none cursor-pointer"
+            >
+              <option value="">Selecione uma organização</option>
+              {impersonateAvailableOrgs.map((membership) => {
+                const orgName = (membership.organizations as { name?: string } | undefined)?.name || membership.org_id;
+                return (
+                  <option key={membership.org_id} value={membership.org_id}>{orgName}</option>
+                );
+              })}
+            </select>
+          </div>
+        </div>
+      )}
 
       <nav className="space-y-2">
         {links.map((item) => {
