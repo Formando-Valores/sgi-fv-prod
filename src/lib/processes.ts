@@ -123,7 +123,7 @@ async function resolveProcessQueryScope(
 
   const normalizedOrgId = orgId ? String(orgId).trim() : '';
   const rawResolvedOrgId = normalizedOrgId || null;
-  const resolvedOrgId = isDefaultOrgAdmin ? null : rawResolvedOrgId;
+  const resolvedOrgId = rawResolvedOrgId;
 
   if (!isDefaultOrgAdmin && !resolvedOrgId) {
     logError(`[${moduleName}] blocked: org_id is mandatory for non-default-org profile.`, {
