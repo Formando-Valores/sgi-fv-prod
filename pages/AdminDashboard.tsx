@@ -201,6 +201,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [validatingProof, setValidatingProof] = useState(false);
   const [paymentProofs, setPaymentProofs] = useState<PaymentProof[]>([]);
   const [impersonatingAccessLevel, setImpersonatingAccessLevel] = useState('Administrador');
+  const isFirstOrgLoad = useRef(true);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { showToast } = useToast();
@@ -399,6 +400,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   useEffect(() => {
     const orgId = getActiveOrgId(currentUser);
     if (orgId) {
+      if (!isFirstOrgLoad.current) {
+        const orgLabel = organizations.find(o => o.id === orgId)?.name || 'organização';
+        showToast({ type: 'success', message: `Organização alterada para ${orgLabel}` });
+      }
+      isFirstOrgLoad.current = false;
       listProcesses(orgId).then(async (processes) => {
         const typed = processes as DbProcess[];
         setDbProcesses(typed);
