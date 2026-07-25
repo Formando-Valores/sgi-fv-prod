@@ -12,6 +12,17 @@ const jsonResponse = (status: number, body: Record<string, unknown>) =>
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 
+async function getSignatureImageBase64(): Promise<string> {
+  try {
+    const filePath = new URL('../../img/assinatura_leonardo_pagio.png', import.meta.url).pathname;
+    const file = await Deno.readFile(filePath);
+    return btoa(String.fromCharCode(...file));
+  } catch (err) {
+    console.warn('[send-certificate] Imagem de assinatura não encontrada:', err);
+    return '';
+  }
+}
+
 function generateCertificateHtml(params: {
   nome: string;
   nacionalidade: string;
@@ -129,17 +140,26 @@ function generateCertificateHtml(params: {
       <!-- SIGNATURES -->
       <tr>
         <td style="padding:16px 40px 32px;">
-          <table width="100%" cellpadding="0" cellspacing="0">
+          <table width="100%" cellpadding="0" cellspacing="0" style="table-layout: fixed;">
             <tr>
-              <td style="width:50%;text-align:center;padding:0 8px;">
-                <div style="border-top:1px solid #374151;padding:8px 0 0;margin-bottom:4px;"></div>
-                <p style="color:#1e3a5f;font-size:12px;font-weight:700;margin:0;">O Presidente da Direção</p>
-                <p style="color:#6b7280;font-size:10px;margin:0;">(assinatura digital)</p>
+              <td style="width:33.33%;text-align:center;padding:0 12px;vertical-align:bottom;">
+                <img src="cid:assinatura_leonardo" alt="Assinatura Leonar Pagio" style="max-width:180px;max-height:80px;width:auto;height:auto;object-fit:contain;display:block;margin:0 auto 8px;" />
+                <p style="color:#1e3a5f;font-size:12px;font-weight:700;margin:0 0 2px;">Leonar Pagio</p>
+                <p style="color:#6b7280;font-size:10px;margin:0;">Advogado</p>
               </td>
-              <td style="width:50%;text-align:center;padding:0 8px;">
-                <div style="border-top:1px solid #374151;padding:8px 0 0;margin-bottom:4px;"></div>
-                <p style="color:#1e3a5f;font-size:12px;font-weight:700;margin:0;">O Secretário</p>
-                <p style="color:#6b7280;font-size:10px;margin:0;">(assinatura digital)</p>
+              <td style="width:33.33%;text-align:center;padding:0 12px;vertical-align:bottom;">
+                <div style="width:80px;height:80px;border:2px dashed #d4a843;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;margin:0 auto 8px;background:#fefce8;">
+                  <span style="color:#d4a843;font-size:10px;font-weight:700;">SELO</span>
+                </div>
+                <p style="color:#1e3a5f;font-size:12px;font-weight:700;margin:0 0 2px;">Selo da Associação</p>
+                <p style="color:#6b7280;font-size:10px;margin:0;">(carimbo)</p>
+              </td>
+              <td style="width:33.33%;text-align:center;padding:0 12px;vertical-align:bottom;">
+                <div style="width:180px;height:80px;border:2px dashed #d1d5db;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;margin:0 auto 8px;background:#f9fafb;color:#9ca3af;font-size:10px;font-weight:700;">
+                  Assinatura do Sócio
+                </div>
+                <p style="color:#1e3a5f;font-size:12px;font-weight:700;margin:0 0 2px;">Nome do Sócio</p>
+                <p style="color:#6b7280;font-size:10px;margin:0;">Advogado</p>
               </td>
             </tr>
           </table>
@@ -278,6 +298,7 @@ Deno.serve(async (request) => {
     };
 
     const certificateHtml = generateCertificateHtml(certParams);
+    const signatureBase64 = await getSignatureImageBase64();
     const textBody = [
       `Certificado de Filiação - ${nome}`,
       '',
@@ -301,6 +322,12 @@ Deno.serve(async (request) => {
         subject: `Certificado de Filiação n.º ${certNumber} - ${nome}`,
         html: certificateHtml,
         text: textBody,
+        attachments: signatureBase64 ? [{
+          filename: 'assinatura_leonardo_pagio.png',
+          content: signatureBase64,
+          disposition: 'inline',
+          contentId: 'assinatura_leonardo',
+        }] : [],
       }),
     });
 

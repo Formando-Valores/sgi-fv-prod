@@ -178,20 +178,55 @@ const CertificatePage: React.FC = () => {
             </div>
           </div>
 
-          <table width="100%" cellPadding="0" cellSpacing="0" style={{ marginBottom: 24 }}>
-            <tr>
-              <td style={{ width: '50%', textAlign: 'center', padding: '0 8px' }}>
-                <div style={{ borderTop: '1px solid #374151', padding: '8px 0 0', marginBottom: 4 }} />
-                <p style={{ color: '#1e3a5f', fontSize: 12, fontWeight: 700, margin: 0 }}>O Presidente da Direção</p>
-                <p style={{ color: '#6b7280', fontSize: 10, margin: 0 }}>(assinatura digital)</p>
-              </td>
-              <td style={{ width: '50%', textAlign: 'center', padding: '0 8px' }}>
-                <div style={{ borderTop: '1px solid #374151', padding: '8px 0 0', marginBottom: 4 }} />
-                <p style={{ color: '#1e3a5f', fontSize: 12, fontWeight: 700, margin: 0 }}>O Secretário</p>
-                <p style={{ color: '#6b7280', fontSize: 10, margin: 0 }}>(assinatura digital)</p>
-              </td>
-            </tr>
-          </table>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 24, gap: '24px' }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', minWidth: 0 }}>
+              <img
+                src="/img/assinatura_leonardo_pagio.png"
+                alt="Assinatura Leonar Pagio"
+                style={{
+                  maxWidth: '180px',
+                  maxHeight: '80px',
+                  width: 'auto',
+                  height: 'auto',
+                  objectFit: 'contain',
+                  marginBottom: 8,
+                }}
+              />
+              <p style={{ color: '#1e3a5f', fontSize: 12, fontWeight: 700, margin: '0 0 2px' }}>Leonar Pagio</p>
+              <p style={{ color: '#6b7280', fontSize: 10, margin: 0 }}>Advogado</p>
+            </div>
+
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', minWidth: 0 }}>
+              <div style={{ width: '80px', height: '80px', border: '2px dashed #d4a843', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8, background: '#fefce8' }}>
+                <span style={{ color: '#d4a843', fontSize: 10, fontWeight: 700 }}>SELO</span>
+              </div>
+              <p style={{ color: '#1e3a5f', fontSize: 12, fontWeight: 700, margin: '0 0 2px' }}>Selo da Associação</p>
+              <p style={{ color: '#6b7280', fontSize: 10, margin: 0 }}>(carimbo)</p>
+            </div>
+
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', minWidth: 0 }}>
+              <div
+                style={{
+                  width: '180px',
+                  height: '80px',
+                  border: '2px dashed #d1d5db',
+                  borderRadius: 4,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: 8,
+                  background: '#f9fafb',
+                  color: '#9ca3af',
+                  fontSize: 10,
+                  fontWeight: 700,
+                }}
+              >
+                Assinatura do Sócio
+              </div>
+              <p style={{ color: '#1e3a5f', fontSize: 12, fontWeight: 700, margin: '0 0 2px' }}>Nome do Sócio</p>
+              <p style={{ color: '#6b7280', fontSize: 10, margin: 0 }}>Advogado</p>
+            </div>
+          </div>
 
           <div style={{ background: '#f9fafb', padding: '16px', textAlign: 'center', borderTop: '2px solid #d4a843', borderRadius: '0 0 12px 12px', margin: '0 -10px -10px' }}>
             <p style={{ color: '#9ca3af', fontSize: 10, margin: 0 }}>Documento gerado eletronicamente pelo SGI FV – Sistema de Gestão Integrada</p>
