@@ -72,16 +72,19 @@ Deno.serve(async (request) => {
     return jsonResponse(500, { success: false, error: 'Supabase URL ou Service Role Key não configurados.' });
   }
 
-  // Auth via user JWT
+  // Auth via user JWT — client with JWT only (for auth verification)
   const authHeader = request.headers.get('Authorization') ?? '';
-  const supabase = createClient(supabaseUrl, serviceRoleKey, {
+  const supabaseAuth = createClient(supabaseUrl, serviceRoleKey, {
     global: { headers: { Authorization: authHeader } },
   });
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
   if (authError || !user) {
     return jsonResponse(401, { success: false, error: 'Não autenticado.' });
   }
+
+  // DB operations — service role client WITHOUT Authorization header (bypasses RLS)
+  const supabase = createClient(supabaseUrl, serviceRoleKey);
 
   // Get encryption key
   let encKey: CryptoKey;
