@@ -11,6 +11,7 @@ export const SUPABASE_EDGE_FUNCTIONS = {
   STRIPE_CREATE_CHECKOUT_SESSION: 'stripe-create-checkout-session',
   STRIPE_CREATE_CUSTOMER_PORTAL_SESSION: 'stripe-create-customer-portal-session',
   STRIPE_RECONCILIATION: 'stripe-reconciliation',
+  STRIPE_CONFIG: 'stripe-config',
   WIX_CLIENT_INTAKE: 'wix-client-intake',
   UPDATE_USER_ORG_MEMBERSHIP: 'update-user-org-membership',
 } as const;

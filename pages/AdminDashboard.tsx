@@ -33,6 +33,7 @@ import CommunicationBlock from '../src/components/dashboard/blocks/Communication
 import ProcessesSection from '../src/components/dashboard/blocks/ProcessesSection';
 import UsersSection from '../src/components/dashboard/blocks/UsersSection';
 import ManagementSection from '../src/components/dashboard/blocks/ManagementSection';
+import StripeConfigPanel from '../src/components/dashboard/blocks/StripeConfigPanel';
 import { useToast } from '../src/contexts/ToastContext';
 import { createCheckoutSession } from '../src/lib/stripe';
 import { getPaymentStatusUi } from '../src/lib/paymentStatus';
@@ -1542,6 +1543,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           Serviços
           {activeTab === 'servicos' && <div className="absolute bottom-0 left-0 w-full h-1 bg-blue-500 rounded-t-full"></div>}
         </button>
+        <button 
+          onClick={() => setActiveTab('stripe')}
+          className={`pb-4 px-2 font-black uppercase text-xs tracking-widest transition-all relative ${activeTab === 'stripe' ? 'text-blue-500' : 'text-gray-500'}`}
+        >
+          Stripe
+          {activeTab === 'stripe' && <div className="absolute bottom-0 left-0 w-full h-1 bg-blue-500 rounded-t-full"></div>}
+        </button>
           </div>
         </>
       )}
@@ -1590,6 +1598,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       )}
       {currentSection === 'configuracoes' && activeTab === 'management' && (
         <ManagementSection users={users} setUsers={setUsers} organizations={organizations} currentUser={currentUser} activeOrgId={activeOrgId} />
+      )}
+      {currentSection === 'configuracoes' && activeTab === 'stripe' && (
+        <div key="tab-stripe" className="animate-slideUp"><StripeConfigPanel activeOrgId={activeOrgId} /></div>
       )}
       {currentSection === 'agenda' && (
         <div className="max-w-full bg-white border border-gray-100 rounded-2xl shadow-[0_16px_34px_rgba(15,23,42,0.08)]">

@@ -1,6 +1,7 @@
 import Stripe from 'https://esm.sh/stripe@18.3.0?target=deno';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { Client } from 'https://deno.land/x/postgres@v0.19.3/mod.ts';
+import { getOrgStripeConfig } from '../_shared/payments/getOrgStripeConfig.ts';
 
 type PortalPayload = { clientId?: string; org_id?: string; returnUrl?: string };
 
@@ -27,13 +28,18 @@ Deno.serve(async (request) => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
   const dbConnectionString = getDbConnectionString();
-  if (!stripeSecretKey || !supabaseUrl || !serviceRoleKey || !dbConnectionString) return jsonResponse(500, { success: false, error: 'Ambiente não configurado.' });
+  if (!supabaseUrl || !serviceRoleKey || !dbConnectionString) return jsonResponse(500, { success: false, error: 'Ambiente não configurado.' });
 
   const payload = (await request.json().catch(() => ({}))) as PortalPayload;
   const clientId = String(payload.clientId ?? '').trim();
   const orgId = String(payload.org_id ?? '').trim();
   const returnUrl = String(payload.returnUrl ?? '').trim();
   if (!isUuid(clientId) || !isUuid(orgId)) return jsonResponse(400, { success: false, error: 'clientId e org_id válidos são obrigatórios.' });
+
+  // Fetch org-specific Stripe config (falls back to env vars)
+  const orgConfig = await getOrgStripeConfig(orgId, supabaseUrl, serviceRoleKey);
+  const resolvedSecretKey = orgConfig.stripeSecretKey || stripeSecretKey;
+  if (!resolvedSecretKey) return jsonResponse(500, { success: false, error: 'STRIPE_SECRET_KEY não configurada.' });
 
   const authHeader = request.headers.get('Authorization') ?? '';
   const jwtToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
@@ -46,7 +52,7 @@ Deno.serve(async (request) => {
   if (authedUserId !== clientId) return jsonResponse(403, { success: false, error: 'clientId divergente do usuário autenticado.' });
 
   const client = new Client(dbConnectionString);
-  const stripe = new Stripe(stripeSecretKey, { apiVersion: '2025-03-31.basil' });
+  const stripe = new Stripe(resolvedSecretKey, { apiVersion: orgConfig.apiVersion as '2025-03-31.basil' });
   try {
     await client.connect();
     const ownership = await client.queryObject<OwnershipRow>('SELECT user_id AS id FROM public.org_members WHERE user_id=$1 AND org_id=$2 LIMIT 1', [clientId, orgId]);

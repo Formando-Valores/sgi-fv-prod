@@ -1,5 +1,6 @@
 import Stripe from 'https://esm.sh/stripe@18.3.0?target=deno';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { getOrgStripeConfig } from '../_shared/payments/getOrgStripeConfig.ts';
 
 type CheckoutPayload = {
   amount?: number;
@@ -43,10 +44,6 @@ Deno.serve(async (request) => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
-  if (!stripeSecretKey) {
-    return jsonResponse(500, { success: false, error: 'STRIPE_SECRET_KEY não configurada.' });
-  }
-
   if (!supabaseUrl || !serviceRoleKey) {
     return jsonResponse(500, { success: false, error: 'SUPABASE_URL ou SERVICE_ROLE_KEY não configurados.' });
   }
@@ -54,13 +51,23 @@ Deno.serve(async (request) => {
   const payload = (await request.json().catch(() => ({}))) as CheckoutPayload;
 
   const amount = Number(payload.amount ?? 0);
-  const currency = String(payload.currency ?? 'brl').trim().toLowerCase();
+  const organizationId = String(payload.organizationId ?? '').trim();
   const successUrl = String(payload.successUrl ?? '').trim();
   const cancelUrl = String(payload.cancelUrl ?? '').trim();
+
+  // Fetch org-specific Stripe config (falls back to env vars)
+  const orgConfig = await getOrgStripeConfig(organizationId, supabaseUrl, serviceRoleKey);
+  const resolvedSecretKey = orgConfig.stripeSecretKey || stripeSecretKey;
+
+  if (!resolvedSecretKey) {
+    return jsonResponse(500, { success: false, error: 'STRIPE_SECRET_KEY não configurada.' });
+  }
 
   if (!Number.isFinite(amount) || amount <= 0) {
     return jsonResponse(400, { success: false, error: 'amount deve ser um número positivo (centavos).' });
   }
+
+  const currency = String(payload.currency ?? orgConfig.defaultCurrency).trim().toLowerCase();
 
   if (!currency) {
     return jsonResponse(400, { success: false, error: 'currency é obrigatório.' });
@@ -70,15 +77,14 @@ Deno.serve(async (request) => {
     return jsonResponse(400, { success: false, error: 'successUrl e cancelUrl são obrigatórios.' });
   }
 
-  const stripe = new Stripe(stripeSecretKey, {
-    apiVersion: '2025-03-31.basil',
+  const stripe = new Stripe(resolvedSecretKey, {
+    apiVersion: orgConfig.apiVersion as '2025-03-31.basil',
   });
 
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
   const processId = String(payload.processId ?? '').trim();
   const clientId = String(payload.clientId ?? '').trim();
-  const organizationId = String(payload.organizationId ?? '').trim();
   const serviceId = String(payload.serviceId ?? '').trim();
 
   if (!processId || !clientId || !organizationId) {
@@ -112,7 +118,7 @@ Deno.serve(async (request) => {
             currency,
             unit_amount: Math.round(amount),
             product_data: {
-              name: 'Serviço SGI FV',
+              name: orgConfig.checkoutProductName,
             },
           },
         },
