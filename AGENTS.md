@@ -28,3 +28,11 @@ O projeto possui um fluxo de registro automatizado para novos usuários:
 
 - Logs salvos em `docs/diario-opencode/sgi-fv/`
 - Use o comando `salvar-dia-sigafv` (skill) ao final de cada sessão
+
+## Supabase CLI (importante!)
+
+- **Credenciais locais:** `SUPABASE_LOCAL.md` (na raiz do projeto, NO .gitignore — NÃO commitar)
+- **Sempre ler esse arquivo** antes de fazer qualquer operação Supabase CLI (deploy, db push, secrets, etc.)
+- Project ref: `ktrrrqaqaljdcmxqdcff`
+- CLI via `npx supabase` (v2.109.1), projeto já linkado
+- Docker indisponível neste host — comandos locais (start/status) não funcionam

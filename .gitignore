@@ -52,3 +52,6 @@ orphaned_section.txt
 
 # Supabase temp
 supabase/.temp/
+
+# Supabase local credentials (NÃO COMMITAR)
+SUPABASE_LOCAL.md
