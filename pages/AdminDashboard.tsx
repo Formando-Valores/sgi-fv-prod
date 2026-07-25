@@ -19,7 +19,6 @@ import DashboardCardContainer from '../src/components/dashboard/DashboardCardCon
 import { can, getAllowedModules, resolvePermissions } from '../src/lib/permissions';
 import OverviewBlock from '../src/components/dashboard/blocks/OverviewBlock';
 import ProcessesBlock from '../src/components/dashboard/blocks/ProcessesBlock';
-import OrganizationsSection from '../src/components/dashboard/blocks/OrganizationsSection';
 import ClientsSection from '../src/components/dashboard/blocks/ClientsSection';
 import DashboardSection from '../src/components/dashboard/blocks/DashboardSection';
 import ClientJourneyBlock from '../src/components/dashboard/blocks/ClientJourneyBlock';
@@ -1551,13 +1550,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       )}
 
 
-      {(currentSection === 'dashboard' || currentSection === 'organizacoes') && (
-        <OrganizationsSection
-          organizations={organizations}
-          canManageOrganizations={can('manage', 'organizacoes', permissionSubject)}
-          onRefreshOrganizations={async () => { const { organizations: loaded, error } = await loadOrganizations(); if (!error) setOrganizations(loaded); }}
-        />
-      )}
       {(currentSection === 'dashboard' || currentSection === 'processos') && (
         <ProcessesSection
         baseProcessRows={baseProcessRows}
