@@ -7,9 +7,10 @@ import { ServiceUnit } from '../../../../types';
 
 interface Props {
   currentUser: { id: string; role: string };
+  activeOrgId?: string | null;
 }
 
-const IbanManagementSection: React.FC<Props> = ({ currentUser }) => {
+const IbanManagementSection: React.FC<Props> = ({ currentUser, activeOrgId }) => {
   const [accounts, setAccounts] = useState<ProfessionalAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -33,7 +34,7 @@ const IbanManagementSection: React.FC<Props> = ({ currentUser }) => {
 
   useEffect(() => {
     void loadAccounts();
-  }, []);
+  }, [activeOrgId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

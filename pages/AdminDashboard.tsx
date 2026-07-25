@@ -1572,7 +1572,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       />
       )}
       {currentSection === 'clientes' && (
-        <ClientsSection organizations={organizations} users={users} setUsers={setUsers} />
+        <ClientsSection organizations={organizations} users={users} setUsers={setUsers} activeOrgId={activeOrgId} />
       )}
       {currentSection === 'relatorios' && (
         <section className="no-print">
@@ -1586,13 +1586,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         <UsersSection users={users} onSelectUser={setSelectedUser} onEditUser={setEditingUser} />
       )}
       {currentSection === 'configuracoes' && activeTab === 'iban' && (
-        <div key="tab-iban" className="animate-slideUp"><IbanManagementSection currentUser={currentUser} /></div>
+        <div key="tab-iban" className="animate-slideUp"><IbanManagementSection currentUser={currentUser} activeOrgId={activeOrgId} /></div>
       )}
       {currentSection === 'configuracoes' && activeTab === 'servicos' && (
-        <div key="tab-servicos" className="animate-slideUp"><ServicesSection currentUser={currentUser} /></div>
+        <div key="tab-servicos" className="animate-slideUp"><ServicesSection currentUser={currentUser} activeOrgId={activeOrgId} /></div>
       )}
       {currentSection === 'configuracoes' && activeTab === 'management' && (
-        <ManagementSection users={users} setUsers={setUsers} organizations={organizations} currentUser={currentUser} />
+        <ManagementSection users={users} setUsers={setUsers} organizations={organizations} currentUser={currentUser} activeOrgId={activeOrgId} />
       )}
       {currentSection === 'agenda' && (
         <div className="max-w-full bg-white border border-gray-100 rounded-2xl shadow-[0_16px_34px_rgba(15,23,42,0.08)]">

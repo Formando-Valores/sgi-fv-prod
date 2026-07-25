@@ -15,6 +15,7 @@ import { useToast } from '../../../contexts/ToastContext';
 
 interface Props {
   currentUser: { id: string; role: string };
+  activeOrgId?: string | null;
 }
 
 const emptyForm = {
@@ -25,7 +26,7 @@ const emptyForm = {
   price: 0,
 };
 
-const ServicesSection: React.FC<Props> = () => {
+const ServicesSection: React.FC<Props> = ({ activeOrgId }) => {
   const { showToast } = useToast();
   const [services, setServices] = useState<DbCatalogService[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,14 +41,14 @@ const ServicesSection: React.FC<Props> = () => {
 
   const load = async () => {
     setLoading(true);
-    const data = await loadServicesCatalog(true);
+    const data = await loadServicesCatalog(true, activeOrgId);
     setServices(data);
     setLoading(false);
   };
 
   useEffect(() => {
     void load();
-  }, []);
+  }, [activeOrgId]);
 
   const resetForm = () => {
     setForm(emptyForm);

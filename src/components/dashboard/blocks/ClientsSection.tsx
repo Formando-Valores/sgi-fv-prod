@@ -21,9 +21,10 @@ interface ClientsSectionProps {
   organizations: Organization[];
   users: User[];
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
+  activeOrgId?: string | null;
 }
 
-const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, setUsers }) => {
+const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, setUsers, activeOrgId }) => {
   const { showToast } = useToast();
   const [clientsData, setClientsData] = useState<ClientProfileView[]>([]);
   const [clientsLoading, setClientsLoading] = useState(false);
@@ -71,9 +72,15 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
     setClientsLoading(true);
     setClientsError('');
 
-    const { data: scopedMembers, error: membersError } = await supabase
+    let query = supabase
       .from('org_members')
       .select('user_id,org_id,role,organizations:org_id(name)');
+
+    if (activeOrgId) {
+      query = query.eq('org_id', activeOrgId);
+    }
+
+    const { data: scopedMembers, error: membersError } = await query;
 
     if (membersError) {
       console.warn('[clientes] erro ao carregar membros', membersError);
@@ -129,7 +136,7 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
 
   useEffect(() => {
     void fetchClients();
-  }, []);
+  }, [activeOrgId]);
 
   const visibleClients = clientsData
     .filter((client) =>

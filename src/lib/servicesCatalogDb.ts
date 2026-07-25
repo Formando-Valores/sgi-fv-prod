@@ -15,16 +15,25 @@ export type DbCatalogService = {
 
 let catalogCache: DbCatalogService[] | null = null;
 
-export async function loadServicesCatalog(force = false): Promise<DbCatalogService[]> {
-  if (catalogCache && !force) return catalogCache;
+export async function loadServicesCatalog(force = false, orgId?: string | null): Promise<DbCatalogService[]> {
+  if (catalogCache && !force && !orgId) return catalogCache;
 
-  const { data } = await supabase
+  let query = supabase
     .from('services_catalog')
     .select('*')
     .order('name');
 
-  catalogCache = data || [];
-  return catalogCache;
+  if (orgId) {
+    query = query.eq('org_id', orgId);
+  }
+
+  const { data } = await query;
+
+  if (!orgId) {
+    catalogCache = data || [];
+    return catalogCache;
+  }
+  return data || [];
 }
 
 export function invalidateCache() {

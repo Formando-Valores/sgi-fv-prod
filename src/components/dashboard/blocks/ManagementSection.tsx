@@ -66,9 +66,10 @@ interface ManagementSectionProps {
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
   organizations: Organization[];
   currentUser: User;
+  activeOrgId?: string | null;
 }
 
-const ManagementSection: React.FC<ManagementSectionProps> = ({ users, setUsers, organizations, currentUser }) => {
+const ManagementSection: React.FC<ManagementSectionProps> = ({ users, setUsers, organizations, currentUser, activeOrgId }) => {
   const { showToast } = useToast();
   const [newAdminName, setNewAdminName] = useState('');
   const [newAdminEmail, setNewAdminEmail] = useState('');
@@ -103,7 +104,7 @@ const ManagementSection: React.FC<ManagementSectionProps> = ({ users, setUsers, 
 
   useEffect(() => {
     void fetchOrgMembers();
-  }, []);
+  }, [activeOrgId]);
 
   const resolveOrganizationScope = async () => {
     const { data, error } = await supabase
@@ -138,6 +139,83 @@ const ManagementSection: React.FC<ManagementSectionProps> = ({ users, setUsers, 
   const fetchOrgMembers = async () => {
     setMembersLoading(true);
     setMembersError('');
+
+    if (activeOrgId) {
+      const orgMemberSelectOptions = [
+        'org_id,user_id,role,nome_completo,nome,name,full_name,organizations(name)',
+        'org_id,user_id,role,organizations(name)',
+        'org_id,user_id,role',
+      ];
+
+      let memberRows: OrgMemberRow[] | null = null;
+      let memberError: { message?: string } | null = null;
+
+      for (const selectFields of orgMemberSelectOptions) {
+        const query = await supabase
+          .from('org_members')
+          .select(selectFields)
+          .eq('org_id', activeOrgId)
+          .order('created_at', { ascending: false });
+
+        if (!query.error) {
+          memberRows = query.data as unknown as OrgMemberRow[] | null;
+          memberError = null;
+          break;
+        }
+        memberError = query.error;
+      }
+
+      if (memberError) {
+        setMembersError('Não foi possível carregar os membros da organização.');
+        setMembersLoading(false);
+        return;
+      }
+
+      const memberUserIds = Array.from(new Set((memberRows || []).map((row) => row.user_id)));
+      let profileMap = new Map<string, { nome_completo?: string | null; nome?: string | null; name?: string | null; email?: string | null; role?: string | null }>();
+
+      if (memberUserIds.length > 0) {
+        const profileSelectOptions = [
+          'id,nome_completo,nome,name,email,role',
+          'id,nome_completo,name,email,role',
+          'id,nome_completo,email,role',
+          'id,email,role',
+        ];
+
+        for (const selectFields of profileSelectOptions) {
+          const profileQuery = await supabase
+            .from('profiles')
+            .select(selectFields)
+            .in('id', memberUserIds);
+
+          if (!profileQuery.error) {
+            profileMap = new Map((profileQuery.data || []).map((row: Record<string, unknown>) => [row.id as string, row as { nome_completo?: string | null; nome?: string | null; name?: string | null; email?: string | null; role?: string | null }]));
+            break;
+          }
+        }
+      }
+
+      const normalizedMembers: OrgMemberView[] = (memberRows || []).map((row) => {
+        const profile = profileMap.get(row.user_id);
+        const name = row.nome_completo || row.nome || row.name || row.full_name || profile?.nome_completo || profile?.nome || profile?.name || `Usuário ${row.user_id.slice(0, 8)}`;
+        const email = profile?.email || 'sem-email@nao-informado';
+        const orgName = extractOrganizationName(row.organizations) || 'Organização Padrão';
+
+        return {
+          user_id: row.user_id,
+          org_id: row.org_id,
+          org_name: orgName,
+          name,
+          email,
+          accessLevel: resolveAccessLevel(row.role || profile?.role),
+          source: profile ? 'profiles' : 'org_members',
+        };
+      });
+
+      setOrgMembers(normalizedMembers);
+      setMembersLoading(false);
+      return;
+    }
 
     const { allowedOrgIds, hasGlobalScope, error: scopeError } = await resolveOrganizationScope();
     if (scopeError) {
