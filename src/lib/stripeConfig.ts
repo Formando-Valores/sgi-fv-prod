@@ -39,22 +39,33 @@ export async function getStripeConfig(orgId: string): Promise<{ data: StripeConf
   const { data: sessionData } = await supabase.auth.getSession();
   const token = sessionData?.session?.access_token;
 
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-    },
-  });
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+      },
+    });
 
-  const result = await response.json();
+    const text = await response.text();
+    let result: Record<string, unknown>;
+    try {
+      result = JSON.parse(text);
+    } catch {
+      return { data: null, error: `Resposta inválida do servidor (HTTP ${response.status}). Verifique se a edge function stripe-config está deployada.` };
+    }
 
-  if (!response.ok || !result.success) {
-    return { data: null, error: result.error || 'Erro ao buscar configuração Stripe.' };
+    if (!response.ok || !result.success) {
+      return { data: null, error: String(result.error || 'Erro ao buscar configuração Stripe.') };
+    }
+
+    return { data: result.data as StripeConfigData };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { data: null, error: `Erro de conexão: ${message}. Verifique se a edge function stripe-config está deployada.` };
   }
-
-  return { data: result.data };
 }
 
 export async function updateStripeConfig(
@@ -66,21 +77,32 @@ export async function updateStripeConfig(
   const { data: sessionData } = await supabase.auth.getSession();
   const token = sessionData?.session?.access_token;
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-    },
-    body: JSON.stringify(config),
-  });
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify(config),
+    });
 
-  const result = await response.json();
+    const text = await response.text();
+    let result: Record<string, unknown>;
+    try {
+      result = JSON.parse(text);
+    } catch {
+      return { data: null, error: `Resposta inválida do servidor (HTTP ${response.status}). Verifique se a edge function stripe-config está deployada.` };
+    }
 
-  if (!response.ok || !result.success) {
-    return { data: null, error: result.error || 'Erro ao atualizar configuração Stripe.' };
+    if (!response.ok || !result.success) {
+      return { data: null, error: String(result.error || 'Erro ao atualizar configuração Stripe.') };
+    }
+
+    return { data: result.data as Partial<StripeConfigData> };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { data: null, error: `Erro de conexão: ${message}. Verifique se a edge function stripe-config está deployada.` };
   }
-
-  return { data: result.data };
 }
