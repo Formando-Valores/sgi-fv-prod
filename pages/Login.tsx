@@ -186,7 +186,7 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
     }
 
     try {
-      console.info('[login] iniciando autenticação', { email });
+      console.info('[login] iniciando autenticação');
       const { data, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -200,7 +200,7 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
 
       if (data.user) {
         const userId = data.user.id;
-        console.info('[login] autenticado, buscando profile', { userId });
+        console.info('[login] autenticado, buscando profile');
 
         const { data: defaultOrganization } = await supabase
           .from('organizations')
@@ -353,10 +353,7 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
           }) as OrgMembership[],
         };
 
-        console.info('[login] profile carregado, redirecionando para dashboard', {
-          profileId: profile?.id,
-          role: normalizedUser.role,
-        });
+        console.info('[login] profile carregado, redirecionando para dashboard');
 
         setCurrentUser(normalizedUser);
 

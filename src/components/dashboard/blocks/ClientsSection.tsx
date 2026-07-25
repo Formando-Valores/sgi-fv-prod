@@ -333,22 +333,19 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
 
   const handleSaveClientEdit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    console.log('[DEBUG handleSaveClientEdit] INICIADO');
-    if (!editingClient) { console.log('[DEBUG] early return: !editingClient'); return; }
+    if (!editingClient) return;
 
     setClientEditError('');
     setClientEditSuccess('');
 
     const selectedOrg = organizations.find((org) => org.id === editClientForm.organizationId);
     if (!selectedOrg) {
-      console.log('[DEBUG] early return: !selectedOrg');
       setClientEditError('Selecione uma organização válida.');
       return;
     }
 
     const normalizedName = sanitizeDisplayValue(editClientForm.fullName);
     if (!normalizedName) {
-      console.log('[DEBUG] early return: !normalizedName');
       setClientEditError('Informe o nome do cliente.');
       return;
     }
@@ -395,10 +392,9 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
           .eq('id', editingClient.user_id);
 
         if (updateProfileError) {
-          console.log('[DEBUG] early return: updateProfileError', updateProfileError);
           setClientEditError('Não foi possível atualizar os dados de perfil do cliente.');
           return;
-        } else { console.log('[DEBUG] profiles update OK'); }
+        }
 
         const { error: upsertMemberError } = await supabase
           .from('org_members')
@@ -412,10 +408,9 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
           );
 
         if (upsertMemberError) {
-          console.log('[DEBUG] early return: upsertMemberError', upsertMemberError);
           setClientEditError('Perfil atualizado, mas houve erro ao atualizar vínculo da organização.');
           return;
-        } else { console.log('[DEBUG] org_members upsert OK'); }
+        }
       }
 
       setClientsData((prev) =>
@@ -434,17 +429,13 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
       );
 
       setClientEditSuccess('Cadastro do cliente atualizado com sucesso.');
-      console.log('[DEBUG] ANTES showToast');
       showToast({ type: 'success', message: 'Cadastro do cliente atualizado com sucesso.' });
-      console.log('[DEBUG] DEPOIS showToast');
       setShowEditClientModal(false);
       setEditingClient(null);
       await fetchClients();
     } finally {
-      console.log('[DEBUG] finally: setSavingClientEdit(false)');
       setSavingClientEdit(false);
     }
-    console.log('[DEBUG handleSaveClientEdit] FINALIZADO');
   };
 
   const handleDeleteClient = async (client: ClientProfileView) => {

@@ -1,8 +1,6 @@
 /**
  * SGI FV - Dashboard Page
  * Main dashboard with real process statistics
- * 
- * DEBUG VERSION: Comprehensive logging enabled
  */
 
 import React, { useState, useEffect } from 'react';
@@ -14,13 +12,12 @@ import { getPaymentStatusLabel, getProcessStatusLabel } from '../lib/paymentStat
 import { checkMigrations, getMigrationStatusMessage, type MigrationStatus } from '../lib/checkMigrations';
 import { can } from '../lib/permissions';
 
-// Debug mode flag
-const DEBUG = true;
+const DEBUG = false;
 const log = (...args: any[]) => {
-  if (DEBUG) console.log('[Dashboard]', new Date().toISOString(), ...args);
+  if (DEBUG) console.log('[Dashboard]', ...args);
 };
 const logError = (...args: any[]) => {
-  console.error('[Dashboard ERROR]', new Date().toISOString(), ...args);
+  if (DEBUG) console.error('[Dashboard ERROR]', ...args);
 };
 
 const Dashboard: React.FC = () => {

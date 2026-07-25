@@ -21,7 +21,6 @@ class ErrorBoundary extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props);
     this.state = { hasError: false, error: null, errorInfo: null };
-    console.log('[ErrorBoundary] Initialized');
   }
 
   static getDerivedStateFromError(error: Error): Partial<State> {
@@ -41,7 +40,6 @@ class ErrorBoundary extends React.Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
-      console.log('[ErrorBoundary] Rendering error UI');
       return (
         <div style={{ 
           padding: '20px', 

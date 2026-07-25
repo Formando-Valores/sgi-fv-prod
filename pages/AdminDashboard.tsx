@@ -368,7 +368,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
   useEffect(() => {
     const resolved = resolveSectionFromLocation();
-    console.log('[AdminDashboard] location change → pathname:', location.pathname, 'section:', resolved);
     setCurrentSection(resolved);
   }, [location.hash, location.pathname, location.search]);
 
@@ -378,9 +377,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       Boolean(location.pathname.split('/')[2] || location.hash.split('/')[2]) && !requestedSection;
 
     const canAccess = canAccessSection(currentSection);
-    console.log('[AdminDashboard] access check → section:', currentSection, 'canAccess:', canAccess, 'requested:', requestedSection, 'invalidRoute:', hasInvalidSectionInRoute);
     if (!hasInvalidSectionInRoute && canAccess) return;
-    console.log('[AdminDashboard] ⚠️ redirecting to /dashboard from', currentSection);
     navigate('/dashboard', { replace: true });
     setCurrentSection('dashboard');
   }, [currentSection, navigate, allowedModules, location.pathname, location.hash]);

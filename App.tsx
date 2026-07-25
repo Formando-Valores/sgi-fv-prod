@@ -1,16 +1,9 @@
 /**
  * SGI FV - Main Application Component
  * Sistema de Gestão Integrada - Formando Valores
- * 
- * DEBUG VERSION: Comprehensive logging enabled
  */
 
-console.log('[APP] ========================================');
-console.log('[APP] App.tsx module loading...', new Date().toISOString());
-console.log('[APP] ========================================');
-
 import React, { useCallback, useEffect, useState } from 'react';
-console.log('[APP] ✅ React imported');
 
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';

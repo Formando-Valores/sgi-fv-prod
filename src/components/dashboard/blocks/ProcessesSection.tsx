@@ -491,7 +491,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
           }),
         });
       } catch {
-        console.warn('[processes] falha ao criar usuário automático para o email:', clientEmail);
+        console.warn('[processes] falha ao criar usuário automático');
       }
     }
 

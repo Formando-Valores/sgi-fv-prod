@@ -1,34 +1,22 @@
 /**
  * SGI FV - Auth Context
  * Provides authentication state and user context throughout the app
- * 
- * DEBUG VERSION: Comprehensive logging enabled
  */
 
-console.log('[AuthContext] ========================================');
-console.log('[AuthContext] AuthContext.tsx module loading...', new Date().toISOString());
-console.log('[AuthContext] ========================================');
-
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-console.log('[AuthContext] ✅ React hooks imported');
 import { Session } from '@supabase/supabase-js';
-console.log('[AuthContext] ✅ Supabase Session type imported');
 
 import { supabase } from '../../supabase';
-console.log('[AuthContext] ✅ Supabase client imported');
 
 import type { UserContext, OrgRole } from '../../types';
 import { resolvePermissions, type PermissionCapabilities, type SystemHierarchy } from '../lib/permissions';
-console.log('[AuthContext] ✅ Types imported');
-console.log('[AuthContext] All imports completed successfully!');
 
-// Debug mode flag - set to false in production
-const DEBUG = true;
+const DEBUG = false;
 const log = (...args: any[]) => {
-  if (DEBUG) console.log('[AuthContext]', new Date().toISOString(), ...args);
+  if (DEBUG) console.log('[AuthContext]', ...args);
 };
 const logError = (...args: any[]) => {
-  console.error('[AuthContext ERROR]', new Date().toISOString(), ...args);
+  if (DEBUG) console.error('[AuthContext ERROR]', ...args);
 };
 
 interface AuthContextValue {

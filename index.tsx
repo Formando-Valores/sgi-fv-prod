@@ -1,20 +1,6 @@
 /**
  * SGI FV - Main Entry Point
- * Ultra-early logging enabled for debugging
  */
-
-// ============================================
-// ULTRA-EARLY CONSOLE TEST
-// ============================================
-console.log('='.repeat(60));
-console.log('[MAIN] 🚀 CONSOLE TEST - If you see this, console works!');
-console.log('[MAIN] Timestamp:', new Date().toISOString());
-console.log('='.repeat(60));
-
-// Check if console is overridden
-if (typeof console.log !== 'function') {
-  document.body.innerHTML = '<h1 style="color:red;padding:20px;">ERROR: Console.log is not a function!</h1>';
-}
 
 // ============================================
 // GLOBAL ERROR HANDLERS
@@ -53,8 +39,6 @@ window.onunhandledrejection = function(event) {
     stack: event.reason?.stack
   });
 };
-
-console.log('[MAIN] ✅ Global error handlers installed');
 
 const normalizeRecoveryCallbackUrl = () => {
   const searchParams = new URLSearchParams(window.location.search);
@@ -133,49 +117,28 @@ ${renderError?.stack || ''}
 };
 
 async function bootstrap() {
-  console.log('[MAIN] Starting imports...');
-
   let React: any;
   let ReactDOM: any;
   let App: any;
   let ErrorBoundary: any;
 
   try {
-    console.log('[MAIN] Importing React...');
     React = await import('react');
-    console.log('[MAIN] ✅ React imported, version:', React.version);
-
-    console.log('[MAIN] Importing ReactDOM...');
     ReactDOM = await import('react-dom/client');
-    console.log('[MAIN] ✅ ReactDOM imported');
-
-    console.log('[MAIN] Importing ErrorBoundary...');
     ErrorBoundary = (await import('./src/components/ErrorBoundary')).default;
-    console.log('[MAIN] ✅ ErrorBoundary imported');
-
-    console.log('[MAIN] Importing App...');
     App = (await import('./App')).default;
-    console.log('[MAIN] ✅ App imported');
   } catch (importError: any) {
     renderImportError(importError);
     throw importError;
   }
 
-  console.log('[MAIN] All imports successful, starting render...');
-
   const rootElement = document.getElementById('root');
   if (!rootElement) {
-    console.error('[MAIN] ❌ Could not find root element!');
     throw new Error('Could not find root element to mount to');
   }
 
-  console.log('[MAIN] Root element found, creating React root...');
-
   try {
     const root = ReactDOM.createRoot(rootElement);
-    console.log('[MAIN] ✅ React root created');
-
-    console.log('[MAIN] Calling root.render()...');
     root.render(
       React.createElement(
         React.StrictMode,
@@ -187,10 +150,6 @@ async function bootstrap() {
         )
       )
     );
-
-    console.log('[MAIN] ✅ root.render() called successfully');
-    console.log('[MAIN] 🎉 Application render initiated!');
-    console.log('='.repeat(60));
 
     const { initVersionCheck } = await import('./src/lib/version-check');
     initVersionCheck();

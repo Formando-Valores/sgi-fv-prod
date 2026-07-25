@@ -1,21 +1,18 @@
 /**
  * SGI FV - Processes API Module
  * Database operations for processes and events
- * 
- * DEBUG VERSION: Comprehensive logging enabled
  */
 
 import { supabase } from '../../supabase';
 import { getAuthorizationDeniedMessage, getProcessScope } from './permissions';
 import { SUPABASE_EDGE_FUNCTIONS } from './supabaseFunctions';
 
-// Debug mode flag
-const DEBUG = true;
+const DEBUG = false;
 const log = (...args: any[]) => {
-  if (DEBUG) console.log('[Processes API]', new Date().toISOString(), ...args);
+  if (DEBUG) console.log('[Processes API]', ...args);
 };
 const logError = (...args: any[]) => {
-  console.error('[Processes API ERROR]', new Date().toISOString(), ...args);
+  if (DEBUG) console.error('[Processes API ERROR]', ...args);
 };
 
 async function getAuthenticatedUserId(): Promise<string | null> {

@@ -68,7 +68,6 @@ export async function getCurrentUserContext(): Promise<UserContext | null> {
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   
   if (authError || !user) {
-    console.log('Nenhum usuário autenticado');
     return null;
   }
   
@@ -88,7 +87,6 @@ export async function getCurrentUserContext(): Promise<UserContext | null> {
     .single();
   
   if (membershipError || !membership) {
-    console.log('Usuário sem membership:', membershipError);
     return null;
   }
   
@@ -100,7 +98,7 @@ export async function getCurrentUserContext(): Promise<UserContext | null> {
     .single();
   
   if (profileError) {
-    console.warn('Perfil não encontrado:', profileError);
+    // Profile not found - continue with membership data
   }
   
   // 4. Monta o contexto completo

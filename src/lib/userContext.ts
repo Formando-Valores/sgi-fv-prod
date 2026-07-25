@@ -15,7 +15,6 @@ export async function getUserContext(): Promise<UserContext | null> {
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   
   if (authError || !user) {
-    console.log('No authenticated user');
     return null;
   }
 
@@ -27,7 +26,6 @@ export async function getUserContext(): Promise<UserContext | null> {
     .single();
 
   if (error || !data) {
-    console.warn('User context not found:', error);
     // Return minimal context with "Sem organização" state
     return {
       id: user.id,

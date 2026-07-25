@@ -110,7 +110,7 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
     }
 
     try {
-      console.info('[register] iniciando cadastro', { email: formData.email });
+      console.info('[register] iniciando cadastro');
 
       const { data, error: authError } = await supabase.auth.signUp({
         email: formData.email,

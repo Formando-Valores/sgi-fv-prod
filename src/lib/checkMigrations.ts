@@ -1,19 +1,16 @@
 /**
  * SGI FV - Migration Status Checker
  * Utility to verify if required database migrations have been run
- * 
- * DEBUG VERSION: Comprehensive logging enabled
  */
 
 import { supabase } from '../../supabase';
 
-// Debug mode flag
-const DEBUG = true;
+const DEBUG = false;
 const log = (...args: any[]) => {
-  if (DEBUG) console.log('[Migrations]', new Date().toISOString(), ...args);
+  if (DEBUG) console.log('[Migrations]', ...args);
 };
 const logError = (...args: any[]) => {
-  console.error('[Migrations ERROR]', new Date().toISOString(), ...args);
+  if (DEBUG) console.error('[Migrations ERROR]', ...args);
 };
 
 export interface MigrationStatus {
