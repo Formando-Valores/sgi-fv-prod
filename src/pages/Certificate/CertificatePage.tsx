@@ -192,7 +192,7 @@ const CertificatePage: React.FC = () => {
                   marginBottom: 8,
                 }}
               />
-              <p style={{ color: '#1e3a5f', fontSize: 12, fontWeight: 700, margin: '0 0 2px' }}>Leonar Pagio</p>
+              <p style={{ color: '#1e3a5f', fontSize: 12, fontWeight: 700, margin: '0 0 2px' }}>Leonardo Saraiva Págio</p>
               <p style={{ color: '#6b7280', fontSize: 10, margin: 0 }}>Advogado</p>
             </div>
 

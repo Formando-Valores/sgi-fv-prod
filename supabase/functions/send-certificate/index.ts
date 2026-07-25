@@ -144,7 +144,7 @@ function generateCertificateHtml(params: {
             <tr>
               <td style="width:33.33%;text-align:center;padding:0 12px;vertical-align:bottom;">
                 <img src="cid:assinatura_leonardo" alt="Assinatura Leonar Pagio" style="max-width:180px;max-height:80px;width:auto;height:auto;object-fit:contain;display:block;margin:0 auto 8px;" />
-                <p style="color:#1e3a5f;font-size:12px;font-weight:700;margin:0 0 2px;">Leonar Pagio</p>
+                <p style="color:#1e3a5f;font-size:12px;font-weight:700;margin:0 0 2px;">Leonardo Saraiva Págio</p>
                 <p style="color:#6b7280;font-size:10px;margin:0;">Advogado</p>
               </td>
               <td style="width:33.33%;text-align:center;padding:0 12px;vertical-align:bottom;">
