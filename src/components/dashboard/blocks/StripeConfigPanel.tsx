@@ -42,6 +42,7 @@ const StripeConfigPanel: React.FC<Props> = ({ activeOrgId }) => {
       return;
     }
     setLoading(true);
+    setFeedback(null);
     const { data, error } = await getStripeConfig(activeOrgId);
     if (error) {
       setFeedback({ type: 'error', message: error });
@@ -54,6 +55,14 @@ const StripeConfigPanel: React.FC<Props> = ({ activeOrgId }) => {
       setCurrency(data.default_currency);
       setProductName(data.checkout_product_name);
       setIsLive(data.is_live_mode);
+    } else {
+      setConfig(null);
+      setSecretKey('');
+      setWebhookSecret('');
+      setApiVersion('2025-03-31.basil');
+      setCurrency('brl');
+      setProductName('Serviço SGI FV');
+      setIsLive(false);
     }
     setLoading(false);
   };
