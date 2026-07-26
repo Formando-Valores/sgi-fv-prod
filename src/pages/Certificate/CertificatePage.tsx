@@ -3,12 +3,35 @@ import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../../../supabase';
 import { Download, ArrowLeft } from 'lucide-react';
 
+interface OrgCertData {
+  name: string;
+  certificate_nipc: string | null;
+  certificate_address: string | null;
+  certificate_city: string | null;
+  certificate_body_text: string | null;
+  certificate_signatory_name: string | null;
+  certificate_signatory_title: string | null;
+  certificate_seal_url: string | null;
+}
+
+const DEFAULT_ORG: OrgCertData = {
+  name: 'Associação contra as Injustiças - AI',
+  certificate_nipc: 'XXXXXXXX',
+  certificate_address: '[Morada da Sede]',
+  certificate_city: 'Lisboa – Portugal',
+  certificate_body_text: null,
+  certificate_signatory_name: 'Leonardo Saraiva Págio',
+  certificate_signatory_title: 'Advogado',
+  certificate_seal_url: null,
+};
+
 const CertificatePage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const processId = searchParams.get('processId');
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState('');
   const [data, setData] = React.useState<Record<string, string>>({});
+  const [org, setOrg] = React.useState<OrgCertData>(DEFAULT_ORG);
 
   React.useEffect(() => {
     if (!processId) {
@@ -38,7 +61,6 @@ const CertificatePage: React.FC = () => {
       }
 
       if (process.cliente_user_id !== currentUserId) {
-        // Check if user has admin role in any org (super admin)
         const { data: adminMemberships } = await supabase
           .from('org_members')
           .select('org_id')
@@ -52,6 +74,27 @@ const CertificatePage: React.FC = () => {
           setError('Você não tem permissão para acessar este certificado.');
           setLoading(false);
           return;
+        }
+      }
+
+      // Fetch org certificate config
+      if (process.org_id) {
+        const { data: orgData } = await supabase
+          .from('organizations')
+          .select('name, certificate_nipc, certificate_address, certificate_city, certificate_body_text, certificate_signatory_name, certificate_signatory_title, certificate_seal_url')
+          .eq('id', process.org_id)
+          .maybeSingle();
+        if (orgData) {
+          setOrg({
+            name: orgData.name || DEFAULT_ORG.name,
+            certificate_nipc: orgData.certificate_nipc,
+            certificate_address: orgData.certificate_address,
+            certificate_city: orgData.certificate_city,
+            certificate_body_text: orgData.certificate_body_text,
+            certificate_signatory_name: orgData.certificate_signatory_name,
+            certificate_signatory_title: orgData.certificate_signatory_title,
+            certificate_seal_url: orgData.certificate_seal_url,
+          });
         }
       }
 
@@ -117,6 +160,20 @@ const CertificatePage: React.FC = () => {
     );
   }
 
+  const nipc = org.certificate_nipc || 'XXXXXXXX';
+  const address = org.certificate_address || '[Morada da Sede]';
+  const city = org.certificate_city || 'Lisboa – Portugal';
+  const signatoryName = org.certificate_signatory_name || 'Leonardo Saraiva Págio';
+  const signatoryTitle = org.certificate_signatory_title || 'Advogado';
+
+  const bodyText = org.certificate_body_text
+    ? org.certificate_body_text.replace(/{orgName}/g, org.name)
+    : `A <strong>${org.name}</strong>, pessoa coletiva n.º ${nipc}, com sede na ${address}, ${city}, certifica para os devidos efeitos que:`;
+
+  const sealSrc = org.certificate_seal_url
+    ? `/img/${org.certificate_seal_url}`
+    : '/img/selo associação.png';
+
   const row = (label: string, value: string) => (
     <tr>
       <td style={{ fontWeight: 600, color: '#1e3a5f', padding: '3px 8px', whiteSpace: 'nowrap' }}>{label}</td>
@@ -130,8 +187,8 @@ const CertificatePage: React.FC = () => {
         <div className="p-8 sm:p-10">
           <div style={{ textAlign: 'center', borderBottom: '3px double #d4a843', paddingBottom: 16, marginBottom: 24 }}>
             <h1 style={{ color: '#1e3a5f', fontSize: 22, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 3, margin: '0 0 4px' }}>Certificado de Filiação</h1>
-            <p style={{ color: '#d4a843', fontSize: 12, fontWeight: 700, letterSpacing: 2, margin: '0 0 4px' }}>ASSOCIAÇÃO CONTRA AS INJUSTIÇAS - AI</p>
-            <p style={{ color: '#6b7280', fontSize: 11, margin: 0 }}>NIPC: XXXXXXXX · Sede: [Morada da Sede] · Lisboa – Portugal</p>
+            <p style={{ color: '#d4a843', fontSize: 12, fontWeight: 700, letterSpacing: 2, margin: '0 0 4px' }}>{org.name.toUpperCase()}</p>
+            <p style={{ color: '#6b7280', fontSize: 11, margin: 0 }}>NIPC: {nipc} · Sede: {address} · {city}</p>
           </div>
 
           <div style={{ textAlign: 'center', marginBottom: 24 }}>
@@ -139,10 +196,9 @@ const CertificatePage: React.FC = () => {
             <p style={{ color: '#1e3a5f', fontSize: 18, fontWeight: 900, margin: 0 }}>{data.certNumber}</p>
           </div>
 
-          <p style={{ color: '#374151', fontSize: 14, lineHeight: 1.8, margin: '0 0 20px', textAlign: 'justify' }}>
-            A <strong>Associação contra as Injustiças - AI</strong>, pessoa coletiva n.º XXXXXXXX, com sede na
-            [Morada da Sede], Lisboa – Portugal, certifica para os devidos efeitos que:
-          </p>
+          <p style={{ color: '#374151', fontSize: 14, lineHeight: 1.8, margin: '0 0 20px', textAlign: 'justify' }}
+            dangerouslySetInnerHTML={{ __html: bodyText }}
+          />
 
           <div style={{ border: '1px solid #e5e7eb', borderRadius: 6, padding: 20, marginBottom: 20 }}>
             <table width="100%" cellPadding="0" cellSpacing="0" style={{ fontSize: 14, color: '#374151' }}>
@@ -164,8 +220,8 @@ const CertificatePage: React.FC = () => {
 
           <p style={{ color: '#374151', fontSize: 14, lineHeight: 1.8, margin: '0 0 24px', textAlign: 'justify' }}>
             que o(a) identificado(a) nos termos supra se encontra devidamente registado(a) como
-            <strong> associado(a) efetivo(a)</strong> da Associação contra as Injustiças - AI, com todos os direitos
-            e deveres previstos nos Estatutos e no Regulamento Interno da Associação.
+            <strong> associado(a) efetivo(a)</strong> da {org.name}, com todos os direitos
+            e deveres previstos nos Estatutos e no Regulamento Interno.
           </p>
 
           <div style={{ textAlign: 'center', marginBottom: 24 }}>
@@ -182,7 +238,7 @@ const CertificatePage: React.FC = () => {
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', minWidth: 0 }}>
               <img
                 src="/img/assinatura_leonardo_pagio.png"
-                alt="Assinatura Leonar Pagio"
+                alt="Assinatura"
                 style={{
                   maxWidth: '180px',
                   maxHeight: '80px',
@@ -192,15 +248,25 @@ const CertificatePage: React.FC = () => {
                   marginBottom: 8,
                 }}
               />
-              <p style={{ color: '#1e3a5f', fontSize: 12, fontWeight: 700, margin: '0 0 2px' }}>Leonardo Saraiva Págio</p>
-              <p style={{ color: '#6b7280', fontSize: 10, margin: 0 }}>Advogado</p>
+              <p style={{ color: '#1e3a5f', fontSize: 12, fontWeight: 700, margin: '0 0 2px' }}>{signatoryName}</p>
+              <p style={{ color: '#6b7280', fontSize: 10, margin: 0 }}>{signatoryTitle}</p>
             </div>
 
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', minWidth: 0 }}>
-              <div style={{ width: '80px', height: '80px', border: '2px dashed #d4a843', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8, background: '#fefce8' }}>
-                <span style={{ color: '#d4a843', fontSize: 10, fontWeight: 700 }}>SELO</span>
-              </div>
-              <p style={{ color: '#1e3a5f', fontSize: 12, fontWeight: 700, margin: '0 0 2px' }}>Selo da Associação</p>
+              <img
+                src={sealSrc}
+                alt="Selo"
+                style={{
+                  width: '80px',
+                  height: '80px',
+                  objectFit: 'contain',
+                  marginBottom: 8,
+                }}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+              />
+              <p style={{ color: '#1e3a5f', fontSize: 12, fontWeight: 700, margin: '0 0 2px' }}>Selo</p>
               <p style={{ color: '#6b7280', fontSize: 10, margin: 0 }}>(carimbo)</p>
             </div>
 
@@ -224,7 +290,7 @@ const CertificatePage: React.FC = () => {
                 Assinatura do Sócio
               </div>
               <p style={{ color: '#1e3a5f', fontSize: 12, fontWeight: 700, margin: '0 0 2px' }}>Nome do Sócio</p>
-              <p style={{ color: '#6b7280', fontSize: 10, margin: 0 }}>Advogado</p>
+              <p style={{ color: '#6b7280', fontSize: 10, margin: 0 }}>{signatoryTitle}</p>
             </div>
           </div>
 

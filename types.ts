@@ -60,6 +60,13 @@ export interface Organization {
   name: string;
   created_at?: string;
   isActive?: boolean;
+  certificate_nipc?: string;
+  certificate_address?: string;
+  certificate_city?: string;
+  certificate_body_text?: string;
+  certificate_signatory_name?: string;
+  certificate_signatory_title?: string;
+  certificate_seal_url?: string;
 }
 
 /** Membership do usuário em uma organização */

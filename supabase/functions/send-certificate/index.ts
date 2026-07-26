@@ -12,16 +12,37 @@ const jsonResponse = (status: number, body: Record<string, unknown>) =>
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 
-async function getSignatureImageBase64(): Promise<string> {
+async function getImageBase64(relativePath: string): Promise<string> {
   try {
-    const filePath = new URL('../../img/assinatura_leonardo_pagio.png', import.meta.url).pathname;
+    const filePath = new URL(relativePath, import.meta.url).pathname;
     const file = await Deno.readFile(filePath);
     return btoa(String.fromCharCode(...file));
-  } catch (err) {
-    console.warn('[send-certificate] Imagem de assinatura não encontrada:', err);
+  } catch {
     return '';
   }
 }
+
+interface OrgCertificateData {
+  name: string;
+  certificate_nipc: string | null;
+  certificate_address: string | null;
+  certificate_city: string | null;
+  certificate_body_text: string | null;
+  certificate_signatory_name: string | null;
+  certificate_signatory_title: string | null;
+  certificate_seal_url: string | null;
+}
+
+const DEFAULT_ORG: OrgCertificateData = {
+  name: 'Associação contra as Injustiças - AI',
+  certificate_nipc: 'XXXXXXXX',
+  certificate_address: '[Morada da Sede]',
+  certificate_city: 'Lisboa – Portugal',
+  certificate_body_text: null,
+  certificate_signatory_name: 'Leonardo Saraiva Págio',
+  certificate_signatory_title: 'Advogado',
+  certificate_seal_url: null,
+};
 
 function generateCertificateHtml(params: {
   nome: string;
@@ -41,8 +62,24 @@ function generateCertificateHtml(params: {
   verifCode: string;
   appUrl: string;
   processId: string;
+  org: OrgCertificateData;
 }): string {
   const p = params;
+  const org = p.org;
+  const nipc = org.certificate_nipc || 'XXXXXXXX';
+  const address = org.certificate_address || '[Morada da Sede]';
+  const city = org.certificate_city || 'Lisboa – Portugal';
+  const signatoryName = org.certificate_signatory_name || 'Leonardo Saraiva Págio';
+  const signatoryTitle = org.certificate_signatory_title || 'Advogado';
+  const sealHtml = org.certificate_seal_url
+    ? `<img src="cid:selo_org" alt="Selo" style="width:80px;height:80px;object-fit:contain;" />`
+    : `<div style="width:80px;height:80px;border:2px dashed #d4a843;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:#fefce8;">
+         <span style="color:#d4a843;font-size:10px;font-weight:700;">SELO</span>
+       </div>`;
+  const bodyText = org.certificate_body_text
+    ? org.certificate_body_text.replace(/{orgName}/g, org.name)
+    : `A <strong>${org.name}</strong>, pessoa coletiva n.º ${nipc}, com sede na ${address}, ${city}, certifica para os devidos efeitos que:`;
+
   return `
 <!DOCTYPE html>
 <html>
@@ -54,8 +91,8 @@ function generateCertificateHtml(params: {
       <tr>
         <td style="padding:32px 40px 16px;text-align:center;border-bottom:3px double #d4a843;">
           <h1 style="color:#1e3a5f;font-size:22px;font-weight:900;text-transform:uppercase;letter-spacing:3px;margin:0 0 4px;">Certificado de Filiação</h1>
-          <p style="color:#d4a843;font-size:12px;font-weight:700;letter-spacing:2px;margin:0 0 4px;">ASSOCIAÇÃO CONTRA AS INJUSTIÇAS - AI</p>
-          <p style="color:#6b7280;font-size:11px;margin:0;">NIPC: XXXXXXXX · Sede: [Morada da Sede] · Lisboa – Portugal</p>
+          <p style="color:#d4a843;font-size:12px;font-weight:700;letter-spacing:2px;margin:0 0 4px;">${org.name.toUpperCase()}</p>
+          <p style="color:#6b7280;font-size:11px;margin:0;">NIPC: ${nipc} · Sede: ${address} · ${city}</p>
         </td>
       </tr>
       <!-- CERTIFICATE NUMBER -->
@@ -69,8 +106,7 @@ function generateCertificateHtml(params: {
       <tr>
         <td style="padding:24px 40px;">
           <p style="color:#374151;font-size:14px;line-height:1.8;margin:0 0 20px;text-align:justify;">
-            A <strong>Associação contra as Injustiças - AI</strong>, pessoa coletiva n.º XXXXXXXX, com sede na
-            [Morada da Sede], Lisboa – Portugal, certifica para os devidos efeitos que:
+            ${bodyText}
           </p>
           <div style="border:1px solid #e5e7eb;border-radius:6px;padding:20px;margin-bottom:20px;">
             <table width="100%" cellpadding="4" cellspacing="0" style="font-size:13px;color:#374151;">
@@ -122,8 +158,8 @@ function generateCertificateHtml(params: {
           </div>
           <p style="color:#374151;font-size:14px;line-height:1.8;margin:0;text-align:justify;">
             que o(a) identificado(a) nos termos supra se encontra devidamente registado(a) como
-            <strong>associado(a) efetivo(a)</strong> da Associação contra as Injustiças - AI, com todos os direitos
-            e deveres previstos nos Estatutos e no Regulamento Interno da Associação.
+            <strong>associado(a) efetivo(a)</strong> da ${org.name}, com todos os direitos
+            e deveres previstos nos Estatutos e no Regulamento Interno.
           </p>
         </td>
       </tr>
@@ -143,15 +179,15 @@ function generateCertificateHtml(params: {
           <table width="100%" cellpadding="0" cellspacing="0" style="table-layout: fixed;">
             <tr>
               <td style="width:33.33%;text-align:center;padding:0 12px;vertical-align:bottom;">
-                <img src="cid:assinatura_leonardo" alt="Assinatura Leonar Pagio" style="max-width:180px;max-height:80px;width:auto;height:auto;object-fit:contain;display:block;margin:0 auto 8px;" />
-                <p style="color:#1e3a5f;font-size:12px;font-weight:700;margin:0 0 2px;">Leonardo Saraiva Págio</p>
-                <p style="color:#6b7280;font-size:10px;margin:0;">Advogado</p>
+                <img src="cid:assinatura_leonardo" alt="Assinatura" style="max-width:180px;max-height:80px;width:auto;height:auto;object-fit:contain;display:block;margin:0 auto 8px;" />
+                <p style="color:#1e3a5f;font-size:12px;font-weight:700;margin:0 0 2px;">${signatoryName}</p>
+                <p style="color:#6b7280;font-size:10px;margin:0;">${signatoryTitle}</p>
               </td>
               <td style="width:33.33%;text-align:center;padding:0 12px;vertical-align:bottom;">
-                <div style="width:80px;height:80px;border:2px dashed #d4a843;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;margin:0 auto 8px;background:#fefce8;">
-                  <span style="color:#d4a843;font-size:10px;font-weight:700;">SELO</span>
+                <div style="display:inline-flex;align-items:center;justify-content:center;margin:0 auto 8px;">
+                  ${sealHtml}
                 </div>
-                <p style="color:#1e3a5f;font-size:12px;font-weight:700;margin:0 0 2px;">Selo da Associação</p>
+                <p style="color:#1e3a5f;font-size:12px;font-weight:700;margin:0 0 2px;">Selo</p>
                 <p style="color:#6b7280;font-size:10px;margin:0;">(carimbo)</p>
               </td>
               <td style="width:33.33%;text-align:center;padding:0 12px;vertical-align:bottom;">
@@ -159,7 +195,7 @@ function generateCertificateHtml(params: {
                   Assinatura do Sócio
                 </div>
                 <p style="color:#1e3a5f;font-size:12px;font-weight:700;margin:0 0 2px;">Nome do Sócio</p>
-                <p style="color:#6b7280;font-size:10px;margin:0;">Advogado</p>
+                <p style="color:#6b7280;font-size:10px;margin:0;">${signatoryTitle}</p>
               </td>
             </tr>
           </table>
@@ -222,6 +258,28 @@ Deno.serve(async (request) => {
       return jsonResponse(404, { success: false, error: 'Processo não encontrado.' });
     }
 
+    // Fetch org certificate config
+    let orgData: OrgCertificateData = { ...DEFAULT_ORG };
+    if (process.org_id) {
+      const { data: org } = await supabase
+        .from('organizations')
+        .select('name, certificate_nipc, certificate_address, certificate_city, certificate_body_text, certificate_signatory_name, certificate_signatory_title, certificate_seal_url')
+        .eq('id', process.org_id)
+        .maybeSingle();
+      if (org) {
+        orgData = {
+          name: org.name || DEFAULT_ORG.name,
+          certificate_nipc: org.certificate_nipc,
+          certificate_address: org.certificate_address,
+          certificate_city: org.certificate_city,
+          certificate_body_text: org.certificate_body_text,
+          certificate_signatory_name: org.certificate_signatory_name,
+          certificate_signatory_title: org.certificate_signatory_title,
+          certificate_seal_url: org.certificate_seal_url,
+        };
+      }
+    }
+
     let userEmail = process.cliente_email || '';
     let profileData: Record<string, unknown> = {};
 
@@ -270,12 +328,12 @@ Deno.serve(async (request) => {
     const protocolo = process.protocolo || 'N/A';
     const data = new Date(process.created_at).toLocaleDateString('pt-PT');
 
-    // Generate certificate number and verification code
     const year = new Date().getFullYear();
     const initials = (nome as string).split(' ').map((n: string) => n[0] || '').join('').toUpperCase().slice(0, 4) || 'XX';
     const seq = protocolo.replace(/\D/g, '').slice(-4) || Math.floor(Math.random() * 9000 + 1000).toString();
-    const certNumber = `AI-${year}/${seq}`;
-    const verifCode = `AI-${year}-${seq}-${initials}`;
+    const certPrefix = orgData.name.split(' ').map((w: string) => w[0] || '').join('').toUpperCase().slice(0, 2) || 'AI';
+    const certNumber = `${certPrefix}-${year}/${seq}`;
+    const verifCode = `${certPrefix}-${year}-${seq}-${initials}`;
 
     const certParams = {
       nome: nome as string,
@@ -295,10 +353,33 @@ Deno.serve(async (request) => {
       verifCode,
       appUrl,
       processId,
+      org: orgData,
     };
 
     const certificateHtml = generateCertificateHtml(certParams);
-    const signatureBase64 = await getSignatureImageBase64();
+    const signatureBase64 = await getImageBase64('../../img/assinatura_leonardo_pagio.png');
+    const sealBase64 = orgData.certificate_seal_url
+      ? await getImageBase64(`../../img/${orgData.certificate_seal_url}`)
+      : await getImageBase64('../../img/selo associação.png');
+
+    const attachments = [];
+    if (signatureBase64) {
+      attachments.push({
+        filename: 'assinatura.png',
+        content: signatureBase64,
+        disposition: 'inline',
+        contentId: 'assinatura_leonardo',
+      });
+    }
+    if (sealBase64) {
+      attachments.push({
+        filename: 'selo.png',
+        content: sealBase64,
+        disposition: 'inline',
+        contentId: 'selo_org',
+      });
+    }
+
     const textBody = [
       `Certificado de Filiação - ${nome}`,
       '',
@@ -317,17 +398,12 @@ Deno.serve(async (request) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: `SGI FV <${fromEmail}>`,
+        from: `${orgData.name} <${fromEmail}>`,
         to: [userEmail],
         subject: `Certificado de Filiação n.º ${certNumber} - ${nome}`,
         html: certificateHtml,
         text: textBody,
-        attachments: signatureBase64 ? [{
-          filename: 'assinatura_leonardo_pagio.png',
-          content: signatureBase64,
-          disposition: 'inline',
-          contentId: 'assinatura_leonardo',
-        }] : [],
+        attachments,
       }),
     });
 
