@@ -34,6 +34,7 @@ import ProcessesSection from '../src/components/dashboard/blocks/ProcessesSectio
 import UsersSection from '../src/components/dashboard/blocks/UsersSection';
 import ManagementSection from '../src/components/dashboard/blocks/ManagementSection';
 import StripeConfigPanel from '../src/components/dashboard/blocks/StripeConfigPanel';
+import OrganizationsSection from '../src/components/dashboard/blocks/OrganizationsSection';
 import { useToast } from '../src/contexts/ToastContext';
 import { createCheckoutSession } from '../src/lib/stripe';
 import { getPaymentStatusUi } from '../src/lib/paymentStatus';
@@ -229,6 +230,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       if (!error) setOrganizations(loaded);
     });
   }, []);
+
+  const refreshOrganizations = async () => {
+    const { organizations: loaded, error } = await loadOrganizations();
+    if (!error) setOrganizations(loaded);
+  };
 
   // Documentos tab state
   const [processDocuments, setProcessDocuments] = useState<ProcessDocument[]>([]);
@@ -1606,6 +1612,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         <div className="max-w-full bg-white border border-surface-100 rounded-2xl shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
           <AgendaBlock />
         </div>
+      )}
+      {currentSection === 'organizacoes' && (
+        <OrganizationsSection
+          organizations={organizations}
+          onRefreshOrganizations={refreshOrganizations}
+          canManageOrganizations={!sectionReadOnly.organizacoes}
+        />
       )}
 
       {/* Details View Modal */}
