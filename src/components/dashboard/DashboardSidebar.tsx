@@ -105,7 +105,8 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
   return (
     <aside
       className={`
-        fixed lg:static inset-y-0 left-0 z-50 lg:z-auto
+        fixed inset-y-0 left-0 z-50
+        lg:sticky lg:top-0 lg:h-screen lg:z-auto
         ${collapsed ? 'w-[68px]' : 'w-64'}
         shrink-0 bg-white border-r border-surface-200/60 shadow-sidebar
         transition-all duration-300 ease-in-out
