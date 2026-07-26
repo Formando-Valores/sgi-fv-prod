@@ -388,7 +388,7 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
           <div className="absolute bottom-20 right-20 w-80 h-80 bg-white/5 rounded-full blur-3xl" />
         </div>
         <div className="relative z-10 flex flex-col justify-center px-12 xl:px-16">
-          <img src="/icons/icon.svg" alt="" className="h-14 w-14 mb-8 brightness-0 invert" />
+          <img src="/icons/icon.svg" alt="SGI FV" className="h-14 w-14 mb-8 rounded-xl" />
           <h1 className="text-3xl xl:text-4xl font-extrabold text-white leading-tight mb-4">
             Junte-se<br />a nós
           </h1>

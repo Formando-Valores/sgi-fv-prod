@@ -373,7 +373,7 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
           <div className="absolute bottom-20 right-20 w-80 h-80 bg-white/5 rounded-full blur-3xl" />
         </div>
         <div className="relative z-10 flex flex-col justify-center px-16 xl:px-24">
-          <img src="/icons/icon.svg" alt="" className="h-14 w-14 mb-8 brightness-0 invert" />
+          <img src="/icons/icon.svg" alt="SGI FV" className="h-14 w-14 mb-8 rounded-xl" />
           <h1 className="text-4xl xl:text-5xl font-extrabold text-white leading-tight mb-4">
             Sistema de<br />Gestão Integrada
           </h1>
