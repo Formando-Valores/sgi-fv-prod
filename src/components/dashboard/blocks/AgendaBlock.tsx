@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+﻿import React, { useEffect, useState, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Loader2, Check, X, Briefcase } from 'lucide-react';
 import {
   listProfessionalSchedules,
@@ -209,13 +209,13 @@ const AgendaBlock: React.FC = () => {
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <h2 className="text-lg font-black uppercase tracking-wider">Agenda de Trabalho</h2>
         <div className="flex items-center gap-3">
-          <div className="flex bg-gray-100 rounded-lg p-0.5 text-xs font-bold">
+          <div className="flex bg-surface-100 rounded-lg p-0.5 text-xs font-bold">
             {(['day', 'week', 'month'] as ViewMode[]).map((v) => (
               <button
                 key={v}
                 onClick={() => handleViewChange(v)}
                 className={`px-3 py-1.5 rounded-md transition-all uppercase tracking-wider ${
-                  view === v ? 'bg-white shadow text-gray-800' : 'text-gray-500 hover:text-gray-700'
+                  view === v ? 'bg-white shadow text-surface-800' : 'text-surface-500 hover:text-surface-700'
                 }`}
               >
                 {v === 'day' ? 'Dia' : v === 'week' ? 'Semana' : 'Mês'}
@@ -225,7 +225,7 @@ const AgendaBlock: React.FC = () => {
           <select
             value={selectedProf}
             onChange={(e) => setSelectedProf(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm font-semibold"
+            className="border border-surface-300 rounded-lg px-3 py-2 text-sm font-semibold"
           >
             <option value="">Selecione um profissional</option>
             {professionals.map((p) => (
@@ -233,18 +233,18 @@ const AgendaBlock: React.FC = () => {
             ))}
           </select>
           <div className="flex items-center gap-1">
-            <button onClick={() => navigate(-1)} className="p-2 rounded-lg hover:bg-gray-100">
+            <button onClick={() => navigate(-1)} className="p-2 rounded-lg hover:bg-surface-100">
               <ChevronLeft className="h-5 w-5" />
             </button>
             <span className="font-bold text-sm min-w-[180px] text-center whitespace-nowrap">
               {renderTitle()}
             </span>
-            <button onClick={() => navigate(1)} className="p-2 rounded-lg hover:bg-gray-100">
+            <button onClick={() => navigate(1)} className="p-2 rounded-lg hover:bg-surface-100">
               <ChevronRight className="h-5 w-5" />
             </button>
             <button
               onClick={goToday}
-              className="ml-1 px-3 py-1.5 text-xs font-bold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all"
+              className="ml-1 px-3 py-1.5 text-xs font-bold bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-all"
             >
               Hoje
             </button>
@@ -253,37 +253,37 @@ const AgendaBlock: React.FC = () => {
       </div>
 
       {!selectedProf ? (
-        <p className="text-gray-500 text-center py-12 font-semibold">Selecione um profissional para ver a agenda.</p>
+        <p className="text-surface-500 text-center py-12 font-semibold">Selecione um profissional para ver a agenda.</p>
       ) : loading ? (
-        <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>
+        <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-brand-600" /></div>
       ) : days.length === 0 ? (
-        <p className="text-gray-500 text-center py-12 font-semibold">Nenhum dia útil neste período.</p>
+        <p className="text-surface-500 text-center py-12 font-semibold">Nenhum dia útil neste período.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-xs">
             <thead>
               <tr>
-                <th className="sticky left-0 bg-white z-10 p-2 text-left font-black text-gray-500 uppercase tracking-wider min-w-[60px]">Horário</th>
+                <th className="sticky left-0 bg-white z-10 p-2 text-left font-black text-surface-500 uppercase tracking-wider min-w-[60px]">Horário</th>
                 {days.map((d, i) => (
-                  <th key={i} className="p-2 text-center font-black text-gray-500 uppercase tracking-wider min-w-[100px]">
+                  <th key={i} className="p-2 text-center font-black text-surface-500 uppercase tracking-wider min-w-[100px]">
                     <div>{view === 'day' ? '' : WEEKDAY_SHORT[d.getDay()]}</div>
-                    <div className="text-sm text-gray-800">{d.getDate()}/{d.getMonth() + 1}</div>
+                    <div className="text-sm text-surface-800">{d.getDate()}/{d.getMonth() + 1}</div>
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {selectedTimeSlots.map((time) => (
-                <tr key={time} className="border-t border-gray-100">
-                  <td className="sticky left-0 bg-white z-10 p-2 font-semibold text-gray-600 whitespace-nowrap">{time}</td>
+                <tr key={time} className="border-t border-surface-100">
+                  <td className="sticky left-0 bg-white z-10 p-2 font-semibold text-surface-600 whitespace-nowrap">{time}</td>
                   {days.map((d, i) => {
                     const dateStr = formatDate(d);
                     const k = key(dateStr, time);
                     const slot = scheduleMap.get(k);
                     const isSaving = saving === k;
 
-                    let bgClass = 'bg-gray-50 hover:bg-gray-100';
-                    let content: React.ReactNode = <X className="h-3 w-3 text-gray-300" />;
+                    let bgClass = 'bg-surface-50 hover:bg-surface-100';
+                    let content: React.ReactNode = <X className="h-3 w-3 text-surface-300" />;
                     let title = 'Indisponível';
 
                     if (slot?.process_id) {
@@ -309,7 +309,7 @@ const AgendaBlock: React.FC = () => {
                           className={`w-full h-10 rounded-lg flex items-center justify-center transition-all ${bgClass} ${isSaving ? 'opacity-50' : ''}`}
                         >
                           {isSaving ? (
-                            <Loader2 className="h-3 w-3 animate-spin text-gray-500" />
+                            <Loader2 className="h-3 w-3 animate-spin text-surface-500" />
                           ) : content}
                         </button>
                       </td>
@@ -322,21 +322,21 @@ const AgendaBlock: React.FC = () => {
         </div>
       )}
 
-      <div className="mt-4 flex items-center gap-4 text-xs text-gray-500">
+      <div className="mt-4 flex items-center gap-4 text-xs text-surface-500">
         <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-emerald-100 inline-block border border-emerald-300" /> Disponível</span>
         <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-sky-100 inline-block border border-sky-300" /> Com processo</span>
-        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-gray-50 inline-block border border-gray-200" /> Indisponível</span>
+        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-surface-50 inline-block border border-surface-200" /> Indisponível</span>
       </div>
 
       {linkModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => { if (!linking) setLinkModal(null); }}>
           <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-black uppercase tracking-wider mb-4">Vincular Processo</h3>
-            <p className="text-sm text-gray-600 mb-4">
+            <p className="text-sm text-surface-600 mb-4">
               Horário: <strong>{linkModal.date}</strong> às <strong>{linkModal.time}</strong>
             </p>
             {availableProcesses.length === 0 ? (
-              <p className="text-sm text-gray-500 mb-4">Nenhum processo disponível para este profissional.</p>
+              <p className="text-sm text-surface-500 mb-4">Nenhum processo disponível para este profissional.</p>
             ) : (
               <div className="space-y-2 max-h-60 overflow-y-auto mb-4">
                 {availableProcesses.map((p) => (
@@ -344,12 +344,12 @@ const AgendaBlock: React.FC = () => {
                     key={p.id}
                     onClick={() => confirmLink(p.id)}
                     disabled={linking}
-                    className="w-full text-left p-3 rounded-xl border border-gray-200 hover:border-sky-300 hover:bg-sky-50 transition-all flex items-center gap-3 disabled:opacity-50"
+                    className="w-full text-left p-3 rounded-xl border border-surface-200 hover:border-sky-300 hover:bg-sky-50 transition-all flex items-center gap-3 disabled:opacity-50"
                   >
                     <Briefcase className="h-4 w-4 text-sky-600 flex-shrink-0" />
                     <div>
-                      <div className="font-bold text-sm text-gray-800">{p.protocolo}</div>
-                      <div className="text-xs text-gray-500">{p.cliente_nome}</div>
+                      <div className="font-bold text-sm text-surface-800">{p.protocolo}</div>
+                      <div className="text-xs text-surface-500">{p.cliente_nome}</div>
                     </div>
                   </button>
                 ))}
@@ -360,7 +360,7 @@ const AgendaBlock: React.FC = () => {
               <button
                 onClick={() => setLinkModal(null)}
                 disabled={linking}
-                className="px-4 py-2 text-sm font-bold rounded-lg bg-gray-100 hover:bg-gray-200 transition-all disabled:opacity-50"
+                className="px-4 py-2 text-sm font-bold rounded-lg bg-surface-100 hover:bg-surface-200 transition-all disabled:opacity-50"
               >
                 Cancelar
               </button>

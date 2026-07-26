@@ -1422,7 +1422,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={isUploading}
-          className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-blue-500 disabled:opacity-60"
+          className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-500 disabled:opacity-60"
         >
           {isUploading ? (
             <><Loader2 className="h-4 w-4 animate-spin" /> Enviando...</>
@@ -1430,7 +1430,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
             <><Upload className="h-4 w-4" /> Enviar Comprovante de Pagamento</>
           )}
         </button>
-        <p className="text-xs text-gray-500 text-center mt-1">Aceito: imagem ou PDF</p>
+        <p className="text-xs text-surface-500 text-center mt-1">Aceito: imagem ou PDF</p>
       </div>
     );
   };
@@ -1514,41 +1514,41 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       {currentSection === 'configuracoes' && (
         <>
           {/* Navigation Tabs */}
-          <div className="flex border-b border-gray-100 mb-6 gap-8 no-print overflow-x-auto overflow-y-hidden whitespace-nowrap scroll-smooth" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+          <div className="flex border-b border-surface-100 mb-6 gap-8 no-print overflow-x-auto overflow-y-hidden whitespace-nowrap scroll-smooth" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         <button 
           onClick={() => setActiveTab('users')}
-          className={`pb-4 px-2 font-black uppercase text-xs tracking-widest transition-all relative ${activeTab === 'users' ? 'text-blue-500' : 'text-gray-500'}`}
+          className={`pb-4 px-2 font-black uppercase text-xs tracking-widest transition-all relative ${activeTab === 'users' ? 'text-brand-500' : 'text-surface-500'}`}
         >
           Visualização de Usuários
-          {activeTab === 'users' && <div className="absolute bottom-0 left-0 w-full h-1 bg-blue-500 rounded-t-full"></div>}
+          {activeTab === 'users' && <div className="absolute bottom-0 left-0 w-full h-1 bg-brand-500 rounded-t-full"></div>}
         </button>
         <button 
           onClick={() => setActiveTab('management')}
-          className={`pb-4 px-2 font-black uppercase text-xs tracking-widest transition-all relative ${activeTab === 'management' ? 'text-blue-500' : 'text-gray-500'}`}
+          className={`pb-4 px-2 font-black uppercase text-xs tracking-widest transition-all relative ${activeTab === 'management' ? 'text-brand-500' : 'text-surface-500'}`}
         >
           Gestão de Acessos
-          {activeTab === 'management' && <div className="absolute bottom-0 left-0 w-full h-1 bg-blue-500 rounded-t-full"></div>}
+          {activeTab === 'management' && <div className="absolute bottom-0 left-0 w-full h-1 bg-brand-500 rounded-t-full"></div>}
         </button>
         <button 
           onClick={() => setActiveTab('iban')}
-          className={`pb-4 px-2 font-black uppercase text-xs tracking-widest transition-all relative ${activeTab === 'iban' ? 'text-blue-500' : 'text-gray-500'}`}
+          className={`pb-4 px-2 font-black uppercase text-xs tracking-widest transition-all relative ${activeTab === 'iban' ? 'text-brand-500' : 'text-surface-500'}`}
         >
           IBAN Profissionais
-          {activeTab === 'iban' && <div className="absolute bottom-0 left-0 w-full h-1 bg-blue-500 rounded-t-full"></div>}
+          {activeTab === 'iban' && <div className="absolute bottom-0 left-0 w-full h-1 bg-brand-500 rounded-t-full"></div>}
         </button>
         <button 
           onClick={() => setActiveTab('servicos')}
-          className={`pb-4 px-2 font-black uppercase text-xs tracking-widest transition-all relative ${activeTab === 'servicos' ? 'text-blue-500' : 'text-gray-500'}`}
+          className={`pb-4 px-2 font-black uppercase text-xs tracking-widest transition-all relative ${activeTab === 'servicos' ? 'text-brand-500' : 'text-surface-500'}`}
         >
           Serviços
-          {activeTab === 'servicos' && <div className="absolute bottom-0 left-0 w-full h-1 bg-blue-500 rounded-t-full"></div>}
+          {activeTab === 'servicos' && <div className="absolute bottom-0 left-0 w-full h-1 bg-brand-500 rounded-t-full"></div>}
         </button>
         <button 
           onClick={() => setActiveTab('stripe')}
-          className={`pb-4 px-2 font-black uppercase text-xs tracking-widest transition-all relative ${activeTab === 'stripe' ? 'text-blue-500' : 'text-gray-500'}`}
+          className={`pb-4 px-2 font-black uppercase text-xs tracking-widest transition-all relative ${activeTab === 'stripe' ? 'text-brand-500' : 'text-surface-500'}`}
         >
           Stripe
-          {activeTab === 'stripe' && <div className="absolute bottom-0 left-0 w-full h-1 bg-blue-500 rounded-t-full"></div>}
+          {activeTab === 'stripe' && <div className="absolute bottom-0 left-0 w-full h-1 bg-brand-500 rounded-t-full"></div>}
         </button>
           </div>
         </>
@@ -1603,7 +1603,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         <div key="tab-stripe" className="animate-slideUp"><StripeConfigPanel activeOrgId={activeOrgId} /></div>
       )}
       {currentSection === 'agenda' && (
-        <div className="max-w-full bg-white border border-gray-100 rounded-2xl shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
+        <div className="max-w-full bg-white border border-surface-100 rounded-2xl shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
           <AgendaBlock />
         </div>
       )}
@@ -1611,14 +1611,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       {/* Details View Modal */}
       {selectedUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white w-[calc(100%-2rem)] sm:w-[calc(100%-3rem)] md:w-full max-w-2xl rounded-2xl border border-gray-100 shadow-2xl max-h-[92vh] md:max-h-[85vh] flex flex-col overflow-hidden animate-scaleIn">
-             <div className="shrink-0 px-4 sm:px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/80 backdrop-blur-sm">
+          <div className="bg-white w-[calc(100%-2rem)] sm:w-[calc(100%-3rem)] md:w-full max-w-2xl rounded-2xl border border-surface-100 shadow-2xl max-h-[92vh] md:max-h-[85vh] flex flex-col overflow-hidden animate-scaleIn">
+             <div className="shrink-0 px-4 sm:px-6 py-4 border-b border-surface-100 flex justify-between items-center bg-surface-50/80 backdrop-blur-sm">
                 <h3 className="text-sm sm:text-lg font-black uppercase tracking-tight truncate pr-2">Ficha Cadastral</h3>
-                <button onClick={() => setSelectedUser(null)} className="p-1.5 sm:p-2 bg-gray-100 hover:bg-gray-200 rounded-full hover:scale-105 active:scale-95 transition-transform shrink-0">
+                <button onClick={() => setSelectedUser(null)} className="p-1.5 sm:p-2 bg-surface-100 hover:bg-surface-200 rounded-full hover:scale-105 active:scale-95 transition-transform shrink-0">
                   <X className="w-4 h-4 sm:w-5 sm:h-5" />
                 </button>
              </div>
-               <div className="flex-1 overflow-y-auto overscroll-contain scroll-smooth px-4 sm:px-6 py-4 sm:py-6 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent">
+               <div className="flex-1 overflow-y-auto overscroll-contain scroll-smooth px-4 sm:px-6 py-4 sm:py-6 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-surface-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent">
                  {/* Sub-aba navigation */}
                 <div className="grid grid-cols-2 md:flex gap-2 mb-6">
                   <button
@@ -1626,8 +1626,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     onClick={() => setSelectedUserTab('cadastral')}
                     className={`px-4 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition-all text-center ${
                       selectedUserTab === 'cadastral'
-                        ? 'bg-blue-600 text-white shadow-md'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        ? 'bg-brand-600 text-white shadow-md'
+                        : 'bg-surface-100 text-surface-600 hover:bg-surface-200'
                     }`}
                   >
                     Consulte seus dados
@@ -1638,7 +1638,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     className={`px-4 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition-all text-center ${
                       selectedUserTab === 'financeiro'
                         ? 'bg-emerald-600 text-white shadow-md'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        : 'bg-surface-100 text-surface-600 hover:bg-surface-200'
                     }`}
                   >
                     Suas finanças
@@ -1649,7 +1649,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     className={`px-4 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition-all text-center ${
                       selectedUserTab === 'documentos'
                         ? 'bg-violet-600 text-white shadow-md'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        : 'bg-surface-100 text-surface-600 hover:bg-surface-200'
                     }`}
                   >
                     Seus documentos
@@ -1660,7 +1660,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     className={`px-4 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition-all text-center ${
                       selectedUserTab === 'comunicacao'
                         ? 'bg-sky-600 text-white shadow-md'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        : 'bg-surface-100 text-surface-600 hover:bg-surface-200'
                     }`}
                   >
                     Fale conosco
@@ -1673,53 +1673,53 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
                       <div className="space-y-4 min-w-0">
                         <div>
-                          <label className="text-[10px] font-black text-gray-500 uppercase">Nome Completo</label>
+                          <label className="text-[10px] font-black text-surface-500 uppercase">Nome Completo</label>
                           <p className="text-lg font-black break-words">{selectedUser.name}</p>
                         </div>
                         <div>
-                          <label className="text-[10px] font-black text-gray-500 uppercase">E-mail</label>
-                          <p className="font-bold text-blue-400 break-all leading-snug">{selectedUser.email}</p>
+                          <label className="text-[10px] font-black text-surface-500 uppercase">E-mail</label>
+                          <p className="font-bold text-brand-400 break-all leading-snug">{selectedUser.email}</p>
                         </div>
                         <div>
-                          <label className="text-[10px] font-black text-gray-500 uppercase">Documento / NIF-CPF</label>
+                          <label className="text-[10px] font-black text-surface-500 uppercase">Documento / NIF-CPF</label>
                           <p className="font-bold break-words">{selectedUser.documentId} / {selectedUser.taxId}</p>
                         </div>
                         <div>
-                          <label className="text-[10px] font-black text-gray-500 uppercase">Estado Civil / País</label>
+                          <label className="text-[10px] font-black text-surface-500 uppercase">Estado Civil / País</label>
                           <p className="font-bold break-words">{selectedUser.maritalStatus} - {selectedUser.country}</p>
                         </div>
                       </div>
                       <div className="space-y-4 min-w-0">
                         <div>
-                          <label className="text-[10px] font-black text-gray-500 uppercase">Protocolo SGI</label>
+                          <label className="text-[10px] font-black text-surface-500 uppercase">Protocolo SGI</label>
                           <p className="text-lg font-black text-emerald-400 break-words">{selectedUser.protocol}</p>
                         </div>
                         <div>
-                          <label className="text-[10px] font-black text-gray-500 uppercase">Título do processo</label>
+                          <label className="text-[10px] font-black text-surface-500 uppercase">Título do processo</label>
                           <p className="font-bold break-words">{sanitizeDisplayValue((selectedUser as AdminProcessRow).contractedServiceName) || 'Não informado'}</p>
                         </div>
                         <div>
-                          <label className="text-[10px] font-black text-gray-500 uppercase">Unidade Atendimento</label>
-                          <p className="font-bold text-blue-300 break-words leading-snug">{selectedUser.unit}</p>
+                          <label className="text-[10px] font-black text-surface-500 uppercase">Unidade Atendimento</label>
+                          <p className="font-bold text-brand-300 break-words leading-snug">{selectedUser.unit}</p>
                         </div>
                         <div>
-                          <label className="text-[10px] font-black text-gray-500 uppercase">Processo Judicial</label>
+                          <label className="text-[10px] font-black text-surface-500 uppercase">Processo Judicial</label>
                           <p className="font-bold break-words">{selectedUser.processNumber || 'NÃƒO INFORMADO'}</p>
                         </div>
                         <div>
-                          <label className="text-[10px] font-black text-gray-500 uppercase">Status Atual</label>
+                          <label className="text-[10px] font-black text-surface-500 uppercase">Status Atual</label>
                           <p className="font-black text-orange-500 uppercase">{selectedUser.status}</p>
                         </div>
                       </div>
                     </div>
-                    <div className="mt-8 pt-6 border-t border-gray-100">
-                      <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Endereço Completo</label>
-                      <p className="font-semibold p-4 bg-gray-50 border border-gray-200 rounded-xl">{selectedUser.address}</p>
+                    <div className="mt-8 pt-6 border-t border-surface-100">
+                      <label className="text-[10px] font-black text-surface-500 uppercase block mb-2">Endereço Completo</label>
+                      <p className="font-semibold p-4 bg-surface-50 border border-surface-200 rounded-xl">{selectedUser.address}</p>
                     </div>
                     {selectedUser.notes && (
                       <div className="mt-4">
-                        <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Observações Internas</label>
-                        <p className="font-bold p-4 bg-blue-900/10 border border-blue-900/30 rounded-xl text-blue-200 italic">"{selectedUser.notes}"</p>
+                        <label className="text-[10px] font-black text-surface-500 uppercase block mb-2">Observações Internas</label>
+                        <p className="font-bold p-4 bg-brand-900/10 border border-brand-900/30 rounded-xl text-brand-200 italic">"{selectedUser.notes}"</p>
                       </div>
                     )}
                   </>
@@ -1739,15 +1739,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
                     {(selectedUser as AdminProcessRow).servicesSelected && (selectedUser as AdminProcessRow).servicesSelected!.length > 0 && (
                       <div>
-                        <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Serviços Contratados</label>
-                        <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
+                        <label className="text-[10px] font-black text-surface-500 uppercase block mb-2">Serviços Contratados</label>
+                        <div className="divide-y divide-surface-100 border border-surface-200 rounded-xl overflow-hidden">
                           {(selectedUser as AdminProcessRow).servicesSelected!.map((svc, idx) => (
                             <div key={idx} className="flex items-center justify-between px-4 py-3 bg-white">
                               <div className="min-w-0 flex-1">
-                                <p className="text-sm font-bold text-gray-800 truncate">{svc.name}</p>
-                                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">{svc.group}</p>
+                                <p className="text-sm font-bold text-surface-800 truncate">{svc.name}</p>
+                                <p className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider">{svc.group}</p>
                               </div>
-                              <span className="text-sm font-black text-gray-700 ml-3">{formatEuro(svc.price)}</span>
+                              <span className="text-sm font-black text-surface-700 ml-3">{formatEuro(svc.price)}</span>
                             </div>
                           ))}
                         </div>
@@ -1766,9 +1766,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                         <div>
                           <label className="text-[10px] font-black text-amber-700 uppercase block mb-2">Taxas Associativas</label>
                           <div className="divide-y divide-amber-100 border border-amber-200 rounded-xl overflow-hidden">
-                            <div className="flex items-center justify-between px-4 py-3 bg-blue-50">
-                              <p className="text-sm font-bold text-blue-800">Valor Bruto dos Serviços</p>
-                              <span className="text-sm font-black text-blue-800">{formatEuro(servicosTotal)}</span>
+                            <div className="flex items-center justify-between px-4 py-3 bg-brand-50">
+                              <p className="text-sm font-bold text-brand-800">Valor Bruto dos Serviços</p>
+                              <span className="text-sm font-black text-brand-800">{formatEuro(servicosTotal)}</span>
                             </div>
                             {convenioFees.map((fee, idx) => (
                               <div key={idx} className="flex items-center justify-between px-4 py-3 bg-amber-50">
@@ -1802,22 +1802,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     })()}
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl">
-                        <label className="text-[10px] font-black text-gray-500 uppercase block mb-1">Tipo de Serviço</label>
-                        <p className="text-lg font-black text-gray-900">{(selectedUser as AdminProcessRow).processType || '-'}</p>
+                      <div className="p-4 bg-surface-50 border border-surface-200 rounded-xl">
+                        <label className="text-[10px] font-black text-surface-500 uppercase block mb-1">Tipo de Serviço</label>
+                        <p className="text-lg font-black text-surface-900">{(selectedUser as AdminProcessRow).processType || '-'}</p>
                       </div>
-                      <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl">
-                        <label className="text-[10px] font-black text-gray-500 uppercase block mb-1">Unidade de Atendimento</label>
-                        <p className="text-lg font-black text-gray-900">{selectedUser.unit}</p>
+                      <div className="p-4 bg-surface-50 border border-surface-200 rounded-xl">
+                        <label className="text-[10px] font-black text-surface-500 uppercase block mb-1">Unidade de Atendimento</label>
+                        <p className="text-lg font-black text-surface-900">{selectedUser.unit}</p>
                       </div>
-                      <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl">
-                        <label className="text-[10px] font-black text-gray-500 uppercase block mb-1">Status do Pagamento</label>
+                      <div className="p-4 bg-surface-50 border border-surface-200 rounded-xl">
+                        <label className="text-[10px] font-black text-surface-500 uppercase block mb-1">Status do Pagamento</label>
                         {(selectedUser as AdminProcessRow).paymentStatus ? (
                           <span className={`inline-block px-3 py-1 rounded text-xs font-bold uppercase text-white ${getPaymentStatusUi((selectedUser as AdminProcessRow).paymentStatus)?.color || 'bg-slate-600'}`}>
                             {getPaymentStatusUi((selectedUser as AdminProcessRow).paymentStatus)?.label || (selectedUser as AdminProcessRow).paymentStatus}
                           </span>
                         ) : (
-                          <p className="text-lg font-black text-gray-400">Pendente</p>
+                          <p className="text-lg font-black text-surface-400">Pendente</p>
                         )}
                       </div>
                     </div>
@@ -1837,7 +1837,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                             <><CreditCard className="h-5 w-5" /> Pagar agora — {formatEuro(Number((selectedUser as AdminProcessRow).osValue ?? 0))}</>
                           )}
                         </button>
-                        <p className="text-xs text-gray-500 text-center">Pagamento processado via Stripe com segurança</p>
+                        <p className="text-xs text-surface-500 text-center">Pagamento processado via Stripe com segurança</p>
 
                         {/* Payment proof upload for clients */}
                         {(isClientScope) && (
@@ -1864,22 +1864,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                         {/* Show payment proofs */}
                         {paymentProofs.length > 0 && (
                           <div>
-                            <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Comprovantes Enviados</label>
-                            <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
+                            <label className="text-[10px] font-black text-surface-500 uppercase block mb-2">Comprovantes Enviados</label>
+                            <div className="divide-y divide-surface-100 border border-surface-200 rounded-xl overflow-hidden">
                               {paymentProofs.map((proof) => (
                                 <div key={proof.id} className="flex items-center justify-between px-4 py-3 bg-white">
                                   <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-bold text-gray-800 truncate">{proof.file_name || 'Comprovante'}</p>
+                                    <p className="text-sm font-bold text-surface-800 truncate">{proof.file_name || 'Comprovante'}</p>
                                     {proof.amount && (
-                                      <p className="text-[10px] font-semibold text-gray-500">Valor: {formatEuro(proof.amount)}</p>
+                                      <p className="text-[10px] font-semibold text-surface-500">Valor: {formatEuro(proof.amount)}</p>
                                     )}
-                                    {proof.notes && <p className="text-[10px] text-gray-500 mt-1">{proof.notes}</p>}
+                                    {proof.notes && <p className="text-[10px] text-surface-500 mt-1">{proof.notes}</p>}
                                   </div>
                                   <a
                                     href={proof.file_url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="text-xs font-bold text-blue-600 hover:text-blue-800 ml-3 underline"
+                                    className="text-xs font-bold text-brand-600 hover:text-brand-800 ml-3 underline"
                                   >
                                     Ver arquivo
                                   </a>
@@ -1960,12 +1960,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
                     {/* Certificate section when paid/validated */}
                     {((selectedUser as AdminProcessRow).paymentStatus === 'paid' || (selectedUser as AdminProcessRow).paymentStatus === 'validated' || (selectedUser as AdminProcessRow).paymentStatus === 'accepted') && (
-                      <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                      <div className="mt-4 p-4 bg-brand-50 border border-brand-200 rounded-xl">
                         <div className="flex items-center justify-between mb-3">
-                          <h4 className="text-sm font-black uppercase text-blue-800">Certificado de Filiação</h4>
+                          <h4 className="text-sm font-black uppercase text-brand-800">Certificado de Filiação</h4>
                           <a
                              href={(selectedUser as AdminProcessRow).processRecordId ? `/#/certificate?processId=${(selectedUser as AdminProcessRow).processRecordId}` : '#'}
-                            className="inline-flex items-center gap-1 text-xs font-bold text-blue-700 hover:text-blue-900 underline"
+                            className="inline-flex items-center gap-1 text-xs font-bold text-brand-700 hover:text-brand-900 underline"
                           >
                             <FileDown className="h-3 w-3" />
                             Baixar
@@ -1975,7 +1975,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                           <button
                             onClick={handleResendCertificate}
                             disabled={resendingCertificate}
-                            className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-bold rounded-lg transition-all"
+                            className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white text-xs font-bold rounded-lg transition-all"
                           >
                             {resendingCertificate ? (
                               <Loader2 className="h-3 w-3 animate-spin" />
@@ -2012,7 +2012,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                 {selectedUserTab === 'documentos' && (
                   <div className="space-y-6">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-black uppercase text-gray-800">Documentos do Processo</h3>
+                      <h3 className="text-lg font-black uppercase text-surface-800">Documentos do Processo</h3>
                       <label className={`inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-bold text-white transition-colors cursor-pointer ${uploadingDocument ? 'bg-violet-400' : 'bg-violet-600 hover:bg-violet-500'}`}>
                         {uploadingDocument ? (
                           <><Loader2 className="h-4 w-4 animate-spin" /> Enviandoâ€¦</>
@@ -2034,41 +2034,41 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                         <Loader2 className="h-8 w-8 animate-spin text-violet-600" />
                       </div>
                     ) : processDocuments.length === 0 ? (
-                      <div className="text-center py-12 text-gray-500">
+                      <div className="text-center py-12 text-surface-500">
                         <p className="font-bold">Nenhum documento anexado.</p>
                         <p className="text-sm mt-1">Clique em "Adicionar Documento" para enviar um arquivo.</p>
                       </div>
                     ) : (
                       <div className="space-y-3">
                         {processDocuments.map((doc) => (
-                          <div key={doc.id} className="border border-gray-200 rounded-xl p-4 flex items-start justify-between gap-4">
+                          <div key={doc.id} className="border border-surface-200 rounded-xl p-4 flex items-start justify-between gap-4">
                             <div className="min-w-0 flex-1">
-                              <p className="font-bold text-gray-800 break-words">{doc.document_name}</p>
+                              <p className="font-bold text-surface-800 break-words">{doc.document_name}</p>
                               <div className="flex items-center gap-2 mt-1">
                                 <span className={`inline-block text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
                                   doc.validation_status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
                                   doc.validation_status === 'rejected' ? 'bg-red-100 text-red-700' :
                                   doc.validation_status === 'resubmission_requested' ? 'bg-amber-100 text-amber-700' :
-                                  'bg-gray-100 text-gray-600'
+                                  'bg-surface-100 text-surface-600'
                                 }`}>
                                   {doc.validation_status === 'approved' ? 'Aprovado' :
                                    doc.validation_status === 'rejected' ? 'Rejeitado' :
                                    doc.validation_status === 'resubmission_requested' ? 'Reenvio solicitado' :
                                    'Pendente'}
                                 </span>
-                                <span className="text-xs text-gray-400">
+                                <span className="text-xs text-surface-400">
                                   {new Date(doc.created_at).toLocaleString('pt-BR')}
                                 </span>
                               </div>
                               {doc.pending_reason && (
-                                <p className="text-xs text-gray-500 mt-1">{doc.pending_reason}</p>
+                                <p className="text-xs text-surface-500 mt-1">{doc.pending_reason}</p>
                               )}
                               {doc.review_notes && (
                                 <p className="text-xs text-amber-600 mt-1 font-semibold">Parecer: {doc.review_notes}</p>
                               )}
                               {doc.file_path && (
                                 <a href={doc.file_path} target="_blank" rel="noopener noreferrer"
-                                   className="text-xs text-blue-600 hover:text-blue-800 font-bold mt-1 inline-block">
+                                   className="text-xs text-brand-600 hover:text-brand-800 font-bold mt-1 inline-block">
                                   Visualizar arquivo â†’
                                 </a>
                               )}
@@ -2120,9 +2120,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                 )}
 
                 {selectedUserTab === 'comunicacao' && selectedUser && (selectedUser as AdminProcessRow).processRecordId && (
-                  <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
-                    <div className="p-4 border-b border-gray-100 bg-gray-50">
-                      <h3 className="text-sm font-black uppercase text-gray-700">Comunicação do Processo</h3>
+                  <div className="bg-white border border-surface-100 rounded-2xl overflow-hidden shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
+                    <div className="p-4 border-b border-surface-100 bg-surface-50">
+                      <h3 className="text-sm font-black uppercase text-surface-700">Comunicação do Processo</h3>
                     </div>
                     <CommunicationBlock
                       processId={(selectedUser as AdminProcessRow).processRecordId!}
@@ -2138,10 +2138,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       {/* Edit Status Modal */}
       {editingUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white w-full max-w-3xl rounded-3xl border border-gray-100 shadow-2xl overflow-hidden animate-scaleIn">
-             <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+          <div className="bg-white w-full max-w-3xl rounded-3xl border border-surface-100 shadow-2xl overflow-hidden animate-scaleIn">
+             <div className="p-6 border-b border-surface-100 flex justify-between items-center bg-surface-50">
                <h3 className="text-xl font-black uppercase">Editar Status: {editingUser.protocol}</h3>
-               <button type="button" onClick={handleCloseEditModal} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full">
+               <button type="button" onClick={handleCloseEditModal} className="p-2 bg-surface-100 hover:bg-surface-200 rounded-full">
                  <X className="w-5 h-5" />
                </button>
              </div>
@@ -2160,18 +2160,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                   <div className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
-                        <label className="text-[10px] font-black text-gray-500 uppercase mb-2 block">Alterar Status do Processo</label>
-                        <select name="status" defaultValue={editingUser.status} onChange={() => setFormChanged(true)} className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none ring-blue-500 focus:ring-2">
+                        <label className="text-[10px] font-black text-surface-500 uppercase mb-2 block">Alterar Status do Processo</label>
+                        <select name="status" defaultValue={editingUser.status} onChange={() => setFormChanged(true)} className="w-full bg-white border border-surface-200 rounded-xl p-4 text-surface-800 font-semibold outline-none ring-brand-500 focus:ring-2">
                           {Object.values(ProcessStatus).map(s => (
                             <option key={s} value={s}>{s}</option>
                           ))}
                         </select>
                       </div>
                       <div>
-                        <label className="text-[10px] font-black text-gray-500 uppercase mb-2 block flex items-center gap-2">
+                        <label className="text-[10px] font-black text-surface-500 uppercase mb-2 block flex items-center gap-2">
                           <UserCheck className="w-3 h-3" /> Gestor do Serviço
                         </label>
-                        <select name="serviceManager" defaultValue={editingUser.serviceManager} onChange={() => setFormChanged(true)} className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none ring-blue-500 focus:ring-2">
+                        <select name="serviceManager" defaultValue={editingUser.serviceManager} onChange={() => setFormChanged(true)} className="w-full bg-white border border-surface-200 rounded-xl p-4 text-surface-800 font-semibold outline-none ring-brand-500 focus:ring-2">
                           <option value="">Selecione um gestor</option>
                           {SERVICE_MANAGERS.map(manager => (
                             <option key={manager} value={manager}>{manager}</option>
@@ -2181,24 +2181,24 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                     </div>
 
                     <div>
-                      <label className="text-[10px] font-black text-gray-500 uppercase mb-2 block flex items-center gap-2">
+                      <label className="text-[10px] font-black text-surface-500 uppercase mb-2 block flex items-center gap-2">
                         <Calendar className="w-3 h-3" /> Data de Prazo
                       </label>
-                      <input name="deadline" type="date" defaultValue={editingUser.deadline} onChange={() => setFormChanged(true)} className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold" />
+                      <input name="deadline" type="date" defaultValue={editingUser.deadline} onChange={() => setFormChanged(true)} className="w-full bg-white border border-surface-200 rounded-xl p-4 text-surface-800 font-semibold" />
                     </div>
                     <div>
-                      <label className="text-[10px] font-black text-gray-500 uppercase mb-2 block flex items-center gap-2">
+                      <label className="text-[10px] font-black text-surface-500 uppercase mb-2 block flex items-center gap-2">
                         <MessageSquare className="w-3 h-3" /> Nota de Observações
                       </label>
-                      <textarea name="notes" rows={4} defaultValue={editingUser.notes} onChange={() => setFormChanged(true)} className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold resize-none" placeholder="Digite as anotações do processo..."></textarea>
+                      <textarea name="notes" rows={4} defaultValue={editingUser.notes} onChange={() => setFormChanged(true)} className="w-full bg-white border border-surface-200 rounded-xl p-4 text-surface-800 font-semibold resize-none" placeholder="Digite as anotações do processo..."></textarea>
                     </div>
 
-                    <div className="rounded-2xl border border-gray-200 bg-gray-50/70 p-4">
+                    <div className="rounded-2xl border border-surface-200 bg-surface-50/70 p-4">
                       <div className="flex items-center gap-2 mb-3">
-                        <Flag className="w-4 h-4 text-blue-600" />
-                        <h4 className="text-sm font-black uppercase text-gray-700">Checklist do processo</h4>
+                        <Flag className="w-4 h-4 text-brand-600" />
+                        <h4 className="text-sm font-black uppercase text-surface-700">Checklist do processo</h4>
                       </div>
-                      <p className="text-xs text-gray-500 mb-3">
+                      <p className="text-xs text-surface-500 mb-3">
                         Todos os administradores podem criar itens e marcar como concluídos.
                       </p>
 
@@ -2208,31 +2208,31 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                           value={newChecklistText}
                           onChange={(event) => setNewChecklistText(event.target.value)}
                           placeholder="Adicionar novo item ao checklist"
-                          className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-800 font-semibold"
+                          className="w-full bg-white border border-surface-200 rounded-xl px-3 py-2 text-sm text-surface-800 font-semibold"
                         />
                         <button
                           type="button"
                           onClick={() => void handleAddChecklistItem()}
                           disabled={!sanitizeDisplayValue(newChecklistText)}
-                          className="rounded-xl bg-blue-600 text-white px-4 py-2 text-xs font-black uppercase disabled:opacity-60"
+                          className="rounded-xl bg-brand-600 text-white px-4 py-2 text-xs font-black uppercase disabled:opacity-60"
                         >
                           Adicionar
                         </button>
                       </div>
 
                       {checklistLoading ? (
-                        <p className="text-xs font-semibold text-gray-500">Carregando checklist...</p>
+                        <p className="text-xs font-semibold text-surface-500">Carregando checklist...</p>
                       ) : processChecklist.length === 0 ? (
-                        <p className="text-xs font-semibold text-gray-500">Nenhum item criado para este processo.</p>
+                        <p className="text-xs font-semibold text-surface-500">Nenhum item criado para este processo.</p>
                       ) : (
                         <div className="space-y-2">
                           {processChecklist.map((item) => (
-                            <div key={item.id} className="flex items-start gap-3 rounded-xl border border-gray-200 bg-white p-3">
+                            <div key={item.id} className="flex items-start gap-3 rounded-xl border border-surface-200 bg-white p-3">
                               <input
                                 type="checkbox"
                                 checked={item.completed}
                                 onChange={(event) => void handleToggleChecklistItem(item.id, event.target.checked)}
-                                className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600"
+                                className="mt-1 h-4 w-4 rounded border-surface-300 text-brand-600"
                               />
                               <div className="flex-1 min-w-0">
                                 {editingChecklistItemId === item.id ? (
@@ -2241,14 +2241,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                                       type="text"
                                       value={editingChecklistText}
                                       onChange={(event) => setEditingChecklistText(event.target.value)}
-                                      className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm font-semibold"
+                                      className="w-full bg-white border border-surface-200 rounded-lg px-2 py-1 text-sm font-semibold"
                                     />
                                     <div className="flex gap-2">
                                       <button
                                         type="button"
                                         onClick={() => void handleEditChecklistItem(item.id, editingChecklistText)}
                                         disabled={!sanitizeDisplayValue(editingChecklistText)}
-                                        className="px-2 py-1 rounded-lg bg-blue-600 text-white text-[11px] font-black uppercase disabled:opacity-50"
+                                        className="px-2 py-1 rounded-lg bg-brand-600 text-white text-[11px] font-black uppercase disabled:opacity-50"
                                       >
                                         Salvar
                                       </button>
@@ -2258,18 +2258,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                                           setEditingChecklistItemId(null);
                                           setEditingChecklistText('');
                                         }}
-                                        className="px-2 py-1 rounded-lg border border-gray-300 text-[11px] font-black uppercase"
+                                        className="px-2 py-1 rounded-lg border border-surface-300 text-[11px] font-black uppercase"
                                       >
                                         Cancelar
                                       </button>
                                     </div>
                                   </div>
                                 ) : (
-                                  <p className={`text-sm font-semibold ${item.completed ? 'line-through text-gray-400' : 'text-gray-800'}`}>
+                                  <p className={`text-sm font-semibold ${item.completed ? 'line-through text-surface-400' : 'text-surface-800'}`}>
                                     {item.text}
                                   </p>
                                 )}
-                                <p className="text-[11px] text-gray-500">
+                                <p className="text-[11px] text-surface-500">
                                   Criado por {item.createdByName || 'Administrador'} em {new Date(item.createdAt).toLocaleString('pt-BR')}
                                   {item.updatedAt ? ` â€¢ Atualizado por ${item.updatedByName || 'Administrador'} em ${new Date(item.updatedAt).toLocaleString('pt-BR')}` : ''}
                                 </p>
@@ -2281,7 +2281,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                                     setEditingChecklistItemId(item.id);
                                     setEditingChecklistText(item.text);
                                   }}
-                                  className="p-1.5 rounded-md border border-gray-200 text-gray-600 hover:bg-gray-100"
+                                  className="p-1.5 rounded-md border border-surface-200 text-surface-600 hover:bg-surface-100"
                                   title="Editar item"
                                 >
                                   <Pencil className="w-3 h-3" />
@@ -2305,79 +2305,79 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                       )}
                     </div>
 
-                    <div className="border-t border-gray-100 pt-6">
+                    <div className="border-t border-surface-100 pt-6">
                       <h4 className="text-lg font-black uppercase mb-4">Dados cadastrais do usuário</h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="md:col-span-2">
-                          <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Nome Completo</label>
+                          <label className="text-[10px] font-black text-surface-500 uppercase block mb-2">Nome Completo</label>
                           <input
                             type="text"
                              value={editingProfileForm.fullName}
                             onChange={(event) => { setEditingProfileForm((prev) => ({ ...prev, fullName: event.target.value })); setFormChanged(true); }}
-                            className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full bg-white border border-surface-200 rounded-xl p-4 text-surface-800 font-semibold outline-none focus:ring-2 focus:ring-brand-500"
                           />
                         </div>
                         <div className="md:col-span-2">
-                          <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">E-mail</label>
+                          <label className="text-[10px] font-black text-surface-500 uppercase block mb-2">E-mail</label>
                           <input
                             type="email"
                              value={editingProfileForm.email}
                             onChange={(event) => { setEditingProfileForm((prev) => ({ ...prev, email: event.target.value })); setFormChanged(true); }}
-                            className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full bg-white border border-surface-200 rounded-xl p-4 text-surface-800 font-semibold outline-none focus:ring-2 focus:ring-brand-500"
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Documento de Identidade</label>
+                          <label className="text-[10px] font-black text-surface-500 uppercase block mb-2">Documento de Identidade</label>
                           <input
                             type="text"
                             value={editingProfileForm.documentId}
                             onChange={(event) => { setEditingProfileForm((prev) => ({ ...prev, documentId: event.target.value })); setFormChanged(true); }}
-                            className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full bg-white border border-surface-200 rounded-xl p-4 text-surface-800 font-semibold outline-none focus:ring-2 focus:ring-brand-500"
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">NIF / CPF</label>
+                          <label className="text-[10px] font-black text-surface-500 uppercase block mb-2">NIF / CPF</label>
                           <input
                             type="text"
                             value={editingProfileForm.taxId}
                             onChange={(event) => { setEditingProfileForm((prev) => ({ ...prev, taxId: event.target.value })); setFormChanged(true); }}
-                            className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full bg-white border border-surface-200 rounded-xl p-4 text-surface-800 font-semibold outline-none focus:ring-2 focus:ring-brand-500"
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Telefone</label>
+                          <label className="text-[10px] font-black text-surface-500 uppercase block mb-2">Telefone</label>
                           <input
                             type="text"
                             value={editingProfileForm.phone}
                             onChange={(event) => { setEditingProfileForm((prev) => ({ ...prev, phone: event.target.value })); setFormChanged(true); }}
-                            className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full bg-white border border-surface-200 rounded-xl p-4 text-surface-800 font-semibold outline-none focus:ring-2 focus:ring-brand-500"
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Estado Civil</label>
+                          <label className="text-[10px] font-black text-surface-500 uppercase block mb-2">Estado Civil</label>
                           <input
                             type="text"
                             value={editingProfileForm.maritalStatus}
                             onChange={(event) => { setEditingProfileForm((prev) => ({ ...prev, maritalStatus: event.target.value })); setFormChanged(true); }}
-                            className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full bg-white border border-surface-200 rounded-xl p-4 text-surface-800 font-semibold outline-none focus:ring-2 focus:ring-brand-500"
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">País</label>
+                          <label className="text-[10px] font-black text-surface-500 uppercase block mb-2">País</label>
                           <input
                             type="text"
                             value={editingProfileForm.country}
                             onChange={(event) => { setEditingProfileForm((prev) => ({ ...prev, country: event.target.value })); setFormChanged(true); }}
-                            className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full bg-white border border-surface-200 rounded-xl p-4 text-surface-800 font-semibold outline-none focus:ring-2 focus:ring-brand-500"
                           />
                         </div>
                         <div className="md:col-span-2">
-                          <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Endereço completo (inclua CEP)</label>
+                          <label className="text-[10px] font-black text-surface-500 uppercase block mb-2">Endereço completo (inclua CEP)</label>
                           <input
                             type="text"
                             value={editingProfileForm.address}
                             onChange={(event) => { setEditingProfileForm((prev) => ({ ...prev, address: event.target.value })); setFormChanged(true); }}
-                            className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full bg-white border border-surface-200 rounded-xl p-4 text-surface-800 font-semibold outline-none focus:ring-2 focus:ring-brand-500"
                           />
                         </div>
                       </div>

@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../../../supabase';
 import { Download, ArrowLeft } from 'lucide-react';
@@ -143,18 +143,18 @@ const CertificatePage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <p className="text-gray-500 font-bold">Carregando certificado...</p>
+      <div className="min-h-screen flex items-center justify-center bg-surface-100">
+        <p className="text-surface-500 font-bold">Carregando certificado...</p>
       </div>
     );
   }
 
   if (error || !data.nome) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div className="min-h-screen flex items-center justify-center bg-surface-100">
         <div className="text-center">
           <p className="text-red-600 font-bold text-lg mb-4">{error || 'Erro ao carregar certificado.'}</p>
-          <a href="/" className="text-blue-600 underline font-bold">Voltar ao início</a>
+          <a href="/" className="text-brand-600 underline font-bold">Voltar ao início</a>
         </div>
       </div>
     );
@@ -182,7 +182,7 @@ const CertificatePage: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-surface-100 p-4">
       <div className="bg-white max-w-3xl w-full rounded-3xl shadow-2xl overflow-hidden" style={{ border: '2px solid #d4a843' }}>
         <div className="p-8 sm:p-10">
           <div style={{ textAlign: 'center', borderBottom: '3px double #d4a843', paddingBottom: 16, marginBottom: 24 }}>
@@ -304,7 +304,7 @@ const CertificatePage: React.FC = () => {
           <div className="flex justify-center mt-6">
             <button
               onClick={() => window.print()}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-500 transition-colors"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-brand-600 text-white font-bold rounded-xl hover:bg-brand-500 transition-colors"
             >
               <Download className="h-4 w-4" />
               Imprimir / Salvar PDF
@@ -313,7 +313,7 @@ const CertificatePage: React.FC = () => {
 
           <a
             href="/"
-            className="inline-flex items-center gap-2 text-sm text-gray-500 font-bold mt-6 hover:text-gray-700 justify-center flex"
+            className="inline-flex items-center gap-2 text-sm text-surface-500 font-bold mt-6 hover:text-surface-700 justify-center flex"
           >
             <ArrowLeft className="h-4 w-4" />
             Voltar ao painel

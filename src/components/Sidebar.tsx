@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SGI FV - Sidebar Component
  * Navigation menu for the SaaS layout with org context
  */
@@ -46,7 +46,7 @@ const Sidebar: React.FC = () => {
       {userContext && (
         <div className="px-4 py-3 border-b border-slate-800">
           <div className="flex items-center gap-3 px-2">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center">
               <Building2 className="w-4 h-4 text-white" />
             </div>
             <div className="flex-1 min-w-0">
@@ -70,7 +70,7 @@ const Sidebar: React.FC = () => {
             className={({ isActive }) =>
               `flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition-all ${
                 isActive
-                  ? 'bg-blue-600 text-white shadow-lg'
+                  ? 'bg-brand-600 text-white shadow-lg'
                   : 'text-slate-400 hover:bg-slate-800 hover:text-white'
               }`
             }

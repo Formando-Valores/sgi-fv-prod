@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+﻿import React, { useMemo } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AlertTriangle, RefreshCcw } from 'lucide-react';
 
@@ -24,10 +24,10 @@ const PaymentCancel: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 py-10 text-gray-900">
-      <div className="mx-auto max-w-2xl rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
+    <div className="min-h-screen bg-surface-50 px-4 py-10 text-surface-900">
+      <div className="mx-auto max-w-2xl rounded-2xl border border-surface-200 bg-white p-8 shadow-sm">
         <h1 className="text-2xl font-black tracking-tight">Pagamento cancelado</h1>
-        <p className="mt-2 text-sm text-gray-600">
+        <p className="mt-2 text-sm text-surface-600">
           Não houve confirmação de pagamento. O processo permanece em <strong>pending_payment</strong> no backend.
         </p>
 
@@ -39,13 +39,13 @@ const PaymentCancel: React.FC = () => {
           </div>
         </div>
 
-        {processId && <p className="mt-6 text-xs text-gray-500">Processo: {processId}</p>}
+        {processId && <p className="mt-6 text-xs text-surface-500">Processo: {processId}</p>}
 
         <div className="mt-8 flex flex-wrap gap-3">
           <button
             type="button"
             onClick={handleRetry}
-            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-blue-500"
+            className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-500"
           >
             <RefreshCcw className="h-4 w-4" /> Tentar novamente
           </button>

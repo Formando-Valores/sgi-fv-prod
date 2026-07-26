@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 import { Plus, Trash2, Pencil, Search, Users, Loader2 } from 'lucide-react';
 import { supabase } from '../../../../supabase';
 import type { User, Organization } from '../../../../types';
@@ -700,17 +700,17 @@ const ManagementSection: React.FC<ManagementSectionProps> = ({ users, setUsers, 
 
   return (
     <div key="tab-management" className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-slideUp">
-      <div ref={createUserFormRef} className="lg:col-span-1 bg-white border border-gray-100 rounded-2xl p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
+      <div ref={createUserFormRef} className="lg:col-span-1 bg-white border border-surface-100 rounded-2xl p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
         <button
           type="button"
           onClick={() => setShowCreateUserForm(!showCreateUserForm)}
           className="w-full flex items-center justify-between gap-2 text-left"
         >
           <h3 className="text-lg font-bold flex items-center gap-2">
-            <Plus className="text-blue-500" /> Cadastrar Usuário e Nível
+            <Plus className="text-brand-500" /> Cadastrar Usuário e Nível
           </h3>
           <svg
-            className={`w-5 h-5 text-gray-400 transition-transform duration-300 ${showCreateUserForm ? 'rotate-180' : ''}`}
+            className={`w-5 h-5 text-surface-400 transition-transform duration-300 ${showCreateUserForm ? 'rotate-180' : ''}`}
             fill="none" stroke="currentColor" viewBox="0 0 24 24"
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -721,80 +721,80 @@ const ManagementSection: React.FC<ManagementSectionProps> = ({ users, setUsers, 
         >
         <form onSubmit={handleCreateUser} className="space-y-4">
           <div>
-            <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Nome de Usuário</label>
+            <label className="text-xs font-bold text-surface-500 uppercase block mb-1">Nome de Usuário</label>
             <input
               required
               type="text"
               placeholder="Nome do Gestor"
               value={newAdminName}
               onChange={e => setNewAdminName(e.target.value)}
-              className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold"
+              className="w-full bg-white border border-surface-200 rounded-lg p-3 text-surface-800 font-semibold"
             />
           </div>
           <div>
-            <label className="text-xs font-bold text-gray-500 uppercase block mb-1">E-mail</label>
+            <label className="text-xs font-bold text-surface-500 uppercase block mb-1">E-mail</label>
             <input
               required
               type="email"
               placeholder="admin@sgi.com"
               value={newAdminEmail}
               onChange={e => setNewAdminEmail(e.target.value)}
-              className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold"
+              className="w-full bg-white border border-surface-200 rounded-lg p-3 text-surface-800 font-semibold"
             />
           </div>
           <div>
-            <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Senha <span className="text-[10px] font-normal text-gray-400">(obrigatório se o usuário não existir)</span></label>
+            <label className="text-xs font-bold text-surface-500 uppercase block mb-1">Senha <span className="text-[10px] font-normal text-surface-400">(obrigatório se o usuário não existir)</span></label>
             <input
               type="password"
               placeholder="mín. 6 caracteres"
               value={newAdminPassword}
               onChange={e => setNewAdminPassword(e.target.value)}
-              className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold"
+              className="w-full bg-white border border-surface-200 rounded-lg p-3 text-surface-800 font-semibold"
             />
-            <p className="text-[11px] text-gray-400 mt-1">Se o e-mail já estiver cadastrado, a senha será ignorada.</p>
+            <p className="text-[11px] text-surface-400 mt-1">Se o e-mail já estiver cadastrado, a senha será ignorada.</p>
           </div>
           <div>
-            <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Perfil de Acesso</label>
+            <label className="text-xs font-bold text-surface-500 uppercase block mb-1">Perfil de Acesso</label>
             <select
               value={newAccessLevel}
               onChange={(event) => setNewAccessLevel(event.target.value as AccessLevel)}
-              className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold"
+              className="w-full bg-white border border-surface-200 rounded-lg p-3 text-surface-800 font-semibold"
             >
               {ACCESS_LEVELS.map((level) => (
                 <option key={level} value={level}>{level}</option>
               ))}
             </select>
-            <p className="text-[11px] text-gray-500 mt-2">Diretoria/Gerência da organização: agenda, equipe e distribuição autorizada.</p>
+            <p className="text-[11px] text-surface-500 mt-2">Diretoria/Gerência da organização: agenda, equipe e distribuição autorizada.</p>
           </div>
           <div>
-            <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Instituição / Organização</label>
+            <label className="text-xs font-bold text-surface-500 uppercase block mb-1">Instituição / Organização</label>
             <select
               value={newAdminOrgId}
               onChange={(event) => setNewAdminOrgId(event.target.value)}
-              className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold"
+              className="w-full bg-white border border-surface-200 rounded-lg p-3 text-surface-800 font-semibold"
             >
               {organizations.length === 0 && <option value="">Carregando organizações...</option>}
               {organizations.map((org) => (
                 <option key={org.id} value={org.id}>{org.name}</option>
               ))}
             </select>
-            <p className="text-[11px] text-gray-500 mt-2">Instituição atual selecionada: {organizations.find((org) => org.id === newAdminOrgId)?.name || 'Organização Padrão'}</p>
+            <p className="text-[11px] text-surface-500 mt-2">Instituição atual selecionada: {organizations.find((org) => org.id === newAdminOrgId)?.name || 'Organização Padrão'}</p>
           </div>
-          <button type="submit" className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg uppercase text-xs tracking-widest mt-4 shadow-lg active:scale-95 transition-transform">
+          <button type="submit" className="w-full py-4 bg-brand-600 hover:bg-brand-500 text-white font-bold rounded-lg uppercase text-xs tracking-widest mt-4 shadow-lg active:scale-95 transition-transform">
             {editingMemberUserId ? 'Atualizar / Definir' : 'Cadastrar / Definir'}
           </button>
         </form>
         </div>
       </div>
 
-      <div className="lg:col-span-2 bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
-        <div className="p-4 border-b border-gray-100 flex flex-col md:flex-row gap-3 md:items-center md:justify-between bg-white">
+      <div className="lg:col-span-2 bg-white border border-surface-100 rounded-2xl overflow-hidden shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
+        <div className="p-4 border-b border-surface-100 flex flex-col md:flex-row gap-3 md:items-center md:justify-between bg-white">
           <div className="flex items-center gap-2">
-            <span className="text-gray-600 text-sm font-bold">Mostrar</span>
+            <span className="text-surface-600 text-sm font-bold">Mostrar</span>
             <select
               value={configRowsLimit}
               onChange={(event) => setConfigRowsLimit(Number(event.target.value))}
-              className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-gray-800 font-semibold"
+              className="bg-white border border-surface-200 rounded-lg px-3 py-2 text-surface-800 font-semibold"
             >
               <option value={10}>10</option>
               <option value={25}>25</option>
@@ -802,12 +802,12 @@ const ManagementSection: React.FC<ManagementSectionProps> = ({ users, setUsers, 
             </select>
           </div>
           <div className="relative w-full md:w-72">
-            <Search className="absolute left-3 top-3 text-gray-500 w-4 h-4" />
+            <Search className="absolute left-3 top-3 text-surface-500 w-4 h-4" />
             <input
               value={configSearch}
               onChange={(event) => setConfigSearch(event.target.value)}
               placeholder="Pesquisar..."
-              className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold"
+              className="w-full pl-9 pr-3 py-2 bg-white border border-surface-200 rounded-lg text-surface-800 font-semibold"
             />
           </div>
         </div>
@@ -817,26 +817,26 @@ const ManagementSection: React.FC<ManagementSectionProps> = ({ users, setUsers, 
           <div className="p-8"><TableSkeleton rows={4} cols={4} /></div>
         ) : managementUsers.length === 0 ? (
           <div className="py-12 text-center">
-            <Users className="w-8 h-8 text-gray-300 mx-auto mb-3" />
-            <p className="text-sm font-bold text-gray-500">Nenhum membro encontrado</p>
-            <p className="text-xs text-gray-400 mt-1">Cadastre novos membros usando o formulário ao lado.</p>
+            <Users className="w-8 h-8 text-surface-300 mx-auto mb-3" />
+            <p className="text-sm font-bold text-surface-500">Nenhum membro encontrado</p>
+            <p className="text-xs text-surface-400 mt-1">Cadastre novos membros usando o formulário ao lado.</p>
           </div>
         ) : (
           <>
             <div className="block md:hidden space-y-3">
               {managementUsers.map(u => (
-                <div key={`${u.user_id}-${u.org_id}`} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
+                <div key={`${u.user_id}-${u.org_id}`} className="bg-white border border-surface-100 rounded-2xl p-4 shadow-sm">
                   <div className="flex items-start justify-between mb-2">
                     <div className="min-w-0 flex-1">
-                      <p className="font-bold text-gray-800 text-sm truncate">{u.name}</p>
-                      <p className="text-[10px] text-gray-500 truncate">{u.email}</p>
+                      <p className="font-bold text-surface-800 text-sm truncate">{u.name}</p>
+                      <p className="text-[10px] text-surface-500 truncate">{u.email}</p>
                     </div>
-                    <span className="text-[10px] font-black text-blue-400 uppercase border border-blue-900/50 bg-blue-900/10 px-2 py-0.5 rounded shrink-0 ml-2">
+                    <span className="text-[10px] font-black text-brand-400 uppercase border border-brand-900/50 bg-brand-900/10 px-2 py-0.5 rounded shrink-0 ml-2">
                       {u.accessLevel.toUpperCase()}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                    <p className="text-xs text-gray-600 font-bold truncate">{u.org_name || 'Organização Padrão'}</p>
+                  <div className="flex items-center justify-between pt-2 border-t border-surface-100">
+                    <p className="text-xs text-surface-600 font-bold truncate">{u.org_name || 'Organização Padrão'}</p>
                     <div className="flex gap-2 shrink-0 ml-2">
                       <button
                         onClick={() => {
@@ -847,7 +847,7 @@ const ManagementSection: React.FC<ManagementSectionProps> = ({ users, setUsers, 
                           setEditingMemberUserId(u.user_id);
                           setShowCreateUserForm(true);
                         }}
-                        className="p-1.5 bg-gray-100 hover:bg-gray-200 rounded-md text-gray-500"
+                        className="p-1.5 bg-surface-100 hover:bg-surface-200 rounded-md text-surface-500"
                       >
                         <Pencil className="w-4 h-4" />
                       </button>
@@ -866,7 +866,7 @@ const ManagementSection: React.FC<ManagementSectionProps> = ({ users, setUsers, 
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="bg-gray-50 text-gray-500 uppercase text-[10px] font-black tracking-widest">
+                  <tr className="bg-surface-50 text-surface-500 uppercase text-[10px] font-black tracking-widest">
                     <th className="px-3 sm:px-6 py-2 sm:py-4">Usuário</th>
                     <th className="px-3 sm:px-6 py-2 sm:py-4">Nível de Acesso</th>
                     <th className="px-3 sm:px-6 py-2 sm:py-4">Instituição</th>
@@ -875,17 +875,17 @@ const ManagementSection: React.FC<ManagementSectionProps> = ({ users, setUsers, 
                 </thead>
                 <tbody className="divide-y divide-slate-800">
                   {managementUsers.map(u => (
-                    <tr key={`${u.user_id}-${u.org_id}`} className="hover:bg-gray-50">
+                    <tr key={`${u.user_id}-${u.org_id}`} className="hover:bg-surface-50">
                       <td className="px-3 sm:px-6 py-2 sm:py-4 font-bold flex flex-col">
                         <span>{u.name}</span>
-                        <span className="text-[10px] text-gray-500">{u.email}</span>
+                        <span className="text-[10px] text-surface-500">{u.email}</span>
                       </td>
                       <td className="px-3 sm:px-6 py-2 sm:py-4">
-                        <span className="text-[10px] font-black text-blue-400 uppercase border border-blue-900/50 bg-blue-900/10 px-2 py-0.5 rounded">
+                        <span className="text-[10px] font-black text-brand-400 uppercase border border-brand-900/50 bg-brand-900/10 px-2 py-0.5 rounded">
                           {u.accessLevel.toUpperCase()}
                         </span>
                       </td>
-                      <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-600 font-bold whitespace-nowrap">{u.org_name || 'Organização Padrão'}</td>
+                      <td className="px-3 sm:px-6 py-2 sm:py-4 text-surface-600 font-bold whitespace-nowrap">{u.org_name || 'Organização Padrão'}</td>
                       <td className="px-3 sm:px-6 py-2 sm:py-4 text-right whitespace-nowrap">
                         <div className="flex justify-end gap-2">
                           <button
@@ -897,7 +897,7 @@ const ManagementSection: React.FC<ManagementSectionProps> = ({ users, setUsers, 
                               setEditingMemberUserId(u.user_id);
                               setShowCreateUserForm(true);
                             }}
-                            className="p-2 bg-gray-100 hover:bg-gray-200 rounded-md text-gray-500 hover:text-white transition-colors"
+                            className="p-2 bg-surface-100 hover:bg-surface-200 rounded-md text-surface-500 hover:text-white transition-colors"
                           >
                             <Pencil className="w-4 h-4" />
                           </button>

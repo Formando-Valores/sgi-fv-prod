@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SGI FV - Configurações Page
  * Settings placeholder
  */
@@ -50,7 +50,7 @@ const Configuracoes: React.FC = () => {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-black text-white uppercase tracking-tight flex items-center gap-2">
-          <Settings className="text-blue-500" /> Configurações
+          <Settings className="text-brand-500" /> Configurações
         </h1>
         <p className="text-slate-400 text-sm font-bold mt-1">Gerencie sua organização</p>
       </div>
@@ -67,7 +67,7 @@ const Configuracoes: React.FC = () => {
             }`}
           >
             <div className="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center mb-4">
-              <item.icon className="w-6 h-6 text-blue-500" />
+              <item.icon className="w-6 h-6 text-brand-500" />
             </div>
             <h3 className="text-lg font-bold text-white mb-1">{item.label}</h3>
             <p className="text-sm text-slate-400">{item.description}</p>

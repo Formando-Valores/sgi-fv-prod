@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2, CheckCircle2, AlertCircle, RefreshCcw } from 'lucide-react';
 import { supabase } from '../../../supabase';
@@ -206,14 +206,14 @@ const PaymentSuccess: React.FC = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 py-10 text-gray-900">
-      <div className="mx-auto max-w-2xl rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
+    <div className="min-h-screen bg-surface-50 px-4 py-10 text-surface-900">
+      <div className="mx-auto max-w-2xl rounded-2xl border border-surface-200 bg-white p-8 shadow-sm">
         <h1 className="text-2xl font-black tracking-tight">Retorno de pagamento</h1>
-        <p className="mt-2 text-sm text-gray-600">Seu checkout foi finalizado. Estamos sincronizando o status oficial.</p>
+        <p className="mt-2 text-sm text-surface-600">Seu checkout foi finalizado. Estamos sincronizando o status oficial.</p>
 
-        <div className="mt-6 rounded-xl border border-gray-200 bg-gray-50 p-4">
+        <div className="mt-6 rounded-xl border border-surface-200 bg-surface-50 p-4">
           {(status === 'checking' || status === 'awaiting') && (
-            <div className="flex items-center gap-3 text-gray-700">
+            <div className="flex items-center gap-3 text-surface-700">
               <Loader2 className="h-5 w-5 animate-spin" />
               <span className="text-sm font-semibold">Aguardando confirmação do pagamento.</span>
             </div>
@@ -225,7 +225,7 @@ const PaymentSuccess: React.FC = () => {
                 <CheckCircle2 className="h-5 w-5" />
                 <span className="text-sm font-semibold">Pagamento confirmado. Seu processo seguirá o fluxo normal.</span>
               </div>
-              <p className="text-xs text-gray-500 ml-8">Redirecionando para lista de processos em {redirectCountdown}s...</p>
+              <p className="text-xs text-surface-500 ml-8">Redirecionando para lista de processos em {redirectCountdown}s...</p>
             </div>
           )}
 
@@ -265,7 +265,7 @@ const PaymentSuccess: React.FC = () => {
           )}
         </div>
 
-        <div className="mt-6 text-xs text-gray-500">
+        <div className="mt-6 text-xs text-surface-500">
           {processId && <p>Processo: {processId}</p>}
           {shortReference && <p>Referência de suporte: {shortReference}</p>}
           {snapshot?.payment_status && <p>Status atual: {getPaymentStatusUi(snapshot.payment_status)?.label || snapshot.payment_status}</p>}
@@ -277,7 +277,7 @@ const PaymentSuccess: React.FC = () => {
             <button
               type="button"
               onClick={handleForceRefresh}
-              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-blue-500"
+              className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-500"
             >
               <RefreshCcw className="h-4 w-4" />
               Consultar novamente
@@ -290,7 +290,7 @@ const PaymentSuccess: React.FC = () => {
                 void handleRetryCheckout();
               }}
               disabled={retryingCheckout}
-              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-500 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <RefreshCcw className={`h-4 w-4 ${retryingCheckout ? 'animate-spin' : ''}`} />
               {retryingCheckout ? 'Recriando checkout...' : 'Tentar novamente'}

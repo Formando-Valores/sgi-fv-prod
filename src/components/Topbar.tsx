@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SGI FV - Topbar Component
  * Action buttons and user info header
  */
@@ -50,7 +50,7 @@ const Topbar: React.FC = () => {
         <button
           onClick={handlePrint}
           title="Gerar PDF"
-          className="p-2 bg-blue-900/40 hover:bg-blue-900/60 rounded-lg text-blue-300 transition-colors flex items-center gap-2 px-4 text-xs font-bold border border-blue-800 uppercase"
+          className="p-2 bg-brand-900/40 hover:bg-brand-900/60 rounded-lg text-brand-300 transition-colors flex items-center gap-2 px-4 text-xs font-bold border border-brand-800 uppercase"
         >
           <FileDown className="w-4 h-4" /> Gerar PDF
         </button>

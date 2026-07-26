@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+﻿import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Send, Paperclip, Loader2, FileText, Image, X, Printer } from 'lucide-react';
 import { supabase } from '../../../../supabase';
 import { listMessages, sendMessage, uploadMessageAttachment, type ProcessMessage } from '../../../lib/processMessages';
@@ -126,12 +126,12 @@ ${msgs.map(msg => `
 
   return (
     <div className="flex flex-col h-[500px]">
-      <div className={`flex items-center justify-between px-4 py-2 border-b ${dark ? 'border-slate-600' : 'border-gray-100'}`}>
-        <h3 className={`text-sm font-bold ${dark ? 'text-slate-200' : 'text-gray-700'}`}>Comunicação</h3>
+      <div className={`flex items-center justify-between px-4 py-2 border-b ${dark ? 'border-slate-600' : 'border-surface-100'}`}>
+        <h3 className={`text-sm font-bold ${dark ? 'text-slate-200' : 'text-surface-700'}`}>Comunicação</h3>
         <button
           onClick={generateReport}
           disabled={reportLoading}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-blue-600 text-white hover:bg-blue-500 transition-all disabled:opacity-50"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-brand-600 text-white hover:bg-brand-500 transition-all disabled:opacity-50"
         >
           {reportLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Printer className="h-3.5 w-3.5" />}
           Expedir Relatório
@@ -139,15 +139,15 @@ ${msgs.map(msg => `
       </div>
       <div className="flex-1 overflow-y-auto space-y-3 p-4">
         {loading ? (
-          <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-blue-600" /></div>
+          <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-brand-600" /></div>
         ) : messages.length === 0 ? (
-          <p className={`text-sm text-center py-8 font-semibold ${dark ? 'text-slate-400' : 'text-gray-400'}`}>Nenhuma mensagem ainda. Envie a primeira!</p>
+          <p className={`text-sm text-center py-8 font-semibold ${dark ? 'text-slate-400' : 'text-surface-400'}`}>Nenhuma mensagem ainda. Envie a primeira!</p>
         ) : (
           messages.map((msg) => {
             const isMine = msg.sender_id === currentUserId;
             return (
               <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[80%] rounded-2xl p-3 ${isMine ? 'bg-blue-600 text-white' : dark ? 'bg-slate-700 text-gray-100' : 'bg-gray-100 text-gray-800'}`}>
+                <div className={`max-w-[80%] rounded-2xl p-3 ${isMine ? 'bg-brand-600 text-white' : dark ? 'bg-slate-700 text-surface-100' : 'bg-surface-100 text-surface-800'}`}>
                   <p className="text-xs font-bold opacity-70 mb-1">{isMine ? 'Você' : msg.sender_name}</p>
                   <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
                   {msg.attachments?.length > 0 && (
@@ -159,7 +159,7 @@ ${msgs.map(msg => `
                           target="_blank"
                           rel="noopener noreferrer"
                           className={`flex items-center gap-2 text-xs p-2 rounded-lg transition-all ${
-                            isMine ? 'bg-blue-500 text-white hover:bg-blue-400' : dark ? 'bg-slate-600 text-gray-200 hover:bg-slate-500 border border-slate-500' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+                            isMine ? 'bg-brand-500 text-white hover:bg-brand-400' : dark ? 'bg-slate-600 text-surface-200 hover:bg-slate-500 border border-slate-500' : 'bg-white text-surface-700 hover:bg-surface-50 border border-surface-200'
                           }`}
                         >
                           {fileIcon(att.name)}
@@ -168,7 +168,7 @@ ${msgs.map(msg => `
                       ))}
                     </div>
                   )}
-                  <p className={`text-[10px] mt-1 ${isMine ? 'text-blue-200' : dark ? 'text-slate-400' : 'text-gray-400'}`}>{formatTime(msg.created_at)}</p>
+                  <p className={`text-[10px] mt-1 ${isMine ? 'text-brand-200' : dark ? 'text-slate-400' : 'text-surface-400'}`}>{formatTime(msg.created_at)}</p>
                 </div>
               </div>
             );
@@ -178,12 +178,12 @@ ${msgs.map(msg => `
       </div>
 
       {files.length > 0 && (
-        <div className={`px-4 py-2 border-t flex flex-wrap gap-2 ${dark ? 'border-slate-600' : 'border-gray-100'}`}>
+        <div className={`px-4 py-2 border-t flex flex-wrap gap-2 ${dark ? 'border-slate-600' : 'border-surface-100'}`}>
           {files.map((f, i) => (
-            <span key={i} className={`inline-flex items-center gap-1 text-xs rounded-lg px-2 py-1 ${dark ? 'bg-slate-700 text-slate-200' : 'bg-gray-100 text-gray-800'}`}>
+            <span key={i} className={`inline-flex items-center gap-1 text-xs rounded-lg px-2 py-1 ${dark ? 'bg-slate-700 text-slate-200' : 'bg-surface-100 text-surface-800'}`}>
               {fileIcon(f.name)}
               <span className="truncate max-w-[120px]">{f.name}</span>
-              <button onClick={() => setFiles((prev) => prev.filter((_, j) => j !== i))} className="text-gray-400 hover:text-red-500">
+              <button onClick={() => setFiles((prev) => prev.filter((_, j) => j !== i))} className="text-surface-400 hover:text-red-500">
                 <X className="h-3 w-3" />
               </button>
             </span>
@@ -191,8 +191,8 @@ ${msgs.map(msg => `
         </div>
       )}
 
-      <div className={`border-t p-4 flex items-end gap-2 ${dark ? 'border-slate-600' : 'border-gray-100'}`}>
-        <label className={`p-2 rounded-lg cursor-pointer ${dark ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-gray-100 text-gray-500'}`}>
+      <div className={`border-t p-4 flex items-end gap-2 ${dark ? 'border-slate-600' : 'border-surface-100'}`}>
+        <label className={`p-2 rounded-lg cursor-pointer ${dark ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-surface-100 text-surface-500'}`}>
           <Paperclip className="h-5 w-5" />
           <input
             type="file"
@@ -207,12 +207,12 @@ ${msgs.map(msg => `
           onKeyDown={handleKeyDown}
           placeholder="Digite sua mensagem..."
           rows={2}
-          className={`flex-1 rounded-xl p-3 text-sm resize-none outline-none focus:ring-2 focus:ring-blue-500 ${dark ? 'bg-slate-700 border border-slate-600 text-white placeholder-slate-400' : 'bg-gray-50 border border-gray-200'}`}
+          className={`flex-1 rounded-xl p-3 text-sm resize-none outline-none focus:ring-2 focus:ring-brand-500 ${dark ? 'bg-slate-700 border border-slate-600 text-white placeholder-slate-400' : 'bg-surface-50 border border-surface-200'}`}
         />
         <button
           onClick={handleSend}
           disabled={sending || (!text.trim() && files.length === 0)}
-          className="p-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-all disabled:opacity-50"
+          className="p-3 bg-brand-600 hover:bg-brand-500 text-white rounded-xl transition-all disabled:opacity-50"
         >
           {sending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
         </button>

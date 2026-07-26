@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SGI FV - Members Settings Page
  * Organization members management
  */
@@ -23,7 +23,7 @@ const Members: React.FC = () => {
           </h1>
           <p className="text-slate-400 text-sm font-bold mt-1">Membros da Organização</p>
         </div>
-        <button className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl flex items-center gap-2 transition-colors shadow-lg">
+        <button className="px-6 py-3 bg-brand-600 hover:bg-brand-500 text-white font-bold rounded-xl flex items-center gap-2 transition-colors shadow-lg">
           <UserPlus className="w-5 h-5" /> Convidar Membro
         </button>
       </div>
@@ -31,7 +31,7 @@ const Members: React.FC = () => {
       <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
         <div className="p-4 sm:p-6 border-b border-slate-800">
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <Users className="text-blue-500" /> Membros Ativos
+            <Users className="text-brand-500" /> Membros Ativos
           </h2>
         </div>
         <div className="hidden md:block overflow-x-auto">
@@ -50,7 +50,7 @@ const Members: React.FC = () => {
                   <td className="px-3 sm:px-6 py-2 sm:py-4 font-bold text-slate-200">{member.name}</td>
                   <td className="px-3 sm:px-6 py-2 sm:py-4 text-slate-400 font-bold">{member.email}</td>
                   <td className="px-3 sm:px-6 py-2 sm:py-4">
-                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-black bg-blue-900/30 text-blue-400 border border-blue-900/50">
+                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-black bg-brand-900/30 text-brand-400 border border-brand-900/50">
                       <Shield className="w-3 h-3" /> {member.role}
                     </span>
                   </td>
@@ -70,7 +70,7 @@ const Members: React.FC = () => {
                   <p className="font-bold text-slate-100 text-sm">{member.name}</p>
                   <p className="text-xs text-slate-400 mt-0.5">{member.email}</p>
                 </div>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-900/30 text-blue-400 border border-blue-900/50 shrink-0">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-brand-900/30 text-brand-400 border border-brand-900/50 shrink-0">
                   <Shield className="w-3 h-3" /> {member.role}
                 </span>
               </div>

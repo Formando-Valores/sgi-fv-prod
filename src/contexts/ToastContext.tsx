@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
+﻿import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
 import { CheckCircle, XCircle, AlertTriangle, Info, X } from 'lucide-react';
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
@@ -34,14 +34,14 @@ const BG: Record<ToastType, string> = {
   success: 'bg-emerald-50 border-emerald-200 text-emerald-800',
   error: 'bg-red-50 border-red-200 text-red-800',
   warning: 'bg-amber-50 border-amber-200 text-amber-800',
-  info: 'bg-blue-50 border-blue-200 text-blue-800',
+  info: 'bg-brand-50 border-brand-200 text-brand-800',
 };
 
 const ICON_COLORS: Record<ToastType, string> = {
   success: 'text-emerald-500',
   error: 'text-red-500',
   warning: 'text-amber-500',
-  info: 'text-blue-500',
+  info: 'text-brand-500',
 };
 
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {

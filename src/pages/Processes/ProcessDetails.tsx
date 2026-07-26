@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SGI FV - Process Details Page
  * Displays the detailed process view with real data
  */
@@ -21,7 +21,7 @@ const statusSteps = [
 ];
 
 const eventTypeLabels: Record<string, { label: string; color: string }> = {
-  registro: { label: 'Registro', color: 'text-blue-400' },
+  registro: { label: 'Registro', color: 'text-brand-400' },
   status_change: { label: 'Alteração de Status', color: 'text-emerald-400' },
   observacao: { label: 'Observação', color: 'text-purple-400' },
   documento: { label: 'Documento', color: 'text-orange-400' },
@@ -175,7 +175,7 @@ const ProcessDetails: React.FC = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+        <Loader2 className="w-8 h-8 text-brand-500 animate-spin" />
       </div>
     );
   }
@@ -222,7 +222,7 @@ const ProcessDetails: React.FC = () => {
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl">
             <div className="flex items-start sm:items-center justify-between mb-6 sm:mb-8 gap-2">
               <h2 className="text-base sm:text-lg font-bold flex items-center gap-2">
-                <Activity className="text-blue-500" /> STATUS DO PROCESSO
+                <Activity className="text-brand-500" /> STATUS DO PROCESSO
               </h2>
               <span className="bg-slate-800 px-3 py-1 rounded-full text-[10px] font-black text-slate-400 tracking-widest uppercase">ACOMPANHAMENTO</span>
             </div>
@@ -265,7 +265,7 @@ const ProcessDetails: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-950/50 rounded-2xl border border-slate-800/50 overflow-hidden">
               {/* Manager */}
               <div className="p-4 sm:p-8 flex flex-col items-center text-center border-b md:border-b-0 md:border-r border-slate-800/50">
-                <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto rounded-2xl flex items-center justify-center mb-4 bg-blue-600 shadow-xl">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto rounded-2xl flex items-center justify-center mb-4 bg-brand-600 shadow-xl">
                   <UserCheck className="text-white w-6 h-6 sm:w-8 sm:h-8" />
                 </div>
                 <p className="text-lg sm:text-xl font-black uppercase tracking-tight text-white">
@@ -300,11 +300,11 @@ const ProcessDetails: React.FC = () => {
             </h2>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-              <div className="p-3 sm:p-4 bg-gray-900 border border-slate-800 rounded-xl">
+              <div className="p-3 sm:p-4 bg-surface-900 border border-slate-800 rounded-xl">
                 <p className="text-slate-500 text-[10px] font-black uppercase mb-1">Protocolo SGI</p>
-                <p className="text-lg sm:text-xl font-black text-blue-400">{process.protocolo || '-'}</p>
+                <p className="text-lg sm:text-xl font-black text-brand-400">{process.protocolo || '-'}</p>
               </div>
-              <div className="p-3 sm:p-4 bg-gray-900 border border-slate-800 rounded-xl">
+              <div className="p-3 sm:p-4 bg-surface-900 border border-slate-800 rounded-xl">
                 <p className="text-slate-500 text-[10px] font-black uppercase mb-1">Situação Atual</p>
                 <p className="text-lg sm:text-xl font-black text-white">
                   {statusSteps.find(s => s.key === process.status)?.label || process.status}
@@ -396,7 +396,7 @@ const ProcessDetails: React.FC = () => {
                     <p className="text-slate-500 text-[10px] font-black uppercase mb-2">Serviços contratados</p>
                     <div className="space-y-2">
                       {process.services_selected.map((svc) => (
-                        <div key={svc.id} className="flex items-center justify-between p-2 bg-gray-900 rounded-lg">
+                        <div key={svc.id} className="flex items-center justify-between p-2 bg-surface-900 rounded-lg">
                           <div>
                             <p className="text-sm font-bold text-slate-200">{svc.name}</p>
                             <p className="text-[10px] text-slate-500">{svc.group}</p>
@@ -409,7 +409,7 @@ const ProcessDetails: React.FC = () => {
                 )}
 
                 {process.os_value != null && Number(process.os_value) > 0 && (
-                  <div className="flex items-center justify-between p-3 bg-gray-900 rounded-xl">
+                  <div className="flex items-center justify-between p-3 bg-surface-900 rounded-xl">
                     <span className="text-sm font-bold text-slate-300">Valor total</span>
                     <span className="text-lg font-black text-emerald-400">{formatEuro(Number(process.os_value))}</span>
                   </div>
@@ -494,7 +494,7 @@ const ProcessDetails: React.FC = () => {
                 <textarea
                   value={obsText}
                   onChange={(e) => setObsText(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none h-32 resize-none"
+                  className="w-full px-4 py-3 bg-surface-900 border border-slate-700 rounded-xl text-white font-bold placeholder:text-slate-600 focus:ring-2 focus:ring-brand-500 outline-none h-32 resize-none"
                   placeholder="Digite sua observação..."
                   required
                 />

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SGI FV - Main Application Component
  * Sistema de Gestão Integrada - Formando Valores
  */
@@ -232,10 +232,10 @@ const RootApp: React.FC = () => {
   }, []);
 
   const authLoadingScreen = (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="min-h-screen flex items-center justify-center bg-surface-50">
       <div className="text-center">
-        <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600" />
-        <p className="mt-3 text-sm font-semibold text-gray-600">Restaurando sessão...</p>
+        <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-brand-200 border-t-brand-600" />
+        <p className="mt-3 text-sm font-semibold text-surface-600">Restaurando sessão...</p>
       </div>
     </div>
   );
@@ -292,7 +292,7 @@ const RootApp: React.FC = () => {
 
   return (
     <HashRouter>
-      <div className="min-h-screen bg-gray-50 text-gray-800 font-['Inter',sans-serif]">
+      <div className="min-h-screen bg-surface-50 text-surface-800 font-['Inter',sans-serif]">
         <ToastProvider>
         <Routes>
           <Route

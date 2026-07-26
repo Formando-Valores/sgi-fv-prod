@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { CreditCard, Eye, EyeOff, Loader2, Save, Check, AlertTriangle, Zap } from 'lucide-react';
 import { getStripeConfig, updateStripeConfig, type StripeConfigData } from '../../../lib/stripeConfig';
 
@@ -112,16 +112,16 @@ const StripeConfigPanel: React.FC<Props> = ({ activeOrgId }) => {
 
   if (!activeOrgId) {
     return (
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_16px_34px_rgba(15,23,42,0.08)] p-8">
-        <p className="text-gray-500 text-sm text-center">Selecione uma organização para configurar o Stripe.</p>
+      <div className="bg-white rounded-2xl border border-surface-100 shadow-[0_16px_34px_rgba(15,23,42,0.08)] p-8">
+        <p className="text-surface-500 text-sm text-center">Selecione uma organização para configurar o Stripe.</p>
       </div>
     );
   }
 
   if (loading) {
     return (
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_16px_34px_rgba(15,23,42,0.08)] p-8">
-        <div className="flex items-center gap-3 justify-center text-gray-400">
+      <div className="bg-white rounded-2xl border border-surface-100 shadow-[0_16px_34px_rgba(15,23,42,0.08)] p-8">
+        <div className="flex items-center gap-3 justify-center text-surface-400">
           <Loader2 className="w-5 h-5 animate-spin" />
           <span className="text-sm">Carregando configuração...</span>
         </div>
@@ -130,28 +130,28 @@ const StripeConfigPanel: React.FC<Props> = ({ activeOrgId }) => {
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_16px_34px_rgba(15,23,42,0.08)] overflow-hidden">
+    <div className="bg-white rounded-2xl border border-surface-100 shadow-[0_16px_34px_rgba(15,23,42,0.08)] overflow-hidden">
       {/* Header */}
-      <div className="px-6 py-5 border-b border-gray-100 flex items-center gap-3">
+      <div className="px-6 py-5 border-b border-surface-100 flex items-center gap-3">
         <div className="p-2 bg-indigo-50 rounded-xl">
           <CreditCard className="w-5 h-5 text-indigo-600" />
         </div>
         <div>
           <h2 className="text-base font-black uppercase tracking-tight">Configuração Stripe</h2>
-          <p className="text-xs text-gray-500 mt-0.5">Credenciais e configurações de pagamento desta organização</p>
+          <p className="text-xs text-surface-500 mt-0.5">Credenciais e configurações de pagamento desta organização</p>
         </div>
       </div>
 
       <div className="p-6 space-y-6">
         {/* Mode Toggle */}
-        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
+        <div className="flex items-center justify-between p-4 bg-surface-50 rounded-xl border border-surface-100">
           <div className="flex items-center gap-3">
             <Zap className={`w-4 h-4 ${isLive ? 'text-emerald-600' : 'text-amber-500'}`} />
             <div>
-              <p className="text-sm font-bold text-gray-800">
+              <p className="text-sm font-bold text-surface-800">
                 Modo {isLive ? 'Produção' : 'Teste'}
               </p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-surface-500">
                 {isLive ? 'Cobranças reais serão processadas' : 'Nenhuma cobrança real será processada'}
               </p>
             </div>
@@ -160,7 +160,7 @@ const StripeConfigPanel: React.FC<Props> = ({ activeOrgId }) => {
             type="button"
             onClick={() => setIsLive(!isLive)}
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-              isLive ? 'bg-emerald-600' : 'bg-gray-300'
+              isLive ? 'bg-emerald-600' : 'bg-surface-300'
             }`}
           >
             <span
@@ -186,7 +186,7 @@ const StripeConfigPanel: React.FC<Props> = ({ activeOrgId }) => {
 
         {/* Stripe Secret Key */}
         <div>
-          <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+          <label className="block text-xs font-bold text-surface-700 uppercase tracking-wider mb-2">
             Chave Secreta do Stripe
           </label>
           <div className="relative">
@@ -195,24 +195,24 @@ const StripeConfigPanel: React.FC<Props> = ({ activeOrgId }) => {
               value={secretKey}
               onChange={(e) => setSecretKey(e.target.value)}
               placeholder={config?.stripe_secret_key_masked || 'sk_test_... ou sk_live_...'}
-              className="w-full px-4 py-2.5 pr-10 bg-white border border-gray-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+              className="w-full px-4 py-2.5 pr-10 bg-white border border-surface-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
             />
             <button
               type="button"
               onClick={() => setShowSecretKey(!showSecretKey)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-surface-400 hover:text-surface-600"
             >
               {showSecretKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
           {config?.stripe_secret_key_masked && (
-            <p className="text-xs text-gray-400 mt-1">Atual: {config.stripe_secret_key_masked}</p>
+            <p className="text-xs text-surface-400 mt-1">Atual: {config.stripe_secret_key_masked}</p>
           )}
         </div>
 
         {/* Webhook Secret */}
         <div>
-          <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+          <label className="block text-xs font-bold text-surface-700 uppercase tracking-wider mb-2">
             Webhook Signing Secret
           </label>
           <div className="relative">
@@ -221,30 +221,30 @@ const StripeConfigPanel: React.FC<Props> = ({ activeOrgId }) => {
               value={webhookSecret}
               onChange={(e) => setWebhookSecret(e.target.value)}
               placeholder={config?.stripe_webhook_secret_masked || 'whsec_...'}
-              className="w-full px-4 py-2.5 pr-10 bg-white border border-gray-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+              className="w-full px-4 py-2.5 pr-10 bg-white border border-surface-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
             />
             <button
               type="button"
               onClick={() => setShowWebhookSecret(!showWebhookSecret)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-surface-400 hover:text-surface-600"
             >
               {showWebhookSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
           {config?.stripe_webhook_secret_masked && (
-            <p className="text-xs text-gray-400 mt-1">Atual: {config.stripe_webhook_secret_masked}</p>
+            <p className="text-xs text-surface-400 mt-1">Atual: {config.stripe_webhook_secret_masked}</p>
           )}
         </div>
 
         {/* API Version */}
         <div>
-          <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+          <label className="block text-xs font-bold text-surface-700 uppercase tracking-wider mb-2">
             Versão da API Stripe
           </label>
           <select
             value={apiVersion}
             onChange={(e) => setApiVersion(e.target.value)}
-            className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+            className="w-full px-4 py-2.5 bg-white border border-surface-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
           >
             {API_VERSIONS.map((v) => (
               <option key={v} value={v}>{v}</option>
@@ -255,13 +255,13 @@ const StripeConfigPanel: React.FC<Props> = ({ activeOrgId }) => {
         {/* Currency + Product Name Row */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+            <label className="block text-xs font-bold text-surface-700 uppercase tracking-wider mb-2">
               Moeda Padrão
             </label>
             <select
               value={currency}
               onChange={(e) => setCurrency(e.target.value)}
-              className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+              className="w-full px-4 py-2.5 bg-white border border-surface-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
             >
               {CURRENCIES.map((c) => (
                 <option key={c.code} value={c.code}>{c.label}</option>
@@ -269,14 +269,14 @@ const StripeConfigPanel: React.FC<Props> = ({ activeOrgId }) => {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+            <label className="block text-xs font-bold text-surface-700 uppercase tracking-wider mb-2">
               Nome do Produto no Checkout
             </label>
             <input
               type="text"
               value={productName}
               onChange={(e) => setProductName(e.target.value)}
-              className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+              className="w-full px-4 py-2.5 bg-white border border-surface-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
             />
           </div>
         </div>
@@ -296,7 +296,7 @@ const StripeConfigPanel: React.FC<Props> = ({ activeOrgId }) => {
         {/* Save Button */}
         <div className="flex items-center justify-between pt-2">
           {config?.updated_at && (
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-surface-400">
               Última atualização: {new Date(config.updated_at).toLocaleString('pt-BR')}
             </p>
           )}

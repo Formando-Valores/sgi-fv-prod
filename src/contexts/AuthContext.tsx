@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SGI FV - Auth Context
  * Provides authentication state and user context throughout the app
  */
@@ -321,11 +321,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   if (loading) {
     log('Rendering loading spinner');
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-surface-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-400">Carregando...</p>
-          <p className="text-gray-600 text-xs mt-2">Verificando autenticação...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500 mx-auto mb-4"></div>
+          <p className="text-surface-400">Carregando...</p>
+          <p className="text-surface-600 text-xs mt-2">Verificando autenticação...</p>
         </div>
       </div>
     );
@@ -335,15 +335,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   if (error && session) {
     log('Rendering error state:', error);
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="bg-gray-800 p-8 rounded-lg max-w-md text-center">
+      <div className="min-h-screen bg-surface-900 flex items-center justify-center">
+        <div className="bg-surface-800 p-8 rounded-lg max-w-md text-center">
           <div className="text-red-500 text-5xl mb-4">⚠️</div>
           <h2 className="text-xl font-bold text-white mb-4">Erro ao Carregar</h2>
-          <p className="text-gray-400 mb-6">{error}</p>
+          <p className="text-surface-400 mb-6">{error}</p>
           <div className="space-y-3">
             <button
               onClick={refreshContext}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors"
+              className="w-full bg-brand-600 hover:bg-brand-700 text-white px-6 py-2 rounded-lg transition-colors"
             >
               Tentar Novamente
             </button>
@@ -353,7 +353,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 await supabase.auth.signOut();
                 window.location.href = '/login';
               }}
-              className="w-full bg-gray-700 hover:bg-gray-600 text-white px-6 py-2 rounded-lg transition-colors"
+              className="w-full bg-surface-700 hover:bg-surface-600 text-white px-6 py-2 rounded-lg transition-colors"
             >
               Sair e Fazer Login Novamente
             </button>

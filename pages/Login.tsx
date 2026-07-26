@@ -5,7 +5,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { AlertCircle, Eye, EyeOff, Mail, Lock } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff, Mail, Lock, ArrowRight, Shield, Scale, Users } from 'lucide-react';
 import { ProcessStatus, ServiceUnit, User, UserRole, type OrgMembership } from '../types';
 import { isSupabaseConfigured, supabase } from '../supabase';
 import { ADMIN_CREDENTIALS } from '../constants';
@@ -307,7 +307,6 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
         }
 
 
-        // Busca todas as organizações ativas que o usuário pode acessar (multi-org)
         const { data: loginOrgMemberships } = await supabase
           .from('org_members')
           .select('org_id, role, organizations(name, slug, is_active)')
@@ -365,173 +364,221 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
     }
   };
 
-
-
-
-
-
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gradient-to-br from-gray-50 to-blue-50/30">
-      <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-[0_8px_30px_-4px_rgba(0,0,0,0.08)] border border-gray-100">
-        <div className="mb-8 text-center">
-          <img src="/icons/icon.svg" alt="SGI FV" className="h-12 w-12 mx-auto mb-3" />
-          <h1 className="text-2xl font-bold tracking-wider text-gray-800">SGI FV</h1>
-          <p className="text-gray-500 font-semibold uppercase text-xs mt-1">Formando Valores</p>
+    <div className="min-h-screen flex">
+      {/* Left: Branding */}
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-brand-600 via-brand-700 to-brand-950 relative overflow-hidden">
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-20 left-20 w-96 h-96 bg-white/10 rounded-full blur-3xl" />
+          <div className="absolute bottom-20 right-20 w-80 h-80 bg-white/5 rounded-full blur-3xl" />
         </div>
+        <div className="relative z-10 flex flex-col justify-center px-16 xl:px-24">
+          <img src="/icons/icon.svg" alt="" className="h-14 w-14 mb-8 brightness-0 invert" />
+          <h1 className="text-4xl xl:text-5xl font-extrabold text-white leading-tight mb-4">
+            Sistema de<br />Gestão Integrada
+          </h1>
+          <p className="text-brand-200 text-lg font-medium max-w-md leading-relaxed">
+            Plataforma completa para gestão de processos jurídicos e acompanhamento de clientes.
+          </p>
 
-        <form onSubmit={handleLogin} className="space-y-6">
-          {showForgotPassword ? (
-            <div className="space-y-4 rounded-xl border border-blue-100 bg-blue-50 p-4">
-              <div>
-                <h3 className="text-sm font-black uppercase tracking-wider text-blue-700">Recuperar acesso</h3>
-                <p className="mt-1 text-sm text-gray-600">
-                  Informe seu e-mail para receber um link seguro de redefinição de senha.
-                </p>
+          <div className="mt-12 space-y-4">
+            {[
+              { icon: Shield, text: 'Controle de acesso por organização' },
+              { icon: Scale, text: 'Acompanhamento de processos em tempo real' },
+              { icon: Users, text: 'Gestão integrada de clientes e afiliação' },
+            ].map((item) => (
+              <div key={item.text} className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
+                  <item.icon className="w-4.5 h-4.5 text-white" />
+                </div>
+                <span className="text-sm font-medium text-brand-100">{item.text}</span>
               </div>
+            ))}
+          </div>
+        </div>
+      </div>
 
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wide text-gray-500 mb-2">
-                    E-mail cadastrado
-                  </label>
+      {/* Right: Form */}
+      <div className="flex-1 flex items-center justify-center p-6 sm:p-8 bg-surface-50">
+        <div className="w-full max-w-md">
+          {/* Mobile logo */}
+          <div className="lg:hidden mb-8 text-center">
+            <img src="/icons/icon.svg" alt="SGI FV" className="h-10 w-10 mx-auto mb-3" />
+            <h1 className="text-xl font-extrabold text-surface-800 tracking-tight">SGI FV</h1>
+            <p className="text-[10px] text-surface-400 font-semibold uppercase tracking-widest">Formando Valores</p>
+          </div>
+
+          <div className="bg-white border border-surface-200/60 rounded-2xl shadow-card p-6 sm:p-8">
+            {!showForgotPassword && (
+              <div className="mb-6">
+                <h2 className="text-xl font-extrabold text-surface-800">Bem-vindo de volta</h2>
+                <p className="text-sm text-surface-500 mt-1">Insira suas credenciais para acessar o painel</p>
+              </div>
+            )}
+
+            <form onSubmit={handleLogin} className="space-y-5">
+              {showForgotPassword ? (
+                <div className="space-y-4 animate-fade-in">
+                  <div>
+                    <h3 className="text-sm font-bold text-surface-800">Recuperar acesso</h3>
+                    <p className="text-xs text-surface-500 mt-1">
+                      Informe seu e-mail para receber um link seguro de redefinição de senha.
+                    </p>
+                  </div>
+
                   <div className="relative">
-                    <Mail className="absolute left-3 top-3.5 text-gray-400 w-5 h-5" />
+                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-surface-400 w-4 h-4" />
                     <input
                       type="email"
                       value={forgotPasswordEmail}
                       onChange={(event) => setForgotPasswordEmail(event.target.value)}
-                      className="w-full rounded-lg border border-gray-200 bg-white py-3 pl-10 pr-4 text-gray-800 font-semibold placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full rounded-xl border border-surface-200 bg-white py-2.5 pl-10 pr-4 text-sm font-medium text-surface-800 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all"
                       placeholder="seu@email.com"
                       required={showForgotPassword}
                       disabled={forgotPasswordLoading}
                     />
                   </div>
-                </div>
 
-                {forgotPasswordError && (
-                  <p className="text-sm font-bold text-red-600">{forgotPasswordError}</p>
-                )}
+                  {forgotPasswordError && (
+                    <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-100 rounded-xl">
+                      <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+                      <p className="text-xs font-medium text-red-600">{forgotPasswordError}</p>
+                    </div>
+                  )}
 
-                {forgotPasswordMessage && (
-                  <p className="text-sm font-bold text-emerald-600">{forgotPasswordMessage}</p>
-                )}
+                  {forgotPasswordMessage && (
+                    <div className="flex items-center gap-2 p-3 bg-emerald-50 border border-emerald-100 rounded-xl">
+                      <p className="text-xs font-medium text-emerald-600">{forgotPasswordMessage}</p>
+                    </div>
+                  )}
 
-                <button
-                  type="button"
-                  onClick={() => void handleForgotPassword()}
-                  disabled={forgotPasswordLoading}
-                  className="w-full rounded-lg border border-blue-700 bg-blue-600/90 px-4 py-3 text-sm font-black uppercase tracking-wider text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-70"
-                >
-                  {forgotPasswordLoading ? 'Enviando instruções...' : 'Enviar link de redefinição'}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowForgotPassword(false);
-                    setForgotPasswordError('');
-                    setForgotPasswordMessage('');
-                  }}
-                  className="w-full rounded-lg border border-gray-200 bg-gray-100 px-4 py-3 text-sm font-black uppercase tracking-wider text-gray-700 transition-colors hover:bg-gray-200"
-                >
-                  Voltar ao login
-                </button>
-              </div>
-            </div>
-          ) : (
-            <>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Usuário - e-mail</label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-3.5 text-gray-400 w-5 h-5" />
-                  <input
-                    type="email"
-                    placeholder="seu@email.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className={`w-full pl-10 pr-4 py-3 bg-white border rounded-lg text-gray-800 font-semibold placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 ${error ? 'input-error' : 'border-gray-200'}`}
-                    required={!showForgotPassword}
-                    disabled={isLoading}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Senha Privada</label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-3.5 text-gray-400 w-5 h-5" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="******"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className={`w-full pl-10 pr-12 py-3 bg-white border rounded-lg text-gray-800 font-semibold placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 ${error ? 'input-error' : 'border-gray-200'}`}
-                    required={!showForgotPassword}
-                    disabled={isLoading}
-                  />
                   <button
                     type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-3.5 text-gray-400 hover:text-gray-600 transition-colors"
+                    onClick={() => void handleForgotPassword()}
+                    disabled={forgotPasswordLoading}
+                    className="w-full rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition-all hover:bg-brand-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70 flex items-center justify-center gap-2"
                   >
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    {forgotPasswordLoading ? (
+                      <>
+                        <div className="animate-spin h-4 w-4 border-2 border-white/30 border-t-white rounded-full" />
+                        Enviando...
+                      </>
+                    ) : (
+                      <>Enviar link de redefinição</>
+                    )}
                   </button>
-                </div>
-                <div className="mt-3 text-right">
+
                   <button
                     type="button"
                     onClick={() => {
-                      setShowForgotPassword(true);
-                      setForgotPasswordEmail((current) => current || email);
+                      setShowForgotPassword(false);
                       setForgotPasswordError('');
                       setForgotPasswordMessage('');
                     }}
-                    className="text-sm font-bold text-blue-600 hover:text-blue-700 transition-colors"
+                    className="w-full rounded-xl border border-surface-200 bg-surface-50 px-4 py-2.5 text-sm font-semibold text-surface-600 transition-all hover:bg-surface-100"
                   >
-                    Esqueci minha senha
+                    Voltar ao login
                   </button>
                 </div>
-              </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-sm font-semibold text-surface-700 mb-1.5">E-mail</label>
+                    <div className="relative">
+                      <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-surface-400 w-4 h-4" />
+                      <input
+                        type="email"
+                        placeholder="seu@email.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className={`w-full pl-10 pr-4 py-2.5 bg-white border rounded-xl text-sm font-medium text-surface-800 placeholder:text-surface-400 transition-all focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 ${error ? 'border-red-300 focus:ring-red-500/20 focus:border-red-500' : 'border-surface-200 hover:border-surface-300'}`}
+                        required
+                        disabled={isLoading}
+                      />
+                    </div>
+                  </div>
 
-              {error && (
-                <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
-                  <p className="text-red-700 text-sm font-bold">{error}</p>
-                </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-surface-700 mb-1.5">Senha</label>
+                    <div className="relative">
+                      <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-surface-400 w-4 h-4" />
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className={`w-full pl-10 pr-11 py-2.5 bg-white border rounded-xl text-sm font-medium text-surface-800 placeholder:text-surface-400 transition-all focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 ${error ? 'border-red-300 focus:ring-red-500/20 focus:border-red-500' : 'border-surface-200 hover:border-surface-300'}`}
+                        required
+                        disabled={isLoading}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-surface-400 hover:text-surface-600 transition-colors p-0.5"
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <div className="mt-2 text-right">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowForgotPassword(true);
+                          setForgotPasswordEmail((current) => current || email);
+                          setForgotPasswordError('');
+                          setForgotPasswordMessage('');
+                        }}
+                        className="text-xs font-semibold text-brand-600 hover:text-brand-700 transition-colors"
+                      >
+                        Esqueci minha senha
+                      </button>
+                    </div>
+                  </div>
+
+                  {error && (
+                    <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-100 rounded-xl">
+                      <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+                      <p className="text-xs font-medium text-red-600">{error}</p>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full py-3 bg-brand-600 hover:bg-brand-700 disabled:bg-brand-800 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-all active:scale-[0.98] shadow-sm hover:shadow-md flex items-center justify-center gap-2 text-sm"
+                  >
+                    {isLoading ? (
+                      <>
+                        <div className="animate-spin h-4 w-4 border-2 border-white/30 border-t-white rounded-full" />
+                        Autenticando...
+                      </>
+                    ) : (
+                      <>
+                        Entrar
+                        <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
+                  </button>
+                </>
               )}
+            </form>
+          </div>
 
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full py-4 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:cursor-not-allowed text-white font-bold rounded-lg uppercase tracking-widest transition-all transform active:scale-95 shadow-lg flex items-center justify-center gap-2"
-              >
-                {isLoading ? (
-                  <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                    <span>Autenticando...</span>
-                  </>
-                ) : (
-                  'Autenticar no SGI'
-                )}
-              </button>
-            </>
-          )}
-        </form>
+          {/* Register link */}
+          <div className="mt-6 text-center">
+            <p className="text-sm text-surface-500">
+              Ainda não possui acesso?{' '}
+              <Link to="/register" className="font-semibold text-brand-600 hover:text-brand-700 transition-colors">
+                Criar conta
+              </Link>
+            </p>
+          </div>
 
-        <div className="mt-8 pt-6 border-t border-gray-100 text-center">
-          <p className="text-gray-400 text-sm mb-4">Ainda não possui acesso?</p>
-          <Link
-            to="/register"
-            className="inline-block w-full py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-bold rounded-xl transition-all shadow-md hover:shadow-lg active:scale-[0.98]"
-          >
-            CRIAR CONTA
-          </Link>
+          <p className="mt-8 text-center text-[10px] text-surface-400 font-medium">
+            © 2026 SGI FV — Sistema de Gestão Integrada
+          </p>
         </div>
       </div>
-      
-      <p className="mt-8 text-gray-400 text-[10px] uppercase tracking-tighter">
-        © 2026 SGI FV — Sistema de Gestão Integrada
-      </p>
     </div>
   );
 };

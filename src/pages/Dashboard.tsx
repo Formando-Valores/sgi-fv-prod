@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SGI FV - Dashboard Page
  * Main dashboard with real process statistics
  */
@@ -156,7 +156,7 @@ const Dashboard: React.FC = () => {
   };
 
   const statCards = [
-    { label: 'Total de Processos', value: stats.total, icon: FolderKanban, color: 'bg-blue-600' },
+    { label: 'Total de Processos', value: stats.total, icon: FolderKanban, color: 'bg-brand-600' },
     { label: 'Em Andamento', value: stats.cadastro + stats.triagem + stats.analise, icon: Clock, color: 'bg-yellow-600' },
     { label: 'Concluídos', value: stats.concluido, icon: CheckCircle2, color: 'bg-emerald-600' },
   ];
@@ -229,7 +229,7 @@ const Dashboard: React.FC = () => {
                   log('User clicked "Verificar Novamente"');
                   window.location.reload();
                 }}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors flex items-center gap-2"
+                className="bg-brand-600 hover:bg-brand-700 text-white px-6 py-2 rounded-lg transition-colors flex items-center gap-2"
               >
                 <RefreshCw className="w-4 h-4" />
                 Verificar Novamente
@@ -255,7 +255,7 @@ const Dashboard: React.FC = () => {
       {/* Stats Cards */}
       {loading ? (
         <div className="flex items-center justify-center h-32">
-          <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+          <Loader2 className="w-8 h-8 text-brand-500 animate-spin" />
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -297,19 +297,19 @@ const Dashboard: React.FC = () => {
       {/* Quick Actions */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
         <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-          <AlertCircle className="w-5 h-5 text-blue-500" />
+          <AlertCircle className="w-5 h-5 text-brand-500" />
           Ações Rápidas
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Link
             to="/processos"
-            className="flex items-center justify-between p-4 bg-blue-900/20 border border-blue-800 rounded-xl hover:bg-blue-900/30 transition-colors group"
+            className="flex items-center justify-between p-4 bg-brand-900/20 border border-brand-800 rounded-xl hover:bg-brand-900/30 transition-colors group"
           >
             <div>
               <p className="font-bold text-white">Ver Processos</p>
               <p className="text-slate-400 text-sm">Visualizar todos os processos</p>
             </div>
-            <ArrowRight className="w-5 h-5 text-blue-400 group-hover:translate-x-1 transition-transform" />
+            <ArrowRight className="w-5 h-5 text-brand-400 group-hover:translate-x-1 transition-transform" />
           </Link>
           {canCreateProcess && (
             <Link
@@ -341,7 +341,7 @@ const Dashboard: React.FC = () => {
                 className="flex items-center justify-between p-4 bg-slate-800/50 border border-slate-700 rounded-xl hover:bg-slate-800 transition-colors"
               >
                 <div className="flex items-center gap-4">
-                  <span className="bg-blue-900/30 text-blue-400 px-2 py-1 rounded-md text-[10px] font-black">
+                  <span className="bg-brand-900/30 text-brand-400 px-2 py-1 rounded-md text-[10px] font-black">
                     {process.protocolo || '-'}
                   </span>
                   <div>

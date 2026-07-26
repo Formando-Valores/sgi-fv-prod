@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+﻿import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Plus, Search, Eye, FolderKanban, X, AlertCircle, Loader2, Lock, ChevronDown, Upload, Check } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -222,14 +222,14 @@ const ProcessList: React.FC = () => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-black text-white uppercase tracking-tight flex items-center gap-2">
-            <FolderKanban className="text-blue-500" /> Processos
+            <FolderKanban className="text-brand-500" /> Processos
           </h1>
           <p className="text-slate-400 text-sm font-bold mt-1">Gerenciamento de processos</p>
         </div>
         {canCreateProcess && (
           <button
             onClick={() => { resetModal(); setShowModal(true); }}
-            className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl flex items-center gap-2 transition-colors shadow-lg"
+            className="px-6 py-3 bg-brand-600 hover:bg-brand-500 text-white font-bold rounded-xl flex items-center gap-2 transition-colors shadow-lg"
           >
             <Plus className="w-5 h-5" /> Novo Processo
           </button>
@@ -245,7 +245,7 @@ const ProcessList: React.FC = () => {
             placeholder="Pesquisar por protocolo, título ou cliente..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 bg-gray-900 border border-slate-800 rounded-xl text-white font-bold placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none"
+            className="w-full pl-10 pr-4 py-3 bg-surface-900 border border-slate-800 rounded-xl text-white font-bold placeholder:text-slate-600 focus:ring-2 focus:ring-brand-500 outline-none"
           />
         </div>
       </div>
@@ -261,7 +261,7 @@ const ProcessList: React.FC = () => {
       {/* Loading */}
       {loading ? (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+          <Loader2 className="w-8 h-8 text-brand-500 animate-spin" />
         </div>
       ) : filteredProcesses.length === 0 ? (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center">
@@ -294,7 +294,7 @@ const ProcessList: React.FC = () => {
                 {filteredProcesses.map((process) => (
                   <tr key={process.id} className="hover:bg-slate-800/50 transition-colors">
                     <td className="px-3 sm:px-6 py-2 sm:py-4">
-                      <span className="bg-blue-900/30 text-blue-400 px-2 py-1 rounded-md text-[10px] font-black">{process.protocolo || '-'}</span>
+                      <span className="bg-brand-900/30 text-brand-400 px-2 py-1 rounded-md text-[10px] font-black">{process.protocolo || '-'}</span>
                     </td>
                     <td className="px-3 sm:px-6 py-2 sm:py-4 font-bold text-slate-200">{process.titulo}</td>
                     <td className="px-3 sm:px-6 py-2 sm:py-4 text-slate-300">{process.cliente_nome || '-'}</td>
@@ -376,7 +376,7 @@ const ProcessList: React.FC = () => {
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex-1 min-w-0 mr-2">
                     <p className="font-bold text-slate-100 text-sm truncate">{process.titulo}</p>
-                    <span className="bg-blue-900/30 text-blue-400 px-2 py-0.5 rounded-md text-[10px] font-black inline-block mt-1">{process.protocolo || '-'}</span>
+                    <span className="bg-brand-900/30 text-brand-400 px-2 py-0.5 rounded-md text-[10px] font-black inline-block mt-1">{process.protocolo || '-'}</span>
                   </div>
                   <div className="flex flex-col items-end gap-1 shrink-0">
                     {process.payment_status && (
@@ -472,7 +472,7 @@ const ProcessList: React.FC = () => {
                       setServiceSearch('');
                       setExpandedGroups({});
                     }}
-                    className="w-full px-4 py-3 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full px-4 py-3 bg-surface-900 border border-slate-700 rounded-xl text-white font-bold focus:ring-2 focus:ring-brand-500 outline-none"
                   >
                     <option value="">Selecione o tipo...</option>
                     {SERVICE_UNITS.map((u) => (
@@ -491,7 +491,7 @@ const ProcessList: React.FC = () => {
                         value={serviceSearch}
                         onChange={(e) => setServiceSearch(e.target.value)}
                         placeholder="Pesquisar serviço..."
-                        className="w-full pl-9 pr-4 py-2 bg-gray-900 border border-slate-700 rounded-xl text-white text-sm font-bold placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none"
+                        className="w-full pl-9 pr-4 py-2 bg-surface-900 border border-slate-700 rounded-xl text-white text-sm font-bold placeholder:text-slate-600 focus:ring-2 focus:ring-brand-500 outline-none"
                       />
                     </div>
                     <div className="space-y-2 max-h-80 overflow-y-auto">
@@ -503,7 +503,7 @@ const ProcessList: React.FC = () => {
                         if (filtered.length === 0) return null;
                         const isCollapsed = !expandedGroups[group];
                         return (
-                          <div key={group} className="bg-gray-900 border border-slate-800 rounded-xl overflow-hidden">
+                          <div key={group} className="bg-surface-900 border border-slate-800 rounded-xl overflow-hidden">
                             <button
                               type="button"
                               onClick={() => setExpandedGroups((prev) => {
@@ -522,8 +522,8 @@ const ProcessList: React.FC = () => {
                                     key={svc.id}
                                     className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors ${
                                       selectedServiceIds.includes(svc.id)
-                                        ? 'bg-blue-900/40 border border-blue-700'
-                                        : 'bg-gray-800 border border-slate-700 hover:border-slate-600'
+                                        ? 'bg-brand-900/40 border border-brand-700'
+                                        : 'bg-surface-800 border border-slate-700 hover:border-slate-600'
                                     }`}
                                   >
                                     <div className="flex items-center gap-3">
@@ -531,7 +531,7 @@ const ProcessList: React.FC = () => {
                                         type="checkbox"
                                         checked={selectedServiceIds.includes(svc.id)}
                                         onChange={() => handleToggleService(svc.id)}
-                                        className="w-4 h-4 accent-blue-500"
+                                        className="w-4 h-4 accent-brand-500"
                                       />
                                       <div>
                                         <p className="text-sm font-bold text-slate-200">{svc.name}</p>
@@ -561,7 +561,7 @@ const ProcessList: React.FC = () => {
                         setCustomMode(!customMode);
                         if (!customMode) setCustomServiceName('');
                       }}
-                      className="w-4 h-4 accent-blue-500"
+                      className="w-4 h-4 accent-brand-500"
                     />
                     <span className="text-sm font-bold text-slate-300">Não encontrei meu serviço na lista</span>
                   </label>
@@ -576,7 +576,7 @@ const ProcessList: React.FC = () => {
                         value={customServiceName}
                         onChange={(e) => setCustomServiceName(e.target.value)}
                         placeholder="Descreva o serviço desejado..."
-                        className="w-full px-4 py-3 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                        className="w-full px-4 py-3 bg-surface-900 border border-slate-700 rounded-xl text-white font-bold placeholder:text-slate-600 focus:ring-2 focus:ring-brand-500 outline-none text-sm"
                       />
                     </div>
                   )}
@@ -607,7 +607,7 @@ const ProcessList: React.FC = () => {
                   <button
                     type="button"
                     onClick={handleContinue}
-                    className="flex-1 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-colors"
+                    className="flex-1 py-3 bg-brand-600 hover:bg-brand-500 text-white font-bold rounded-xl transition-colors"
                   >
                     Continuar
                   </button>
@@ -627,7 +627,7 @@ const ProcessList: React.FC = () => {
                     maxLength={100}
                     value={formData.titulo}
                     onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
-                    className="w-full px-4 py-3 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full px-4 py-3 bg-surface-900 border border-slate-700 rounded-xl text-white font-bold placeholder:text-slate-600 focus:ring-2 focus:ring-brand-500 outline-none"
                     placeholder="Título do processo"
                     required
                   />
@@ -644,7 +644,7 @@ const ProcessList: React.FC = () => {
                     maxLength={100}
                     value={formData.cliente_nome}
                     onChange={(e) => setFormData({ ...formData, cliente_nome: e.target.value })}
-                    className="w-full px-4 py-3 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full px-4 py-3 bg-surface-900 border border-slate-700 rounded-xl text-white font-bold placeholder:text-slate-600 focus:ring-2 focus:ring-brand-500 outline-none"
                     placeholder="Nome do cliente"
                   />
                 </div>
@@ -654,7 +654,7 @@ const ProcessList: React.FC = () => {
                     type="text"
                     value={formData.cliente_documento}
                     onChange={(e) => setFormData({ ...formData, cliente_documento: e.target.value })}
-                    className="w-full px-4 py-3 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full px-4 py-3 bg-surface-900 border border-slate-700 rounded-xl text-white font-bold placeholder:text-slate-600 focus:ring-2 focus:ring-brand-500 outline-none"
                     placeholder="000.000.000-00"
                   />
                 </div>
@@ -666,7 +666,7 @@ const ProcessList: React.FC = () => {
                     step="0.01"
                     value={formData.os_value ?? ''}
                     onChange={(e) => setFormData({ ...formData, os_value: e.target.value ? Number(e.target.value) : undefined })}
-                    className="w-full px-4 py-3 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full px-4 py-3 bg-surface-900 border border-slate-700 rounded-xl text-white font-bold placeholder:text-slate-600 focus:ring-2 focus:ring-brand-500 outline-none"
                     placeholder="0,00"
                     readOnly
                   />
@@ -705,7 +705,7 @@ const ProcessList: React.FC = () => {
                     type="text"
                     value={formData.cliente_contato}
                     onChange={(e) => setFormData({ ...formData, cliente_contato: e.target.value })}
-                    className="w-full px-4 py-3 bg-gray-900 border border-slate-700 rounded-xl text-white font-bold placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full px-4 py-3 bg-surface-900 border border-slate-700 rounded-xl text-white font-bold placeholder:text-slate-600 focus:ring-2 focus:ring-brand-500 outline-none"
                     placeholder="Telefone ou email"
                   />
                 </div>
@@ -717,7 +717,7 @@ const ProcessList: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setStep(1)}
-                      className="text-xs text-blue-400 hover:text-blue-300 font-bold mt-1"
+                      className="text-xs text-brand-400 hover:text-brand-300 font-bold mt-1"
                     >
                       Alterar serviços
                     </button>
@@ -789,7 +789,7 @@ const ProcessList: React.FC = () => {
                   <button
                     type="submit"
                     disabled={creating}
-                    className="flex-1 py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+                    className="flex-1 py-3 bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
                   >
                     {creating ? (
                       <>

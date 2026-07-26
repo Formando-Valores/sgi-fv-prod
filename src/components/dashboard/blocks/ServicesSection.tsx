@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { Plus, Trash2, Pencil, Loader2, Check, X, Search, ChevronDown, XCircle, Package } from 'lucide-react';
 import Skeleton, { TableSkeleton } from '../../ui/Skeleton';
 import EmptyState from '../../ui/EmptyState';
@@ -144,25 +144,25 @@ const ServicesSection: React.FC<Props> = ({ activeOrgId }) => {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      <div className="lg:col-span-1 bg-white border border-gray-100 rounded-2xl p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
+      <div className="lg:col-span-1 bg-white border border-surface-100 rounded-2xl p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
         <button
           onClick={openNewModal}
-          className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold uppercase text-xs tracking-widest rounded-xl transition-all active:scale-95 flex items-center justify-center gap-2"
+          className="w-full py-3 bg-brand-600 hover:bg-brand-500 text-white font-bold uppercase text-xs tracking-widest rounded-xl transition-all active:scale-95 flex items-center justify-center gap-2"
         >
           <Plus className="w-4 h-4" /> Cadastrar Serviço
         </button>
       </div>
 
-      <div className="lg:col-span-2 bg-white border border-gray-100 rounded-2xl p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
+      <div className="lg:col-span-2 bg-white border border-surface-100 rounded-2xl p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <h3 className="text-lg font-bold">Serviços Cadastrados</h3>
           <div className="relative w-full md:w-72">
-            <Search className="absolute left-3 top-2.5 text-gray-500 w-4 h-4" />
+            <Search className="absolute left-3 top-2.5 text-surface-500 w-4 h-4" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Pesquisar serviços..."
-              className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold"
+              className="w-full pl-9 pr-3 py-2 bg-white border border-surface-200 rounded-lg text-surface-800 font-semibold"
             />
           </div>
         </div>
@@ -177,34 +177,34 @@ const ServicesSection: React.FC<Props> = ({ activeOrgId }) => {
               if (unitServices.length === 0) return null;
               const isOpen = expandedUnits[unit] ?? false;
               return (
-                <div key={unit} className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
+                <div key={unit} className="bg-white border border-surface-100 rounded-2xl overflow-hidden shadow-sm">
                   <button
                     onClick={() => setExpandedUnits((prev) => ({ ...prev, [unit]: !isOpen }))}
-                    className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
+                    className="w-full flex items-center justify-between px-5 py-4 hover:bg-surface-50 transition-colors"
                   >
-                    <h4 className="font-black text-sm uppercase tracking-widest text-gray-700">{unit}</h4>
+                    <h4 className="font-black text-sm uppercase tracking-widest text-surface-700">{unit}</h4>
                     <div className="flex items-center gap-3">
-                      <span className="text-xs font-bold text-gray-400">{unitServices.length} serviço{(unitServices.length !== 1) ? 's' : ''}</span>
-                      <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-0' : '-rotate-90'}`} />
+                      <span className="text-xs font-bold text-surface-400">{unitServices.length} serviço{(unitServices.length !== 1) ? 's' : ''}</span>
+                      <ChevronDown className={`w-4 h-4 text-surface-400 transition-transform duration-200 ${isOpen ? 'rotate-0' : '-rotate-90'}`} />
                     </div>
                   </button>
                   {isOpen && (
-                    <div className="divide-y divide-gray-50">
+                    <div className="divide-y divide-surface-50">
                       {unitServices.map((svc) => (
-                        <div key={svc.id} className="flex items-start justify-between px-5 py-3 hover:bg-gray-50 transition-colors gap-4">
+                        <div key={svc.id} className="flex items-start justify-between px-5 py-3 hover:bg-surface-50 transition-colors gap-4">
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-bold text-gray-800 text-sm">{svc.name}</span>
+                              <span className="font-bold text-surface-800 text-sm">{svc.name}</span>
                               <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${svc.active ? 'bg-emerald-500' : 'bg-red-500'}`} title={svc.active ? 'Ativo' : 'Inativo'} />
                             </div>
-                            <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-500">
+                            <div className="flex items-center gap-3 mt-0.5 text-xs text-surface-500">
                               {svc.group && <span className="font-semibold">{svc.group}</span>}
-                              {svc.description && <span className="text-gray-400 truncate">{svc.description}</span>}
+                              {svc.description && <span className="text-surface-400 truncate">{svc.description}</span>}
                             </div>
                           </div>
                           <div className="flex items-center gap-3 shrink-0">
-                            <span className="font-mono text-sm font-bold text-gray-700 whitespace-nowrap">{formatEuro(svc.price)}</span>
-                            <button onClick={() => openEditModal(svc)} className="p-1.5 bg-blue-100 hover:bg-blue-200 rounded-md text-blue-600" title="Editar"><Pencil className="w-4 h-4" /></button>
+                            <span className="font-mono text-sm font-bold text-surface-700 whitespace-nowrap">{formatEuro(svc.price)}</span>
+                            <button onClick={() => openEditModal(svc)} className="p-1.5 bg-brand-100 hover:bg-brand-200 rounded-md text-brand-600" title="Editar"><Pencil className="w-4 h-4" /></button>
                             <button onClick={() => handleDelete(svc.id)} className="p-1.5 bg-red-100 hover:bg-red-200 rounded-md text-red-600" title="Excluir"><Trash2 className="w-4 h-4" /></button>
                           </div>
                         </div>
@@ -224,45 +224,45 @@ const ServicesSection: React.FC<Props> = ({ activeOrgId }) => {
           <div className="relative bg-white w-[calc(100%-2rem)] sm:w-[calc(100%-3rem)] md:w-full md:max-w-lg max-h-[90vh] rounded-2xl shadow-2xl overflow-y-auto p-6 animate-scaleIn">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-bold flex items-center gap-2">
-                {editingId ? <Pencil className="text-blue-500" /> : <Plus className="text-blue-500" />}
+                {editingId ? <Pencil className="text-brand-500" /> : <Plus className="text-brand-500" />}
                 {editingId ? 'Editar Serviço' : 'Novo Serviço'}
               </h3>
               <button
                 onClick={() => { setShowModal(false); resetForm(); setFeedback(null); }}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-surface-100 rounded-lg transition-colors"
               >
-                <XCircle className="w-5 h-5 text-gray-500" />
+                <XCircle className="w-5 h-5 text-surface-500" />
               </button>
             </div>
             <form onSubmit={handleSubmit} className={`space-y-4 ${feedback?.type === 'error' ? 'p-3 -m-3 border-2 border-red-200 rounded-xl' : ''}`}>
               <div>
-                <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Nome *</label>
+                <label className="text-xs font-bold text-surface-500 uppercase block mb-1">Nome *</label>
                 <input
                   required
                   type="text"
                   placeholder="Nome do serviço"
                   value={form.name}
                   onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-                  className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold"
+                  className="w-full bg-white border border-surface-200 rounded-lg p-3 text-surface-800 font-semibold"
                 />
               </div>
               <div>
-                <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Descrição</label>
+                <label className="text-xs font-bold text-surface-500 uppercase block mb-1">Descrição</label>
                 <textarea
                   placeholder="Descrição do serviço"
                   value={form.description}
                   onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
                   rows={3}
-                  className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold resize-none"
+                  className="w-full bg-white border border-surface-200 rounded-lg p-3 text-surface-800 font-semibold resize-none"
                 />
               </div>
               <div>
-                <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Unidade *</label>
+                <label className="text-xs font-bold text-surface-500 uppercase block mb-1">Unidade *</label>
                 <select
                   required
                   value={form.unit}
                   onChange={(e) => setForm((prev) => ({ ...prev, unit: e.target.value }))}
-                  className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold"
+                  className="w-full bg-white border border-surface-200 rounded-lg p-3 text-surface-800 font-semibold"
                 >
                   {Object.values(ServiceUnit).map((u) => (
                     <option key={u} value={u}>{u}</option>
@@ -270,17 +270,17 @@ const ServicesSection: React.FC<Props> = ({ activeOrgId }) => {
                 </select>
               </div>
               <div>
-                <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Grupo</label>
+                <label className="text-xs font-bold text-surface-500 uppercase block mb-1">Grupo</label>
                 <input
                   type="text"
                   placeholder="Ex: Licenciamento, Certidão, etc."
                   value={form.group}
                   onChange={(e) => setForm((prev) => ({ ...prev, group: e.target.value }))}
-                  className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold"
+                  className="w-full bg-white border border-surface-200 rounded-lg p-3 text-surface-800 font-semibold"
                 />
               </div>
               <div>
-                <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Preço (€) *</label>
+                <label className="text-xs font-bold text-surface-500 uppercase block mb-1">Preço (€) *</label>
                 <input
                   required
                   type="number"
@@ -289,7 +289,7 @@ const ServicesSection: React.FC<Props> = ({ activeOrgId }) => {
                   placeholder="0.00"
                   value={form.price}
                   onChange={(e) => setForm((prev) => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
-                  className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold"
+                  className="w-full bg-white border border-surface-200 rounded-lg p-3 text-surface-800 font-semibold"
                 />
               </div>
               {feedback && (
@@ -301,7 +301,7 @@ const ServicesSection: React.FC<Props> = ({ activeOrgId }) => {
               <button
                 type="submit"
                 disabled={saving}
-                className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white font-bold uppercase rounded-xl transition-colors"
+                className="w-full py-3 bg-brand-600 hover:bg-brand-500 disabled:opacity-60 text-white font-bold uppercase rounded-xl transition-colors"
               >
                 {saving ? <><Loader2 className="h-4 w-4 animate-spin inline mr-2" /> Salvando...</> : editingId ? 'Atualizar' : 'Cadastrar'}
               </button>

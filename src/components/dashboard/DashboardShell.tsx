@@ -16,23 +16,23 @@ const DashboardShell: React.FC<DashboardShellProps> = ({
   children,
 }) => {
   return (
-    <div className="min-h-screen overflow-x-hidden bg-gray-50 p-3 sm:p-4 md:p-8 text-gray-800">
-      <div className="mx-auto flex min-w-0 max-w-[1600px] flex-col gap-4 sm:gap-6 lg:flex-row">
-        {sidebarOpen && (
-          <button
-            className="lg:hidden fixed inset-0 bg-black/30 z-40"
-            onClick={onCloseSidebar}
-            aria-label="Fechar menu"
-          />
-        )}
+    <div className="min-h-screen bg-surface-50 flex">
+      {sidebarOpen && (
+        <button
+          className="lg:hidden fixed inset-0 bg-surface-900/30 backdrop-blur-sm z-40 transition-opacity"
+          onClick={onCloseSidebar}
+          aria-label="Fechar menu"
+        />
+      )}
 
-        {sidebar}
+      {sidebar}
 
-        <div className="min-w-0 flex-1 lg:pl-0">
-          {topbar}
-          {children}
+      <main className="flex-1 min-w-0 flex flex-col">
+        <div className="sticky top-0 z-30">{topbar}</div>
+        <div className="flex-1 p-4 sm:p-6 lg:p-8">
+          <div className="mx-auto max-w-[1400px]">{children}</div>
         </div>
-      </div>
+      </main>
     </div>
   );
 };

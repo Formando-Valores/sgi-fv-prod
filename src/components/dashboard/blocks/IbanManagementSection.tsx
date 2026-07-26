@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { Plus, Trash2, Loader2, Check, X, Building2 } from 'lucide-react';
 import Skeleton, { TableSkeleton } from '../../ui/Skeleton';
 import EmptyState from '../../ui/EmptyState';
@@ -77,59 +77,59 @@ const IbanManagementSection: React.FC<Props> = ({ currentUser, activeOrgId }) =>
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      <div className="lg:col-span-1 bg-white border border-gray-100 rounded-2xl p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
+      <div className="lg:col-span-1 bg-white border border-surface-100 rounded-2xl p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
         <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
-          <Plus className="text-blue-500" /> Cadastrar IBAN
+          <Plus className="text-brand-500" /> Cadastrar IBAN
         </h3>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Nome Completo *</label>
+            <label className="text-xs font-bold text-surface-500 uppercase block mb-1">Nome Completo *</label>
             <input
               required
               type="text"
               placeholder="Nome do profissional"
               value={form.fullName}
               onChange={(e) => setForm((prev) => ({ ...prev, fullName: e.target.value }))}
-              className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold"
+              className="w-full bg-white border border-surface-200 rounded-lg p-3 text-surface-800 font-semibold"
             />
           </div>
           <div>
-            <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Documento (RG/CPF)</label>
+            <label className="text-xs font-bold text-surface-500 uppercase block mb-1">Documento (RG/CPF)</label>
             <input
               type="text"
               placeholder="Documento de identificação"
               value={form.document}
               onChange={(e) => setForm((prev) => ({ ...prev, document: e.target.value }))}
-              className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold"
+              className="w-full bg-white border border-surface-200 rounded-lg p-3 text-surface-800 font-semibold"
             />
           </div>
           <div>
-            <label className="text-xs font-bold text-gray-500 uppercase block mb-1">IBAN *</label>
+            <label className="text-xs font-bold text-surface-500 uppercase block mb-1">IBAN *</label>
             <input
               required
               type="text"
               placeholder="PT50 0000 0000 0000 0000 0000 0"
               value={form.iban}
               onChange={(e) => setForm((prev) => ({ ...prev, iban: e.target.value }))}
-              className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold"
+              className="w-full bg-white border border-surface-200 rounded-lg p-3 text-surface-800 font-semibold"
             />
           </div>
           <div>
-            <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Banco</label>
+            <label className="text-xs font-bold text-surface-500 uppercase block mb-1">Banco</label>
             <input
               type="text"
               placeholder="Nome do banco"
               value={form.bankName}
               onChange={(e) => setForm((prev) => ({ ...prev, bankName: e.target.value }))}
-              className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold"
+              className="w-full bg-white border border-surface-200 rounded-lg p-3 text-surface-800 font-semibold"
             />
           </div>
           <div>
-            <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Unidade de Serviço</label>
+            <label className="text-xs font-bold text-surface-500 uppercase block mb-1">Unidade de Serviço</label>
             <select
               value={form.serviceUnit}
               onChange={(e) => setForm((prev) => ({ ...prev, serviceUnit: e.target.value as ServiceUnit }))}
-              className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800 font-semibold"
+              className="w-full bg-white border border-surface-200 rounded-lg p-3 text-surface-800 font-semibold"
             >
               <option value="ADMINISTRATIVO">Administrativo</option>
               <option value="JURÍDICO / ADVOCACIA">Jurídico / Advocacia</option>
@@ -139,7 +139,7 @@ const IbanManagementSection: React.FC<Props> = ({ currentUser, activeOrgId }) =>
           <button
             type="submit"
             disabled={saving}
-            className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white font-bold uppercase rounded-xl transition-colors"
+            className="w-full py-3 bg-brand-600 hover:bg-brand-500 disabled:opacity-60 text-white font-bold uppercase rounded-xl transition-colors"
           >
             {saving ? <><Loader2 className="h-4 w-4 animate-spin inline mr-2" /> Salvando...</> : 'Salvar IBAN'}
           </button>
@@ -152,7 +152,7 @@ const IbanManagementSection: React.FC<Props> = ({ currentUser, activeOrgId }) =>
         </form>
       </div>
 
-      <div className="lg:col-span-2 bg-white border border-gray-100 rounded-2xl p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
+      <div className="lg:col-span-2 bg-white border border-surface-100 rounded-2xl p-6 shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
         <h3 className="text-lg font-bold mb-6">Contas Cadastradas</h3>
         {loading ? (
           <TableSkeleton rows={4} cols={6} />
@@ -163,7 +163,7 @@ const IbanManagementSection: React.FC<Props> = ({ currentUser, activeOrgId }) =>
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="bg-gray-50 text-gray-500 uppercase text-[10px] font-black tracking-widest">
+                  <tr className="bg-surface-50 text-surface-500 uppercase text-[10px] font-black tracking-widest">
                     <th className="px-3 sm:px-4 py-2 sm:py-3">Nome</th>
                     <th className="px-3 sm:px-4 py-2 sm:py-3">Documento</th>
                     <th className="px-3 sm:px-4 py-2 sm:py-3">IBAN</th>
@@ -172,14 +172,14 @@ const IbanManagementSection: React.FC<Props> = ({ currentUser, activeOrgId }) =>
                     <th className="px-3 sm:px-4 py-2 sm:py-3 text-right">Ações</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-surface-100">
                   {accounts.map((acc) => (
-                    <tr key={acc.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-3 sm:px-4 py-2 sm:py-3 font-bold text-gray-700">{acc.full_name}</td>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3 text-gray-500">{acc.document || '-'}</td>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3 font-mono text-gray-700 whitespace-nowrap">{acc.iban}</td>
+                    <tr key={acc.id} className="hover:bg-surface-50 transition-colors">
+                      <td className="px-3 sm:px-4 py-2 sm:py-3 font-bold text-surface-700">{acc.full_name}</td>
+                      <td className="px-3 sm:px-4 py-2 sm:py-3 text-surface-500">{acc.document || '-'}</td>
+                      <td className="px-3 sm:px-4 py-2 sm:py-3 font-mono text-surface-700 whitespace-nowrap">{acc.iban}</td>
                       <td className="px-3 sm:px-4 py-2 sm:py-3">
-                        <span className="text-[10px] font-black text-gray-500 whitespace-nowrap">
+                        <span className="text-[10px] font-black text-surface-500 whitespace-nowrap">
                           {acc.service_unit === 'ADMINISTRATIVO' ? 'ADM' : acc.service_unit === 'JURÍDICO / ADVOCACIA' ? 'JUR' : 'TEC'}
                         </span>
                       </td>
@@ -196,16 +196,16 @@ const IbanManagementSection: React.FC<Props> = ({ currentUser, activeOrgId }) =>
             </div>
             <div className="block md:hidden space-y-3">
               {accounts.map((acc) => (
-                <div key={acc.id} className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
+                <div key={acc.id} className="bg-white border border-surface-100 rounded-xl p-4 shadow-sm">
                   <div className="flex items-start justify-between mb-2">
-                    <p className="font-bold text-gray-800 text-sm">{acc.full_name}</p>
+                    <p className="font-bold text-surface-800 text-sm">{acc.full_name}</p>
                     <button onClick={() => handleDelete(acc.id)} className="p-1.5 bg-red-100 hover:bg-red-200 rounded-md text-red-600 shrink-0" title="Excluir"><Trash2 className="w-4 h-4" /></button>
                   </div>
-                  <div className="space-y-1 text-xs text-gray-600">
-                    <p><span className="font-semibold text-gray-400">Documento:</span> {acc.document || '-'}</p>
-                    <p><span className="font-semibold text-gray-400">IBAN:</span> <span className="font-mono">{acc.iban}</span></p>
-                    <p><span className="font-semibold text-gray-400">Unidade:</span> {acc.service_unit === 'ADMINISTRATIVO' ? 'ADMINISTRATIVO' : acc.service_unit === 'JURÍDICO / ADVOCACIA' ? 'JURÍDICO / ADVOCACIA' : 'TECNOLÓGICO / AI'}</p>
-                    <p><span className="font-semibold text-gray-400">Ativo:</span> <span className={`inline-block w-2 h-2 rounded-full ${acc.is_active ? 'bg-emerald-500' : 'bg-red-500'}`} /></p>
+                  <div className="space-y-1 text-xs text-surface-600">
+                    <p><span className="font-semibold text-surface-400">Documento:</span> {acc.document || '-'}</p>
+                    <p><span className="font-semibold text-surface-400">IBAN:</span> <span className="font-mono">{acc.iban}</span></p>
+                    <p><span className="font-semibold text-surface-400">Unidade:</span> {acc.service_unit === 'ADMINISTRATIVO' ? 'ADMINISTRATIVO' : acc.service_unit === 'JURÍDICO / ADVOCACIA' ? 'JURÍDICO / ADVOCACIA' : 'TECNOLÓGICO / AI'}</p>
+                    <p><span className="font-semibold text-surface-400">Ativo:</span> <span className={`inline-block w-2 h-2 rounded-full ${acc.is_active ? 'bg-emerald-500' : 'bg-red-500'}`} /></p>
                   </div>
                 </div>
               ))}

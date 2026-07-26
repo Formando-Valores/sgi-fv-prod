@@ -4,8 +4,8 @@
  */
 
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, ShieldCheck, ExternalLink } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ArrowLeft, CheckCircle2, ShieldCheck, Shield, Scale, Users } from 'lucide-react';
 import { CONSENT_TEXT_VERSION, COUNTRIES } from '../constants';
 import { ServiceUnit, ProcessStatus, User, UserRole, Organization } from '../types';
 import { isSupabaseConfigured, supabase } from '../supabase';
@@ -46,8 +46,8 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
-
-  const inputClass = 'w-full p-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500';
+  const inputClass = 'w-full px-4 py-2.5 bg-white border border-surface-200 rounded-xl text-sm font-medium text-surface-800 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all hover:border-surface-300';
+  const selectClass = 'w-full px-4 py-2.5 bg-white border border-surface-200 rounded-xl text-sm font-medium text-surface-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all hover:border-surface-300 appearance-none';
   const privacyPolicyUrl = import.meta.env.VITE_PRIVACY_POLICY_URL || 'https://example.com/politica-de-privacidade';
 
   const validatePassword = (pass: string) => {
@@ -57,7 +57,6 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
     const hasNumber = /[0-9]/.test(pass);
     return hasMinLength && hasUpper && hasSpecial && hasNumber;
   };
-
 
   React.useEffect(() => {
     const fetchOrganizations = async () => {
@@ -295,7 +294,6 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
           organizationName: selectedOrganization?.name,
         };
 
-        // Cria processo de filiação automaticamente
         const membershipFees = calcAssociationFees(0, 'membership');
         const { data: processData, error: processErr } = await supabase
           .from('processes')
@@ -317,7 +315,6 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
         if (processErr) {
           console.error('[register] erro ao criar processo', processErr);
         } else {
-          // Cria sessão Stripe
           try {
             const session = await createCheckoutSession({
               amount: ASSOCIATION_ANNUAL_FEE * 100,
@@ -336,7 +333,6 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
             console.warn('[register] erro ao criar checkout session', stripeErr);
           }
 
-          // Envia email com credenciais e link de pagamento
           const loginUrl = `${window.location.origin}/#/login`;
           supabase.functions.invoke(
             SUPABASE_EDGE_FUNCTIONS.SEND_ACCESS_CREDENTIALS,
@@ -367,239 +363,286 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
 
   if (success) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gradient-to-br from-gray-50 to-emerald-50/30">
-        <div className="w-full max-w-md bg-white p-8 sm:p-10 rounded-2xl shadow-[0_8px_30px_-4px_rgba(0,0,0,0.08)] border border-gray-100 text-center">
-          <div className="w-16 h-16 bg-emerald-500 rounded-full flex items-center justify-center mx-auto mb-5 shadow-lg shadow-emerald-200">
+      <div className="min-h-screen flex items-center justify-center p-6 bg-surface-50">
+        <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-card border border-surface-200/60 text-center animate-scale-in">
+          <div className="w-16 h-16 bg-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-lg shadow-emerald-200">
             <ShieldCheck className="w-8 h-8 text-white" />
           </div>
-          <h2 className="text-xl font-bold text-gray-800 mb-3">Cadastro Realizado!</h2>
-          <p className="text-gray-500 text-sm leading-relaxed">Sua conta foi criada com sucesso. Enviamos um e-mail com as instruções de acesso e o link para realizar o pagamento da taxa associativa.</p>
-          <div className="mt-6 p-4 bg-blue-50 border border-blue-100 rounded-xl">
-            <p className="text-xs text-blue-700 font-semibold">📧 Verifique sua caixa de entrada e também a pasta de spam.</p>
+          <h2 className="text-xl font-extrabold text-surface-800 mb-2">Cadastro Realizado!</h2>
+          <p className="text-surface-500 text-sm leading-relaxed">Sua conta foi criada com sucesso. Enviamos um e-mail com as instruções de acesso e o link para realizar o pagamento da taxa associativa.</p>
+          <div className="mt-5 p-3 bg-brand-50 border border-brand-100 rounded-xl">
+            <p className="text-xs text-brand-700 font-semibold">📧 Verifique sua caixa de entrada e também a pasta de spam.</p>
           </div>
-          <p className="text-gray-400 text-xs mt-6">Redirecionando para o login em 5 segundos...</p>
+          <p className="text-surface-400 text-xs mt-6">Redirecionando para o login em 5 segundos...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gradient-to-br from-gray-50 to-blue-50/30">
-      <div className="w-full max-w-4xl bg-white p-4 sm:p-8 rounded-2xl shadow-[0_8px_30px_-4px_rgba(0,0,0,0.08)] border border-gray-100">
-        <div className="mb-8 text-center">
-          <img src="/icons/icon.svg" alt="SGI FV" className="h-12 w-12 mx-auto mb-3" />
-          <h1 className="text-2xl font-bold tracking-wider text-gray-800">SGI FV</h1>
-          <p className="text-gray-500 font-semibold uppercase text-xs mt-1">Criar Nova Conta</p>
+    <div className="min-h-screen flex">
+      {/* Left: Branding */}
+      <div className="hidden lg:flex lg:w-[40%] bg-gradient-to-br from-brand-600 via-brand-700 to-brand-950 relative overflow-hidden">
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-20 left-20 w-96 h-96 bg-white/10 rounded-full blur-3xl" />
+          <div className="absolute bottom-20 right-20 w-80 h-80 bg-white/5 rounded-full blur-3xl" />
         </div>
+        <div className="relative z-10 flex flex-col justify-center px-12 xl:px-16">
+          <img src="/icons/icon.svg" alt="" className="h-14 w-14 mb-8 brightness-0 invert" />
+          <h1 className="text-3xl xl:text-4xl font-extrabold text-white leading-tight mb-4">
+            Junte-se<br />a nós
+          </h1>
+          <p className="text-brand-200 text-base font-medium max-w-sm leading-relaxed">
+            Crie sua conta e tenha acesso a uma plataforma completa de gestão jurídica.
+          </p>
 
-        <div className="p-2 sm:p-6">
-          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-8">
-            <h2 className="text-2xl sm:text-3xl font-bold">Solicitar Registro</h2>
-            <button 
-              onClick={() => goToRoute('/login')}
-              className="flex items-center gap-2 text-gray-500 hover:text-gray-800 transition-colors text-sm font-bold"
-            >
-              <ArrowLeft className="w-4 h-4" /> VOLTAR AO LOGIN
-            </button>
+          <div className="mt-10 space-y-4">
+            {[
+              { icon: Shield, text: 'Dados protegidos com criptografia' },
+              { icon: Scale, text: 'Processos automatizados' },
+              { icon: Users, text: 'Suporte dedicado' },
+            ].map((item) => (
+              <div key={item.text} className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
+                  <item.icon className="w-4.5 h-4.5 text-white" />
+                </div>
+                <span className="text-sm font-medium text-brand-100">{item.text}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Right: Form */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="min-h-screen flex flex-col p-6 sm:p-8 lg:p-12">
+          {/* Mobile header */}
+          <div className="lg:hidden mb-6 text-center">
+            <img src="/icons/icon.svg" alt="SGI FV" className="h-10 w-10 mx-auto mb-3" />
+            <h1 className="text-xl font-extrabold text-surface-800 tracking-tight">SGI FV</h1>
           </div>
 
-          <div className="space-y-8">
-            {/* Secção 1 */}
-            <section>
-              <h3 className="text-blue-600 font-bold uppercase text-xs tracking-[0.2em] mb-4 flex items-center gap-2">
-                <span className="w-6 h-px bg-blue-600"></span> 1. Dados de Identificação
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="md:col-span-2">
-                  <label className="text-xs font-bold text-gray-500 mb-2 block">Nome Completo</label>
-                  <input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className={inputClass} />
-                </div>
+          <div className="flex-1 flex items-center justify-center">
+            <div className="w-full max-w-2xl">
+              <div className="flex items-center justify-between mb-6">
                 <div>
-                  <label className="text-xs font-bold text-gray-500 mb-2 block">E-mail para Login</label>
-                  <input type="email" required value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className={inputClass} placeholder="exemplo@email.com" />
+                  <h2 className="text-xl font-extrabold text-surface-800">Criar Nova Conta</h2>
+                  <p className="text-sm text-surface-500 mt-1">Preencha os dados abaixo para se cadastrar</p>
                 </div>
-                <div>
-                  <label className="text-xs font-bold text-gray-500 mb-2 block">Documento Identidade</label>
-                  <input required value={formData.documentId} onChange={e => setFormData({...formData, documentId: e.target.value})} className={inputClass} />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-gray-500 mb-2 block">Identificação Fiscal (NIF/CPF)</label>
-                  <input required value={formData.taxId} onChange={e => setFormData({...formData, taxId: e.target.value})} className={inputClass} />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-gray-500 mb-2 block">Senha</label>
-                  <input type="password" required value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className={inputClass} />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-gray-500 mb-2 block">Confirmar Senha</label>
-                  <input type="password" required value={formData.confirmPassword} onChange={e => setFormData({...formData, confirmPassword: e.target.value})} className={inputClass} />
-                </div>
-              </div>
-            </section>
-
-            {/* Secção 2 */}
-            <section>
-              <h3 className="text-blue-600 font-bold uppercase text-xs tracking-[0.2em] mb-4 flex items-center gap-2">
-                <span className="w-6 h-px bg-blue-600"></span> 2. Contato & Morada
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="md:col-span-2">
-                  <label className="text-xs font-bold text-gray-500 mb-2 block">Endereço Completo</label>
-                  <input required value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className={inputClass} />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-gray-500 mb-2 block">Estado Civil</label>
-                  <select value={formData.maritalStatus} onChange={e => setFormData({...formData, maritalStatus: e.target.value})} className={inputClass}>
-                    <option value="Solteiro">Solteiro</option>
-                    <option value="Casado">Casado</option>
-                    <option value="Divorciado">Divorciado</option>
-                    <option value="Viúvo">Viúvo</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-gray-500 mb-2 block">Selecione o País (DDD)</label>
-                  <select value={formData.country} onChange={e => setFormData({...formData, country: e.target.value})} className={inputClass}>
-                    {COUNTRIES.map(c => (
-                      <option key={c.name} value={c.name}>{c.flag} {c.name} ({c.code})</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-gray-500 mb-2 block">Celular / WhatsApp (apenas números)</label>
-                  <input required type="tel" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value.replace(/\D/g, '')})} className={inputClass} placeholder="Ex: 11999999999" />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-gray-500 mb-2 block">Nº DO PROCESSO JUDICIAL (Opcional)</label>
-                  <input value={formData.processNumber} onChange={e => setFormData({...formData, processNumber: e.target.value})} className={inputClass} />
-                </div>
-              </div>
-            </section>
-
-            {/* Secção 3 */}
-            <section>
-              <h3 className="text-blue-600 font-bold uppercase text-xs tracking-[0.2em] mb-4 flex items-center gap-2">
-                <span className="w-6 h-px bg-blue-600"></span> 3. Unidade de Atendimento
-              </h3>
-
-              <div className="mb-4">
-                <label className="text-xs font-bold text-gray-500 mb-2 block">Organização</label>
-                <select
-                  required
-                  value={formData.organizationId}
-                  onChange={e => setFormData({ ...formData, organizationId: e.target.value })}
-                  className={inputClass}
+                <Link
+                  to="/login"
+                  className="hidden sm:flex items-center gap-1.5 text-xs font-semibold text-surface-500 hover:text-surface-700 transition-colors"
                 >
-                  <option value="">Selecione a organização</option>
-                  {organizations.map((organization) => (
-                    <option key={organization.id} value={organization.id}>{organization.name}</option>
-                  ))}
-                </select>
+                  <ArrowLeft className="w-3.5 h-3.5" /> Voltar ao login
+                </Link>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {Object.values(ServiceUnit).map(unit => (
-                  <label key={unit} className={`cursor-pointer p-4 rounded-xl border-2 transition-all ${formData.unit === unit ? 'bg-blue-50 border-blue-500 shadow-[0_10px_20px_rgba(59,130,246,0.25)]' : 'bg-white border-gray-200'}`}>
-                    <input type="radio" name="unit" className="hidden" value={unit} checked={formData.unit === unit} onChange={() => setFormData({...formData, unit})} />
-                    <div className="text-center">
-                      <p className={`text-sm font-bold ${formData.unit === unit ? 'text-blue-700' : 'text-gray-600'}`}>{unit}</p>
+              <div className="bg-white border border-surface-200/60 rounded-2xl shadow-card p-5 sm:p-7">
+                <div className="space-y-6">
+                  {/* Section 1 */}
+                  <section>
+                    <h3 className="text-brand-600 font-bold uppercase text-[11px] tracking-[0.15em] mb-3 flex items-center gap-2">
+                      <span className="w-5 h-px bg-brand-500" /> 1. Dados de Identificação
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                      <div className="md:col-span-2">
+                        <label className="text-xs font-semibold text-surface-600 mb-1.5 block">Nome Completo</label>
+                        <input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className={inputClass} />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-surface-600 mb-1.5 block">E-mail para Login</label>
+                        <input type="email" required value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className={inputClass} placeholder="exemplo@email.com" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-surface-600 mb-1.5 block">Documento Identidade</label>
+                        <input required value={formData.documentId} onChange={e => setFormData({...formData, documentId: e.target.value})} className={inputClass} />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-surface-600 mb-1.5 block">Identificação Fiscal (NIF/CPF)</label>
+                        <input required value={formData.taxId} onChange={e => setFormData({...formData, taxId: e.target.value})} className={inputClass} />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-surface-600 mb-1.5 block">Senha</label>
+                        <input type="password" required value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className={inputClass} />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-surface-600 mb-1.5 block">Confirmar Senha</label>
+                        <input type="password" required value={formData.confirmPassword} onChange={e => setFormData({...formData, confirmPassword: e.target.value})} className={inputClass} />
+                      </div>
                     </div>
-                  </label>
-                ))}
-              </div>
-            </section>
+                  </section>
 
-            {/* Secção 4 */}
-            <section>
-              <h3 className="text-blue-600 font-bold uppercase text-xs tracking-[0.2em] mb-4 flex items-center gap-2">
-                <span className="w-6 h-px bg-blue-600"></span> 4. Consentimentos
-              </h3>
+                  {/* Section 2 */}
+                  <section>
+                    <h3 className="text-brand-600 font-bold uppercase text-[11px] tracking-[0.15em] mb-3 flex items-center gap-2">
+                      <span className="w-5 h-px bg-brand-500" /> 2. Contato & Morada
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                      <div className="md:col-span-2">
+                        <label className="text-xs font-semibold text-surface-600 mb-1.5 block">Endereço Completo</label>
+                        <input required value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className={inputClass} />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-surface-600 mb-1.5 block">Estado Civil</label>
+                        <select value={formData.maritalStatus} onChange={e => setFormData({...formData, maritalStatus: e.target.value})} className={selectClass}>
+                          <option value="Solteiro">Solteiro</option>
+                          <option value="Casado">Casado</option>
+                          <option value="Divorciado">Divorciado</option>
+                          <option value="Viúvo">Viúvo</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-surface-600 mb-1.5 block">País (DDD)</label>
+                        <select value={formData.country} onChange={e => setFormData({...formData, country: e.target.value})} className={selectClass}>
+                          {COUNTRIES.map(c => (
+                            <option key={c.name} value={c.name}>{c.flag} {c.name} ({c.code})</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-surface-600 mb-1.5 block">Celular / WhatsApp</label>
+                        <input required type="tel" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value.replace(/\D/g, '')})} className={inputClass} placeholder="Ex: 11999999999" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-surface-600 mb-1.5 block">Nº Processo Judicial (Opcional)</label>
+                        <input value={formData.processNumber} onChange={e => setFormData({...formData, processNumber: e.target.value})} className={inputClass} />
+                      </div>
+                    </div>
+                  </section>
 
-              <div className="border border-gray-200 rounded-xl p-4 sm:p-5 bg-gray-50 space-y-4">
-                <p className="text-xs font-bold text-gray-500">
-                  Declaro que li e aceito a Política de Privacidade, autorizando o tratamento dos meus dados pessoais para fins de cadastro e atendimento.
-                </p>
-                <a
-                  href={privacyPolicyUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs font-bold text-blue-600 underline"
-                >
-                  Ler Política de Privacidade
-                </a>
+                  {/* Section 3 */}
+                  <section>
+                    <h3 className="text-brand-600 font-bold uppercase text-[11px] tracking-[0.15em] mb-3 flex items-center gap-2">
+                      <span className="w-5 h-px bg-brand-500" /> 3. Unidade de Atendimento
+                    </h3>
 
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3">
-                    <input
-                      id="consentPrivacyPolicy"
-                      type="checkbox"
-                      checked={formData.consentPrivacyPolicy}
-                      onChange={(e) => setFormData({ ...formData, consentPrivacyPolicy: e.target.checked })}
-                      className="mt-0.5 h-4 w-4 border border-gray-300 rounded"
-                    />
-                    <label htmlFor="consentPrivacyPolicy" className="text-xs font-bold text-gray-500">
-                      Autorizo o tratamento dos meus dados pessoais conforme a Política de Privacidade. (Obrigatório)
-                    </label>
-                  </div>
+                    <div className="mb-3">
+                      <label className="text-xs font-semibold text-surface-600 mb-1.5 block">Organização</label>
+                      <select
+                        required
+                        value={formData.organizationId}
+                        onChange={e => setFormData({ ...formData, organizationId: e.target.value })}
+                        className={selectClass}
+                      >
+                        <option value="">Selecione a organização</option>
+                        {organizations.map((organization) => (
+                          <option key={organization.id} value={organization.id}>{organization.name}</option>
+                        ))}
+                      </select>
+                    </div>
 
-                  <div className="flex items-start gap-3">
-                    <input
-                      id="consentServiceContact"
-                      type="checkbox"
-                      checked={formData.consentServiceContact}
-                      onChange={(e) => setFormData({ ...formData, consentServiceContact: e.target.checked })}
-                      className="mt-0.5 h-4 w-4 border border-gray-300 rounded"
-                    />
-                    <label htmlFor="consentServiceContact" className="text-xs font-bold text-gray-500">
-                      Autorizo contato por e-mail, telefone ou WhatsApp para tratativas de atendimento e andamento do serviço. (Opcional)
-                    </label>
-                  </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {Object.values(ServiceUnit).map(unit => (
+                        <label key={unit} className={`cursor-pointer p-3.5 rounded-xl border-2 transition-all text-center ${formData.unit === unit ? 'bg-brand-50 border-brand-500 shadow-sm' : 'bg-white border-surface-200 hover:border-surface-300'}`}>
+                          <input type="radio" name="unit" className="hidden" value={unit} checked={formData.unit === unit} onChange={() => setFormData({...formData, unit})} />
+                          <p className={`text-sm font-semibold ${formData.unit === unit ? 'text-brand-700' : 'text-surface-600'}`}>{unit}</p>
+                        </label>
+                      ))}
+                    </div>
+                  </section>
 
-                  <div className="flex items-start gap-3">
-                    <input
-                      id="consentInformativeCommunications"
-                      type="checkbox"
-                      checked={formData.consentInformativeCommunications}
-                      onChange={(e) => setFormData({ ...formData, consentInformativeCommunications: e.target.checked })}
-                      className="mt-0.5 h-4 w-4 border border-gray-300 rounded"
-                    />
-                    <label htmlFor="consentInformativeCommunications" className="text-xs font-bold text-gray-500">
-                      Aceito receber comunicações informativas sobre conteúdos, novidades e orientações relacionadas aos serviços. (Opcional)
-                    </label>
-                  </div>
+                  {/* Section 4 */}
+                  <section>
+                    <h3 className="text-brand-600 font-bold uppercase text-[11px] tracking-[0.15em] mb-3 flex items-center gap-2">
+                      <span className="w-5 h-px bg-brand-500" /> 4. Consentimentos
+                    </h3>
+
+                    <div className="border border-surface-200 rounded-xl p-4 bg-surface-50 space-y-3">
+                      <p className="text-xs font-medium text-surface-600">
+                        Declaro que li e aceito a Política de Privacidade, autorizando o tratamento dos meus dados pessoais para fins de cadastro e atendimento.
+                      </p>
+                      <a
+                        href={privacyPolicyUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs font-semibold text-brand-600 underline hover:text-brand-700"
+                      >
+                        Ler Política de Privacidade
+                      </a>
+
+                      <div className="space-y-2.5">
+                        <div className="flex items-start gap-3">
+                          <input
+                            id="consentPrivacyPolicy"
+                            type="checkbox"
+                            checked={formData.consentPrivacyPolicy}
+                            onChange={(e) => setFormData({ ...formData, consentPrivacyPolicy: e.target.checked })}
+                            className="mt-0.5 h-4 w-4 border-surface-300 rounded text-brand-600 focus:ring-brand-500/20"
+                          />
+                          <label htmlFor="consentPrivacyPolicy" className="text-xs font-medium text-surface-600">
+                            Autorizo o tratamento dos meus dados pessoais conforme a Política de Privacidade. (Obrigatório)
+                          </label>
+                        </div>
+
+                        <div className="flex items-start gap-3">
+                          <input
+                            id="consentServiceContact"
+                            type="checkbox"
+                            checked={formData.consentServiceContact}
+                            onChange={(e) => setFormData({ ...formData, consentServiceContact: e.target.checked })}
+                            className="mt-0.5 h-4 w-4 border-surface-300 rounded text-brand-600 focus:ring-brand-500/20"
+                          />
+                          <label htmlFor="consentServiceContact" className="text-xs font-medium text-surface-600">
+                            Autorizo contato por e-mail, telefone ou WhatsApp para tratativas de atendimento. (Opcional)
+                          </label>
+                        </div>
+
+                        <div className="flex items-start gap-3">
+                          <input
+                            id="consentInformativeCommunications"
+                            type="checkbox"
+                            checked={formData.consentInformativeCommunications}
+                            onChange={(e) => setFormData({ ...formData, consentInformativeCommunications: e.target.checked })}
+                            className="mt-0.5 h-4 w-4 border-surface-300 rounded text-brand-600 focus:ring-brand-500/20"
+                          />
+                          <label htmlFor="consentInformativeCommunications" className="text-xs font-medium text-surface-600">
+                            Aceito receber comunicações informativas sobre conteúdos e novidades. (Opcional)
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+
+                  {error && (
+                    <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-red-600 text-xs font-medium text-center">
+                      {error}
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    disabled={isLoading}
+                    className="w-full py-3 bg-brand-600 hover:bg-brand-700 disabled:bg-brand-800 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-all active:scale-[0.98] shadow-sm hover:shadow-md flex items-center justify-center gap-2 text-sm"
+                    onClick={handleRegister}
+                  >
+                    {isLoading ? (
+                      <>
+                        <div className="animate-spin h-4 w-4 border-2 border-white/30 border-t-white rounded-full" />
+                        Finalizando cadastro...
+                      </>
+                    ) : (
+                      'Cadastrar'
+                    )}
+                  </button>
                 </div>
               </div>
-            </section>
 
-            {error && (
-              <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm font-bold text-center">
-                {error}
+              <div className="mt-6 text-center sm:hidden">
+                <p className="text-sm text-surface-500">
+                  Já tem conta?{' '}
+                  <Link to="/login" className="font-semibold text-brand-600 hover:text-brand-700">
+                    Entrar
+                  </Link>
+                </p>
               </div>
-            )}
 
-            <div className="pt-6">
-              <button 
-                type="button"
-                disabled={isLoading}
-                className="w-full py-5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 disabled:cursor-not-allowed text-white font-bold rounded-xl uppercase tracking-widest transition-all shadow-xl flex items-center justify-center gap-3 active:scale-[0.98]"
-                onClick={handleRegister}
-              >
-                {isLoading ? (
-                  <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                    <span>Finalizando cadastro...</span>
-                  </>
-                ) : (
-                  <span>Cadastrar</span>
-                )}
-              </button>
+              <p className="mt-8 text-center text-[10px] text-surface-400 font-medium">
+                © 2026 SGI FV — Sistema de Gestão Integrada
+              </p>
             </div>
           </div>
         </div>
       </div>
-      
-      <p className="mt-8 text-gray-500 text-[10px] uppercase tracking-tighter">
-        © 2026 SGI FV - Sistema de Gestão Integrada
-      </p>
     </div>
   );
 };

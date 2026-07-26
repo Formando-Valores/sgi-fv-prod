@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu } from 'lucide-react';
+import { Menu, Bell } from 'lucide-react';
 
 interface DashboardTopbarProps {
   title: React.ReactNode;
@@ -10,20 +10,34 @@ interface DashboardTopbarProps {
 
 const DashboardTopbar: React.FC<DashboardTopbarProps> = ({ title, subtitle, actions, onOpenSidebar }) => {
   return (
-    <header className="flex flex-row items-center gap-3 mb-8 no-print">
-      <button
-        onClick={onOpenSidebar}
-        className="lg:hidden p-2.5 rounded-xl bg-white border border-gray-200 text-gray-700 shadow-sm hover:bg-gray-50 active:scale-95 transition-all"
-        aria-label="Abrir menu"
-      >
-        <Menu className="w-5 h-5" />
-      </button>
-      <div className="flex-1 min-w-0 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-        <div>
-          <h1 className="text-lg sm:text-2xl font-black text-gray-800 tracking-tighter flex items-center gap-2">{title}</h1>
-          <p className="text-gray-500 text-[10px] sm:text-xs font-bold uppercase mt-0.5">{subtitle}</p>
+    <header className="glass border-b border-surface-200/60 px-4 sm:px-6 lg:px-8 no-print">
+      <div className="flex items-center gap-3 h-16">
+        <button
+          onClick={onOpenSidebar}
+          className="lg:hidden p-2 rounded-xl text-surface-500 hover:bg-surface-100 hover:text-surface-700 active:scale-95 transition-all"
+          aria-label="Abrir menu"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+
+        <div className="flex-1 min-w-0 flex items-center justify-between">
+          <div className="min-w-0">
+            <h1 className="text-base sm:text-lg font-bold text-surface-800 truncate flex items-center gap-2">
+              {title}
+            </h1>
+            <p className="text-[11px] font-medium text-surface-400 uppercase tracking-wider truncate">
+              {subtitle}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button className="p-2 rounded-xl text-surface-400 hover:bg-surface-100 hover:text-surface-600 transition-colors relative">
+              <Bell className="w-5 h-5" />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white" />
+            </button>
+            {actions && <div className="flex-shrink-0">{actions}</div>}
+          </div>
         </div>
-        {actions && <div className="flex-shrink-0">{actions}</div>}
       </div>
     </header>
   );

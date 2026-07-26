@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { isSupabaseConfigured, supabase } from '../supabase';
 
@@ -164,7 +164,7 @@ const PasswordRecovery: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-white text-gray-800 font-arial flex items-center justify-center p-6">
+    <div className="min-h-screen bg-white text-surface-800 font-arial flex items-center justify-center p-6">
       <div className="w-full max-w-[460px] rounded-3xl border border-slate-200 bg-white p-8 shadow-lg">
         <div className="text-center mb-6">
           <h1 className="m-0 text-5xl font-extrabold tracking-wide text-[#142c4c]">SGI FV</h1>
@@ -211,12 +211,12 @@ const PasswordRecovery: React.FC = () => {
           <button
             type="submit"
             disabled={!canSubmit}
-            className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-extrabold uppercase tracking-widest text-white disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-xl bg-brand-600 px-4 py-3 text-sm font-extrabold uppercase tracking-widest text-white disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isSubmitting ? 'Atualizando...' : 'Atualizar senha'}
           </button>
 
-          <Link to="/login" className="text-center font-bold text-blue-600 no-underline">
+          <Link to="/login" className="text-center font-bold text-brand-600 no-underline">
             Voltar para o login
           </Link>
         </form>

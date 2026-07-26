@@ -1,4 +1,4 @@
-
+﻿
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -13,84 +13,115 @@
     <link rel="apple-touch-icon" href="/icons/icon.svg">
     <title>SGI FV - FORMANDO VALORES</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eef5ff',
+                            100: '#d9e8ff',
+                            200: '#bcd7ff',
+                            300: '#8ebfff',
+                            400: '#599dff',
+                            500: '#3378fc',
+                            600: '#1d5af1',
+                            700: '#1545de',
+                            800: '#1838b4',
+                            900: '#19338e',
+                            950: '#142056',
+                        },
+                        surface: {
+                            0: '#ffffff',
+                            50: '#f8fafc',
+                            100: '#f1f5f9',
+                            200: '#e2e8f0',
+                            300: '#cbd5e1',
+                            400: '#94a3b8',
+                            500: '#64748b',
+                            600: '#475569',
+                            700: '#334155',
+                            800: '#1e293b',
+                            900: '#0f172a',
+                        },
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+                    },
+                    borderRadius: {
+                        '4xl': '2rem',
+                    },
+                    boxShadow: {
+                        'glass': '0 8px 32px rgba(0, 0, 0, 0.04)',
+                        'elevated': '0 20px 60px -15px rgba(0, 0, 0, 0.08)',
+                        'card': '0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.06)',
+                        'card-hover': '0 4px 12px rgba(0,0,0,0.06), 0 16px 40px rgba(0,0,0,0.10)',
+                        'sidebar': '4px 0 24px rgba(0,0,0,0.03)',
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 200ms ease-out both',
+                        'scale-in': 'scaleIn 200ms ease-out both',
+                        'slide-up': 'slideUp 250ms ease-out both',
+                        'slide-in-right': 'slideInRight 250ms ease-out both',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            from: { opacity: '0' },
+                            to: { opacity: '1' },
+                        },
+                        scaleIn: {
+                            from: { opacity: '0', transform: 'scale(0.95)' },
+                            to: { opacity: '1', transform: 'scale(1)' },
+                        },
+                        slideUp: {
+                            from: { opacity: '0', transform: 'translateY(16px)' },
+                            to: { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        slideInRight: {
+                            from: { opacity: '0', transform: 'translateX(-16px)' },
+                            to: { opacity: '1', transform: 'translateX(0)' },
+                        },
+                    },
+                },
+            },
+        }
+    </script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        *, *::before, *::after { box-sizing: border-box; }
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f9fafb;
-            color: #1f2937;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: #f8fafc;
+            color: #1e293b;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
-        .font-arial {
-            font-family: 'Inter', sans-serif;
-        }
-        /* Custom scrollbar */
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #1e293b;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #475569;
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #64748b;
-        }
-        /* Form elements */
+        .font-arial { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         input:focus, select:focus, textarea:focus {
             outline: none;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
-            border-color: #93c5fd;
+            box-shadow: 0 0 0 3px rgba(51, 120, 252, 0.12);
+            border-color: #3378fc;
         }
-        .input-error {
-            border-color: #f87171 !important;
-        }
+        .input-error { border-color: #ef4444 !important; }
         .input-error:focus {
-            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
-            border-color: #f87171 !important;
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12) !important;
+            border-color: #ef4444 !important;
         }
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-        @keyframes scaleIn {
-            from { opacity: 0; transform: scale(0.95); }
-            to { opacity: 1; transform: scale(1); }
-        }
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fadeIn { animation: fadeIn 200ms ease-out both; }
-        .animate-scaleIn { animation: scaleIn 200ms ease-out both; }
-        .animate-slideUp { animation: slideUp 250ms ease-out both; }
+        .glass { background: rgba(255,255,255,0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
         @media print {
-            .no-print {
-                display: none !important;
+            .no-print { display: none !important; }
+            body { background: white !important; color: black !important; }
+            #root { padding: 0 !important; }
+            .bg-slate-900, .bg-slate-950, .bg-surface-900 {
+                background: transparent !important; border: 1px solid #eee !important; color: black !important;
             }
-            body {
-                background: white !important;
-                color: black !important;
-            }
-            #root {
-                padding: 0 !important;
-            }
-            .bg-slate-900, .bg-slate-950, .bg-gray-900 {
-                background: transparent !important;
-                border: 1px solid #eee !important;
-                color: black !important;
-            }
-            .text-white, .text-slate-200, .text-slate-300 {
-                color: black !important;
-            }
-            .text-blue-400, .text-blue-500, .text-emerald-500 {
-                color: #000 !important;
-                font-weight: bold !important;
-            }
-            header, section, div {
-              box-shadow: none !important;
-            }
+            .text-white, .text-slate-200, .text-slate-300 { color: black !important; }
+            .text-brand-400, .text-brand-500, .text-emerald-500 { color: #000 !important; font-weight: bold !important; }
+            header, section, div { box-shadow: none !important; }
         }
     </style>
 <script type="importmap">

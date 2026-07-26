@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Search, Users, Pencil, Trash2, X, Plus, Check } from 'lucide-react';
 import { User, ServiceUnit, Organization } from '../../../../types';
 import { supabase } from '../../../../supabase';
@@ -478,18 +478,18 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
 
         <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-3">
           <div className="relative md:col-span-1">
-            <Search className="absolute left-3 top-3 text-gray-500 w-4 h-4" />
+            <Search className="absolute left-3 top-3 text-surface-500 w-4 h-4" />
             <input
               value={clientsSearch}
               onChange={(event) => setClientsSearch(event.target.value)}
               placeholder="Buscar por nome..."
-              className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold"
+              className="w-full pl-9 pr-3 py-2 bg-white border border-surface-200 rounded-lg text-surface-800 font-semibold"
             />
           </div>
           <select
             value={clientsSort}
             onChange={(event) => setClientsSort(event.target.value as 'name_asc' | 'name_desc' | 'recent')}
-            className="w-full py-2 px-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold"
+            className="w-full py-2 px-3 bg-white border border-surface-200 rounded-lg text-surface-800 font-semibold"
           >
             <option value="name_asc">Ordenar: Nome (A-Z)</option>
             <option value="name_desc">Ordenar: Nome (Z-A)</option>
@@ -498,7 +498,7 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
           <select
             value={clientsRowsLimit}
             onChange={(event) => setClientsRowsLimit(Number(event.target.value))}
-            className="w-full py-2 px-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold"
+            className="w-full py-2 px-3 bg-white border border-surface-200 rounded-lg text-surface-800 font-semibold"
           >
             <option value={10}>Mostrar 10</option>
             <option value={25}>Mostrar 25</option>
@@ -508,7 +508,7 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
 
         <div className="mb-4 flex items-center justify-between gap-3 flex-wrap">
           {clientsError && <p className="text-sm text-amber-600 font-bold">{clientsError}</p>}
-          <div className="flex items-center gap-3 text-xs text-gray-500 font-bold ml-auto">
+          <div className="flex items-center gap-3 text-xs text-surface-500 font-bold ml-auto">
             <span>Total: {clientsData.length}</span>
             <span>Exibindo: {visibleClients.length}</span>
           </div>
@@ -517,26 +517,26 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
               resetNewClientForm();
               setShowCreateClientModal(true);
             }}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black uppercase rounded-lg transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-black uppercase rounded-lg transition-colors"
           >
             + Novo Cliente
           </button>
         </div>
 
         {clientsLoading ? (
-          <div className="rounded-xl border border-gray-100 bg-gray-50 p-6"><TableSkeleton rows={4} cols={6} /></div>
+          <div className="rounded-xl border border-surface-100 bg-surface-50 p-6"><TableSkeleton rows={4} cols={6} /></div>
         ) : visibleClients.length === 0 ? (
-          <div className="rounded-xl border border-gray-100 bg-gray-50 p-6 text-center">
-            <Users className="w-8 h-8 text-gray-300 mx-auto mb-3" />
-            <p className="text-sm font-bold text-gray-500">Nenhum membro encontrado</p>
-            <p className="text-xs text-gray-400 mt-1">Nenhum cliente ou usuário corresponde aos critérios atuais.</p>
+          <div className="rounded-xl border border-surface-100 bg-surface-50 p-6 text-center">
+            <Users className="w-8 h-8 text-surface-300 mx-auto mb-3" />
+            <p className="text-sm font-bold text-surface-500">Nenhum membro encontrado</p>
+            <p className="text-xs text-surface-400 mt-1">Nenhum cliente ou usuário corresponde aos critérios atuais.</p>
           </div>
         ) : (
           <>
-            <div className="hidden md:block overflow-x-auto rounded-xl border border-gray-100 bg-gray-50">
+            <div className="hidden md:block overflow-x-auto rounded-xl border border-surface-100 bg-surface-50">
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="bg-gray-50 text-gray-500 uppercase text-[10px] font-black tracking-widest">
+                  <tr className="bg-surface-50 text-surface-500 uppercase text-[10px] font-black tracking-widest">
                     <th className="px-3 sm:px-6 py-2 sm:py-4">Usuário</th>
                     <th className="px-3 sm:px-6 py-2 sm:py-4">Nível</th>
                     <th className="px-3 sm:px-6 py-2 sm:py-4">Organização</th>
@@ -547,19 +547,19 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
                 </thead>
                 <tbody className="divide-y divide-slate-800">
                   {visibleClients.map((client) => (
-                    <tr key={client.id} className="hover:bg-gray-50">
-                      <td className="px-3 sm:px-6 py-2 sm:py-4 font-bold text-gray-800">{client.nome}</td>
+                    <tr key={client.id} className="hover:bg-surface-50">
+                      <td className="px-3 sm:px-6 py-2 sm:py-4 font-bold text-surface-800">{client.nome}</td>
                       <td className="px-3 sm:px-6 py-2 sm:py-4">
-                        <span className="text-[10px] font-black text-blue-400 uppercase border border-blue-900/50 bg-blue-900/10 px-2 py-0.5 rounded">{client.accessLevel}</span>
+                        <span className="text-[10px] font-black text-brand-400 uppercase border border-brand-900/50 bg-brand-900/10 px-2 py-0.5 rounded">{client.accessLevel}</span>
                       </td>
-                      <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-600 font-bold whitespace-nowrap">{client.org_name}</td>
-                      <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-500 font-bold">{client.email}</td>
-                      <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-400 text-[10px] font-bold uppercase whitespace-nowrap">
+                      <td className="px-3 sm:px-6 py-2 sm:py-4 text-surface-600 font-bold whitespace-nowrap">{client.org_name}</td>
+                      <td className="px-3 sm:px-6 py-2 sm:py-4 text-surface-500 font-bold">{client.email}</td>
+                      <td className="px-3 sm:px-6 py-2 sm:py-4 text-surface-400 text-[10px] font-bold uppercase whitespace-nowrap">
                         {client.source === 'local_manual' ? 'Manual' : client.source === 'org_members+profiles' ? 'Sistema' : 'Sistema'}
                       </td>
                       <td className="px-3 sm:px-6 py-2 sm:py-4 text-right whitespace-nowrap">
                         <div className="flex justify-end gap-2">
-                          <button onClick={() => void handleStartEditClient(client)} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-md text-gray-500 hover:text-white transition-colors" title="Editar cliente"><Pencil className="w-4 h-4" /></button>
+                          <button onClick={() => void handleStartEditClient(client)} className="p-2 bg-surface-100 hover:bg-surface-200 rounded-md text-surface-500 hover:text-white transition-colors" title="Editar cliente"><Pencil className="w-4 h-4" /></button>
                           <button onClick={() => void handleDeleteClient(client)} className="p-2 bg-red-900/20 hover:bg-red-900/40 rounded-md text-red-500 transition-colors" title="Remover cliente"><Trash2 className="w-4 h-4" /></button>
                         </div>
                       </td>
@@ -570,21 +570,21 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
             </div>
             <div className="block md:hidden space-y-3">
               {visibleClients.map((client) => (
-                <div key={client.id} className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
+                <div key={client.id} className="bg-white border border-surface-100 rounded-xl p-4 shadow-sm">
                   <div className="flex items-start justify-between mb-2">
                     <div>
-                      <p className="font-bold text-gray-800 text-sm">{client.nome}</p>
-                      <span className="text-[10px] font-black text-blue-400 uppercase border border-blue-900/50 bg-blue-900/10 px-2 py-0.5 rounded inline-block mt-1">{client.accessLevel}</span>
+                      <p className="font-bold text-surface-800 text-sm">{client.nome}</p>
+                      <span className="text-[10px] font-black text-brand-400 uppercase border border-brand-900/50 bg-brand-900/10 px-2 py-0.5 rounded inline-block mt-1">{client.accessLevel}</span>
                     </div>
                     <div className="flex gap-2 shrink-0">
-                      <button onClick={() => void handleStartEditClient(client)} className="p-1.5 bg-gray-100 hover:bg-gray-200 rounded-md text-gray-600"><Pencil className="w-4 h-4" /></button>
+                      <button onClick={() => void handleStartEditClient(client)} className="p-1.5 bg-surface-100 hover:bg-surface-200 rounded-md text-surface-600"><Pencil className="w-4 h-4" /></button>
                       <button onClick={() => void handleDeleteClient(client)} className="p-1.5 bg-red-100 hover:bg-red-200 rounded-md text-red-600"><Trash2 className="w-4 h-4" /></button>
                     </div>
                   </div>
-                  <div className="space-y-1 text-xs text-gray-600">
-                    <p><span className="font-semibold text-gray-400">Email:</span> {client.email}</p>
-                    <p><span className="font-semibold text-gray-400">Organização:</span> {client.org_name}</p>
-                    <p><span className="font-semibold text-gray-400">Origem:</span> {client.source === 'local_manual' ? 'Manual' : client.source === 'org_members+profiles' ? 'Sistema' : 'Sistema'}</p>
+                  <div className="space-y-1 text-xs text-surface-600">
+                    <p><span className="font-semibold text-surface-400">Email:</span> {client.email}</p>
+                    <p><span className="font-semibold text-surface-400">Organização:</span> {client.org_name}</p>
+                    <p><span className="font-semibold text-surface-400">Origem:</span> {client.source === 'local_manual' ? 'Manual' : client.source === 'org_members+profiles' ? 'Sistema' : 'Sistema'}</p>
                   </div>
                 </div>
               ))}
@@ -595,8 +595,8 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
 
       {showCreateClientModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white w-full max-w-4xl rounded-3xl border border-gray-100 shadow-2xl overflow-hidden animate-scaleIn">
-            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+          <div className="bg-white w-full max-w-4xl rounded-3xl border border-surface-100 shadow-2xl overflow-hidden animate-scaleIn">
+            <div className="p-6 border-b border-surface-100 flex justify-between items-center bg-surface-50">
               <h3 className="text-xl font-black uppercase">Cadastrar novo cliente</h3>
               <button
                 onClick={() => {
@@ -604,7 +604,7 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
                   setClientFormError('');
                   setClientFormSuccess('');
                 }}
-                className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-500 hover:scale-105 active:scale-95 transition-transform"
+                className="p-2 bg-surface-100 hover:bg-surface-200 rounded-full text-surface-500 hover:scale-105 active:scale-95 transition-transform"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -618,56 +618,56 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
               <form onSubmit={handleCreateClient} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs font-bold text-gray-500 mb-2 block">Nome completo *</label>
+                    <label className="text-xs font-bold text-surface-500 mb-2 block">Nome completo *</label>
                     <input
                       value={newClientForm.fullName}
                       onChange={(e) => setNewClientForm((prev) => ({ ...prev, fullName: e.target.value }))}
-                      className="w-full p-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold"
+                      className="w-full p-3 bg-white border border-surface-200 rounded-lg text-surface-800 font-semibold"
                       placeholder="Nome do cliente"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-500 mb-2 block">E-mail *</label>
+                    <label className="text-xs font-bold text-surface-500 mb-2 block">E-mail *</label>
                     <input
                       value={newClientForm.email}
                       onChange={(e) => setNewClientForm((prev) => ({ ...prev, email: e.target.value }))}
-                      className="w-full p-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold"
+                      className="w-full p-3 bg-white border border-surface-200 rounded-lg text-surface-800 font-semibold"
                       placeholder="email@exemplo.com"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-500 mb-2 block">Telefone *</label>
+                    <label className="text-xs font-bold text-surface-500 mb-2 block">Telefone *</label>
                     <input
                       value={newClientForm.phone}
                       onChange={(e) => setNewClientForm((prev) => ({ ...prev, phone: e.target.value }))}
-                      className="w-full p-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold"
+                      className="w-full p-3 bg-white border border-surface-200 rounded-lg text-surface-800 font-semibold"
                       placeholder="(11) 99999-9999"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-500 mb-2 block">Documento de Identidade</label>
+                    <label className="text-xs font-bold text-surface-500 mb-2 block">Documento de Identidade</label>
                     <input
                       value={newClientForm.documentId}
                       onChange={(e) => setNewClientForm((prev) => ({ ...prev, documentId: e.target.value }))}
-                      className="w-full p-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold"
+                      className="w-full p-3 bg-white border border-surface-200 rounded-lg text-surface-800 font-semibold"
                       placeholder="RG / Documento"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-500 mb-2 block">NIF / CPF *</label>
+                    <label className="text-xs font-bold text-surface-500 mb-2 block">NIF / CPF *</label>
                     <input
                       value={newClientForm.taxId}
                       onChange={(e) => setNewClientForm((prev) => ({ ...prev, taxId: e.target.value }))}
-                      className="w-full p-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold"
+                      className="w-full p-3 bg-white border border-surface-200 rounded-lg text-surface-800 font-semibold"
                       placeholder="000.000.000-00"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-500 mb-2 block">Estado Civil</label>
+                    <label className="text-xs font-bold text-surface-500 mb-2 block">Estado Civil</label>
                     <select
                       value={newClientForm.maritalStatus}
                       onChange={(e) => setNewClientForm((prev) => ({ ...prev, maritalStatus: e.target.value }))}
-                      className="w-full p-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold"
+                      className="w-full p-3 bg-white border border-surface-200 rounded-lg text-surface-800 font-semibold"
                     >
                       <option>Solteiro</option>
                       <option>Casado</option>
@@ -676,20 +676,20 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-500 mb-2 block">País</label>
+                    <label className="text-xs font-bold text-surface-500 mb-2 block">País</label>
                     <input
                       value={newClientForm.country}
                       onChange={(e) => setNewClientForm((prev) => ({ ...prev, country: e.target.value }))}
-                      className="w-full p-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold"
+                      className="w-full p-3 bg-white border border-surface-200 rounded-lg text-surface-800 font-semibold"
                       placeholder="Brasil"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-500 mb-2 block">Organização *</label>
+                    <label className="text-xs font-bold text-surface-500 mb-2 block">Organização *</label>
                     <select
                       value={newClientForm.organizationId}
                       onChange={(e) => setNewClientForm((prev) => ({ ...prev, organizationId: e.target.value }))}
-                      className="w-full p-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold"
+                      className="w-full p-3 bg-white border border-surface-200 rounded-lg text-surface-800 font-semibold"
                     >
                       <option value="">Selecione a organização</option>
                       {organizations.map((org) => (
@@ -698,20 +698,20 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
                     </select>
                   </div>
                   <div className="md:col-span-2">
-                    <label className="text-xs font-bold text-gray-500 mb-2 block">Endereço *</label>
+                    <label className="text-xs font-bold text-surface-500 mb-2 block">Endereço *</label>
                     <input
                       value={newClientForm.address}
                       onChange={(e) => setNewClientForm((prev) => ({ ...prev, address: e.target.value }))}
-                      className="w-full p-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold"
+                      className="w-full p-3 bg-white border border-surface-200 rounded-lg text-surface-800 font-semibold"
                       placeholder="Endereço completo"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-500 mb-2 block">Nível de Acesso *</label>
+                    <label className="text-xs font-bold text-surface-500 mb-2 block">Nível de Acesso *</label>
                     <select
                       value={newClientForm.accessLevel}
                       onChange={(e) => setNewClientForm((prev) => ({ ...prev, accessLevel: e.target.value as AccessLevel }))}
-                      className="w-full p-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold"
+                      className="w-full p-3 bg-white border border-surface-200 rounded-lg text-surface-800 font-semibold"
                     >
                       {ACCESS_LEVELS.map((level) => (
                         <option key={level} value={level}>{level}</option>
@@ -719,7 +719,7 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
                     </select>
                   </div>
                   <div className="md:col-span-2 pt-2">
-                    <p className="text-xs font-semibold text-gray-400 italic">
+                    <p className="text-xs font-semibold text-surface-400 italic">
                       Os dados de acesso serão enviados automaticamente para o e-mail informado.
                     </p>
                   </div>
@@ -751,11 +751,11 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
 
       {showEditClientModal && editingClient && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white w-full max-w-4xl rounded-3xl border border-gray-100 shadow-2xl overflow-hidden animate-scaleIn">
-            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+          <div className="bg-white w-full max-w-4xl rounded-3xl border border-surface-100 shadow-2xl overflow-hidden animate-scaleIn">
+            <div className="p-6 border-b border-surface-100 flex justify-between items-center bg-surface-50">
               <div>
                 <h3 className="text-xl font-black uppercase">Editar cadastro do cliente</h3>
-                <p className="text-xs font-semibold text-gray-500 mt-1">
+                <p className="text-xs font-semibold text-surface-500 mt-1">
                   Origem: {editingClient.source === 'org_members+profiles' ? 'org_members + profiles' : editingClient.source === 'org_members_only' ? 'somente org_members' : 'cadastro manual'}
                 </p>
               </div>
@@ -766,14 +766,14 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
                   setClientEditError('');
                   setClientEditSuccess('');
                 }}
-                className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-500 hover:scale-105 active:scale-95 transition-transform"
+                className="p-2 bg-surface-100 hover:bg-surface-200 rounded-full text-surface-500 hover:scale-105 active:scale-95 transition-transform"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div className="p-6 max-h-[70vh] overflow-y-auto">
-              <p className="text-xs font-semibold text-gray-400 mb-4">
-                ID do cliente: <span className="font-black text-gray-800">{editingClient.user_id}</span>
+              <p className="text-xs font-semibold text-surface-400 mb-4">
+                ID do cliente: <span className="font-black text-surface-800">{editingClient.user_id}</span>
               </p>
 
               {clientEditSuccess && (
@@ -785,51 +785,51 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
               <form onSubmit={handleSaveClientEdit} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs font-bold text-gray-500 mb-2 block">Nome completo *</label>
+                    <label className="text-xs font-bold text-surface-500 mb-2 block">Nome completo *</label>
                     <input
                       value={editClientForm.fullName}
                       onChange={(e) => setEditClientForm((prev) => ({ ...prev, fullName: e.target.value }))}
-                      className="w-full p-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold"
+                      className="w-full p-3 bg-white border border-surface-200 rounded-lg text-surface-800 font-semibold"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-500 mb-2 block">E-mail</label>
+                    <label className="text-xs font-bold text-surface-500 mb-2 block">E-mail</label>
                     <input
                       value={editClientForm.email}
                       onChange={(e) => setEditClientForm((prev) => ({ ...prev, email: e.target.value }))}
-                      className="w-full p-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold"
+                      className="w-full p-3 bg-white border border-surface-200 rounded-lg text-surface-800 font-semibold"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-500 mb-2 block">Telefone</label>
+                    <label className="text-xs font-bold text-surface-500 mb-2 block">Telefone</label>
                     <input
                       value={editClientForm.phone}
                       onChange={(e) => setEditClientForm((prev) => ({ ...prev, phone: e.target.value }))}
-                      className="w-full p-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold"
+                      className="w-full p-3 bg-white border border-surface-200 rounded-lg text-surface-800 font-semibold"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-500 mb-2 block">Documento de Identidade</label>
+                    <label className="text-xs font-bold text-surface-500 mb-2 block">Documento de Identidade</label>
                     <input
                       value={editClientForm.documentId}
                       onChange={(e) => setEditClientForm((prev) => ({ ...prev, documentId: e.target.value }))}
-                      className="w-full p-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold"
+                      className="w-full p-3 bg-white border border-surface-200 rounded-lg text-surface-800 font-semibold"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-500 mb-2 block">NIF / CPF</label>
+                    <label className="text-xs font-bold text-surface-500 mb-2 block">NIF / CPF</label>
                     <input
                       value={editClientForm.taxId}
                       onChange={(e) => setEditClientForm((prev) => ({ ...prev, taxId: e.target.value }))}
-                      className="w-full p-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold"
+                      className="w-full p-3 bg-white border border-surface-200 rounded-lg text-surface-800 font-semibold"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-500 mb-2 block">Estado Civil</label>
+                    <label className="text-xs font-bold text-surface-500 mb-2 block">Estado Civil</label>
                     <select
                       value={editClientForm.maritalStatus}
                       onChange={(e) => setEditClientForm((prev) => ({ ...prev, maritalStatus: e.target.value }))}
-                      className="w-full p-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold"
+                      className="w-full p-3 bg-white border border-surface-200 rounded-lg text-surface-800 font-semibold"
                     >
                       <option>Solteiro</option>
                       <option>Casado</option>
@@ -838,19 +838,19 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-500 mb-2 block">País</label>
+                    <label className="text-xs font-bold text-surface-500 mb-2 block">País</label>
                     <input
                       value={editClientForm.country}
                       onChange={(e) => setEditClientForm((prev) => ({ ...prev, country: e.target.value }))}
-                      className="w-full p-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold"
+                      className="w-full p-3 bg-white border border-surface-200 rounded-lg text-surface-800 font-semibold"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-500 mb-2 block">Organização *</label>
+                    <label className="text-xs font-bold text-surface-500 mb-2 block">Organização *</label>
                     <select
                       value={editClientForm.organizationId}
                       onChange={(e) => setEditClientForm((prev) => ({ ...prev, organizationId: e.target.value }))}
-                      className="w-full p-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold"
+                      className="w-full p-3 bg-white border border-surface-200 rounded-lg text-surface-800 font-semibold"
                     >
                       <option value="">Selecione a organização</option>
                       {organizations.map((org) => (
@@ -859,19 +859,19 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
                     </select>
                   </div>
                   <div className="md:col-span-2">
-                    <label className="text-xs font-bold text-gray-500 mb-2 block">Endereço</label>
+                    <label className="text-xs font-bold text-surface-500 mb-2 block">Endereço</label>
                     <input
                       value={editClientForm.address}
                       onChange={(e) => setEditClientForm((prev) => ({ ...prev, address: e.target.value }))}
-                      className="w-full p-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold"
+                      className="w-full p-3 bg-white border border-surface-200 rounded-lg text-surface-800 font-semibold"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-500 mb-2 block">Nível de Acesso *</label>
+                    <label className="text-xs font-bold text-surface-500 mb-2 block">Nível de Acesso *</label>
                     <select
                       value={editClientForm.accessLevel}
                       onChange={(e) => setEditClientForm((prev) => ({ ...prev, accessLevel: e.target.value as AccessLevel }))}
-                      className="w-full p-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold"
+                      className="w-full p-3 bg-white border border-surface-200 rounded-lg text-surface-800 font-semibold"
                     >
                       {ACCESS_LEVELS.map((level) => (
                         <option key={level} value={level}>{level}</option>

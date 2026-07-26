@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { Eye, Pencil, Search, X, Plus, Trash2, ChevronDown, SearchX, Filter, ChevronUp } from 'lucide-react';
 import type { Process as DbProcess } from '../../../lib/processes';
 import { ProcessStatus, ServiceUnit, type User, type Organization } from '../../../../types';
@@ -586,13 +586,13 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
   return (
     <ProcessesContainer>
       <div className="min-w-0 space-y-6">
-        <Card className="min-w-0 bg-white border-gray-100 p-4 sm:p-5">
+        <Card className="min-w-0 bg-white border-surface-100 p-4 sm:p-5">
           <div className="mb-2 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
               <h3 className="text-3xl sm:text-4xl font-black tracking-tight leading-none">Processos</h3>
             </div>
           </div>
-          <p className="text-gray-500 text-sm mb-4">Visão geral em formato de planilha para filtrar, acompanhar status e agir rápido.</p>
+          <p className="text-surface-500 text-sm mb-4">Visão geral em formato de planilha para filtrar, acompanhar status e agir rápido.</p>
           {sectionReadOnly && (
             <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">Modo somente leitura neste escopo: visualização habilitada, ações de criação/remoção bloqueadas.</p>
           )}
@@ -602,7 +602,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
             <button
               type="button"
               onClick={() => setFiltersOpen((prev) => !prev)}
-              className="w-full flex items-center justify-between gap-2 px-4 py-3 bg-white border border-gray-200 rounded-lg text-gray-700 font-semibold hover:bg-gray-50 transition-colors"
+              className="w-full flex items-center justify-between gap-2 px-4 py-3 bg-white border border-surface-200 rounded-lg text-surface-700 font-semibold hover:bg-surface-50 transition-colors"
             >
               <span className="flex items-center gap-2 text-sm">
                 <Filter className="w-4 h-4" />
@@ -613,12 +613,12 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
             {filtersOpen && (
               <div className="mt-2 space-y-2.5">
                 <div className="relative min-w-0">
-                  <Search className="absolute left-3 top-3 text-gray-500 w-5 h-5" />
+                  <Search className="absolute left-3 top-3 text-surface-500 w-5 h-5" />
                   <input
                     value={processSearch}
                     onChange={(event) => setProcessSearch(event.target.value)}
                     placeholder="Buscar processo, título, cliente, responsável..."
-                    className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full pl-10 pr-4 py-3 bg-white border border-surface-200 rounded-lg text-surface-800 font-semibold focus:ring-2 focus:ring-brand-500 outline-none"
                   />
                 </div>
                 <select
@@ -627,7 +627,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                     setProcessStatusFilter(event.target.value as 'all' | ProcessStatus);
                     setProcessStatusPreset('all');
                   }}
-                  className="w-full py-3 px-4 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full py-3 px-4 bg-white border border-surface-200 rounded-lg text-surface-800 font-semibold focus:ring-2 focus:ring-brand-500 outline-none"
                 >
                   <option value="all">Todos os status</option>
                   <option value={ProcessStatus.PENDENTE}>Cadastro</option>
@@ -638,7 +638,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                 <select
                   value={processResponsibleFilter}
                   onChange={(event) => setProcessResponsibleFilter(event.target.value)}
-                  className="w-full py-3 px-4 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full py-3 px-4 bg-white border border-surface-200 rounded-lg text-surface-800 font-semibold focus:ring-2 focus:ring-brand-500 outline-none"
                 >
                   <option value="all">Todos os responsáveis</option>
                   {processResponsibles.map((responsible) => (
@@ -648,7 +648,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                 <select
                   value={processTypeFilter}
                   onChange={(event) => setProcessTypeFilter(event.target.value as 'all' | ServiceUnit)}
-                  className="w-full py-3 px-4 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full py-3 px-4 bg-white border border-surface-200 rounded-lg text-surface-800 font-semibold focus:ring-2 focus:ring-brand-500 outline-none"
                 >
                   <option value="all">Todos os tipos</option>
                   <option value={ServiceUnit.ADMINISTRATIVO}>Administrativo</option>
@@ -658,7 +658,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                 <select
                   value={processPeriodFilter}
                   onChange={(event) => setProcessPeriodFilter(event.target.value as 'all' | 'today' | '7d' | '30d')}
-                  className="w-full py-3 px-4 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full py-3 px-4 bg-white border border-surface-200 rounded-lg text-surface-800 font-semibold focus:ring-2 focus:ring-brand-500 outline-none"
                 >
                   <option value="all">Todo período</option>
                   <option value="today">Hoje</option>
@@ -672,12 +672,12 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
           {/* Filters - desktop grid */}
           <div className="hidden mt-4 md:grid min-w-0 grid-cols-1 md:grid-cols-2 2xl:grid-cols-4 gap-2.5 sm:gap-3">
             <div className="relative min-w-0 md:col-span-2 2xl:col-span-4">
-              <Search className="absolute left-3 top-3 text-gray-500 w-5 h-5" />
+              <Search className="absolute left-3 top-3 text-surface-500 w-5 h-5" />
               <input
                 value={processSearch}
                 onChange={(event) => setProcessSearch(event.target.value)}
                 placeholder="Buscar processo, título, cliente, responsável..."
-                className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full pl-10 pr-4 py-3 bg-white border border-surface-200 rounded-lg text-surface-800 font-semibold focus:ring-2 focus:ring-brand-500 outline-none"
               />
             </div>
             <select
@@ -686,7 +686,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                 setProcessStatusFilter(event.target.value as 'all' | ProcessStatus);
                 setProcessStatusPreset('all');
               }}
-              className="w-full py-3 px-4 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full py-3 px-4 bg-white border border-surface-200 rounded-lg text-surface-800 font-semibold focus:ring-2 focus:ring-brand-500 outline-none"
             >
               <option value="all">Todos os status</option>
               <option value={ProcessStatus.PENDENTE}>Cadastro</option>
@@ -697,7 +697,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
             <select
               value={processResponsibleFilter}
               onChange={(event) => setProcessResponsibleFilter(event.target.value)}
-              className="w-full py-3 px-4 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full py-3 px-4 bg-white border border-surface-200 rounded-lg text-surface-800 font-semibold focus:ring-2 focus:ring-brand-500 outline-none"
             >
               <option value="all">Todos os responsáveis</option>
               {processResponsibles.map((responsible) => (
@@ -707,7 +707,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
             <select
               value={processTypeFilter}
               onChange={(event) => setProcessTypeFilter(event.target.value as 'all' | ServiceUnit)}
-              className="w-full py-3 px-4 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full py-3 px-4 bg-white border border-surface-200 rounded-lg text-surface-800 font-semibold focus:ring-2 focus:ring-brand-500 outline-none"
             >
               <option value="all">Todos os tipos</option>
               <option value={ServiceUnit.ADMINISTRATIVO}>Administrativo</option>
@@ -717,7 +717,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
             <select
               value={processPeriodFilter}
               onChange={(event) => setProcessPeriodFilter(event.target.value as 'all' | 'today' | '7d' | '30d')}
-              className="w-full py-3 px-4 bg-white border border-gray-200 rounded-lg text-gray-800 font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full py-3 px-4 bg-white border border-surface-200 rounded-lg text-surface-800 font-semibold focus:ring-2 focus:ring-brand-500 outline-none"
             >
               <option value="all">Todo período</option>
               <option value="today">Hoje</option>
@@ -728,23 +728,23 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
 
           <div className="mt-4 grid min-w-0 grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5 gap-2 sm:gap-2">
             <div
-              className="bg-white border-l-4 border-blue-500 rounded-xl p-1.5 shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-shadow"
+              className="bg-white border-l-4 border-brand-500 rounded-xl p-1.5 shadow-sm border border-surface-100 cursor-pointer hover:shadow-md transition-shadow"
               onClick={() => { setProcessStatusFilter('all'); setProcessStatusPreset('all'); setProcessOverdueFilter(false); showToast({ type: 'info', message: 'Filtro removido: exibindo todos os processos.' }); }}
             >
-              <p className="text-[10px] text-blue-500 uppercase font-bold">Processos</p>
-              <p className="text-xl font-black leading-none mt-0.5 text-blue-600">{processStats.total}</p>
-              <p className="text-[10px] text-blue-600 mt-0.5">Total após filtros</p>
+              <p className="text-[10px] text-brand-500 uppercase font-bold">Processos</p>
+              <p className="text-xl font-black leading-none mt-0.5 text-brand-600">{processStats.total}</p>
+              <p className="text-[10px] text-brand-600 mt-0.5">Total após filtros</p>
             </div>
             <div
-              className="bg-white border-l-4 border-blue-400 rounded-xl p-1.5 shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-shadow"
+              className="bg-white border-l-4 border-brand-400 rounded-xl p-1.5 shadow-sm border border-surface-100 cursor-pointer hover:shadow-md transition-shadow"
               onClick={() => { setProcessStatusFilter('all'); setProcessStatusPreset('andamento'); setProcessOverdueFilter(false); showToast({ type: 'info', message: 'Filtro aplicado: processos em andamento.' }); }}
             >
-              <p className="text-[10px] text-blue-500 uppercase font-bold">Em andamento</p>
-              <p className="text-xl font-black leading-none mt-0.5 text-blue-600">{processStats.emAndamento}</p>
-              <p className="text-[10px] text-blue-600 mt-0.5">Ativos</p>
+              <p className="text-[10px] text-brand-500 uppercase font-bold">Em andamento</p>
+              <p className="text-xl font-black leading-none mt-0.5 text-brand-600">{processStats.emAndamento}</p>
+              <p className="text-[10px] text-brand-600 mt-0.5">Ativos</p>
             </div>
             <div
-              className="bg-white border-l-4 border-green-500 rounded-xl p-1.5 shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-shadow"
+              className="bg-white border-l-4 border-green-500 rounded-xl p-1.5 shadow-sm border border-surface-100 cursor-pointer hover:shadow-md transition-shadow"
               onClick={() => { setProcessStatusFilter(ProcessStatus.CONCLUIDO); setProcessStatusPreset('all'); setProcessOverdueFilter(false); showToast({ type: 'info', message: 'Filtro aplicado: processos concluídos.' }); }}
             >
               <p className="text-[10px] text-green-500 uppercase font-bold">Concluídos</p>
@@ -752,7 +752,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
               <p className="text-[10px] text-green-600 mt-0.5">Finalizados</p>
             </div>
             <div
-              className="bg-white border-l-4 border-yellow-500 rounded-xl p-1.5 shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-shadow"
+              className="bg-white border-l-4 border-yellow-500 rounded-xl p-1.5 shadow-sm border border-surface-100 cursor-pointer hover:shadow-md transition-shadow"
               onClick={() => { setProcessStatusFilter('all'); setProcessStatusPreset('atencao'); setProcessOverdueFilter(false); showToast({ type: 'info', message: 'Filtro aplicado: processos aguardando atenção.' }); }}
             >
               <p className="text-[10px] text-yellow-500 uppercase font-bold">Aguardando</p>
@@ -760,7 +760,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
               <p className="text-[10px] text-yellow-600 mt-0.5">Pendências</p>
             </div>
             <div
-              className="bg-white border-l-4 border-red-500 rounded-xl p-1.5 shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-shadow"
+              className="bg-white border-l-4 border-red-500 rounded-xl p-1.5 shadow-sm border border-surface-100 cursor-pointer hover:shadow-md transition-shadow"
               onClick={() => { setProcessStatusFilter('all'); setProcessStatusPreset('all'); setProcessOverdueFilter(true); showToast({ type: 'info', message: 'Filtro aplicado: processos com prazo vencido.' }); }}
             >
               <p className="text-[10px] text-red-500 uppercase font-bold">Atrasados</p>
@@ -777,25 +777,25 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
         )}
 
         {quickPresetVisual && (
-          <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
-            <p className="text-xs font-black uppercase tracking-wider text-blue-600">Filtro rápido ativo</p>
-            <p className="text-sm font-bold text-blue-700">{quickPresetVisual.label}</p>
-            <p className="text-xs font-semibold text-blue-600 mt-1">{quickPresetVisual.helper}</p>
+          <div className="mb-4 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3">
+            <p className="text-xs font-black uppercase tracking-wider text-brand-600">Filtro rápido ativo</p>
+            <p className="text-sm font-bold text-brand-700">{quickPresetVisual.label}</p>
+            <p className="text-xs font-semibold text-brand-600 mt-1">{quickPresetVisual.helper}</p>
           </div>
         )}
 
-        <Card className="bg-white border-gray-100 rounded-2xl overflow-hidden p-0">
-          <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white">
+        <Card className="bg-white border-surface-100 rounded-2xl overflow-hidden p-0">
+          <div className="px-4 sm:px-6 py-4 border-b border-surface-100 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white">
             <div>
               <h4 className="text-2xl font-black">Lista de processos</h4>
-              <p className="text-gray-500 text-sm">Mostrando {visibleProcessRows.length} de {processRows.length} resultados</p>
+              <p className="text-surface-500 text-sm">Mostrando {visibleProcessRows.length} de {processRows.length} resultados</p>
             </div>
             <div className="flex items-center gap-2 self-start sm:self-auto">
-              <span className="text-sm text-gray-500 font-semibold">Linhas</span>
+              <span className="text-sm text-surface-500 font-semibold">Linhas</span>
               <select
                 value={processRowsLimit}
                 onChange={(event) => setProcessRowsLimit(Number(event.target.value))}
-                className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm font-semibold text-gray-700"
+                className="bg-white border border-surface-200 rounded-lg px-3 py-2 text-sm font-semibold text-surface-700"
               >
                 <option value={10}>10</option>
                 <option value={25}>25</option>
@@ -804,37 +804,37 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
             </div>
           </div>
 
-          <div className="p-4 sm:p-6 space-y-4 bg-gray-50/70">
+          <div className="p-4 sm:p-6 space-y-4 bg-surface-50/70">
             {!initialProcessesLoaded && visibleProcessRows.length === 0 ? (
               <CardSkeleton count={3} />
             ) : visibleProcessRows.length === 0 ? (
-              <div className="rounded-xl border border-gray-200 bg-white px-4 py-10 text-center">
-                <SearchX className="w-8 h-8 text-gray-300 mx-auto mb-3" />
-                <p className="text-sm font-bold text-gray-500">Nenhum resultado encontrado</p>
-                <p className="text-xs text-gray-400 mt-1">Tente ajustar os filtros ou o termo da busca.</p>
+              <div className="rounded-xl border border-surface-200 bg-white px-4 py-10 text-center">
+                <SearchX className="w-8 h-8 text-surface-300 mx-auto mb-3" />
+                <p className="text-sm font-bold text-surface-500">Nenhum resultado encontrado</p>
+                <p className="text-xs text-surface-400 mt-1">Tente ajustar os filtros ou o termo da busca.</p>
               </div>
             ) : visibleProcessRows.map((process) => (
               <article
                 key={process.id}
-                className="rounded-xl sm:rounded-2xl border border-gray-100 bg-white px-3 py-3 sm:px-5 sm:py-5 hover:border-blue-200 hover:bg-gray-50 transition-all shadow-sm"
+                className="rounded-xl sm:rounded-2xl border border-surface-100 bg-white px-3 py-3 sm:px-5 sm:py-5 hover:border-brand-200 hover:bg-surface-50 transition-all shadow-sm"
               >
                 <div className="flex flex-col gap-2 sm:gap-4">
                   <div className="flex flex-col gap-2 sm:gap-3 xl:flex-row xl:items-start xl:justify-between">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                        <p className="text-gray-800 font-black text-sm sm:text-lg tracking-tight break-words">{process.protocol}</p>
+                        <p className="text-surface-800 font-black text-sm sm:text-lg tracking-tight break-words">{process.protocol}</p>
                         <Badge variant={process.sourceLabel === 'WIX' ? 'info' : 'neutral'} className="text-[10px] sm:text-xs px-2 sm:px-2.5 py-0.5 sm:py-1">{process.sourceLabel}</Badge>
                         <Badge variant={statusBadgeVariant(process.status)} className="text-[10px] sm:text-xs px-2 sm:px-2.5 py-0.5 sm:py-1">{process.status}</Badge>
                       </div>
-                      <p className="text-gray-800 text-sm sm:text-base font-semibold mt-0.5 sm:mt-1 break-words">{process.contractedServiceName}</p>
-                      <p className="text-gray-700 text-xs sm:text-sm mt-0.5 sm:mt-1 break-words"><span className="font-black uppercase tracking-wide text-[9px] sm:text-[10px] text-gray-500 mr-1">Cliente:</span>{process.name}</p>
-                      <p className="text-gray-500 text-[11px] sm:text-xs mt-0.5">Etapa: {process.etapaAtual}{process.requestedOrganizationName !== 'Não informado' ? ` · ${process.requestedOrganizationName}` : ''}</p>
+                      <p className="text-surface-800 text-sm sm:text-base font-semibold mt-0.5 sm:mt-1 break-words">{process.contractedServiceName}</p>
+                      <p className="text-surface-700 text-xs sm:text-sm mt-0.5 sm:mt-1 break-words"><span className="font-black uppercase tracking-wide text-[9px] sm:text-[10px] text-surface-500 mr-1">Cliente:</span>{process.name}</p>
+                      <p className="text-surface-500 text-[11px] sm:text-xs mt-0.5">Etapa: {process.etapaAtual}{process.requestedOrganizationName !== 'Não informado' ? ` · ${process.requestedOrganizationName}` : ''}</p>
                     </div>
 
                     <div className="flex items-center gap-1.5 sm:gap-2 self-start xl:self-auto">
                       <button
                         onClick={() => setSelectedUser(process)}
-                        className="p-1.5 sm:p-2 bg-blue-500 hover:bg-blue-600 rounded-lg text-white"
+                        className="p-1.5 sm:p-2 bg-brand-500 hover:bg-brand-600 rounded-lg text-white"
                         title="Visualizar"
                       >
                         <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -861,24 +861,24 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-1.5 sm:gap-3 text-xs sm:text-sm">
-                    <div className="rounded-lg sm:rounded-xl border border-gray-100 bg-gray-50/50 sm:bg-white p-2 sm:p-3">
-                      <p className="text-[9px] sm:text-[10px] uppercase tracking-widest text-gray-500 font-black">Tipo</p>
-                      <p className="text-gray-800 font-semibold mt-0.5 sm:mt-1 truncate">{process.processType}</p>
+                    <div className="rounded-lg sm:rounded-xl border border-surface-100 bg-surface-50/50 sm:bg-white p-2 sm:p-3">
+                      <p className="text-[9px] sm:text-[10px] uppercase tracking-widest text-surface-500 font-black">Tipo</p>
+                      <p className="text-surface-800 font-semibold mt-0.5 sm:mt-1 truncate">{process.processType}</p>
                     </div>
-                    <div className="rounded-lg sm:rounded-xl border border-gray-100 bg-gray-50/50 sm:bg-white p-2 sm:p-3">
-                      <p className="text-[9px] sm:text-[10px] uppercase tracking-widest text-gray-500 font-black">Responsável</p>
-                      <p className="text-gray-800 font-semibold mt-0.5 sm:mt-1 truncate">{process.serviceManager || 'Não definido'}</p>
+                    <div className="rounded-lg sm:rounded-xl border border-surface-100 bg-surface-50/50 sm:bg-white p-2 sm:p-3">
+                      <p className="text-[9px] sm:text-[10px] uppercase tracking-widest text-surface-500 font-black">Responsável</p>
+                      <p className="text-surface-800 font-semibold mt-0.5 sm:mt-1 truncate">{process.serviceManager || 'Não definido'}</p>
                     </div>
-                    <div className="rounded-lg sm:rounded-xl border border-gray-100 bg-gray-50/50 sm:bg-white p-2 sm:p-3">
-                      <p className="text-[9px] sm:text-[10px] uppercase tracking-widest text-gray-500 font-black">Início</p>
-                      <p className="text-gray-800 font-semibold mt-0.5 sm:mt-1 truncate">{process.startDate}</p>
+                    <div className="rounded-lg sm:rounded-xl border border-surface-100 bg-surface-50/50 sm:bg-white p-2 sm:p-3">
+                      <p className="text-[9px] sm:text-[10px] uppercase tracking-widest text-surface-500 font-black">Início</p>
+                      <p className="text-surface-800 font-semibold mt-0.5 sm:mt-1 truncate">{process.startDate}</p>
                     </div>
-                    <div className="rounded-lg sm:rounded-xl border border-gray-100 bg-gray-50/50 sm:bg-white p-2 sm:p-3">
-                      <p className="text-[9px] sm:text-[10px] uppercase tracking-widest text-gray-500 font-black">Prazo</p>
-                      <p className="text-gray-800 font-semibold mt-0.5 sm:mt-1 truncate">{process.deadlineDate}</p>
+                    <div className="rounded-lg sm:rounded-xl border border-surface-100 bg-surface-50/50 sm:bg-white p-2 sm:p-3">
+                      <p className="text-[9px] sm:text-[10px] uppercase tracking-widest text-surface-500 font-black">Prazo</p>
+                      <p className="text-surface-800 font-semibold mt-0.5 sm:mt-1 truncate">{process.deadlineDate}</p>
                     </div>
-                    <div className="rounded-lg sm:rounded-xl border border-gray-100 bg-gray-50/50 sm:bg-white p-2 sm:p-3">
-                      <p className="text-[9px] sm:text-[10px] uppercase tracking-widest text-gray-500 font-black">Financeiro</p>
+                    <div className="rounded-lg sm:rounded-xl border border-surface-100 bg-surface-50/50 sm:bg-white p-2 sm:p-3">
+                      <p className="text-[9px] sm:text-[10px] uppercase tracking-widest text-surface-500 font-black">Financeiro</p>
                       <p className="mt-0.5 sm:mt-1">
                         {(() => {
                           const paymentUi = getPaymentStatusUi(process.paymentStatus);
@@ -892,11 +892,11 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                         })()}
                       </p>
                     </div>
-                    <div className="rounded-lg sm:rounded-xl border border-gray-100 bg-gray-50/50 sm:bg-white p-2 sm:p-3">
-                      <p className="text-[9px] sm:text-[10px] uppercase tracking-widest text-gray-500 font-black">Prioridade & Valor</p>
+                    <div className="rounded-lg sm:rounded-xl border border-surface-100 bg-surface-50/50 sm:bg-white p-2 sm:p-3">
+                      <p className="text-[9px] sm:text-[10px] uppercase tracking-widest text-surface-500 font-black">Prioridade & Valor</p>
                       <p className="mt-0.5 sm:mt-1 flex flex-wrap items-center gap-1.5 sm:gap-2">
                         <Badge variant="success" className="text-[10px] sm:text-xs px-1.5 sm:px-2.5 py-0.5 sm:py-1">{process.prioridade}</Badge>
-                        <span className="text-gray-800 font-black text-[11px] sm:text-base">{formatEuro(process.valor)}</span>
+                        <span className="text-surface-800 font-black text-[11px] sm:text-base">{formatEuro(process.valor)}</span>
                       </p>
                     </div>
                   </div>
@@ -909,8 +909,8 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
 
       {canCreateProcess && showCreateProcessModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white w-full max-w-3xl rounded-3xl border border-gray-100 shadow-2xl overflow-hidden animate-scaleIn">
-            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+          <div className="bg-white w-full max-w-3xl rounded-3xl border border-surface-100 shadow-2xl overflow-hidden animate-scaleIn">
+            <div className="p-6 border-b border-surface-100 flex justify-between items-center bg-surface-50">
               <h3 className="text-xl font-black uppercase">{createdProcessInfo ? 'Processo criado' : 'Criar processo manual'}</h3>
               <button
                 onClick={() => {
@@ -918,7 +918,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                   setCreatedProcessInfo(null);
                   resetNewProcessForm();
                 }}
-                className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full"
+                className="p-2 bg-surface-100 hover:bg-surface-200 rounded-full"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -928,11 +928,11 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                 <fieldset disabled={!!createdProcessInfo} className="contents">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
-                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Organização</label>
+                    <label className="text-[10px] font-black text-surface-500 uppercase block mb-2">Organização</label>
                     <select
                       value={newProcessForm.organizationId}
                       onChange={(event) => setNewProcessForm((prev) => ({ ...prev, organizationId: event.target.value }))}
-                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full bg-white border border-surface-200 rounded-xl p-4 text-surface-800 font-semibold outline-none focus:ring-2 focus:ring-brand-500"
                       required
                     >
                       <option value="">Selecione a organização</option>
@@ -946,9 +946,9 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                   </div>
 
                   <div className="md:col-span-2">
-                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">
+                    <label className="text-[10px] font-black text-surface-500 uppercase block mb-2">
                       Título do processo
-                      <span className={`ml-2 text-[10px] font-normal ${newProcessForm.title.length >= 90 ? 'text-red-500' : 'text-gray-400'}`}>
+                      <span className={`ml-2 text-[10px] font-normal ${newProcessForm.title.length >= 90 ? 'text-red-500' : 'text-surface-400'}`}>
                         {newProcessForm.title.length}/100
                       </span>
                     </label>
@@ -957,15 +957,15 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                       maxLength={100}
                       value={newProcessForm.title}
                       onChange={(event) => setNewProcessForm((prev) => ({ ...prev, title: event.target.value }))}
-                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full bg-white border border-surface-200 rounded-xl p-4 text-surface-800 font-semibold outline-none focus:ring-2 focus:ring-brand-500"
                       placeholder="Ex.: Abertura de acompanhamento administrativo"
                     />
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">
+                    <label className="text-[10px] font-black text-surface-500 uppercase block mb-2">
                       Cliente
-                      <span className={`ml-2 text-[10px] font-normal ${newProcessForm.clientName.length >= 90 ? 'text-red-500' : 'text-gray-400'}`}>
+                      <span className={`ml-2 text-[10px] font-normal ${newProcessForm.clientName.length >= 90 ? 'text-red-500' : 'text-surface-400'}`}>
                         {newProcessForm.clientName.length}/100
                       </span>
                     </label>
@@ -974,47 +974,47 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                       maxLength={100}
                       value={newProcessForm.clientName}
                       onChange={(event) => setNewProcessForm((prev) => ({ ...prev, clientName: event.target.value }))}
-                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full bg-white border border-surface-200 rounded-xl p-4 text-surface-800 font-semibold outline-none focus:ring-2 focus:ring-brand-500"
                       placeholder="Nome completo do cliente"
                       required
                     />
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Documento</label>
+                    <label className="text-[10px] font-black text-surface-500 uppercase block mb-2">Documento</label>
                     <input
                       type="text"
                       value={newProcessForm.clientDocument}
                       onChange={(event) => setNewProcessForm((prev) => ({ ...prev, clientDocument: event.target.value }))}
-                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full bg-white border border-surface-200 rounded-xl p-4 text-surface-800 font-semibold outline-none focus:ring-2 focus:ring-brand-500"
                       placeholder="CPF / NIF / Documento"
                     />
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Contato</label>
+                    <label className="text-[10px] font-black text-surface-500 uppercase block mb-2">Contato</label>
                     <input
                       type="text"
                       value={newProcessForm.clientContact}
                       onChange={(event) => setNewProcessForm((prev) => ({ ...prev, clientContact: event.target.value }))}
-                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full bg-white border border-surface-200 rounded-xl p-4 text-surface-800 font-semibold outline-none focus:ring-2 focus:ring-brand-500"
                       placeholder="E-mail, telefone ou WhatsApp"
                     />
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Email do Cliente</label>
+                    <label className="text-[10px] font-black text-surface-500 uppercase block mb-2">Email do Cliente</label>
                     <input
                       type="email"
                       value={newProcessForm.clientEmail}
                       onChange={(event) => setNewProcessForm((prev) => ({ ...prev, clientEmail: event.target.value }))}
-                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full bg-white border border-surface-200 rounded-xl p-4 text-surface-800 font-semibold outline-none focus:ring-2 focus:ring-brand-500"
                       placeholder="cliente@exemplo.com"
                     />
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Tipo</label>
+                    <label className="text-[10px] font-black text-surface-500 uppercase block mb-2">Tipo</label>
                     <select
                       value={newProcessForm.serviceUnit ?? ''}
                       onChange={(event) => {
@@ -1026,7 +1026,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                         setAdminServiceSearch('');
                         setAdminExpandedGroups({});
                       }}
-                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full bg-white border border-surface-200 rounded-xl p-4 text-surface-800 font-semibold outline-none focus:ring-2 focus:ring-brand-500"
                     >
                       <option value="">Todos os tipos</option>
                       <option value={ServiceUnit.ADMINISTRATIVO}>Administrativo</option>
@@ -1041,22 +1041,22 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                       : [...new Set(adminCatalog.map(s => s.unit))];
                     return (
                     <div className="md:col-span-2">
-                      <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Serviços <span className="font-normal normal-case text-gray-400">(selecione abaixo os serviços a contratar)</span></label>
+                      <label className="text-[10px] font-black text-surface-500 uppercase block mb-2">Serviços <span className="font-normal normal-case text-surface-400">(selecione abaixo os serviços a contratar)</span></label>
                       <div className="relative mb-3">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400" />
                         <input
                           type="text"
                           value={adminServiceSearch}
                           onChange={(e) => setAdminServiceSearch(e.target.value)}
                           placeholder="Pesquisar serviço..."
-                          className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-gray-800 text-sm font-bold placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 outline-none"
+                          className="w-full pl-9 pr-4 py-2 bg-white border border-surface-200 rounded-xl text-surface-800 text-sm font-bold placeholder:text-surface-400 focus:ring-2 focus:ring-brand-500 outline-none"
                         />
                       </div>
                       <div className="space-y-3 max-h-80 overflow-y-auto">
                         {displayUnits.map((unit) => (
                           <div key={unit}>
                             {newProcessForm.serviceUnit === null && (
-                              <h4 className="text-xs font-black uppercase tracking-wider text-gray-500 mb-1 px-1">{unit}</h4>
+                              <h4 className="text-xs font-black uppercase tracking-wider text-surface-500 mb-1 px-1">{unit}</h4>
                             )}
                             <div className="space-y-2">
                             {filterGroupsByUnit(adminCatalog, unit).map((group) => {
@@ -1068,14 +1068,14 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                               const groupKey = `${unit}|${group}`;
                               const isCollapsed = !adminExpandedGroups[groupKey];
                               return (
-                                <div key={groupKey} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                                <div key={groupKey} className="bg-white rounded-xl border border-surface-200 overflow-hidden">
                                   <button
                                     type="button"
                                     onClick={() => setAdminExpandedGroups((prev) => {
                                       if (prev[groupKey]) { const { [groupKey]: _, ...rest } = prev; return rest; }
                                       return { ...prev, [groupKey]: true };
                                     })}
-                                    className="flex items-center justify-between w-full px-4 py-3 text-xs font-black uppercase tracking-wider text-gray-500 hover:text-gray-700 transition-colors"
+                                    className="flex items-center justify-between w-full px-4 py-3 text-xs font-black uppercase tracking-wider text-surface-500 hover:text-surface-700 transition-colors"
                                   >
                                     {group}
                                     <ChevronDown className={`w-4 h-4 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
@@ -1088,7 +1088,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                                           <label
                                             key={svc.id}
                                             className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors border ${
-                                              selected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300'
+                                              selected ? 'border-brand-500 bg-brand-50' : 'border-surface-200 bg-white hover:border-brand-300'
                                             }`}
                                           >
                                             <div className="flex items-center gap-3">
@@ -1106,11 +1106,11 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                                                     return { ...prev, selectedServiceIds: next };
                                                   });
                                                 }}
-                                                className="w-4 h-4 accent-blue-600"
+                                                className="w-4 h-4 accent-brand-600"
                                               />
                                               <div>
-                                                <p className="text-sm font-bold text-gray-800">{svc.name}</p>
-                                                <p className="text-xs text-gray-500">{svc.description}</p>
+                                                <p className="text-sm font-bold text-surface-800">{svc.name}</p>
+                                                <p className="text-xs text-surface-500">{svc.description}</p>
                                               </div>
                                             </div>
                                             <span className="text-sm font-black text-emerald-600">{formatEuro(svc.price)}</span>
@@ -1133,23 +1133,23 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                   {(newProcessForm.selectedServiceIds ?? []).length > 0 && (
                     <div className="md:col-span-2 space-y-3">
                       <div>
-                        <label className="text-[10px] font-black text-gray-500 uppercase block mb-2">Serviços Selecionados</label>
-                        <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
+                        <label className="text-[10px] font-black text-surface-500 uppercase block mb-2">Serviços Selecionados</label>
+                        <div className="divide-y divide-surface-100 border border-surface-200 rounded-xl overflow-hidden">
                           {(newProcessForm.selectedServiceIds ?? []).map((id: string) => {
                             const svc = adminCatalog.find((s) => s.id === id);
                             if (!svc) return null;
                             return (
                               <div key={id} className="flex items-center justify-between px-4 py-3 bg-white">
                                 <div className="min-w-0 flex-1">
-                                  <p className="text-sm font-bold text-gray-800 truncate">{svc.name}</p>
-                                  <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">{svc.group} · {svc.unit}</p>
+                                  <p className="text-sm font-bold text-surface-800 truncate">{svc.name}</p>
+                                  <p className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider">{svc.group} · {svc.unit}</p>
                                 </div>
                                 <span className="text-sm font-black text-emerald-600 ml-3">{formatEuro(svc.price)}</span>
                               </div>
                             );
                           })}
-                          <div className="flex items-center justify-between px-4 py-3 bg-gray-50">
-                            <p className="text-sm font-black text-gray-700 uppercase">Subtotal Serviços</p>
+                          <div className="flex items-center justify-between px-4 py-3 bg-surface-50">
+                            <p className="text-sm font-black text-surface-700 uppercase">Subtotal Serviços</p>
                             <span className="text-base font-black text-emerald-700">
                               {formatEuro((newProcessForm.selectedServiceIds ?? []).reduce((sum: number, id: string) => {
                                 const s = adminCatalog.find((x) => x.id === id);
@@ -1161,7 +1161,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                       </div>
 
                       <div>
-                        <label className="text-[10px] font-black text-purple-600 uppercase block mb-2">Doação Voluntária (€) <span className="text-[10px] font-normal text-gray-400">— valor extra para associação</span></label>
+                        <label className="text-[10px] font-black text-purple-600 uppercase block mb-2">Doação Voluntária (€) <span className="text-[10px] font-normal text-surface-400">— valor extra para associação</span></label>
                         <div className="flex flex-col sm:flex-row gap-2">
                           <input
                             type="number"
@@ -1221,9 +1221,9 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                           <div>
                             <label className="text-[10px] font-black text-amber-700 uppercase block mb-2">Taxas Associativas</label>
                             <div className="divide-y divide-amber-100 border border-amber-200 rounded-xl overflow-hidden">
-                              <div className="flex items-center justify-between px-4 py-3 bg-blue-50">
-                                <p className="text-sm font-bold text-blue-800">Valor Bruto dos Serviços</p>
-                                <span className="text-sm font-black text-blue-800">{formatEuro(svcTotal)}</span>
+                              <div className="flex items-center justify-between px-4 py-3 bg-brand-50">
+                                <p className="text-sm font-bold text-brand-800">Valor Bruto dos Serviços</p>
+                                <span className="text-sm font-black text-brand-800">{formatEuro(svcTotal)}</span>
                               </div>
                               {fees.map((fee) => (
                                 <div key={fee.type} className="flex items-center justify-between px-4 py-3 bg-amber-50">
@@ -1259,7 +1259,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                   )}
                   {(newProcessForm.selectedServiceIds ?? []).length === 0 && (
                     <div className="md:col-span-2">
-                      <label className="text-[10px] font-black text-purple-600 uppercase block mb-2">Doação Voluntária (€) <span className="text-[10px] font-normal text-gray-400">— valor extra para associação</span></label>
+                      <label className="text-[10px] font-black text-purple-600 uppercase block mb-2">Doação Voluntária (€) <span className="text-[10px] font-normal text-surface-400">— valor extra para associação</span></label>
                       <div className="flex flex-col sm:flex-row gap-2">
                         <input
                           type="number"
@@ -1306,10 +1306,10 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
 
                 </fieldset>
 
-                <div className="rounded-2xl border border-gray-100 bg-gray-50/70 p-4 text-sm text-gray-600">
+                <div className="rounded-2xl border border-surface-100 bg-surface-50/70 p-4 text-sm text-surface-600">
                   {createdProcessInfo
                     ? 'Processo criado com sucesso! Utilize os botões abaixo para acompanhar o andamento ou efetuar o pagamento.'
-                    : <>O processo será criado manualmente com origem <span className="font-black text-gray-800">PAINEL</span>, status inicial <span className="font-black text-gray-800">Cadastro</span> e vinculado à organização selecionada.</>
+                    : <>O processo será criado manualmente com origem <span className="font-black text-surface-800">PAINEL</span>, status inicial <span className="font-black text-surface-800">Cadastro</span> e vinculado à organização selecionada.</>
                   }
                 </div>
 
@@ -1319,7 +1319,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                       <button
                         type="button"
                         onClick={handleGoToCreatedProcess}
-                        className="px-5 py-3 rounded-xl border border-gray-200 text-gray-700 font-bold hover:bg-gray-100 transition-colors"
+                        className="px-5 py-3 rounded-xl border border-surface-200 text-surface-700 font-bold hover:bg-surface-100 transition-colors"
                       >
                         Acompanhar Processo
                       </button>
@@ -1339,14 +1339,14 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                         onClick={() => {
                           setShowCreateProcessModal(false);
                         }}
-                        className="px-5 py-3 rounded-xl border border-gray-200 text-gray-700 font-bold hover:bg-gray-100 transition-colors"
+                        className="px-5 py-3 rounded-xl border border-surface-200 text-surface-700 font-bold hover:bg-surface-100 transition-colors"
                       >
                         Cancelar
                       </button>
                       <button
                         type="submit"
                         disabled={creatingProcess}
-                        className="px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:cursor-not-allowed text-white font-black uppercase tracking-wider"
+                        className="px-5 py-3 rounded-xl bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:cursor-not-allowed text-white font-black uppercase tracking-wider"
                       >
                         {creatingProcess ? 'Criando processo...' : 'Criar processo'}
                       </button>
