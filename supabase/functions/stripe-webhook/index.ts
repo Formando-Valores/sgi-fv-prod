@@ -1,5 +1,6 @@
 import Stripe from 'https://esm.sh/stripe@18.3.0?target=deno';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { getOrgStripeConfig } from '../_shared/payments/getOrgStripeConfig.ts';
 
 type ProcessRecord = {
   id: string;
@@ -93,17 +94,24 @@ Deno.serve(async (request) => {
     return jsonResponse(405, { success: false, error: 'Método não permitido.' });
   }
 
-  const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY') ?? '';
-  const stripeWebhookSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET') ?? '';
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
-  if (!stripeSecretKey || !stripeWebhookSecret) {
-    return jsonResponse(500, { success: false, error: 'Credenciais Stripe ausentes.' });
-  }
-
   if (!supabaseUrl || !serviceRoleKey) {
     return jsonResponse(500, { success: false, error: 'SUPABASE_URL ou SERVICE_ROLE_KEY não configurados.' });
+  }
+
+  // Resolve orgId from the URL path: /functions/v1/stripe-webhook/<org_id>
+  const url = new URL(request.url);
+  const orgIdFromPath = url.pathname.split('/').filter(Boolean).pop() ?? '';
+
+  // Fetch org-specific Stripe credentials (falls back to env vars when no orgId/config)
+  const orgConfig = await getOrgStripeConfig(orgIdFromPath, supabaseUrl, serviceRoleKey);
+  const stripeSecretKey = orgConfig.stripeSecretKey;
+  const stripeWebhookSecret = orgConfig.stripeWebhookSecret;
+
+  if (!stripeSecretKey || !stripeWebhookSecret) {
+    return jsonResponse(500, { success: false, error: 'Credenciais Stripe ausentes.' });
   }
 
   const signature = request.headers.get('stripe-signature');
@@ -112,7 +120,15 @@ Deno.serve(async (request) => {
   }
 
   const rawBody = await request.text();
-  const stripe = new Stripe(stripeSecretKey, { apiVersion: '2025-03-31.basil' });
+  const stripe = new Stripe(stripeSecretKey, { apiVersion: orgConfig.apiVersion as '2025-03-31.basil' });
+
+  logAudit('webhook_org_resolved', {
+    orgIdFromPath,
+    resolvedStripeKey: stripeSecretKey.slice(0, 7) + '...',
+    hasWebhookSecret: Boolean(stripeWebhookSecret),
+    eventId: null,
+    processId: null,
+  });
 
   let event: Stripe.Event;
   try {
