@@ -13,6 +13,7 @@ import { buildOrganizationErrorMessage, loadOrganizations } from '../organizatio
 import { SUPABASE_EDGE_FUNCTIONS } from '../src/lib/supabaseFunctions';
 import { calcAssociationFees, ASSOCIATION_ANNUAL_FEE } from '../src/lib/servicesCatalog';
 import { createCheckoutSession } from '../src/lib/stripe';
+import { getOrgCurrencies, amountToMinorUnits } from '../src/lib/stripeCurrency';
 
 interface RegisterProps {
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
@@ -316,9 +317,16 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
           console.error('[register] erro ao criar processo', processErr);
         } else {
           try {
+            let defaultCurrency = 'eur';
+            try {
+              const orgCurrencies = await getOrgCurrencies(formData.organizationId);
+              defaultCurrency = orgCurrencies.defaultCurrency || 'eur';
+            } catch {
+              // fallback para eur
+            }
             const session = await createCheckoutSession({
-              amount: ASSOCIATION_ANNUAL_FEE * 100,
-              currency: 'brl',
+              amount: amountToMinorUnits(ASSOCIATION_ANNUAL_FEE, defaultCurrency),
+              currency: defaultCurrency,
               successUrl: `${window.location.origin}/#/payments/success?processId=${processData.id}`,
               cancelUrl: `${window.location.origin}/#/payments/cancel?processId=${processData.id}`,
               processId: processData.id,

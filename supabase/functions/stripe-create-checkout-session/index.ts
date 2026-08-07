@@ -73,6 +73,14 @@ Deno.serve(async (request) => {
     return jsonResponse(400, { success: false, error: 'currency é obrigatório.' });
   }
 
+  const allowedCurrencies = orgConfig.allowedCurrencies.map((c) => c.toLowerCase());
+  if (allowedCurrencies.length > 0 && !allowedCurrencies.includes(currency)) {
+    return jsonResponse(400, {
+      success: false,
+      error: `Moeda "${currency}" não permitida para esta organização. Permitidas: ${allowedCurrencies.join(', ')}.`,
+    });
+  }
+
   if (!successUrl || !cancelUrl) {
     return jsonResponse(400, { success: false, error: 'successUrl e cancelUrl são obrigatórios.' });
   }

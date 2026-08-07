@@ -9,6 +9,7 @@ export interface StripeConfigData {
   stripe_webhook_secret_masked: string;
   stripe_api_version: string;
   default_currency: string;
+  allowed_currencies: string[];
   checkout_product_name: string;
   is_live_mode: boolean;
   created_at: string;
@@ -20,6 +21,7 @@ export interface StripeConfigUpdate {
   stripe_webhook_secret?: string;
   stripe_api_version?: string;
   default_currency?: string;
+  allowed_currencies?: string[];
   checkout_product_name?: string;
   is_live_mode?: boolean;
 }

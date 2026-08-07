@@ -30,6 +30,7 @@ const StripeConfigPanel: React.FC<Props> = ({ activeOrgId }) => {
   const [webhookSecret, setWebhookSecret] = useState('');
   const [apiVersion, setApiVersion] = useState('2025-03-31.basil');
   const [currency, setCurrency] = useState('brl');
+  const [allowedCurrencies, setAllowedCurrencies] = useState<string[]>(['eur']);
   const [productName, setProductName] = useState('Serviço SGI FV');
   const [isLive, setIsLive] = useState(false);
 
@@ -53,6 +54,9 @@ const StripeConfigPanel: React.FC<Props> = ({ activeOrgId }) => {
       setWebhookSecret(data.stripe_webhook_secret || '');
       setApiVersion(data.stripe_api_version);
       setCurrency(data.default_currency);
+      setAllowedCurrencies(Array.isArray(data.allowed_currencies) && data.allowed_currencies.length > 0
+        ? data.allowed_currencies
+        : [data.default_currency || 'eur']);
       setProductName(data.checkout_product_name);
       setIsLive(data.is_live_mode);
     } else {
@@ -61,6 +65,7 @@ const StripeConfigPanel: React.FC<Props> = ({ activeOrgId }) => {
       setWebhookSecret('');
       setApiVersion('2025-03-31.basil');
       setCurrency('brl');
+      setAllowedCurrencies(['eur']);
       setProductName('Serviço SGI FV');
       setIsLive(false);
     }
@@ -79,12 +84,23 @@ const StripeConfigPanel: React.FC<Props> = ({ activeOrgId }) => {
       return;
     }
 
+    const normalizedAllowed = Array.from(new Set(allowedCurrencies.map((c) => c.toLowerCase())));
+    if (normalizedAllowed.length === 0) {
+      setFeedback({ type: 'error', message: 'Selecione pelo menos uma moeda permitida.' });
+      return;
+    }
+    if (!normalizedAllowed.includes(currency)) {
+      setFeedback({ type: 'error', message: 'A moeda padrão deve estar entre as moedas permitidas.' });
+      return;
+    }
+
     setSaving(true);
     setFeedback(null);
 
     const payload: Record<string, unknown> = {
       stripe_api_version: apiVersion,
       default_currency: currency,
+      allowed_currencies: normalizedAllowed,
       checkout_product_name: productName,
       is_live_mode: isLive,
     };
@@ -263,10 +279,11 @@ const StripeConfigPanel: React.FC<Props> = ({ activeOrgId }) => {
               onChange={(e) => setCurrency(e.target.value)}
               className="w-full px-4 py-2.5 bg-white border border-surface-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
             >
-              {CURRENCIES.map((c) => (
+              {CURRENCIES.filter((c) => allowedCurrencies.includes(c.code)).map((c) => (
                 <option key={c.code} value={c.code}>{c.label}</option>
               ))}
             </select>
+            <p className="text-[11px] text-surface-400 mt-1">Usada quando o pagamento não especifica moeda.</p>
           </div>
           <div>
             <label className="block text-xs font-bold text-surface-700 uppercase tracking-wider mb-2">
@@ -278,6 +295,44 @@ const StripeConfigPanel: React.FC<Props> = ({ activeOrgId }) => {
               onChange={(e) => setProductName(e.target.value)}
               className="w-full px-4 py-2.5 bg-white border border-surface-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
             />
+          </div>
+        </div>
+
+        {/* Allowed Currencies */}
+        <div>
+          <label className="block text-xs font-bold text-surface-700 uppercase tracking-wider mb-2">
+            Moedas Permitidas no Checkout
+          </label>
+          <p className="text-xs text-surface-500 mb-3">
+            Quando mais de uma moeda estiver marcada, o cliente escolhe a moeda na hora do pagamento.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            {CURRENCIES.map((c) => {
+              const checked = allowedCurrencies.includes(c.code);
+              return (
+                <button
+                  key={c.code}
+                  type="button"
+                  onClick={() => {
+                    setAllowedCurrencies((prev) =>
+                      checked ? prev.filter((x) => x !== c.code) : [...prev, c.code]
+                    );
+                  }}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all ${
+                    checked
+                      ? 'bg-indigo-50 border-indigo-400 text-indigo-700'
+                      : 'bg-white border-surface-200 text-surface-500 hover:border-surface-300'
+                  }`}
+                >
+                  <span className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+                    checked ? 'bg-indigo-600 border-indigo-600' : 'border-surface-300'
+                  }`}>
+                    {checked && <Check className="w-3 h-3 text-white" />}
+                  </span>
+                  {c.label}
+                </button>
+              );
+            })}
           </div>
         </div>
 

@@ -9,9 +9,9 @@ import { ArrowLeft, Activity, Calendar, Landmark, UserCheck, MessageSquare, User
 import CommunicationBlock from '../../components/dashboard/blocks/CommunicationBlock';
 import { useAuth } from '../../contexts/AuthContext';
 import { getProcessById, listProcessEvents, updateProcessStatus, addProcessEvent, listRequiredChecklistDocuments, listProcessAttachments, reviewProcessAttachment, type Process, type ProcessEvent, type ProcessDocumentAttachment, type ProcessDocumentChecklistItem } from '../../lib/processes';
-import { createCheckoutSession } from '../../lib/stripe';
 import { getPaymentStatusUi } from '../../lib/paymentStatus';
-import { formatEuro, EUR_RATE } from '../../lib/servicesCatalog';
+import { formatEuro } from '../../lib/servicesCatalog';
+import CurrencySelectModal, { type CheckoutRequest } from '../../components/checkout/CurrencySelectModal';
 
 const statusSteps = [
   { key: 'cadastro', label: 'CADASTRO', color: 'bg-slate-500' },
@@ -44,7 +44,7 @@ const ProcessDetails: React.FC = () => {
   const [showObsModal, setShowObsModal] = useState(false);
   const [obsText, setObsText] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [redirectingCheckout, setRedirectingCheckout] = useState(false);
+  const [checkoutRequest, setCheckoutRequest] = useState<CheckoutRequest | null>(null);
 
   useEffect(() => {
     loadData();
@@ -130,30 +130,17 @@ const ProcessDetails: React.FC = () => {
       return;
     }
 
-    setRedirectingCheckout(true);
-    try {
-      const session = await createCheckoutSession({
-        amount: Math.round((amount / EUR_RATE) * 100),
-        currency: 'brl',
-        successUrl: `${window.location.origin}/#/payments/success?processId=${process.id}`,
-        cancelUrl: `${window.location.origin}/#/payments/cancel?processId=${process.id}`,
-        processId: process.id,
-        clientId: userContext.id,
-        serviceId: String((process as Record<string, unknown>).service_id ?? ''),
-        organizationId: userContext.org_id,
-        areaId: String((process as Record<string, unknown>).area_id ?? ''),
-        sectorId: String((process as Record<string, unknown>).sector_id ?? ''),
-      });
-
-      if (session.url) {
-        window.location.assign(session.url);
-      }
-    } catch (err) {
-      console.error('Erro ao criar checkout:', err);
-      window.alert('Não foi possível iniciar o pagamento. Tente novamente mais tarde.');
-    } finally {
-      setRedirectingCheckout(false);
-    }
+    setCheckoutRequest({
+      amountBRL: amount,
+      processId: process.id,
+      clientId: userContext.id,
+      serviceId: String((process as Record<string, unknown>).service_id ?? ''),
+      organizationId: userContext.org_id,
+      areaId: String((process as Record<string, unknown>).area_id ?? ''),
+      sectorId: String((process as Record<string, unknown>).sector_id ?? ''),
+      successUrl: `${window.location.origin}/#/payments/success?processId=${process.id}`,
+      cancelUrl: `${window.location.origin}/#/payments/cancel?processId=${process.id}`,
+    });
   };
 
   const handleReview = async (attachmentId: string, decision: 'approved' | 'rejected' | 'resubmission_requested') => {
@@ -419,14 +406,9 @@ const ProcessDetails: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => { void handleGoToCheckout(); }}
-                    disabled={redirectingCheckout}
-                    className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-emerald-500"
                   >
-                    {redirectingCheckout ? (
-                      <><Loader2 className="h-4 w-4 animate-spin" /> Redirecionando...</>
-                    ) : (
-                      <><ExternalLink className="h-4 w-4" /> Pagar agora</>
-                    )}
+                    <ExternalLink className="h-4 w-4" /> Pagar agora
                   </button>
                 )}
               </div>
@@ -477,6 +459,18 @@ const ProcessDetails: React.FC = () => {
           </div>
         </section>
       </div>
+
+      {/* Currency Selection Modal */}
+      <CurrencySelectModal
+        open={checkoutRequest !== null}
+        request={checkoutRequest}
+        onClose={() => setCheckoutRequest(null)}
+        onError={(message) => window.alert(message)}
+        onStart={(url) => {
+          setCheckoutRequest(null);
+          window.location.assign(url);
+        }}
+      />
 
       {/* Observation Modal */}
       {showObsModal && (

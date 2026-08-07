@@ -8,10 +8,10 @@ import { calcAssociationFees, EUR_RATE, formatEuro } from '../../../lib/services
 import { filterServicesByUnit, filterGroupsByUnit, filterServicesByGroup, type DbCatalogService } from '../../../lib/servicesCatalogDb';
 import { getPaymentStatusUi } from '../../../lib/paymentStatus';
 import { useToast } from '../../../contexts/ToastContext';
-import { createCheckoutSession } from '../../../lib/stripe';
 import Card from '../../ui/Card';
 import Badge from '../../ui/Badge';
 import { CardSkeleton } from '../../ui/Skeleton';
+import CurrencySelectModal, { type CheckoutRequest } from '../../checkout/CurrencySelectModal';
 
 interface AdminProcessRow extends User {
   processRecordId?: string;
@@ -136,7 +136,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
   const [showCreateProcessModal, setShowCreateProcessModal] = useState(false);
   const [creatingProcess, setCreatingProcess] = useState(false);
   const [createdProcessInfo, setCreatedProcessInfo] = useState<{ id: string; osValue: number; orgId: string } | null>(null);
-  const [redirectingCheckout, setRedirectingCheckout] = useState(false);
+  const [checkoutRequest, setCheckoutRequest] = useState<CheckoutRequest | null>(null);
   const [pendingDonation, setPendingDonation] = useState('');
   const [newProcessForm, setNewProcessForm] = useState<NewProcessFormState>({
     organizationId: '',
@@ -509,29 +509,17 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
       showToast({ type: 'error', message: 'Valor do pagamento não definido para este processo.' });
       return;
     }
-    setRedirectingCheckout(true);
-    try {
-      const session = await createCheckoutSession({
-        amount: Math.round((createdProcessInfo.osValue / EUR_RATE) * 100),
-        currency: 'eur',
-        successUrl: `${window.location.origin}/#/payments/success?processId=${createdProcessInfo.id}`,
-        cancelUrl: `${window.location.origin}/#/payments/cancel?processId=${createdProcessInfo.id}`,
-        processId: createdProcessInfo.id,
-        clientId: currentUser.id,
-        serviceId: '',
-        organizationId: createdProcessInfo.orgId,
-        areaId: '',
-        sectorId: '',
-      });
-      if (session.url) {
-        window.location.assign(session.url);
-      }
-    } catch (err) {
-      console.error('Erro ao criar checkout:', err);
-      showToast({ type: 'error', message: 'Não foi possível iniciar o pagamento. Tente novamente mais tarde.' });
-    } finally {
-      setRedirectingCheckout(false);
-    }
+    setCheckoutRequest({
+      amountBRL: createdProcessInfo.osValue,
+      processId: createdProcessInfo.id,
+      clientId: currentUser.id,
+      serviceId: '',
+      organizationId: createdProcessInfo.orgId,
+      areaId: '',
+      sectorId: '',
+      successUrl: `${window.location.origin}/#/payments/success?processId=${createdProcessInfo.id}`,
+      cancelUrl: `${window.location.origin}/#/payments/cancel?processId=${createdProcessInfo.id}`,
+    });
   };
 
   const handleGoToCreatedProcess = () => {
@@ -1326,10 +1314,9 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                       <button
                         type="button"
                         onClick={handlePayCreatedProcess}
-                        disabled={redirectingCheckout}
-                        className="px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 disabled:cursor-not-allowed text-white font-black uppercase tracking-wider"
+                        className="px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-wider"
                       >
-                        {redirectingCheckout ? 'Redirecionando...' : `Pagar agora — ${formatEuro(createdProcessInfo.osValue)}`}
+                        {`Pagar agora — ${formatEuro(createdProcessInfo.osValue)}`}
                       </button>
                     </>
                   ) : (
@@ -1358,6 +1345,18 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
           </div>
         </div>
       )}
+
+      {/* Currency Selection Modal */}
+      <CurrencySelectModal
+        open={checkoutRequest !== null}
+        request={checkoutRequest}
+        onClose={() => setCheckoutRequest(null)}
+        onError={(message) => showToast({ type: 'error', message })}
+        onStart={(url) => {
+          setCheckoutRequest(null);
+          window.location.assign(url);
+        }}
+      />
     </ProcessesContainer>
   );
 };

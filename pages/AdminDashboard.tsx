@@ -27,7 +27,6 @@ const ManagementSection = lazy(() => import('../src/components/dashboard/blocks/
 const StripeConfigPanel = lazy(() => import('../src/components/dashboard/blocks/StripeConfigPanel'));
 const OrganizationsSection = lazy(() => import('../src/components/dashboard/blocks/OrganizationsSection'));
 import { useToast } from '../src/contexts/ToastContext';
-import { createCheckoutSession } from '../src/lib/stripe';
 import { loadServicesCatalog, filterServicesByUnit, filterGroupsByUnit, filterServicesByGroup, type DbCatalogService } from '../src/lib/servicesCatalogDb';
 import { uploadPaymentProof, validatePaymentProof, getPaymentProofs, type PaymentProof } from '../src/lib/paymentProofs';
 import { uploadProcessDocument, listProcessDocuments, reviewProcessDocument, type ProcessDocument } from '../src/lib/processDocuments';
@@ -36,6 +35,7 @@ import { sanitizeDisplayValue, mapAccessLevelToOrgRole, type AccessLevel } from 
 import { useChecklist } from '../src/hooks/useChecklist';
 import SelectedUserDetailModal, { type AdminProcessRow } from '../src/components/dashboard/modals/SelectedUserDetailModal';
 import EditingUserStatusModal from '../src/components/dashboard/modals/EditingUserStatusModal';
+import CurrencySelectModal, { type CheckoutRequest } from '../src/components/checkout/CurrencySelectModal';
 
 type ProcessVisualOverrides = Record<
   string,
@@ -167,6 +167,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [selectedUserTab, setSelectedUserTab] = useState<'cadastral' | 'financeiro' | 'documentos' | 'comunicacao'>('cadastral');
   const [editingUser, setEditingUser] = useState<AdminProcessRow | User | null>(null);
   const [redirectingCheckout, setRedirectingCheckout] = useState(false);
+  const [checkoutRequest, setCheckoutRequest] = useState<CheckoutRequest | null>(null);
   const [uploadingProof, setUploadingProof] = useState(false);
   const [validatingProof, setValidatingProof] = useState(false);
   const [paymentProofs, setPaymentProofs] = useState<PaymentProof[]>([]);
@@ -670,29 +671,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       window.alert('Valor do pagamento não definido para este processo.');
       return;
     }
-    setRedirectingCheckout(true);
-    try {
-      const session = await createCheckoutSession({
-        amount: Math.round(amount * 100),
-        currency: 'brl',
-        successUrl: `${window.location.origin}/#/payments/success?processId=${processRow.processRecordId || processRow.id}`,
-        cancelUrl: `${window.location.origin}/#/payments/cancel?processId=${processRow.processRecordId || processRow.id}`,
-        processId: processRow.processRecordId || processRow.id,
-        clientId: currentUser.id,
-        serviceId: '',
-        organizationId: processRow.organizationId,
-        areaId: '',
-        sectorId: '',
-      });
-      if (session.url) {
-        window.location.assign(session.url);
-      }
-    } catch (err) {
-      console.error('Erro ao criar checkout:', err);
-      window.alert('Não foi possível iniciar o pagamento. Tente novamente mais tarde.');
-    } finally {
-      setRedirectingCheckout(false);
-    }
+    setCheckoutRequest({
+      amountBRL: amount,
+      processId: processRow.processRecordId || processRow.id,
+      clientId: currentUser.id,
+      serviceId: '',
+      organizationId: processRow.organizationId,
+      areaId: '',
+      sectorId: '',
+      successUrl: `${window.location.origin}/#/payments/success?processId=${processRow.processRecordId || processRow.id}`,
+      cancelUrl: `${window.location.origin}/#/payments/cancel?processId=${processRow.processRecordId || processRow.id}`,
+    });
   };
 
   const fetchPaymentProofsForSelected = async () => {
@@ -1320,6 +1309,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           setUploadingForProcess={setUploadingForProcess}
         />
       )}
+
+      {/* Currency Selection Modal */}
+      <CurrencySelectModal
+        open={checkoutRequest !== null}
+        request={checkoutRequest}
+        onClose={() => setCheckoutRequest(null)}
+        onError={(message) => window.alert(message)}
+        onStart={(url) => {
+          setCheckoutRequest(null);
+          window.location.assign(url);
+        }}
+      />
 
       {/* Edit Status Modal */}
       <EditingUserStatusModal

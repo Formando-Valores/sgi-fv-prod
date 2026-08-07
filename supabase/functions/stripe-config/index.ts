@@ -144,6 +144,9 @@ Deno.serve(async (request) => {
         stripe_webhook_secret_masked: data.webhook_secret_last4 ? `whsec_****${data.webhook_secret_last4}` : '',
         stripe_api_version: data.stripe_api_version,
         default_currency: data.default_currency,
+        allowed_currencies: Array.isArray(data.allowed_currencies)
+          ? data.allowed_currencies
+          : [data.default_currency || 'brl'],
         checkout_product_name: data.checkout_product_name,
         is_live_mode: data.is_live_mode,
         created_at: data.created_at,
@@ -162,6 +165,13 @@ Deno.serve(async (request) => {
     const currency = String(body.default_currency ?? 'brl').trim().toLowerCase();
     const productName = String(body.checkout_product_name ?? 'Serviço SGI FV').trim();
     const isLive = Boolean(body.is_live_mode);
+
+    const rawCurrencies = Array.isArray(body.allowed_currencies) ? body.allowed_currencies : [currency];
+    const allowedCurrencies = rawCurrencies
+      .map((c) => String(c).trim().toLowerCase())
+      .filter((c) => c.length > 0);
+    const normalizedCurrencies = Array.from(new Set(allowedCurrencies.length > 0 ? allowedCurrencies : [currency]));
+    const normalizedDefaultCurrency = normalizedCurrencies.includes(currency) ? currency : normalizedCurrencies[0];
 
     if (!stripeSecretKey) {
       return jsonResponse(400, { success: false, error: 'stripe_secret_key é obrigatório.' });
@@ -192,7 +202,8 @@ Deno.serve(async (request) => {
       stripe_secret_key_encrypted: encryptedSecret || null,
       stripe_webhook_secret_encrypted: encryptedWebhook || null,
       stripe_api_version: apiVersion,
-      default_currency: currency,
+      default_currency: normalizedDefaultCurrency,
+      allowed_currencies: normalizedCurrencies,
       checkout_product_name: productName,
       is_live_mode: isLive,
       secret_key_last4: secretLast4 || null,
@@ -219,6 +230,9 @@ Deno.serve(async (request) => {
         stripe_webhook_secret_masked: data.webhook_secret_last4 ? `whsec_****${data.webhook_secret_last4}` : '',
         stripe_api_version: data.stripe_api_version,
         default_currency: data.default_currency,
+        allowed_currencies: Array.isArray(data.allowed_currencies)
+          ? data.allowed_currencies
+          : [data.default_currency || 'brl'],
         checkout_product_name: data.checkout_product_name,
         is_live_mode: data.is_live_mode,
         updated_at: data.updated_at,

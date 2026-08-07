@@ -13,6 +13,7 @@ export async function getOrgStripeConfig(
   stripeWebhookSecret: string;
   apiVersion: string;
   defaultCurrency: string;
+  allowedCurrencies: string[];
   checkoutProductName: string;
 }> {
   // Defaults from env vars (backward compatibility)
@@ -25,6 +26,7 @@ export async function getOrgStripeConfig(
       stripeWebhookSecret: envWebhookSecret,
       apiVersion: '2025-03-31.basil',
       defaultCurrency: 'brl',
+      allowedCurrencies: ['brl', 'eur'],
       checkoutProductName: 'Serviço SGI FV',
     };
   }
@@ -43,6 +45,7 @@ export async function getOrgStripeConfig(
         stripeWebhookSecret: envWebhookSecret,
         apiVersion: '2025-03-31.basil',
         defaultCurrency: 'brl',
+        allowedCurrencies: ['brl', 'eur'],
         checkoutProductName: 'Serviço SGI FV',
       };
     }
@@ -74,6 +77,9 @@ export async function getOrgStripeConfig(
       stripeWebhookSecret,
       apiVersion: data.stripe_api_version || '2025-03-31.basil',
       defaultCurrency: data.default_currency || 'brl',
+      allowedCurrencies: Array.isArray(data.allowed_currencies) && data.allowed_currencies.length > 0
+        ? data.allowed_currencies
+        : [data.default_currency || 'brl'],
       checkoutProductName: data.checkout_product_name || 'Serviço SGI FV',
     };
   } catch {
@@ -83,6 +89,7 @@ export async function getOrgStripeConfig(
       stripeWebhookSecret: envWebhookSecret,
       apiVersion: '2025-03-31.basil',
       defaultCurrency: 'brl',
+      allowedCurrencies: ['brl', 'eur'],
       checkoutProductName: 'Serviço SGI FV',
     };
   }

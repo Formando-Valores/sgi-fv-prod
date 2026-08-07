@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { getOrgStripeConfig } from '../_shared/payments/getOrgStripeConfig.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -223,6 +224,15 @@ Deno.serve(async (request) => {
 
         let paymentUrl = '';
         try {
+          let amountMinor = 3000;
+          let currency = 'eur';
+          try {
+            const orgStripe = await getOrgStripeConfig(org_id, supabaseUrl, serviceRoleKey);
+            currency = orgStripe.defaultCurrency || 'eur';
+            amountMinor = currency === 'brl' ? 18000 : Math.round((180 / 6) * 100);
+          } catch {
+            // fallback mantém eur/3000
+          }
           const stripeResponse = await fetch(
             `${supabaseUrl}/functions/v1/stripe-create-checkout-session`,
             {
@@ -233,8 +243,8 @@ Deno.serve(async (request) => {
                 Authorization: `Bearer ${supabaseAnonKey}`,
               },
               body: JSON.stringify({
-                amount: 18000,
-                currency: 'brl',
+                amount: amountMinor,
+                currency,
                 successUrl,
                 cancelUrl,
                 processId,
