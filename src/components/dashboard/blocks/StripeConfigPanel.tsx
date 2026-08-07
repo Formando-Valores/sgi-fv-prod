@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { CreditCard, Eye, EyeOff, Loader2, Save, Check, AlertTriangle, Zap } from 'lucide-react';
 import { getStripeConfig, updateStripeConfig, type StripeConfigData } from '../../../lib/stripeConfig';
 

@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Loader2, Check, X, Briefcase } from 'lucide-react';
 import {
   listProfessionalSchedules,

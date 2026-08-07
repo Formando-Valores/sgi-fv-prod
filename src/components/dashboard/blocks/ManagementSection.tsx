@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Plus, Trash2, Pencil, Search, Users, Loader2 } from 'lucide-react';
 import { supabase } from '../../../../supabase';
 import type { User, Organization } from '../../../../types';

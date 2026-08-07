@@ -1,4 +1,4 @@
-﻿/**
+/**
  * SGI FV - Dashboard Page
  * Main dashboard with real process statistics
  */

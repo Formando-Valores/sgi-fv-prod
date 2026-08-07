@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Plus, Search, Eye, FolderKanban, X, AlertCircle, Loader2, Lock, ChevronDown, Upload, Check } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';

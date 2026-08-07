@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import Badge from '../ui/Badge';
 
 export interface ClientProcessProgressHistoryItem {

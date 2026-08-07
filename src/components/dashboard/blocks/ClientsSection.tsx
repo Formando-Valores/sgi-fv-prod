@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Users, Pencil, Trash2, X, Plus, Check } from 'lucide-react';
 import { User, ServiceUnit, Organization } from '../../../../types';
 import { supabase } from '../../../../supabase';

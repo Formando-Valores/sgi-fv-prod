@@ -1,4 +1,4 @@
-﻿/**
+/**
  * SGI FV - Auth Context
  * Provides authentication state and user context throughout the app
  */

@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, Download, FileText, Search } from 'lucide-react';
 import { listReportActivities, type ReportFilters, type ReportRow } from '../../lib/reports';
 import { formatEuro } from '../../lib/servicesCatalog';

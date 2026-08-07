@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2, CheckCircle2, AlertCircle, RefreshCcw } from 'lucide-react';
 import { supabase } from '../../../supabase';

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef, lazy, Suspense } from 'react';
 import { Eye, Calendar, LayoutDashboard, FolderKanban, Users2, Settings, Building2, FileBarChart2, BarChart3, FilePlus } from 'lucide-react';
 import { User, ProcessStatus, UserRole, Hierarchy, ServiceUnit, Organization, type OrgRole, type OrgMembership } from '../types';
@@ -156,13 +155,13 @@ const getActiveOrgId = (user: User): string | null => {
 };
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, setUsers, onLogout, onSwitchOrg, section = 'dashboard', blocks }) => {
-  // Estado do seletor de organiza��o
+  // Estado do seletor de organização
   const [orgSwitcherOpen, setOrgSwitcherOpen] = useState(false);
   const orgSwitcherRef = useRef<HTMLDivElement>(null);
   const activeOrgId = getActiveOrgId(currentUser);
   const currentOrgName = currentUser.availableOrgs?.find(o => o.org_id === activeOrgId)?.organizations?.name
     || currentUser.organizationName
-    || 'Selecionar Organiza��o';
+    || 'Selecionar Organização';
   const [activeTab, setActiveTab] = useState<'users' | 'management' | 'iban' | 'servicos'>('users');
   const [selectedUser, setSelectedUser] = useState<AdminProcessRow | User | null>(null);
   const [selectedUserTab, setSelectedUserTab] = useState<'cadastral' | 'financeiro' | 'documentos' | 'comunicacao'>('cadastral');
@@ -311,9 +310,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     { to: '/dashboard/processos?novo=1', label: 'Novo Processo', icon: FilePlus, visible: allowedModules.includes('processos') },
     { to: '/dashboard/processos', label: 'Processos', icon: FolderKanban, visible: allowedModules.includes('processos') },
     { to: '/dashboard/clientes', label: 'Clientes', icon: Users2, visible: allowedModules.includes('clientes') },
-    { to: '/dashboard/configuracoes', label: 'Configura��es', icon: Settings, visible: allowedModules.includes('configuracoes') },
-    { to: '/dashboard/organizacoes', label: 'Organiza��es', icon: Building2, visible: allowedModules.includes('organizacoes') },
-    { to: '/dashboard/relatorios', label: 'Relat�rios', icon: FileBarChart2, visible: allowedModules.includes('relatorios') },
+    { to: '/dashboard/configuracoes', label: 'Configurações', icon: Settings, visible: allowedModules.includes('configuracoes') },
+    { to: '/dashboard/organizacoes', label: 'Organizações', icon: Building2, visible: allowedModules.includes('organizacoes') },
+    { to: '/dashboard/relatorios', label: 'Relatórios', icon: FileBarChart2, visible: allowedModules.includes('relatorios') },
     { to: '/dashboard/agenda', label: 'Agenda', icon: Calendar, visible: allowedModules.includes('agenda') },
   ].filter((item) => item.visible);
 
@@ -370,8 +369,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const orgId = getActiveOrgId(currentUser);
     if (orgId) {
       if (!isFirstOrgLoad.current) {
-        const orgLabel = organizations.find(o => o.id === orgId)?.name || 'organiza��o';
-        showToast({ type: 'success', message: `Organiza��o alterada para ${orgLabel}` });
+        const orgLabel = organizations.find(o => o.id === orgId)?.name || 'organização';
+        showToast({ type: 'success', message: `Organização alterada para ${orgLabel}` });
       }
       isFirstOrgLoad.current = false;
       listProcesses(orgId).then(async (processes) => {
@@ -435,9 +434,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
   const buildProcessStage = (process: DbProcess) => {
     const source = sanitizeDisplayValue(process.origem_canal).toLowerCase();
-    if (source === 'wix' || source === 'vainaai') return 'Solicita��o recebida';
+    if (source === 'wix' || source === 'vainaai') return 'Solicitação recebida';
     if (process.status === 'concluido') return 'Finalizado';
-    if (process.status === 'analise') return 'Em an�lise';
+    if (process.status === 'analise') return 'Em análise';
     if (process.status === 'triagem') return 'Triagem';
     return 'Cadastro';
   };
@@ -448,7 +447,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       const source = sanitizeDisplayValue(process.origem_canal);
       const contact = sanitizeDisplayValue(process.cliente_contato);
       const email = contact.includes('@') ? contact : '';
-      const requestedOrganizationName = sanitizeDisplayValue(process.org_nome_solicitado) || 'N�o informado';
+      const requestedOrganizationName = sanitizeDisplayValue(process.org_nome_solicitado) || 'Não informado';
       const isExternalRequest = source.toLowerCase() === 'wix' || source.toLowerCase() === 'vainaai';
       const generatedValue = unit === ServiceUnit.ADMINISTRATIVO ? 5200 : unit === ServiceUnit.TECNOLOGICO ? 8200 : 1800;
       const processOverrides = processVisualOverrides[process.id] || {};
@@ -462,7 +461,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       const resolvedServiceManager = persistedServiceManager || manualServiceManager;
       const resolvedNotes = persistedNotes || manualNotes;
       const resolvedDeadlineDisplay =
-        formatDeadlineForDisplay(resolvedDeadline) || (isExternalRequest ? 'Aguardando an�lise' : '-');
+        formatDeadlineForDisplay(resolvedDeadline) || (isExternalRequest ? 'Aguardando análise' : '-');
 
       const pClientUserId = (process as Record<string, unknown>).cliente_user_id;
       const profile = typeof pClientUserId === 'string' && pClientUserId ? profileMap.get(pClientUserId) : null;
@@ -478,12 +477,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         id: process.id,
         processRecordId: process.id,
         profileUserId: process.cliente_user_id,
-        name: sanitizeDisplayValue(process.cliente_nome) || sanitizeDisplayValue(process.titulo) || 'Solicita��o sem nome',
+        name: sanitizeDisplayValue(process.cliente_nome) || sanitizeDisplayValue(process.titulo) || 'Solicitação sem nome',
         email: pEmail || email || '-',
         role: UserRole.CLIENT,
         documentId: sanitizeDisplayValue(process.cliente_documento) || pDocId || '---',
         taxId: pTaxId || sanitizeDisplayValue(process.cliente_documento) || '---',
-        address: pAddress || (requestedOrganizationName !== 'N�o informado' ? `Organiza��o solicitada: ${requestedOrganizationName}` : '---'),
+        address: pAddress || (requestedOrganizationName !== 'Não informado' ? `Organização solicitada: ${requestedOrganizationName}` : '---'),
         maritalStatus: pMarital || '---',
         country: pCountry || 'Brasil',
         phone: pPhone || (!email && contact ? contact : '---'),
@@ -496,21 +495,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         hierarchy: Hierarchy.STATUS_ONLY,
         notes:
           resolvedNotes ||
-          (isExternalRequest ? `Origem: ${source.toLowerCase() === 'wix' ? 'Wix' : 'VAINAAI'}${requestedOrganizationName !== 'N�o informado' ? ` � Organiza��o solicitada: ${requestedOrganizationName}` : ''}` : undefined),
+          (isExternalRequest ? `Origem: ${source.toLowerCase() === 'wix' ? 'Wix' : 'VAINAAI'}${requestedOrganizationName !== 'Não informado' ? ` — Organização solicitada: ${requestedOrganizationName}` : ''}` : undefined),
         deadline: resolvedDeadline,
-        serviceManager: resolvedServiceManager || (isExternalRequest ? 'Aguardando aprova��o' : 'N�o definido'),
+        serviceManager: resolvedServiceManager || (isExternalRequest ? 'Aguardando aprovação' : 'Não definido'),
         organizationId: process.org_id,
         organizationName: requestedOrganizationName,
         processType: unit,
         startDate: formatProcessDate(process.created_at),
         deadlineDate: resolvedDeadlineDisplay,
         etapaAtual: buildProcessStage(process),
-        financeiro: isExternalRequest ? 'Aguardando valida��o' : (legacyStatus === ProcessStatus.CONCLUIDO ? 'Quitado' : 'Pendente'),
-        prioridade: isExternalRequest ? 'Alta' : (legacyStatus === ProcessStatus.CONCLUIDO ? 'M�dia' : 'Baixa'),
+        financeiro: isExternalRequest ? 'Aguardando validação' : (legacyStatus === ProcessStatus.CONCLUIDO ? 'Quitado' : 'Pendente'),
+        prioridade: isExternalRequest ? 'Alta' : (legacyStatus === ProcessStatus.CONCLUIDO ? 'Média' : 'Baixa'),
         valor: process.os_value != null ? Number(process.os_value) : generatedValue,
         sourceLabel: source ? source.toUpperCase() : 'PAINEL',
         requestedOrganizationName,
-        contractedServiceName: sanitizeDisplayValue(process.titulo) || 'Servi�o n�o informado',
+        contractedServiceName: sanitizeDisplayValue(process.titulo) || 'Serviço não informado',
         paymentStatus: process.payment_status ?? null,
         osValue: process.os_value ?? null,
         servicesSelected: (process.services_selected as AdminProcessRow['servicesSelected']) ?? null,
@@ -559,7 +558,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       .maybeSingle();
 
     if (error) {
-      setEditingProfileError('N�o foi poss�vel carregar todos os dados cadastrais do usu�rio.');
+      setEditingProfileError('Não foi possível carregar todos os dados cadastrais do usuário.');
       setEditingProfileLoading(false);
       return;
     }
@@ -588,7 +587,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
   const handleCloseEditModal = () => {
     if (formChanged) {
-      const confirmed = window.confirm('Voc� tem altera��es n�o salvas. Deseja realmente sair?');
+      const confirmed = window.confirm('Você tem alterações não salvas. Deseja realmente sair?');
       if (!confirmed) return;
     }
     setEditingUser(null);
@@ -650,7 +649,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       const compactHistory = ((data || []) as Array<{ id: string; mensagem?: string | null; created_at?: string | null }>).map((event) => ({
         id: event.id,
         dateLabel: event.created_at ? new Date(event.created_at).toLocaleString('pt-BR') : 'Sem data',
-        message: sanitizeDisplayValue(event.mensagem) || 'Atualiza��o registrada.',
+        message: sanitizeDisplayValue(event.mensagem) || 'Atualização registrada.',
       }));
 
       setClientJourneyHistory(compactHistory);
@@ -668,7 +667,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const processRow = selected as AdminProcessRow;
     const amount = Number(processRow.osValue ?? processRow.valor ?? 0);
     if (amount <= 0) {
-      window.alert('Valor do pagamento n�o definido para este processo.');
+      window.alert('Valor do pagamento não definido para este processo.');
       return;
     }
     setRedirectingCheckout(true);
@@ -690,7 +689,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       }
     } catch (err) {
       console.error('Erro ao criar checkout:', err);
-      window.alert('N�o foi poss�vel iniciar o pagamento. Tente novamente mais tarde.');
+      window.alert('Não foi possível iniciar o pagamento. Tente novamente mais tarde.');
     } finally {
       setRedirectingCheckout(false);
     }
@@ -707,7 +706,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const handleUploadProof = async (file: File, amount?: number) => {
     if (!selectedUser) return;
     const processId = (selectedUser as AdminProcessRow).processRecordId;
-    if (!processId) { window.alert('Usu�rio n�o possui um processo vinculado para comprovante de pagamento.'); return; }
+    if (!processId) { window.alert('Usuário não possui um processo vinculado para comprovante de pagamento.'); return; }
     setUploadingProof(true);
     const { proof, error } = await uploadPaymentProof(processId, currentUser.id, file, amount);
     setUploadingProof(false);
@@ -777,8 +776,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const statusLabelMap: Record<'cadastro' | 'triagem' | 'analise' | 'concluido', string> = {
       cadastro: 'cadastro',
       triagem: 'triagem',
-      analise: 'an�lise',
-      concluido: 'conclu�do',
+      analise: 'análise',
+      concluido: 'concluído',
     };
 
     const previousStatus = statusMap[(currentEditingUser as AdminProcessRow | null)?.status || ProcessStatus.PENDENTE];
@@ -800,7 +799,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const notesChanged = previousNotes !== normalizedNotes;
 
     if (normalizedDeadline && !/^\d{4}-\d{2}-\d{2}$/.test(normalizedDeadline)) {
-      setEditingProfileError('Data de prazo inv�lida. Use o calend�rio para selecionar uma data v�lida.');
+      setEditingProfileError('Data de prazo inválida. Use o calendário para selecionar uma data válida.');
       setEditingProfileSaving(false);
       return;
     }
@@ -820,7 +819,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         .eq('id', processRecordId);
 
       if (error) {
-        processUpdateError = 'N�o foi poss�vel atualizar status, prazo, gestor e observa��es do processo no banco.';
+        processUpdateError = 'Não foi possível atualizar status, prazo, gestor e observações do processo no banco.';
       } else {
         setDbProcesses((prev) =>
           prev.map((process) => (process.id === processRecordId ? { ...process, ...processUpdatePayload } : process))
@@ -860,20 +859,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       }
 
       if (serviceManagerChanged) {
-        const previousManagerLabel = previousServiceManager || 'N�o definido';
-        const nextManagerLabel = normalizedServiceManager || 'N�o definido';
+        const previousManagerLabel = previousServiceManager || 'Não definido';
+        const nextManagerLabel = normalizedServiceManager || 'Não definido';
         processEventsPayload.push({
           org_id: processOrgId,
           process_id: processRecordId,
           tipo: 'atribuicao',
-          mensagem: `Respons�vel do servi�o alterado de ${previousManagerLabel} para ${nextManagerLabel}.`,
+          mensagem: `Responsável do serviço alterado de ${previousManagerLabel} para ${nextManagerLabel}.`,
           created_by: currentUser.id,
         });
       }
 
       if (deadlineChanged) {
-        const previousDeadlineLabel = previousDeadline ? formatDeadlineForDisplay(previousDeadline) : 'N�o definido';
-        const nextDeadlineLabel = normalizedDeadline ? formatDeadlineForDisplay(normalizedDeadline) : 'N�o definido';
+        const previousDeadlineLabel = previousDeadline ? formatDeadlineForDisplay(previousDeadline) : 'Não definido';
+        const nextDeadlineLabel = normalizedDeadline ? formatDeadlineForDisplay(normalizedDeadline) : 'Não definido';
         processEventsPayload.push({
           org_id: processOrgId,
           process_id: processRecordId,
@@ -888,7 +887,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           org_id: processOrgId,
           process_id: processRecordId,
           tipo: 'observacao',
-          mensagem: `Observa��o registrada: ${normalizedNotes}.`,
+          mensagem: `Observação registrada: ${normalizedNotes}.`,
           created_by: currentUser.id,
         });
       }
@@ -934,7 +933,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         .eq('id', profileUserId);
 
       if (error) {
-        profileUpdateError = 'N�o foi poss�vel atualizar os dados cadastrais na tabela profiles.';
+        profileUpdateError = 'Não foi possível atualizar os dados cadastrais na tabela profiles.';
       }
     }
 
@@ -976,7 +975,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
 
   const handleDeleteUser = (id: string) => {
-    if(window.confirm('Deseja realmente excluir este usu�rio?')) {
+    if(window.confirm('Deseja realmente excluir este usuário?')) {
       setUsers(prev => prev.filter(u => u.id !== id));
     }
   };
@@ -1007,7 +1006,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const file = e.target.files?.[0];
     if (!file || !selectedUser || !currentUser.id) return;
     const processId = (selectedUser as AdminProcessRow).processRecordId;
-    if (!processId) { alert('Usu�rio n�o possui um processo vinculado para anexar documentos.'); return; }
+    if (!processId) { alert('Usuário não possui um processo vinculado para anexar documentos.'); return; }
     const orgId = getActiveOrgId(currentUser);
     if (!orgId) return;
     setUploadingDocument(true);
@@ -1020,7 +1019,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const handleResendCertificate = async () => {
     if (!selectedUser) return;
     const processId = (selectedUser as AdminProcessRow).processRecordId;
-    if (!processId) { showToast({ type: 'error', message: 'Usu�rio n�o possui um processo vinculado para reenviar certificado.' }); return; }
+    if (!processId) { showToast({ type: 'error', message: 'Usuário não possui um processo vinculado para reenviar certificado.' }); return; }
 
     setResendingCertificate(true);
 
@@ -1052,12 +1051,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       };
 
       const requiredFields = [
-        { key: 'documento_identidade', label: 'Documento de Identidade (Cart�o de Cidad�o)' },
+        { key: 'documento_identidade', label: 'Documento de Identidade (Cartão de Cidadão)' },
         { key: 'nif_cpf', label: 'NIF/CPF' },
-        { key: 'endereco', label: 'Endere�o (Morada)' },
+        { key: 'endereco', label: 'Endereço (Morada)' },
         { key: 'estado_civil', label: 'Estado Civil' },
         { key: 'phone', label: 'Telefone/WhatsApp' },
-        { key: 'pais', label: 'Pa�s' },
+        { key: 'pais', label: 'País' },
       ];
 
       const missingFields = requiredFields.filter(f => {
@@ -1076,7 +1075,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         return;
       }
 
-      if (!window.confirm('Deseja realmente gerar o certificado de filia��o e envi�-lo por e-mail para o cliente?')) {
+      if (!window.confirm('Deseja realmente gerar o certificado de filiação e enviá-lo por e-mail para o cliente?')) {
         setResendingCertificate(false);
         return;
       }
@@ -1139,7 +1138,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                 Visualizando como {impersonatingAccessLevel}
               </p>
               <p className="text-xs text-amber-600 truncate">
-                Permiss�es ajustadas automaticamente
+                Permissões ajustadas automaticamente
               </p>
             </div>
           </div>
@@ -1194,14 +1193,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           onClick={() => setActiveTab('users')}
           className={`pb-4 px-2 font-black uppercase text-xs tracking-widest transition-all relative ${activeTab === 'users' ? 'text-brand-500' : 'text-surface-500'}`}
         >
-          Visualiza��o de Usu�rios
+          Visualização de Usuários
           {activeTab === 'users' && <div className="absolute bottom-0 left-0 w-full h-1 bg-brand-500 rounded-t-full"></div>}
         </button>
         <button 
           onClick={() => setActiveTab('management')}
           className={`pb-4 px-2 font-black uppercase text-xs tracking-widest transition-all relative ${activeTab === 'management' ? 'text-brand-500' : 'text-surface-500'}`}
         >
-          Gest�o de Acessos
+          Gestão de Acessos
           {activeTab === 'management' && <div className="absolute bottom-0 left-0 w-full h-1 bg-brand-500 rounded-t-full"></div>}
         </button>
         <button 
@@ -1215,7 +1214,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           onClick={() => setActiveTab('servicos')}
           className={`pb-4 px-2 font-black uppercase text-xs tracking-widest transition-all relative ${activeTab === 'servicos' ? 'text-brand-500' : 'text-surface-500'}`}
         >
-          Servi�os
+          Serviços
           {activeTab === 'servicos' && <div className="absolute bottom-0 left-0 w-full h-1 bg-brand-500 rounded-t-full"></div>}
         </button>
         <button 

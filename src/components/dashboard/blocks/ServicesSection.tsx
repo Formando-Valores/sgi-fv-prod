@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Plus, Trash2, Pencil, Loader2, Check, X, Search, ChevronDown, XCircle, Package } from 'lucide-react';
 import Skeleton, { TableSkeleton } from '../../ui/Skeleton';
 import EmptyState from '../../ui/EmptyState';

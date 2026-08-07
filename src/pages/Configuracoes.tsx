@@ -1,4 +1,4 @@
-﻿/**
+/**
  * SGI FV - Configurações Page
  * Settings placeholder
  */

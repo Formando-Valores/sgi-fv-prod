@@ -1,4 +1,4 @@
-﻿/**
+/**
  * SGI FV - Main Application Component
  * Sistema de Gestão Integrada - Formando Valores
  */

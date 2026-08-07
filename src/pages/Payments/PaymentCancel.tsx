@@ -1,4 +1,4 @@
-﻿import React, { useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AlertTriangle, RefreshCcw } from 'lucide-react';
 

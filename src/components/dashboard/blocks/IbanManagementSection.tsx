@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Plus, Trash2, Loader2, Check, X, Building2 } from 'lucide-react';
 import Skeleton, { TableSkeleton } from '../../ui/Skeleton';
 import EmptyState from '../../ui/EmptyState';

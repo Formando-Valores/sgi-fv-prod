@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Building2, Search, Pencil, Power, Trash2, MoreVertical, Check, X } from 'lucide-react';
 import { Organization } from '../../../../types';
 import Card from '../../ui/Card';

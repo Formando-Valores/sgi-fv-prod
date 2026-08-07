@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Send, Paperclip, Loader2, FileText, Image, X, Printer } from 'lucide-react';
 import { supabase } from '../../../../supabase';
 import { listMessages, sendMessage, uploadMessageAttachment, type ProcessMessage } from '../../../lib/processMessages';

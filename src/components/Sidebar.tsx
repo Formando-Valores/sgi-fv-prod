@@ -1,4 +1,4 @@
-﻿/**
+/**
  * SGI FV - Sidebar Component
  * Navigation menu for the SaaS layout with org context
  */

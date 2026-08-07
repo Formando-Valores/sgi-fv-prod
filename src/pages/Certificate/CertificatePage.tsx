@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../../../supabase';
 import { Download, ArrowLeft } from 'lucide-react';

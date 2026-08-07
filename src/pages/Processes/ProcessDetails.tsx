@@ -1,4 +1,4 @@
-﻿/**
+/**
  * SGI FV - Process Details Page
  * Displays the detailed process view with real data
  */

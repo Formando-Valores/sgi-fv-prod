@@ -1,4 +1,4 @@
-﻿/**
+/**
  * SGI FV - Members Settings Page
  * Organization members management
  */

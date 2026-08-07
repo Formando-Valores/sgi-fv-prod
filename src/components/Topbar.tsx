@@ -1,4 +1,4 @@
-﻿/**
+/**
  * SGI FV - Topbar Component
  * Action buttons and user info header
  */

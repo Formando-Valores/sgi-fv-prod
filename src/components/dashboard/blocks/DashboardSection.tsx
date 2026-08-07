@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { Inbox, Users2, FolderKanban, MessageSquare, Calendar, FilePlus, Clock } from 'lucide-react';
 import { ProcessStatus, type User } from '../../../../types';
 import { useNavigate } from 'react-router-dom';
