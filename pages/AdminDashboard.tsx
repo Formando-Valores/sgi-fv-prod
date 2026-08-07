@@ -1,10 +1,11 @@
 
-import React, { useEffect, useState, lazy, Suspense } from 'react';
+import React, { useEffect, useState, useRef, lazy, Suspense } from 'react';
 import { Eye, Calendar, LayoutDashboard, FolderKanban, Users2, Settings, Building2, FileBarChart2, BarChart3, FilePlus } from 'lucide-react';
 import { User, ProcessStatus, UserRole, Hierarchy, ServiceUnit, Organization, type OrgRole, type OrgMembership } from '../types';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { loadOrganizations } from '../organizationRepository';
 import { supabase } from '../supabase';
+import { listProcesses } from '../src/lib/processes';
 import type { Process as DbProcess } from '../src/lib/processes';
 import DashboardShell from '../src/components/dashboard/DashboardShell';
 import DashboardSidebar from '../src/components/dashboard/DashboardSidebar';
