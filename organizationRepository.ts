@@ -341,7 +341,7 @@ export const buildOrganizationErrorMessage = (error: PostgrestErrorLike | null |
   const normalizedMessage = `${error.message ?? ''} ${error.details ?? ''}`.toLowerCase();
 
   if (normalizedMessage.includes('infinite recursion detected in policy')) {
-    return 'Foi detectada uma policy recursiva na tabela organizations. Aplique a migration 012_fix_organizations_policy_reapply.sql (ou 011 se ainda não aplicada) e atualize a página.';
+    return 'Foi detectada uma policy recursiva na tabela organizations. Aplique a migration 054_fix_organizations_insert_policy_recursion.sql e atualize a página.';
   }
 
 

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { LogOut, Eye, Shield, Building2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LogOut, Eye, Shield, Building2, Scale, ChevronLeft, ChevronRight } from 'lucide-react';
 
 type SidebarLink = {
   to: string;
@@ -40,14 +40,22 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
   const [collapsed, setCollapsed] = useState(false);
   const isViewingAsDifferent = showRoleSwitcher && accessLevel && originalRoleLabel && accessLevel !== originalRoleLabel;
 
-  const renderUserInfo = () => (
-    <div className="mb-4 px-3 py-3 rounded-xl bg-surface-50 border border-surface-200/60">
-      <p className="font-bold text-surface-800 text-sm truncate">{userName}</p>
-      <p className="text-[10px] uppercase tracking-wider text-surface-400 font-semibold mt-0.5 truncate">
-        {hierarchyLabel}{orgName ? ` · ${orgName}` : ''}
-      </p>
-    </div>
-  );
+  const renderUserInfo = () => {
+    const initial = userName.trim().charAt(0).toUpperCase() || 'U';
+    return (
+      <div className="mb-4 px-3 py-3 rounded-xl bg-surface-50 border border-surface-200/60 flex items-center gap-3">
+        <div className="w-9 h-9 rounded-lg bg-brand-600/10 text-brand-700 flex items-center justify-center font-bold text-sm shrink-0">
+          {initial}
+        </div>
+        <div className="min-w-0">
+          <p className="font-semibold text-surface-800 text-sm truncate">{userName}</p>
+          <p className="text-[10px] uppercase tracking-wider text-surface-400 font-semibold mt-0.5 truncate">
+            {hierarchyLabel}{orgName ? ` · ${orgName}` : ''}
+          </p>
+        </div>
+      </div>
+    );
+  };
 
   const renderRoleSwitcher = () => {
     if (!showRoleSwitcher) return null;
@@ -115,20 +123,36 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
       `}
     >
       {/* Header */}
-      <div className={`px-4 py-5 border-b border-surface-100 flex items-center ${collapsed ? 'justify-center' : 'justify-between'}`}>
+      <div className={`px-4 py-5 border-b border-surface-100 flex items-center ${collapsed ? 'justify-center' : 'justify-between'} gap-2`}>
         {!collapsed && (
-          <div className="min-w-0 animate-fade-in">
-            <h2 className="text-base font-extrabold text-surface-800 tracking-tight">SGI FV</h2>
-            <p className="text-[10px] text-surface-400 font-semibold uppercase tracking-wider">Formando Valores</p>
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-white shadow-sm shrink-0">
+              <Scale className="w-4 h-4" />
+            </div>
+            <div className="min-w-0 animate-fade-in">
+              <h2 className="text-sm font-extrabold text-surface-800 tracking-tight leading-tight">SGI FV</h2>
+              <p className="text-[9px] text-surface-400 font-semibold uppercase tracking-wider">Formando Valores</p>
+            </div>
           </div>
         )}
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="hidden lg:flex p-1.5 rounded-lg text-surface-400 hover:bg-surface-100 hover:text-surface-600 transition-colors shrink-0"
-          title={collapsed ? 'Expandir' : 'Recolher'}
-        >
-          {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-        </button>
+        {!collapsed && (
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            className="p-1.5 rounded-lg text-surface-400 hover:bg-surface-100 hover:text-surface-600 transition-colors shrink-0"
+            title="Recolher"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+        )}
+        {collapsed && (
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            className="p-1.5 rounded-lg text-surface-400 hover:bg-surface-100 hover:text-surface-600 transition-colors shrink-0"
+            title="Expandir"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {/* Content */}
@@ -138,7 +162,10 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
         {!collapsed && renderOrgSelector()}
 
         {/* Navigation */}
-        <nav className="space-y-1">
+        <nav className="space-y-1.5">
+          {!collapsed && (
+            <p className="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-surface-400">Menu</p>
+          )}
           {links.map((item) => {
             const isActive = currentPath === item.to || (item.to !== '/dashboard' && currentPath.startsWith(item.to));
             return (
@@ -152,16 +179,20 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                   onNavigate();
                 }}
                 className={`
-                  flex items-center gap-3 w-full text-left rounded-xl transition-all duration-150
+                  relative flex items-center gap-3 w-full text-left rounded-xl transition-all duration-150
+                  active:scale-[0.98]
                   ${collapsed ? 'px-0 py-2.5 justify-center' : 'px-3 py-2.5'}
                   ${isActive
-                    ? 'bg-brand-50 text-brand-700 font-bold shadow-sm ring-1 ring-brand-200/40'
-                    : 'text-surface-500 hover:bg-surface-50 hover:text-surface-700 font-medium'
+                    ? 'bg-brand-50 text-brand-700 font-semibold shadow-sm ring-1 ring-brand-200/50'
+                    : 'text-surface-500 hover:bg-surface-50 hover:text-surface-800 font-medium'
                   }
                 `}
                 title={collapsed ? item.label : undefined}
               >
-                <item.icon className={`w-[18px] h-[18px] shrink-0 ${isActive ? 'text-brand-600' : ''}`} />
+                {!collapsed && isActive && (
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-brand-600" />
+                )}
+                <item.icon className={`w-[18px] h-[18px] shrink-0 transition-colors duration-150 ${isActive ? 'text-brand-600' : 'text-surface-400'}`} />
                 {!collapsed && <span className="text-sm truncate">{item.label}</span>}
               </button>
             );
@@ -176,6 +207,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
           onClick={() => { onLogout?.(); onNavigate(); }}
           className={`
             flex items-center gap-3 w-full rounded-xl transition-all duration-150
+            active:scale-[0.98]
             text-surface-400 hover:bg-red-50 hover:text-red-600 font-medium
             ${collapsed ? 'px-0 py-2.5 justify-center' : 'px-3 py-2.5'}
           `}

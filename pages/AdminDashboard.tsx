@@ -1,68 +1,41 @@
-﻿
-import React, { useEffect, useState, useRef } from 'react';
-import { Eye, Pencil, Users, ShieldCheck, X, Plus, Trash2, Calendar, MessageSquare, Check, UserCheck, LayoutDashboard, FolderKanban, Users2, Settings, Building2, Flag, FileBarChart2, ExternalLink, Loader2, CreditCard, ChevronDown, Upload, FileDown, Mail, SearchX, BarChart3, FilePlus } from 'lucide-react';
+
+import React, { useEffect, useState, lazy, Suspense } from 'react';
+import { Eye, Calendar, LayoutDashboard, FolderKanban, Users2, Settings, Building2, FileBarChart2, BarChart3, FilePlus } from 'lucide-react';
 import { User, ProcessStatus, UserRole, Hierarchy, ServiceUnit, Organization, type OrgRole, type OrgMembership } from '../types';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { SERVICE_MANAGERS } from '../constants';
 import { loadOrganizations } from '../organizationRepository';
 import { supabase } from '../supabase';
 import type { Process as DbProcess } from '../src/lib/processes';
-import { listProcesses } from '../src/lib/processes';
-import Card from '../src/components/ui/Card';
-import Badge from '../src/components/ui/Badge';
-import Skeleton from '../src/components/ui/Skeleton';
-import Button from '../src/components/ui/Button';
 import DashboardShell from '../src/components/dashboard/DashboardShell';
 import DashboardSidebar from '../src/components/dashboard/DashboardSidebar';
 import DashboardTopbar from '../src/components/dashboard/DashboardTopbar';
-import DashboardCardContainer from '../src/components/dashboard/DashboardCardContainer';
 import { can, getAllowedModules, resolvePermissions } from '../src/lib/permissions';
-import OverviewBlock from '../src/components/dashboard/blocks/OverviewBlock';
-import ProcessesBlock from '../src/components/dashboard/blocks/ProcessesBlock';
-import ClientsSection from '../src/components/dashboard/blocks/ClientsSection';
-import DashboardSection from '../src/components/dashboard/blocks/DashboardSection';
-import ClientJourneyBlock from '../src/components/dashboard/blocks/ClientJourneyBlock';
-import AgendaBlock from '../src/components/dashboard/blocks/AgendaBlock';
-import ClientProcessProgressPanel, {
-  ClientProcessProgressHistoryItem,
-} from '../src/components/dashboard/ClientProcessProgressPanel';
-import ReportsPage from '../src/pages/Reports/ReportsPage';
-import IbanManagementSection from '../src/components/dashboard/blocks/IbanManagementSection';
-import ServicesSection from '../src/components/dashboard/blocks/ServicesSection';
-import CommunicationBlock from '../src/components/dashboard/blocks/CommunicationBlock';
-import ProcessesSection from '../src/components/dashboard/blocks/ProcessesSection';
-import UsersSection from '../src/components/dashboard/blocks/UsersSection';
-import ManagementSection from '../src/components/dashboard/blocks/ManagementSection';
-import StripeConfigPanel from '../src/components/dashboard/blocks/StripeConfigPanel';
-import OrganizationsSection from '../src/components/dashboard/blocks/OrganizationsSection';
+import Skeleton from '../src/components/ui/Skeleton';
+const OverviewBlock = lazy(() => import('../src/components/dashboard/blocks/OverviewBlock'));
+const ProcessesBlock = lazy(() => import('../src/components/dashboard/blocks/ProcessesBlock'));
+const ClientsSection = lazy(() => import('../src/components/dashboard/blocks/ClientsSection'));
+const DashboardSection = lazy(() => import('../src/components/dashboard/blocks/DashboardSection'));
+const ClientJourneyBlock = lazy(() => import('../src/components/dashboard/blocks/ClientJourneyBlock'));
+const AgendaBlock = lazy(() => import('../src/components/dashboard/blocks/AgendaBlock'));
+import { ClientProcessProgressHistoryItem } from '../src/components/dashboard/ClientProcessProgressPanel';
+const ReportsPage = lazy(() => import('../src/pages/Reports/ReportsPage'));
+const IbanManagementSection = lazy(() => import('../src/components/dashboard/blocks/IbanManagementSection'));
+const ServicesSection = lazy(() => import('../src/components/dashboard/blocks/ServicesSection'));
+const ProcessesSection = lazy(() => import('../src/components/dashboard/blocks/ProcessesSection'));
+const UsersSection = lazy(() => import('../src/components/dashboard/blocks/UsersSection'));
+const ManagementSection = lazy(() => import('../src/components/dashboard/blocks/ManagementSection'));
+const StripeConfigPanel = lazy(() => import('../src/components/dashboard/blocks/StripeConfigPanel'));
+const OrganizationsSection = lazy(() => import('../src/components/dashboard/blocks/OrganizationsSection'));
 import { useToast } from '../src/contexts/ToastContext';
 import { createCheckoutSession } from '../src/lib/stripe';
-import { getPaymentStatusUi } from '../src/lib/paymentStatus';
-import { calcAssociationFees, ASSOCIATION_ANNUAL_FEE, type AssociationFeeItem, formatEuro } from '../src/lib/servicesCatalog';
 import { loadServicesCatalog, filterServicesByUnit, filterGroupsByUnit, filterServicesByGroup, type DbCatalogService } from '../src/lib/servicesCatalogDb';
 import { uploadPaymentProof, validatePaymentProof, getPaymentProofs, type PaymentProof } from '../src/lib/paymentProofs';
-import { uploadProcessDocument, listProcessDocuments, reviewProcessDocument, deleteProcessDocument, type ProcessDocument } from '../src/lib/processDocuments';
+import { uploadProcessDocument, listProcessDocuments, reviewProcessDocument, type ProcessDocument } from '../src/lib/processDocuments';
 import { SUPABASE_EDGE_FUNCTIONS } from '../src/lib/supabaseFunctions';
 import { sanitizeDisplayValue, mapAccessLevelToOrgRole, type AccessLevel } from '../src/lib/clientUtils';
-
-interface AdminProcessRow extends User {
-  processRecordId?: string;
-  profileUserId?: string | null;
-  processType: string;
-  startDate: string;
-  deadlineDate: string;
-  etapaAtual: string;
-  financeiro: string;
-  prioridade: string;
-  valor: number;
-  sourceLabel: string;
-  requestedOrganizationName: string;
-  contractedServiceName: string;
-  paymentStatus?: string | null;
-  osValue?: number | null;
-  servicesSelected?: { id: string; name: string; price: number; group: string }[] | null;
-  associationFees?: AssociationFeeItem[] | null;
-}
+import { useChecklist } from '../src/hooks/useChecklist';
+import SelectedUserDetailModal, { type AdminProcessRow } from '../src/components/dashboard/modals/SelectedUserDetailModal';
+import EditingUserStatusModal from '../src/components/dashboard/modals/EditingUserStatusModal';
 
 type ProcessVisualOverrides = Record<
   string,
@@ -84,10 +57,6 @@ type ProcessChecklistItem = {
 };
 
 type ProcessQuickPreset = 'andamento' | 'atencao' | 'novos7d';
-
-const CHECKLIST_EVENT_PREFIX = 'CHECKLIST_EVENT:';
-
-
 
 
 
@@ -186,13 +155,13 @@ const getActiveOrgId = (user: User): string | null => {
 };
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, setUsers, onLogout, onSwitchOrg, section = 'dashboard', blocks }) => {
-  // Estado do seletor de organização
+  // Estado do seletor de organiza��o
   const [orgSwitcherOpen, setOrgSwitcherOpen] = useState(false);
   const orgSwitcherRef = useRef<HTMLDivElement>(null);
   const activeOrgId = getActiveOrgId(currentUser);
   const currentOrgName = currentUser.availableOrgs?.find(o => o.org_id === activeOrgId)?.organizations?.name
     || currentUser.organizationName
-    || 'Selecionar Organização';
+    || 'Selecionar Organiza��o';
   const [activeTab, setActiveTab] = useState<'users' | 'management' | 'iban' | 'servicos'>('users');
   const [selectedUser, setSelectedUser] = useState<AdminProcessRow | User | null>(null);
   const [selectedUserTab, setSelectedUserTab] = useState<'cadastral' | 'financeiro' | 'documentos' | 'comunicacao'>('cadastral');
@@ -264,12 +233,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const [editingProfileError, setEditingProfileError] = useState('');
   const [editingProfileSaving, setEditingProfileSaving] = useState(false);
   const [formChanged, setFormChanged] = useState(false);
-  const [processChecklist, setProcessChecklist] = useState<ProcessChecklistItem[]>([]);
-  const [newChecklistText, setNewChecklistText] = useState('');
-  const [editingChecklistItemId, setEditingChecklistItemId] = useState<string | null>(null);
-  const [editingChecklistText, setEditingChecklistText] = useState('');
-  const [checklistLoading, setChecklistLoading] = useState(false);
-  const [checklistError, setChecklistError] = useState('');
+  // Checklist via hook
+  const checklist = useChecklist(editingUser, currentUser, activeOrgId);
   const [clientJourneyHistory, setClientJourneyHistory] = useState<ClientProcessProgressHistoryItem[]>([]);
   const [clientJourneyLoading, setClientJourneyLoading] = useState(false);
   const clientJourneyLastProcessIdRef = React.useRef<string | null>(null);
@@ -345,9 +310,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     { to: '/dashboard/processos?novo=1', label: 'Novo Processo', icon: FilePlus, visible: allowedModules.includes('processos') },
     { to: '/dashboard/processos', label: 'Processos', icon: FolderKanban, visible: allowedModules.includes('processos') },
     { to: '/dashboard/clientes', label: 'Clientes', icon: Users2, visible: allowedModules.includes('clientes') },
-    { to: '/dashboard/configuracoes', label: 'Configurações', icon: Settings, visible: allowedModules.includes('configuracoes') },
-    { to: '/dashboard/organizacoes', label: 'Organizações', icon: Building2, visible: allowedModules.includes('organizacoes') },
-    { to: '/dashboard/relatorios', label: 'Relatórios', icon: FileBarChart2, visible: allowedModules.includes('relatorios') },
+    { to: '/dashboard/configuracoes', label: 'Configura��es', icon: Settings, visible: allowedModules.includes('configuracoes') },
+    { to: '/dashboard/organizacoes', label: 'Organiza��es', icon: Building2, visible: allowedModules.includes('organizacoes') },
+    { to: '/dashboard/relatorios', label: 'Relat�rios', icon: FileBarChart2, visible: allowedModules.includes('relatorios') },
     { to: '/dashboard/agenda', label: 'Agenda', icon: Calendar, visible: allowedModules.includes('agenda') },
   ].filter((item) => item.visible);
 
@@ -404,8 +369,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const orgId = getActiveOrgId(currentUser);
     if (orgId) {
       if (!isFirstOrgLoad.current) {
-        const orgLabel = organizations.find(o => o.id === orgId)?.name || 'organização';
-        showToast({ type: 'success', message: `Organização alterada para ${orgLabel}` });
+        const orgLabel = organizations.find(o => o.id === orgId)?.name || 'organiza��o';
+        showToast({ type: 'success', message: `Organiza��o alterada para ${orgLabel}` });
       }
       isFirstOrgLoad.current = false;
       listProcesses(orgId).then(async (processes) => {
@@ -446,79 +411,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     return ProcessStatus.PENDENTE;
   };
 
-  const getEditingProcessRecordId = (user: AdminProcessRow | User | null) =>
-    sanitizeDisplayValue((user as AdminProcessRow | null)?.processRecordId || user?.id);
-
-  const buildChecklistFromEvents = (
-    events: Array<{ mensagem?: string | null; created_at?: string | null; created_by?: string | null }>,
-    userNameById: Record<string, string>
-  ): ProcessChecklistItem[] => {
-    const checklistMap = new Map<string, ProcessChecklistItem>();
-
-    events.forEach((event) => {
-      const rawMessage = sanitizeDisplayValue(event.mensagem);
-      if (!rawMessage) return;
-      if (!rawMessage.startsWith(CHECKLIST_EVENT_PREFIX)) return;
-
-      try {
-        const payload = JSON.parse(rawMessage.slice(CHECKLIST_EVENT_PREFIX.length)) as {
-          action?: 'add' | 'toggle' | 'edit' | 'delete';
-          itemId?: string;
-          text?: string;
-          completed?: boolean;
-          actorName?: string;
-        };
-
-        if (!payload?.action || !payload.itemId) return;
-
-        if (payload.action === 'add' && payload.text) {
-          checklistMap.set(payload.itemId, {
-            id: payload.itemId,
-            text: payload.text,
-            completed: false,
-            createdAt: event.created_at || new Date().toISOString(),
-            createdByName: payload.actorName || (event.created_by ? userNameById[event.created_by] : '') || 'Administrador',
-          });
-          return;
-        }
-
-        if (payload.action === 'toggle' && checklistMap.has(payload.itemId)) {
-          const existing = checklistMap.get(payload.itemId)!;
-          checklistMap.set(payload.itemId, {
-            ...existing,
-            completed: Boolean(payload.completed),
-            updatedAt: event.created_at || existing.updatedAt,
-            updatedByName: payload.actorName || (event.created_by ? userNameById[event.created_by] : '') || existing.updatedByName || 'Administrador',
-          });
-          return;
-        }
-
-        if (payload.action === 'edit' && checklistMap.has(payload.itemId) && payload.text) {
-          const existing = checklistMap.get(payload.itemId)!;
-          checklistMap.set(payload.itemId, {
-            ...existing,
-            text: payload.text,
-            updatedAt: event.created_at || existing.updatedAt,
-            updatedByName: payload.actorName || (event.created_by ? userNameById[event.created_by] : '') || existing.updatedByName || 'Administrador',
-          });
-          return;
-        }
-
-        if (payload.action === 'delete' && checklistMap.has(payload.itemId)) {
-          checklistMap.delete(payload.itemId);
-        }
-      } catch {
-        // ignora mensagens antigas de outros formatos
-      }
-    });
-
-    return Array.from(checklistMap.values()).sort((a, b) => {
-      const aTime = new Date(a.createdAt).getTime();
-      const bTime = new Date(b.createdAt).getTime();
-      return aTime - bTime;
-    });
-  };
-
   const formatProcessDate = (value?: string | null) => {
     if (!value) return '-';
     const parsed = new Date(value);
@@ -542,9 +434,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
   const buildProcessStage = (process: DbProcess) => {
     const source = sanitizeDisplayValue(process.origem_canal).toLowerCase();
-    if (source === 'wix' || source === 'vainaai') return 'Solicitação recebida';
+    if (source === 'wix' || source === 'vainaai') return 'Solicita��o recebida';
     if (process.status === 'concluido') return 'Finalizado';
-    if (process.status === 'analise') return 'Em análise';
+    if (process.status === 'analise') return 'Em an�lise';
     if (process.status === 'triagem') return 'Triagem';
     return 'Cadastro';
   };
@@ -555,7 +447,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       const source = sanitizeDisplayValue(process.origem_canal);
       const contact = sanitizeDisplayValue(process.cliente_contato);
       const email = contact.includes('@') ? contact : '';
-      const requestedOrganizationName = sanitizeDisplayValue(process.org_nome_solicitado) || 'Não informado';
+      const requestedOrganizationName = sanitizeDisplayValue(process.org_nome_solicitado) || 'N�o informado';
       const isExternalRequest = source.toLowerCase() === 'wix' || source.toLowerCase() === 'vainaai';
       const generatedValue = unit === ServiceUnit.ADMINISTRATIVO ? 5200 : unit === ServiceUnit.TECNOLOGICO ? 8200 : 1800;
       const processOverrides = processVisualOverrides[process.id] || {};
@@ -569,7 +461,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       const resolvedServiceManager = persistedServiceManager || manualServiceManager;
       const resolvedNotes = persistedNotes || manualNotes;
       const resolvedDeadlineDisplay =
-        formatDeadlineForDisplay(resolvedDeadline) || (isExternalRequest ? 'Aguardando análise' : '-');
+        formatDeadlineForDisplay(resolvedDeadline) || (isExternalRequest ? 'Aguardando an�lise' : '-');
 
       const pClientUserId = (process as Record<string, unknown>).cliente_user_id;
       const profile = typeof pClientUserId === 'string' && pClientUserId ? profileMap.get(pClientUserId) : null;
@@ -585,12 +477,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         id: process.id,
         processRecordId: process.id,
         profileUserId: process.cliente_user_id,
-        name: sanitizeDisplayValue(process.cliente_nome) || sanitizeDisplayValue(process.titulo) || 'Solicitação sem nome',
+        name: sanitizeDisplayValue(process.cliente_nome) || sanitizeDisplayValue(process.titulo) || 'Solicita��o sem nome',
         email: pEmail || email || '-',
         role: UserRole.CLIENT,
         documentId: sanitizeDisplayValue(process.cliente_documento) || pDocId || '---',
         taxId: pTaxId || sanitizeDisplayValue(process.cliente_documento) || '---',
-        address: pAddress || (requestedOrganizationName !== 'Não informado' ? `Organização solicitada: ${requestedOrganizationName}` : '---'),
+        address: pAddress || (requestedOrganizationName !== 'N�o informado' ? `Organiza��o solicitada: ${requestedOrganizationName}` : '---'),
         maritalStatus: pMarital || '---',
         country: pCountry || 'Brasil',
         phone: pPhone || (!email && contact ? contact : '---'),
@@ -603,21 +495,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         hierarchy: Hierarchy.STATUS_ONLY,
         notes:
           resolvedNotes ||
-          (isExternalRequest ? `Origem: ${source.toLowerCase() === 'wix' ? 'Wix' : 'VAINAAI'}${requestedOrganizationName !== 'Não informado' ? ` · Organização solicitada: ${requestedOrganizationName}` : ''}` : undefined),
+          (isExternalRequest ? `Origem: ${source.toLowerCase() === 'wix' ? 'Wix' : 'VAINAAI'}${requestedOrganizationName !== 'N�o informado' ? ` � Organiza��o solicitada: ${requestedOrganizationName}` : ''}` : undefined),
         deadline: resolvedDeadline,
-        serviceManager: resolvedServiceManager || (isExternalRequest ? 'Aguardando aprovação' : 'Não definido'),
+        serviceManager: resolvedServiceManager || (isExternalRequest ? 'Aguardando aprova��o' : 'N�o definido'),
         organizationId: process.org_id,
         organizationName: requestedOrganizationName,
         processType: unit,
         startDate: formatProcessDate(process.created_at),
         deadlineDate: resolvedDeadlineDisplay,
         etapaAtual: buildProcessStage(process),
-        financeiro: isExternalRequest ? 'Aguardando validação' : (legacyStatus === ProcessStatus.CONCLUIDO ? 'Quitado' : 'Pendente'),
-        prioridade: isExternalRequest ? 'Alta' : (legacyStatus === ProcessStatus.CONCLUIDO ? 'Média' : 'Baixa'),
+        financeiro: isExternalRequest ? 'Aguardando valida��o' : (legacyStatus === ProcessStatus.CONCLUIDO ? 'Quitado' : 'Pendente'),
+        prioridade: isExternalRequest ? 'Alta' : (legacyStatus === ProcessStatus.CONCLUIDO ? 'M�dia' : 'Baixa'),
         valor: process.os_value != null ? Number(process.os_value) : generatedValue,
         sourceLabel: source ? source.toUpperCase() : 'PAINEL',
         requestedOrganizationName,
-        contractedServiceName: sanitizeDisplayValue(process.titulo) || 'Serviço não informado',
+        contractedServiceName: sanitizeDisplayValue(process.titulo) || 'Servi�o n�o informado',
         paymentStatus: process.payment_status ?? null,
         osValue: process.os_value ?? null,
         servicesSelected: (process.services_selected as AdminProcessRow['servicesSelected']) ?? null,
@@ -666,7 +558,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       .maybeSingle();
 
     if (error) {
-      setEditingProfileError('Não foi possível carregar todos os dados cadastrais do usuário.');
+      setEditingProfileError('N�o foi poss�vel carregar todos os dados cadastrais do usu�rio.');
       setEditingProfileLoading(false);
       return;
     }
@@ -695,7 +587,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
   const handleCloseEditModal = () => {
     if (formChanged) {
-      const confirmed = window.confirm('Você tem alterações não salvas. Deseja realmente sair?');
+      const confirmed = window.confirm('Voc� tem altera��es n�o salvas. Deseja realmente sair?');
       if (!confirmed) return;
     }
     setEditingUser(null);
@@ -710,193 +602,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
   }, [formChanged, editingUser]);
-
-  useEffect(() => {
-    const processId = getEditingProcessRecordId(editingUser);
-    if (!processId) {
-      setProcessChecklist([]);
-      setChecklistError('');
-      setNewChecklistText('');
-      return;
-    }
-
-    const loadChecklist = async () => {
-      setChecklistLoading(true);
-      setChecklistError('');
-
-      const { data, error } = await supabase
-        .from('process_events')
-        .select('mensagem,created_at,created_by')
-        .eq('process_id', processId)
-        .eq('tipo', 'observacao')
-        .order('created_at', { ascending: true });
-
-      if (error) {
-        setChecklistError('Não foi possível carregar o checklist deste processo.');
-        setChecklistLoading(false);
-        return;
-      }
-
-      const events = (data || []) as Array<{ mensagem?: string | null; created_at?: string | null; created_by?: string | null }>;
-      const userIds = Array.from(new Set(events.map((event) => event.created_by).filter(Boolean))) as string[];
-      let userNameById: Record<string, string> = {};
-
-      if (userIds.length > 0) {
-        const { data: profileRows } = await supabase
-          .from('profiles')
-          .select('id,nome_completo,nome,name,email')
-          .in('id', userIds);
-
-        userNameById = ((profileRows || []) as Array<{ id: string; nome_completo?: string | null; nome?: string | null; name?: string | null; email?: string | null }>)
-          .reduce<Record<string, string>>((accumulator, profile) => {
-            accumulator[profile.id] =
-              sanitizeDisplayValue(profile.nome_completo) ||
-              sanitizeDisplayValue(profile.nome) ||
-              sanitizeDisplayValue(profile.name) ||
-              sanitizeDisplayValue(profile.email) ||
-              'Administrador';
-            return accumulator;
-          }, {});
-      }
-
-      const checklist = buildChecklistFromEvents(events, userNameById);
-      setProcessChecklist(checklist);
-      setChecklistLoading(false);
-      setEditingChecklistItemId(null);
-      setEditingChecklistText('');
-    };
-
-    void loadChecklist();
-  }, [editingUser]);
-
-  const handleAddChecklistItem = async () => {
-    const processId = getEditingProcessRecordId(editingUser);
-    const normalizedText = sanitizeDisplayValue(newChecklistText);
-
-    if (!processId || !normalizedText) return;
-
-    const itemId = crypto.randomUUID();
-    const nowIso = new Date().toISOString();
-
-    const newItem: ProcessChecklistItem = {
-      id: itemId,
-      text: normalizedText,
-      completed: false,
-      createdAt: nowIso,
-      createdByName: currentUser.name || 'Administrador',
-    };
-
-    setProcessChecklist((prev) => [...prev, newItem]);
-    setNewChecklistText('');
-    setChecklistError('');
-
-    const { error } = await supabase.from('process_events').insert({
-      org_id: (editingUser as AdminProcessRow | null)?.organizationId || activeOrgId,
-      process_id: processId,
-      tipo: 'observacao',
-      mensagem: `${CHECKLIST_EVENT_PREFIX}${JSON.stringify({ action: 'add', itemId, text: normalizedText, actorName: currentUser.name || 'Administrador' })}`,
-      created_by: currentUser.id,
-    });
-
-    if (error) {
-      setChecklistError('Não foi possível salvar o novo item do checklist.');
-      setProcessChecklist((prev) => prev.filter((item) => item.id !== itemId));
-    }
-  };
-
-  const handleToggleChecklistItem = async (itemId: string, completed: boolean) => {
-    const processId = getEditingProcessRecordId(editingUser);
-    if (!processId) return;
-
-    setChecklistError('');
-    setProcessChecklist((prev) =>
-      prev.map((item) =>
-        item.id === itemId ? { ...item, completed, updatedAt: new Date().toISOString() } : item
-      )
-    );
-
-    const { error } = await supabase.from('process_events').insert({
-      org_id: (editingUser as AdminProcessRow | null)?.organizationId || activeOrgId,
-      process_id: processId,
-      tipo: 'observacao',
-      mensagem: `${CHECKLIST_EVENT_PREFIX}${JSON.stringify({ action: 'toggle', itemId, completed, actorName: currentUser.name || 'Administrador' })}`,
-      created_by: currentUser.id,
-    });
-
-    if (error) {
-      setChecklistError('Não foi possível atualizar o checklist.');
-      setProcessChecklist((prev) =>
-        prev.map((item) => (item.id === itemId ? { ...item, completed: !completed } : item))
-      );
-    }
-  };
-
-  const handleEditChecklistItem = async (itemId: string, text: string) => {
-    const processId = getEditingProcessRecordId(editingUser);
-    const normalizedText = sanitizeDisplayValue(text);
-    if (!processId || !normalizedText) return;
-
-    setChecklistError('');
-    const currentItem = processChecklist.find((item) => item.id === itemId);
-    if (!currentItem) return;
-
-    setProcessChecklist((prev) =>
-      prev.map((item) =>
-        item.id === itemId
-          ? { ...item, text: normalizedText, updatedAt: new Date().toISOString(), updatedByName: currentUser.name || 'Administrador' }
-          : item
-      )
-    );
-
-    const { error } = await supabase.from('process_events').insert({
-      org_id: (editingUser as AdminProcessRow | null)?.organizationId || activeOrgId,
-      process_id: processId,
-      tipo: 'observacao',
-      mensagem: `${CHECKLIST_EVENT_PREFIX}${JSON.stringify({ action: 'edit', itemId, text: normalizedText, actorName: currentUser.name || 'Administrador' })}`,
-      created_by: currentUser.id,
-    });
-
-    if (error) {
-      setChecklistError('Não foi possível editar o item do checklist.');
-      setProcessChecklist((prev) =>
-        prev.map((item) =>
-          item.id === itemId
-            ? { ...item, text: currentItem.text, updatedAt: currentItem.updatedAt, updatedByName: currentItem.updatedByName }
-            : item
-        )
-      );
-      return;
-    }
-
-    setEditingChecklistItemId(null);
-    setEditingChecklistText('');
-  };
-
-  const handleDeleteChecklistItem = async (itemId: string) => {
-    const processId = getEditingProcessRecordId(editingUser);
-    if (!processId) return;
-
-    setChecklistError('');
-    const previousItems = processChecklist;
-    setProcessChecklist((prev) => prev.filter((item) => item.id !== itemId));
-    if (editingChecklistItemId === itemId) {
-      setEditingChecklistItemId(null);
-      setEditingChecklistText('');
-    }
-
-    const { error } = await supabase.from('process_events').insert({
-      org_id: (editingUser as AdminProcessRow | null)?.organizationId || activeOrgId,
-      process_id: processId,
-      tipo: 'observacao',
-      mensagem: `${CHECKLIST_EVENT_PREFIX}${JSON.stringify({ action: 'delete', itemId, actorName: currentUser.name || 'Administrador' })}`,
-      created_by: currentUser.id,
-    });
-
-    if (error) {
-      setChecklistError('Não foi possível excluir o item do checklist.');
-      setProcessChecklist(previousItems);
-    }
-  };
 
 
   useEffect(() => {
@@ -944,7 +649,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       const compactHistory = ((data || []) as Array<{ id: string; mensagem?: string | null; created_at?: string | null }>).map((event) => ({
         id: event.id,
         dateLabel: event.created_at ? new Date(event.created_at).toLocaleString('pt-BR') : 'Sem data',
-        message: sanitizeDisplayValue(event.mensagem) || 'Atualização registrada.',
+        message: sanitizeDisplayValue(event.mensagem) || 'Atualiza��o registrada.',
       }));
 
       setClientJourneyHistory(compactHistory);
@@ -962,7 +667,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const processRow = selected as AdminProcessRow;
     const amount = Number(processRow.osValue ?? processRow.valor ?? 0);
     if (amount <= 0) {
-      window.alert('Valor do pagamento não definido para este processo.');
+      window.alert('Valor do pagamento n�o definido para este processo.');
       return;
     }
     setRedirectingCheckout(true);
@@ -984,7 +689,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       }
     } catch (err) {
       console.error('Erro ao criar checkout:', err);
-      window.alert('Não foi possível iniciar o pagamento. Tente novamente mais tarde.');
+      window.alert('N�o foi poss�vel iniciar o pagamento. Tente novamente mais tarde.');
     } finally {
       setRedirectingCheckout(false);
     }
@@ -1001,7 +706,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const handleUploadProof = async (file: File, amount?: number) => {
     if (!selectedUser) return;
     const processId = (selectedUser as AdminProcessRow).processRecordId;
-    if (!processId) { window.alert('Usuário não possui um processo vinculado para comprovante de pagamento.'); return; }
+    if (!processId) { window.alert('Usu�rio n�o possui um processo vinculado para comprovante de pagamento.'); return; }
     setUploadingProof(true);
     const { proof, error } = await uploadPaymentProof(processId, currentUser.id, file, amount);
     setUploadingProof(false);
@@ -1071,8 +776,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const statusLabelMap: Record<'cadastro' | 'triagem' | 'analise' | 'concluido', string> = {
       cadastro: 'cadastro',
       triagem: 'triagem',
-      analise: 'análise',
-      concluido: 'concluído',
+      analise: 'an�lise',
+      concluido: 'conclu�do',
     };
 
     const previousStatus = statusMap[(currentEditingUser as AdminProcessRow | null)?.status || ProcessStatus.PENDENTE];
@@ -1094,7 +799,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const notesChanged = previousNotes !== normalizedNotes;
 
     if (normalizedDeadline && !/^\d{4}-\d{2}-\d{2}$/.test(normalizedDeadline)) {
-      setEditingProfileError('Data de prazo inválida. Use o calendário para selecionar uma data válida.');
+      setEditingProfileError('Data de prazo inv�lida. Use o calend�rio para selecionar uma data v�lida.');
       setEditingProfileSaving(false);
       return;
     }
@@ -1114,7 +819,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         .eq('id', processRecordId);
 
       if (error) {
-        processUpdateError = 'Não foi possível atualizar status, prazo, gestor e observações do processo no banco.';
+        processUpdateError = 'N�o foi poss�vel atualizar status, prazo, gestor e observa��es do processo no banco.';
       } else {
         setDbProcesses((prev) =>
           prev.map((process) => (process.id === processRecordId ? { ...process, ...processUpdatePayload } : process))
@@ -1154,20 +859,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       }
 
       if (serviceManagerChanged) {
-        const previousManagerLabel = previousServiceManager || 'Não definido';
-        const nextManagerLabel = normalizedServiceManager || 'Não definido';
+        const previousManagerLabel = previousServiceManager || 'N�o definido';
+        const nextManagerLabel = normalizedServiceManager || 'N�o definido';
         processEventsPayload.push({
           org_id: processOrgId,
           process_id: processRecordId,
           tipo: 'atribuicao',
-          mensagem: `Responsável do serviço alterado de ${previousManagerLabel} para ${nextManagerLabel}.`,
+          mensagem: `Respons�vel do servi�o alterado de ${previousManagerLabel} para ${nextManagerLabel}.`,
           created_by: currentUser.id,
         });
       }
 
       if (deadlineChanged) {
-        const previousDeadlineLabel = previousDeadline ? formatDeadlineForDisplay(previousDeadline) : 'Não definido';
-        const nextDeadlineLabel = normalizedDeadline ? formatDeadlineForDisplay(normalizedDeadline) : 'Não definido';
+        const previousDeadlineLabel = previousDeadline ? formatDeadlineForDisplay(previousDeadline) : 'N�o definido';
+        const nextDeadlineLabel = normalizedDeadline ? formatDeadlineForDisplay(normalizedDeadline) : 'N�o definido';
         processEventsPayload.push({
           org_id: processOrgId,
           process_id: processRecordId,
@@ -1182,7 +887,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           org_id: processOrgId,
           process_id: processRecordId,
           tipo: 'observacao',
-          mensagem: `Observação registrada: ${normalizedNotes}.`,
+          mensagem: `Observa��o registrada: ${normalizedNotes}.`,
           created_by: currentUser.id,
         });
       }
@@ -1228,7 +933,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         .eq('id', profileUserId);
 
       if (error) {
-        profileUpdateError = 'Não foi possível atualizar os dados cadastrais na tabela profiles.';
+        profileUpdateError = 'N�o foi poss�vel atualizar os dados cadastrais na tabela profiles.';
       }
     }
 
@@ -1270,7 +975,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
 
 
   const handleDeleteUser = (id: string) => {
-    if(window.confirm('Deseja realmente excluir este usuário?')) {
+    if(window.confirm('Deseja realmente excluir este usu�rio?')) {
       setUsers(prev => prev.filter(u => u.id !== id));
     }
   };
@@ -1301,7 +1006,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
     const file = e.target.files?.[0];
     if (!file || !selectedUser || !currentUser.id) return;
     const processId = (selectedUser as AdminProcessRow).processRecordId;
-    if (!processId) { alert('Usuário não possui um processo vinculado para anexar documentos.'); return; }
+    if (!processId) { alert('Usu�rio n�o possui um processo vinculado para anexar documentos.'); return; }
     const orgId = getActiveOrgId(currentUser);
     if (!orgId) return;
     setUploadingDocument(true);
@@ -1314,7 +1019,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const handleResendCertificate = async () => {
     if (!selectedUser) return;
     const processId = (selectedUser as AdminProcessRow).processRecordId;
-    if (!processId) { showToast({ type: 'error', message: 'Usuário não possui um processo vinculado para reenviar certificado.' }); return; }
+    if (!processId) { showToast({ type: 'error', message: 'Usu�rio n�o possui um processo vinculado para reenviar certificado.' }); return; }
 
     setResendingCertificate(true);
 
@@ -1346,12 +1051,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       };
 
       const requiredFields = [
-        { key: 'documento_identidade', label: 'Documento de Identidade (Cartão de Cidadão)' },
+        { key: 'documento_identidade', label: 'Documento de Identidade (Cart�o de Cidad�o)' },
         { key: 'nif_cpf', label: 'NIF/CPF' },
-        { key: 'endereco', label: 'Endereço (Morada)' },
+        { key: 'endereco', label: 'Endere�o (Morada)' },
         { key: 'estado_civil', label: 'Estado Civil' },
         { key: 'phone', label: 'Telefone/WhatsApp' },
-        { key: 'pais', label: 'País' },
+        { key: 'pais', label: 'Pa�s' },
       ];
 
       const missingFields = requiredFields.filter(f => {
@@ -1370,7 +1075,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         return;
       }
 
-      if (!window.confirm('Deseja realmente gerar o certificado de filiação e enviá-lo por e-mail para o cliente?')) {
+      if (!window.confirm('Deseja realmente gerar o certificado de filia��o e envi�-lo por e-mail para o cliente?')) {
         setResendingCertificate(false);
         return;
       }
@@ -1401,45 +1106,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   };
 
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingForProcess, setUploadingForProcess] = useState<string | null>(null);
-
-  const PaymentProofUploadButton = ({ processRow }: { processRow: AdminProcessRow }) => {
-    const pid = processRow.processRecordId;
-    const isUploading = uploadingProof && !!pid && uploadingForProcess === pid;
-
-    return (
-      <div>
-        <input
-          type="file"
-          ref={fileInputRef}
-          accept="image/*,application/pdf"
-          className="hidden"
-          onChange={async (e) => {
-            const file = e.target.files?.[0];
-            if (!file) return;
-            setUploadingForProcess(pid);
-            await handleUploadProof(file);
-            setUploadingForProcess(null);
-            if (fileInputRef.current) fileInputRef.current.value = '';
-          }}
-        />
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isUploading}
-          className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-500 disabled:opacity-60"
-        >
-          {isUploading ? (
-            <><Loader2 className="h-4 w-4 animate-spin" /> Enviando...</>
-          ) : (
-            <><Upload className="h-4 w-4" /> Enviar Comprovante de Pagamento</>
-          )}
-        </button>
-        <p className="text-xs text-surface-500 text-center mt-1">Aceito: imagem ou PDF</p>
-      </div>
-    );
-  };
 
   return (
     <AdminDashboardLayout
@@ -1471,7 +1138,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
                 Visualizando como {impersonatingAccessLevel}
               </p>
               <p className="text-xs text-amber-600 truncate">
-                Permissões ajustadas automaticamente
+                Permiss�es ajustadas automaticamente
               </p>
             </div>
           </div>
@@ -1487,6 +1154,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         </div>
       )}
 
+      <Suspense fallback={<div className="p-8"><Skeleton className="h-64 w-full" /></div>}>
       {currentSection === 'dashboard' && (
         <DashboardSection
           dashboardProcessRows={baseProcessRows}
@@ -1525,14 +1193,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           onClick={() => setActiveTab('users')}
           className={`pb-4 px-2 font-black uppercase text-xs tracking-widest transition-all relative ${activeTab === 'users' ? 'text-brand-500' : 'text-surface-500'}`}
         >
-          Visualização de Usuários
+          Visualiza��o de Usu�rios
           {activeTab === 'users' && <div className="absolute bottom-0 left-0 w-full h-1 bg-brand-500 rounded-t-full"></div>}
         </button>
         <button 
           onClick={() => setActiveTab('management')}
           className={`pb-4 px-2 font-black uppercase text-xs tracking-widest transition-all relative ${activeTab === 'management' ? 'text-brand-500' : 'text-surface-500'}`}
         >
-          Gestão de Acessos
+          Gest�o de Acessos
           {activeTab === 'management' && <div className="absolute bottom-0 left-0 w-full h-1 bg-brand-500 rounded-t-full"></div>}
         </button>
         <button 
@@ -1546,7 +1214,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
           onClick={() => setActiveTab('servicos')}
           className={`pb-4 px-2 font-black uppercase text-xs tracking-widest transition-all relative ${activeTab === 'servicos' ? 'text-brand-500' : 'text-surface-500'}`}
         >
-          Serviços
+          Servi�os
           {activeTab === 'servicos' && <div className="absolute bottom-0 left-0 w-full h-1 bg-brand-500 rounded-t-full"></div>}
         </button>
         <button 
@@ -1621,801 +1289,74 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         />
       )}
 
+      </Suspense>
+
       {/* Details View Modal */}
       {selectedUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white w-[calc(100%-2rem)] sm:w-[calc(100%-3rem)] md:w-full max-w-2xl rounded-2xl border border-surface-100 shadow-2xl max-h-[92vh] md:max-h-[85vh] flex flex-col overflow-hidden animate-scaleIn">
-             <div className="shrink-0 px-4 sm:px-6 py-4 border-b border-surface-100 flex justify-between items-center bg-surface-50/80 backdrop-blur-sm">
-                <h3 className="text-sm sm:text-lg font-black uppercase tracking-tight truncate pr-2">Ficha Cadastral</h3>
-                <button onClick={() => setSelectedUser(null)} className="p-1.5 sm:p-2 bg-surface-100 hover:bg-surface-200 rounded-full hover:scale-105 active:scale-95 transition-transform shrink-0">
-                  <X className="w-4 h-4 sm:w-5 sm:h-5" />
-                </button>
-             </div>
-               <div className="flex-1 overflow-y-auto overscroll-contain scroll-smooth px-4 sm:px-6 py-4 sm:py-6 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-surface-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent">
-                 {/* Sub-aba navigation */}
-                <div className="grid grid-cols-2 md:flex gap-2 mb-6">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedUserTab('cadastral')}
-                    className={`px-4 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition-all text-center ${
-                      selectedUserTab === 'cadastral'
-                        ? 'bg-brand-600 text-white shadow-md'
-                        : 'bg-surface-100 text-surface-600 hover:bg-surface-200'
-                    }`}
-                  >
-                    Consulte seus dados
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedUserTab('financeiro')}
-                    className={`px-4 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition-all text-center ${
-                      selectedUserTab === 'financeiro'
-                        ? 'bg-emerald-600 text-white shadow-md'
-                        : 'bg-surface-100 text-surface-600 hover:bg-surface-200'
-                    }`}
-                  >
-                    Suas finanças
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setSelectedUserTab('documentos'); loadProcessDocuments(); }}
-                    className={`px-4 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition-all text-center ${
-                      selectedUserTab === 'documentos'
-                        ? 'bg-violet-600 text-white shadow-md'
-                        : 'bg-surface-100 text-surface-600 hover:bg-surface-200'
-                    }`}
-                  >
-                    Seus documentos
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedUserTab('comunicacao')}
-                    className={`px-4 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition-all text-center ${
-                      selectedUserTab === 'comunicacao'
-                        ? 'bg-sky-600 text-white shadow-md'
-                        : 'bg-surface-100 text-surface-600 hover:bg-surface-200'
-                    }`}
-                  >
-                    Fale conosco
-                  </button>
-                </div>
-
-                {/* Dados Cadastrais */}
-                {selectedUserTab === 'cadastral' && (
-                  <>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
-                      <div className="space-y-4 min-w-0">
-                        <div>
-                          <label className="text-[10px] font-black text-surface-500 uppercase">Nome Completo</label>
-                          <p className="text-lg font-black break-words">{selectedUser.name}</p>
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-black text-surface-500 uppercase">E-mail</label>
-                          <p className="font-bold text-brand-400 break-all leading-snug">{selectedUser.email}</p>
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-black text-surface-500 uppercase">Documento / NIF-CPF</label>
-                          <p className="font-bold break-words">{selectedUser.documentId} / {selectedUser.taxId}</p>
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-black text-surface-500 uppercase">Estado Civil / País</label>
-                          <p className="font-bold break-words">{selectedUser.maritalStatus} - {selectedUser.country}</p>
-                        </div>
-                      </div>
-                      <div className="space-y-4 min-w-0">
-                        <div>
-                          <label className="text-[10px] font-black text-surface-500 uppercase">Protocolo SGI</label>
-                          <p className="text-lg font-black text-emerald-400 break-words">{selectedUser.protocol}</p>
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-black text-surface-500 uppercase">Título do processo</label>
-                          <p className="font-bold break-words">{sanitizeDisplayValue((selectedUser as AdminProcessRow).contractedServiceName) || 'Não informado'}</p>
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-black text-surface-500 uppercase">Unidade Atendimento</label>
-                          <p className="font-bold text-brand-300 break-words leading-snug">{selectedUser.unit}</p>
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-black text-surface-500 uppercase">Processo Judicial</label>
-                          <p className="font-bold break-words">{selectedUser.processNumber || 'NÃƒO INFORMADO'}</p>
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-black text-surface-500 uppercase">Status Atual</label>
-                          <p className="font-black text-orange-500 uppercase">{selectedUser.status}</p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="mt-8 pt-6 border-t border-surface-100">
-                      <label className="text-[10px] font-black text-surface-500 uppercase block mb-2">Endereço Completo</label>
-                      <p className="font-semibold p-4 bg-surface-50 border border-surface-200 rounded-xl">{selectedUser.address}</p>
-                    </div>
-                    {selectedUser.notes && (
-                      <div className="mt-4">
-                        <label className="text-[10px] font-black text-surface-500 uppercase block mb-2">Observações Internas</label>
-                        <p className="font-bold p-4 bg-brand-900/10 border border-brand-900/30 rounded-xl text-brand-200 italic">"{selectedUser.notes}"</p>
-                      </div>
-                    )}
-                  </>
-                )}
-
-                {/* Financeiro */}
-                {selectedUserTab === 'financeiro' && (
-                  <div className="space-y-6">
-                    <div className="p-5 bg-emerald-50 border border-emerald-200 rounded-xl">
-                      <label className="text-[10px] font-black text-emerald-700 uppercase block mb-1">Resumo do Pagamento</label>
-                      <p className="text-3xl font-black text-emerald-700">
-                        {(selectedUser as AdminProcessRow).osValue != null
-                          ? formatEuro(Number((selectedUser as AdminProcessRow).osValue ?? 0))
-                          : '-'}
-                      </p>
-                    </div>
-
-                    {(selectedUser as AdminProcessRow).servicesSelected && (selectedUser as AdminProcessRow).servicesSelected!.length > 0 && (
-                      <div>
-                        <label className="text-[10px] font-black text-surface-500 uppercase block mb-2">Serviços Contratados</label>
-                        <div className="divide-y divide-surface-100 border border-surface-200 rounded-xl overflow-hidden">
-                          {(selectedUser as AdminProcessRow).servicesSelected!.map((svc, idx) => (
-                            <div key={idx} className="flex items-center justify-between px-4 py-3 bg-white">
-                              <div className="min-w-0 flex-1">
-                                <p className="text-sm font-bold text-surface-800 truncate">{svc.name}</p>
-                                <p className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider">{svc.group}</p>
-                              </div>
-                              <span className="text-sm font-black text-surface-700 ml-3">{formatEuro(svc.price)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {(selectedUser as AdminProcessRow).associationFees && (selectedUser as AdminProcessRow).associationFees!.length > 0 && (() => {
-                      const allFees = (selectedUser as AdminProcessRow).associationFees!;
-                      const svcTotal = (selectedUser as AdminProcessRow).osValue ?? 0;
-                      const servicosTotal = svcTotal - (allFees.find(f => f.type === 'doacao')?.price ?? 0);
-                      const convenioFees = allFees.filter(f => f.type === 'convenio');
-                      const doacaoFee = allFees.find(f => f.type === 'doacao');
-                      const convenioTotal = convenioFees.reduce((s, f) => s + f.price, 0);
-                      const profissionalNet = servicosTotal - convenioTotal;
-                      return (
-                        <div>
-                          <label className="text-[10px] font-black text-amber-700 uppercase block mb-2">Taxas Associativas</label>
-                          <div className="divide-y divide-amber-100 border border-amber-200 rounded-xl overflow-hidden">
-                            <div className="flex items-center justify-between px-4 py-3 bg-brand-50">
-                              <p className="text-sm font-bold text-brand-800">Valor Bruto dos Serviços</p>
-                              <span className="text-sm font-black text-brand-800">{formatEuro(servicosTotal)}</span>
-                            </div>
-                            {convenioFees.map((fee, idx) => (
-                              <div key={idx} className="flex items-center justify-between px-4 py-3 bg-amber-50">
-                                <div className="min-w-0 flex-1">
-                                  <p className="text-sm font-bold text-amber-900 truncate">{fee.name}</p>
-                                  <p className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider">Associação</p>
-                                </div>
-                                <span className="text-sm font-black text-amber-700 ml-3">- {formatEuro(fee.price)}</span>
-                              </div>
-                            ))}
-                            {doacaoFee && (
-                              <div className="flex items-center justify-between px-4 py-3 bg-purple-50">
-                                <div className="min-w-0 flex-1">
-                                  <p className="text-sm font-bold text-purple-900 truncate">{doacaoFee.name}</p>
-                                  <p className="text-[10px] font-semibold text-purple-600 uppercase tracking-wider">Associação</p>
-                                </div>
-                                <span className="text-sm font-black text-purple-700 ml-3">+ {formatEuro(doacaoFee.price)}</span>
-                              </div>
-                            )}
-                            <div className="flex items-center justify-between px-4 py-3 bg-emerald-50">
-                              <p className="text-sm font-bold text-emerald-800">Valor Líquido ao Profissional</p>
-                              <span className="text-base font-black text-emerald-700">{formatEuro(Math.max(0, profissionalNet))}</span>
-                            </div>
-                            <div className="flex items-center justify-between px-4 py-3 bg-amber-100">
-                              <p className="text-sm font-black text-amber-900 uppercase">Total a Pagar</p>
-                              <span className="text-base font-black text-amber-900">{formatEuro(svcTotal)}</span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="p-4 bg-surface-50 border border-surface-200 rounded-xl">
-                        <label className="text-[10px] font-black text-surface-500 uppercase block mb-1">Tipo de Serviço</label>
-                        <p className="text-lg font-black text-surface-900">{(selectedUser as AdminProcessRow).processType || '-'}</p>
-                      </div>
-                      <div className="p-4 bg-surface-50 border border-surface-200 rounded-xl">
-                        <label className="text-[10px] font-black text-surface-500 uppercase block mb-1">Unidade de Atendimento</label>
-                        <p className="text-lg font-black text-surface-900">{selectedUser.unit}</p>
-                      </div>
-                      <div className="p-4 bg-surface-50 border border-surface-200 rounded-xl">
-                        <label className="text-[10px] font-black text-surface-500 uppercase block mb-1">Status do Pagamento</label>
-                        {(selectedUser as AdminProcessRow).paymentStatus ? (
-                          <span className={`inline-block px-3 py-1 rounded text-xs font-bold uppercase text-white ${getPaymentStatusUi((selectedUser as AdminProcessRow).paymentStatus)?.color || 'bg-slate-600'}`}>
-                            {getPaymentStatusUi((selectedUser as AdminProcessRow).paymentStatus)?.label || (selectedUser as AdminProcessRow).paymentStatus}
-                          </span>
-                        ) : (
-                          <p className="text-lg font-black text-surface-400">Pendente</p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Stripe payment button */}
-                    {((selectedUser as AdminProcessRow).paymentStatus == null || (selectedUser as AdminProcessRow).paymentStatus === 'pending' || (selectedUser as AdminProcessRow).paymentStatus === 'failed' || (selectedUser as AdminProcessRow).paymentStatus === 'canceled') && (
-                      <div className="space-y-3">
-                        <button
-                          type="button"
-                          onClick={() => { void handleGoToCheckout(selectedUser); }}
-                          disabled={redirectingCheckout}
-                          className="w-full inline-flex items-center justify-center gap-3 rounded-xl bg-emerald-600 px-6 py-4 text-base font-bold text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60 shadow-lg"
-                        >
-                          {redirectingCheckout ? (
-                            <><Loader2 className="h-5 w-5 animate-spin" /> Redirecionando para pagamento...</>
-                          ) : (
-                            <><CreditCard className="h-5 w-5" /> Pagar agora — {formatEuro(Number((selectedUser as AdminProcessRow).osValue ?? 0))}</>
-                          )}
-                        </button>
-                        <p className="text-xs text-surface-500 text-center">Pagamento processado via Stripe com segurança</p>
-
-                        {/* Payment proof upload for clients */}
-                        {(isClientScope) && (
-                          <PaymentProofUploadButton
-                            processRow={selectedUser as AdminProcessRow}
-                            uploadingProof={uploadingProof}
-                            onUpload={handleUploadProof}
-                          />
-                        )}
-                      </div>
-                    )}
-
-                    {/* Pending validation - waiting for admin approval */}
-                    {(selectedUser as AdminProcessRow).paymentStatus === 'pending_validation' && (
-                      <div className="space-y-4">
-                        <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-center">
-                          <p className="font-bold text-amber-800">
-                            {isClientScope
-                              ? 'Comprovante enviado! Aguardando validação.'
-                              : 'Cliente enviou comprovante. Valide abaixo.'}
-                          </p>
-                        </div>
-
-                        {/* Show payment proofs */}
-                        {paymentProofs.length > 0 && (
-                          <div>
-                            <label className="text-[10px] font-black text-surface-500 uppercase block mb-2">Comprovantes Enviados</label>
-                            <div className="divide-y divide-surface-100 border border-surface-200 rounded-xl overflow-hidden">
-                              {paymentProofs.map((proof) => (
-                                <div key={proof.id} className="flex items-center justify-between px-4 py-3 bg-white">
-                                  <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-bold text-surface-800 truncate">{proof.file_name || 'Comprovante'}</p>
-                                    {proof.amount && (
-                                      <p className="text-[10px] font-semibold text-surface-500">Valor: {formatEuro(proof.amount)}</p>
-                                    )}
-                                    {proof.notes && <p className="text-[10px] text-surface-500 mt-1">{proof.notes}</p>}
-                                  </div>
-                                  <a
-                                    href={proof.file_url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-xs font-bold text-brand-600 hover:text-brand-800 ml-3 underline"
-                                  >
-                                    Ver arquivo
-                                  </a>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Admin validation buttons */}
-                        {!isClientScope && (
-                          <div className="flex gap-3">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const pid = (selectedUser as AdminProcessRow).processRecordId;
-                                const proofId = paymentProofs[0]?.id;
-                                if (proofId && pid) void handleValidateProof(proofId, pid, 'validated');
-                              }}
-                              disabled={validatingProof || paymentProofs.length === 0}
-                              className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-emerald-500 disabled:opacity-60"
-                            >
-                              {validatingProof ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                              Validar Pagamento
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const pid = (selectedUser as AdminProcessRow).processRecordId;
-                                const proofId = paymentProofs[0]?.id;
-                                if (proofId && pid) void handleValidateProof(proofId, pid, 'rejected');
-                              }}
-                              disabled={validatingProof || paymentProofs.length === 0}
-                              className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-red-500 disabled:opacity-60"
-                            >
-                              <X className="h-4 w-4" />
-                              Rejeitar
-                            </button>
-                          </div>
-                        )}
-
-                        {/* Client sees resend option if rejected */}
-                        {isClientScope && paymentProofs[0]?.status === 'rejected' && (
-                          <PaymentProofUploadButton
-                            processRow={selectedUser as AdminProcessRow}
-                            uploadingProof={uploadingProof}
-                            onUpload={handleUploadProof}
-                          />
-                        )}
-                      </div>
-                    )}
-
-                    {/* Validated/accepted */}
-                    {((selectedUser as AdminProcessRow).paymentStatus === 'validated' || (selectedUser as AdminProcessRow).paymentStatus === 'accepted') && (
-                      <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
-                        <Check className="h-8 w-8 text-emerald-600 mx-auto mb-2" />
-                        <p className="font-bold text-emerald-800 text-lg">Pagamento Validado</p>
-                        <p className="text-sm text-emerald-600 mt-1">Certificado de Filiação disponível para download.</p>
-                      </div>
-                    )}
-
-                    {/* Rejected */}
-                    {(selectedUser as AdminProcessRow).paymentStatus === 'rejected' && (
-                      <div className="space-y-3">
-                        <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-center">
-                          <p className="font-bold text-red-800">Comprovante rejeitado</p>
-                          <p className="text-sm text-red-600 mt-1">Envie um novo comprovante válido.</p>
-                        </div>
-                        {isClientScope && (
-                          <PaymentProofUploadButton
-                            processRow={selectedUser as AdminProcessRow}
-                            uploadingProof={uploadingProof}
-                            onUpload={handleUploadProof}
-                          />
-                        )}
-                      </div>
-                    )}
-
-                    {/* Certificate section when paid/validated */}
-                    {((selectedUser as AdminProcessRow).paymentStatus === 'paid' || (selectedUser as AdminProcessRow).paymentStatus === 'validated' || (selectedUser as AdminProcessRow).paymentStatus === 'accepted') && (
-                      <div className="mt-4 p-4 bg-brand-50 border border-brand-200 rounded-xl">
-                        <div className="flex items-center justify-between mb-3">
-                          <h4 className="text-sm font-black uppercase text-brand-800">Certificado de Filiação</h4>
-                          <a
-                             href={(selectedUser as AdminProcessRow).processRecordId ? `/#/certificate?processId=${(selectedUser as AdminProcessRow).processRecordId}` : '#'}
-                            className="inline-flex items-center gap-1 text-xs font-bold text-brand-700 hover:text-brand-900 underline"
-                          >
-                            <FileDown className="h-3 w-3" />
-                            Baixar
-                          </a>
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={handleResendCertificate}
-                            disabled={resendingCertificate}
-                            className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white text-xs font-bold rounded-lg transition-all"
-                          >
-                            {resendingCertificate ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : (
-                              <Mail className="h-3 w-3" />
-                            )}
-                            Reenviar por Email
-                          </button>
-                          <label className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg cursor-pointer transition-all">
-                            <Upload className="h-3 w-3" />
-                            Upload Manual
-                            <input
-                              type="file"
-                              className="hidden"
-                              accept="application/pdf,image/*"
-                              onChange={async (e) => {
-                                const file = e.target.files?.[0];
-                                if (!file || !selectedUser || !currentUser.id) return;
-                                const processId = (selectedUser as AdminProcessRow).processRecordId;
-                                const orgId = getActiveOrgId(currentUser);
-                                if (!orgId || !processId) return;
-                                await uploadProcessDocument(orgId, processId, currentUser.id, file, 'Certificado - Upload Manual');
-                                if (e.target) e.target.value = '';
-                                await loadProcessDocuments();
-                              }}
-                            />
-                          </label>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {selectedUserTab === 'documentos' && (
-                  <div className="space-y-6">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-black uppercase text-surface-800">Documentos do Processo</h3>
-                      <label className={`inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-bold text-white transition-colors cursor-pointer ${uploadingDocument ? 'bg-violet-400' : 'bg-violet-600 hover:bg-violet-500'}`}>
-                        {uploadingDocument ? (
-                          <><Loader2 className="h-4 w-4 animate-spin" /> Enviandoâ€¦</>
-                        ) : (
-                          <><Upload className="h-4 w-4" /> Adicionar Documento</>
-                        )}
-                        <input
-                          type="file"
-                          className="hidden"
-                          accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt"
-                          onChange={handleUploadDocument}
-                          disabled={uploadingDocument}
-                        />
-                      </label>
-                    </div>
-
-                    {processDocumentsLoading ? (
-                      <div className="flex items-center justify-center py-12">
-                        <Loader2 className="h-8 w-8 animate-spin text-violet-600" />
-                      </div>
-                    ) : processDocuments.length === 0 ? (
-                      <div className="text-center py-12 text-surface-500">
-                        <p className="font-bold">Nenhum documento anexado.</p>
-                        <p className="text-sm mt-1">Clique em "Adicionar Documento" para enviar um arquivo.</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {processDocuments.map((doc) => (
-                          <div key={doc.id} className="border border-surface-200 rounded-xl p-4 flex items-start justify-between gap-4">
-                            <div className="min-w-0 flex-1">
-                              <p className="font-bold text-surface-800 break-words">{doc.document_name}</p>
-                              <div className="flex items-center gap-2 mt-1">
-                                <span className={`inline-block text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                                  doc.validation_status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
-                                  doc.validation_status === 'rejected' ? 'bg-red-100 text-red-700' :
-                                  doc.validation_status === 'resubmission_requested' ? 'bg-amber-100 text-amber-700' :
-                                  'bg-surface-100 text-surface-600'
-                                }`}>
-                                  {doc.validation_status === 'approved' ? 'Aprovado' :
-                                   doc.validation_status === 'rejected' ? 'Rejeitado' :
-                                   doc.validation_status === 'resubmission_requested' ? 'Reenvio solicitado' :
-                                   'Pendente'}
-                                </span>
-                                <span className="text-xs text-surface-400">
-                                  {new Date(doc.created_at).toLocaleString('pt-BR')}
-                                </span>
-                              </div>
-                              {doc.pending_reason && (
-                                <p className="text-xs text-surface-500 mt-1">{doc.pending_reason}</p>
-                              )}
-                              {doc.review_notes && (
-                                <p className="text-xs text-amber-600 mt-1 font-semibold">Parecer: {doc.review_notes}</p>
-                              )}
-                              {doc.file_path && (
-                                <a href={doc.file_path} target="_blank" rel="noopener noreferrer"
-                                   className="text-xs text-brand-600 hover:text-brand-800 font-bold mt-1 inline-block">
-                                  Visualizar arquivo â†’
-                                </a>
-                              )}
-                            </div>
-                            {!isClientScope && doc.validation_status === 'pending' && (
-                              <div className="flex gap-2 flex-shrink-0">
-                                <button
-                                  type="button"
-                                  onClick={() => handleDocumentReview(doc.id, 'approved')}
-                                  disabled={reviewingDocumentId === doc.id}
-                                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white text-xs font-bold rounded-lg transition-colors"
-                                >
-                                  {reviewingDocumentId === doc.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Aprovar'}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleDocumentReview(doc.id, 'rejected')}
-                                  disabled={reviewingDocumentId === doc.id}
-                                  className="px-3 py-1.5 bg-red-600 hover:bg-red-500 disabled:opacity-60 text-white text-xs font-bold rounded-lg transition-colors"
-                                >
-                                  Rejeitar
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleDocumentReview(doc.id, 'resubmission_requested')}
-                                  disabled={reviewingDocumentId === doc.id}
-                                  className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-60 text-white text-xs font-bold rounded-lg transition-colors"
-                                >
-                                  Solicitar Reenvio
-                                </button>
-                              </div>
-                            )}
-                            {doc.validation_status === 'rejected' && !isClientScope && (
-                              <div className="flex gap-2 flex-shrink-0">
-                                <button
-                                  type="button"
-                                  onClick={() => handleDocumentReview(doc.id, 'resubmission_requested')}
-                                  className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-lg transition-colors"
-                                >
-                                  Solicitar Reenvio
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {selectedUserTab === 'comunicacao' && selectedUser && (selectedUser as AdminProcessRow).processRecordId && (
-                  <div className="bg-white border border-surface-100 rounded-2xl overflow-hidden shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
-                    <div className="p-4 border-b border-surface-100 bg-surface-50">
-                      <h3 className="text-sm font-black uppercase text-surface-700">Comunicação do Processo</h3>
-                    </div>
-                    <CommunicationBlock
-                      processId={(selectedUser as AdminProcessRow).processRecordId!}
-                      currentUserId={currentUser.id}
-                    />
-                  </div>
-                )}
-             </div>
-          </div>
-        </div>
+        <SelectedUserDetailModal
+          selectedUser={selectedUser}
+          selectedUserTab={selectedUserTab}
+          onTabChange={setSelectedUserTab}
+          onClose={() => setSelectedUser(null)}
+          onLoadDocuments={loadProcessDocuments}
+          processDocuments={processDocuments}
+          processDocumentsLoading={processDocumentsLoading}
+          uploadingDocument={uploadingDocument}
+          reviewingDocumentId={reviewingDocumentId}
+          onUploadDocument={handleUploadDocument}
+          onDocumentReview={handleDocumentReview}
+          isClientScope={isClientScope}
+          paymentProofs={paymentProofs}
+          uploadingProof={uploadingProof}
+          onUploadProof={handleUploadProof}
+          onGoToCheckout={() => void handleGoToCheckout(selectedUser)}
+          onValidateProof={handleValidateProof}
+          validatingProof={validatingProof}
+          redirectingCheckout={redirectingCheckout}
+          resendingCertificate={resendingCertificate}
+          onResendCertificate={handleResendCertificate}
+          currentUserId={currentUser.id}
+          uploadingForProcess={uploadingForProcess}
+          setUploadingForProcess={setUploadingForProcess}
+        />
       )}
 
       {/* Edit Status Modal */}
-      {editingUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white w-full max-w-3xl rounded-3xl border border-surface-100 shadow-2xl overflow-hidden animate-scaleIn">
-             <div className="p-6 border-b border-surface-100 flex justify-between items-center bg-surface-50">
-               <h3 className="text-xl font-black uppercase">Editar Status: {editingUser.protocol}</h3>
-               <button type="button" onClick={handleCloseEditModal} className="p-2 bg-surface-100 hover:bg-surface-200 rounded-full">
-                 <X className="w-5 h-5" />
-               </button>
-             </div>
-             <div className="p-8 max-h-[85vh] overflow-y-auto">
-                <form onSubmit={(e: React.FormEvent<HTMLFormElement>) => {
-                  e.preventDefault();
-                  const fd = new FormData(e.currentTarget);
-                  void handleUpdateStatus(
-                    editingUser.id, 
-                    fd.get('status') as ProcessStatus,
-                    fd.get('deadline') as string,
-                    fd.get('notes') as string,
-                    fd.get('serviceManager') as string
-                  );
-                }}>
-                  <div className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
-                        <label className="text-[10px] font-black text-surface-500 uppercase mb-2 block">Alterar Status do Processo</label>
-                        <select name="status" defaultValue={editingUser.status} onChange={() => setFormChanged(true)} className="w-full bg-white border border-surface-200 rounded-xl p-4 text-surface-800 font-semibold outline-none ring-brand-500 focus:ring-2">
-                          {Object.values(ProcessStatus).map(s => (
-                            <option key={s} value={s}>{s}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-black text-surface-500 uppercase mb-2 block flex items-center gap-2">
-                          <UserCheck className="w-3 h-3" /> Gestor do Serviço
-                        </label>
-                        <select name="serviceManager" defaultValue={editingUser.serviceManager} onChange={() => setFormChanged(true)} className="w-full bg-white border border-surface-200 rounded-xl p-4 text-surface-800 font-semibold outline-none ring-brand-500 focus:ring-2">
-                          <option value="">Selecione um gestor</option>
-                          {SERVICE_MANAGERS.map(manager => (
-                            <option key={manager} value={manager}>{manager}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="text-[10px] font-black text-surface-500 uppercase mb-2 block flex items-center gap-2">
-                        <Calendar className="w-3 h-3" /> Data de Prazo
-                      </label>
-                      <input name="deadline" type="date" defaultValue={editingUser.deadline} onChange={() => setFormChanged(true)} className="w-full bg-white border border-surface-200 rounded-xl p-4 text-surface-800 font-semibold" />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-black text-surface-500 uppercase mb-2 block flex items-center gap-2">
-                        <MessageSquare className="w-3 h-3" /> Nota de Observações
-                      </label>
-                      <textarea name="notes" rows={4} defaultValue={editingUser.notes} onChange={() => setFormChanged(true)} className="w-full bg-white border border-surface-200 rounded-xl p-4 text-surface-800 font-semibold resize-none" placeholder="Digite as anotações do processo..."></textarea>
-                    </div>
-
-                    <div className="rounded-2xl border border-surface-200 bg-surface-50/70 p-4">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Flag className="w-4 h-4 text-brand-600" />
-                        <h4 className="text-sm font-black uppercase text-surface-700">Checklist do processo</h4>
-                      </div>
-                      <p className="text-xs text-surface-500 mb-3">
-                        Todos os administradores podem criar itens e marcar como concluídos.
-                      </p>
-
-                      <div className="flex flex-col sm:flex-row gap-2 mb-3">
-                        <input
-                          type="text"
-                          value={newChecklistText}
-                          onChange={(event) => setNewChecklistText(event.target.value)}
-                          placeholder="Adicionar novo item ao checklist"
-                          className="w-full bg-white border border-surface-200 rounded-xl px-3 py-2 text-sm text-surface-800 font-semibold"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => void handleAddChecklistItem()}
-                          disabled={!sanitizeDisplayValue(newChecklistText)}
-                          className="rounded-xl bg-brand-600 text-white px-4 py-2 text-xs font-black uppercase disabled:opacity-60"
-                        >
-                          Adicionar
-                        </button>
-                      </div>
-
-                      {checklistLoading ? (
-                        <p className="text-xs font-semibold text-surface-500">Carregando checklist...</p>
-                      ) : processChecklist.length === 0 ? (
-                        <p className="text-xs font-semibold text-surface-500">Nenhum item criado para este processo.</p>
-                      ) : (
-                        <div className="space-y-2">
-                          {processChecklist.map((item) => (
-                            <div key={item.id} className="flex items-start gap-3 rounded-xl border border-surface-200 bg-white p-3">
-                              <input
-                                type="checkbox"
-                                checked={item.completed}
-                                onChange={(event) => void handleToggleChecklistItem(item.id, event.target.checked)}
-                                className="mt-1 h-4 w-4 rounded border-surface-300 text-brand-600"
-                              />
-                              <div className="flex-1 min-w-0">
-                                {editingChecklistItemId === item.id ? (
-                                  <div className="flex flex-col sm:flex-row gap-2 mb-1">
-                                    <input
-                                      type="text"
-                                      value={editingChecklistText}
-                                      onChange={(event) => setEditingChecklistText(event.target.value)}
-                                      className="w-full bg-white border border-surface-200 rounded-lg px-2 py-1 text-sm font-semibold"
-                                    />
-                                    <div className="flex gap-2">
-                                      <button
-                                        type="button"
-                                        onClick={() => void handleEditChecklistItem(item.id, editingChecklistText)}
-                                        disabled={!sanitizeDisplayValue(editingChecklistText)}
-                                        className="px-2 py-1 rounded-lg bg-brand-600 text-white text-[11px] font-black uppercase disabled:opacity-50"
-                                      >
-                                        Salvar
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setEditingChecklistItemId(null);
-                                          setEditingChecklistText('');
-                                        }}
-                                        className="px-2 py-1 rounded-lg border border-surface-300 text-[11px] font-black uppercase"
-                                      >
-                                        Cancelar
-                                      </button>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <p className={`text-sm font-semibold ${item.completed ? 'line-through text-surface-400' : 'text-surface-800'}`}>
-                                    {item.text}
-                                  </p>
-                                )}
-                                <p className="text-[11px] text-surface-500">
-                                  Criado por {item.createdByName || 'Administrador'} em {new Date(item.createdAt).toLocaleString('pt-BR')}
-                                  {item.updatedAt ? ` â€¢ Atualizado por ${item.updatedByName || 'Administrador'} em ${new Date(item.updatedAt).toLocaleString('pt-BR')}` : ''}
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setEditingChecklistItemId(item.id);
-                                    setEditingChecklistText(item.text);
-                                  }}
-                                  className="p-1.5 rounded-md border border-surface-200 text-surface-600 hover:bg-surface-100"
-                                  title="Editar item"
-                                >
-                                  <Pencil className="w-3 h-3" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => void handleDeleteChecklistItem(item.id)}
-                                  className="p-1.5 rounded-md border border-red-200 text-red-600 hover:bg-red-50"
-                                  title="Excluir item"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {checklistError && (
-                        <p className="mt-2 text-xs font-semibold text-red-600">{checklistError}</p>
-                      )}
-                    </div>
-
-                    <div className="border-t border-surface-100 pt-6">
-                      <h4 className="text-lg font-black uppercase mb-4">Dados cadastrais do usuário</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="md:col-span-2">
-                          <label className="text-[10px] font-black text-surface-500 uppercase block mb-2">Nome Completo</label>
-                          <input
-                            type="text"
-                             value={editingProfileForm.fullName}
-                            onChange={(event) => { setEditingProfileForm((prev) => ({ ...prev, fullName: event.target.value })); setFormChanged(true); }}
-                            className="w-full bg-white border border-surface-200 rounded-xl p-4 text-surface-800 font-semibold outline-none focus:ring-2 focus:ring-brand-500"
-                          />
-                        </div>
-                        <div className="md:col-span-2">
-                          <label className="text-[10px] font-black text-surface-500 uppercase block mb-2">E-mail</label>
-                          <input
-                            type="email"
-                             value={editingProfileForm.email}
-                            onChange={(event) => { setEditingProfileForm((prev) => ({ ...prev, email: event.target.value })); setFormChanged(true); }}
-                            className="w-full bg-white border border-surface-200 rounded-xl p-4 text-surface-800 font-semibold outline-none focus:ring-2 focus:ring-brand-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-black text-surface-500 uppercase block mb-2">Documento de Identidade</label>
-                          <input
-                            type="text"
-                            value={editingProfileForm.documentId}
-                            onChange={(event) => { setEditingProfileForm((prev) => ({ ...prev, documentId: event.target.value })); setFormChanged(true); }}
-                            className="w-full bg-white border border-surface-200 rounded-xl p-4 text-surface-800 font-semibold outline-none focus:ring-2 focus:ring-brand-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-black text-surface-500 uppercase block mb-2">NIF / CPF</label>
-                          <input
-                            type="text"
-                            value={editingProfileForm.taxId}
-                            onChange={(event) => { setEditingProfileForm((prev) => ({ ...prev, taxId: event.target.value })); setFormChanged(true); }}
-                            className="w-full bg-white border border-surface-200 rounded-xl p-4 text-surface-800 font-semibold outline-none focus:ring-2 focus:ring-brand-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-black text-surface-500 uppercase block mb-2">Telefone</label>
-                          <input
-                            type="text"
-                            value={editingProfileForm.phone}
-                            onChange={(event) => { setEditingProfileForm((prev) => ({ ...prev, phone: event.target.value })); setFormChanged(true); }}
-                            className="w-full bg-white border border-surface-200 rounded-xl p-4 text-surface-800 font-semibold outline-none focus:ring-2 focus:ring-brand-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-black text-surface-500 uppercase block mb-2">Estado Civil</label>
-                          <input
-                            type="text"
-                            value={editingProfileForm.maritalStatus}
-                            onChange={(event) => { setEditingProfileForm((prev) => ({ ...prev, maritalStatus: event.target.value })); setFormChanged(true); }}
-                            className="w-full bg-white border border-surface-200 rounded-xl p-4 text-surface-800 font-semibold outline-none focus:ring-2 focus:ring-brand-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-black text-surface-500 uppercase block mb-2">País</label>
-                          <input
-                            type="text"
-                            value={editingProfileForm.country}
-                            onChange={(event) => { setEditingProfileForm((prev) => ({ ...prev, country: event.target.value })); setFormChanged(true); }}
-                            className="w-full bg-white border border-surface-200 rounded-xl p-4 text-surface-800 font-semibold outline-none focus:ring-2 focus:ring-brand-500"
-                          />
-                        </div>
-                        <div className="md:col-span-2">
-                          <label className="text-[10px] font-black text-surface-500 uppercase block mb-2">Endereço completo (inclua CEP)</label>
-                          <input
-                            type="text"
-                            value={editingProfileForm.address}
-                            onChange={(event) => { setEditingProfileForm((prev) => ({ ...prev, address: event.target.value })); setFormChanged(true); }}
-                            className="w-full bg-white border border-surface-200 rounded-xl p-4 text-surface-800 font-semibold outline-none focus:ring-2 focus:ring-brand-500"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {editingProfileLoading && (
-                      <div className="space-y-4 p-4"><Skeleton className="h-8 w-1/3" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-2/3" /></div>
-                    )}
-                    {editingProfileError && (
-                      <p className="text-sm font-bold text-amber-300">{editingProfileError}</p>
-                    )}
-
-                    <button
-                      type="submit"
-                      disabled={editingProfileSaving}
-                      className="w-full py-5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-black uppercase tracking-widest rounded-2xl shadow-xl transition-all"
-                    >
-                      {editingProfileSaving ? 'SALVANDO...' : 'Salvar Alterações'}
-                    </button>
-                  </div>
-                </form>
-             </div>
-          </div>
-        </div>
-      )}
+      <EditingUserStatusModal
+        editingUser={editingUser}
+        onClose={handleCloseEditModal}
+        onSubmit={(e: React.FormEvent<HTMLFormElement>) => {
+          e.preventDefault();
+          const fd = new FormData(e.currentTarget);
+          void handleUpdateStatus(
+            editingUser.id,
+            fd.get('status') as ProcessStatus,
+            fd.get('deadline') as string,
+            fd.get('notes') as string,
+            fd.get('serviceManager') as string
+          );
+        }}
+        formChanged={formChanged}
+        setFormChanged={setFormChanged}
+        editingProfileForm={editingProfileForm}
+        setEditingProfileForm={setEditingProfileForm}
+        editingProfileLoading={editingProfileLoading}
+        editingProfileSaving={editingProfileSaving}
+        editingProfileError={editingProfileError}
+        processChecklist={checklist.processChecklist}
+        newChecklistText={checklist.newChecklistText}
+        setNewChecklistText={checklist.setNewChecklistText}
+        editingChecklistItemId={checklist.editingChecklistItemId}
+        setEditingChecklistItemId={checklist.setEditingChecklistItemId}
+        editingChecklistText={checklist.editingChecklistText}
+        setEditingChecklistText={checklist.setEditingChecklistText}
+        checklistLoading={checklist.checklistLoading}
+        checklistError={checklist.checklistError}
+        onAddChecklistItem={checklist.handleAddChecklistItem}
+        onToggleChecklistItem={checklist.handleToggleChecklistItem}
+        onEditChecklistItem={checklist.handleEditChecklistItem}
+        onDeleteChecklistItem={checklist.handleDeleteChecklistItem}
+      />
     </AdminDashboardLayout>
   );
 };

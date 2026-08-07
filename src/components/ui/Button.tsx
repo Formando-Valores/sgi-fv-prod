@@ -1,6 +1,6 @@
 import React from 'react';
 
-type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost' | 'success' | 'warning';
+type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost' | 'success' | 'warning' | 'outline' | 'outlineWarning' | 'outlineDanger';
 type ButtonSize = 'sm' | 'md' | 'lg';
 
 const variantClasses: Record<ButtonVariant, string> = {
@@ -10,6 +10,9 @@ const variantClasses: Record<ButtonVariant, string> = {
   ghost: 'bg-transparent hover:bg-surface-100 text-surface-600 hover:text-surface-800',
   success: 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm active:bg-emerald-800',
   warning: 'bg-amber-500 hover:bg-amber-600 text-white shadow-sm active:bg-amber-700',
+  outline: 'bg-white border border-brand-200 text-brand-700 hover:bg-brand-50 hover:border-brand-300 shadow-sm',
+  outlineWarning: 'bg-white border border-amber-200 text-amber-700 hover:bg-amber-50 hover:border-amber-300 shadow-sm',
+  outlineDanger: 'bg-white border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 shadow-sm',
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
