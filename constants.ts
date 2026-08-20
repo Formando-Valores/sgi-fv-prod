@@ -25,12 +25,7 @@ export const SERVICE_MANAGERS = [
   'Leonardo Saraiva Págio'
 ];
 
-export const ADMIN_CREDENTIALS = [
-  'contato@vainaai.com',
-  'contato@formandovalores.com'
-];
-
-export const ADMIN_PASSWORD = 'Sgifvadm@2026!';
+export const ADMIN_CREDENTIALS: string[] = [];
 
 
 export const CONSENT_TEXT_VERSION = 'rgpd-v1-2026-04';

@@ -8,7 +8,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { AlertCircle, Eye, EyeOff, Mail, Lock, ArrowRight, Shield, Scale, Users } from 'lucide-react';
 import { ProcessStatus, ServiceUnit, User, UserRole, type OrgMembership } from '../types';
 import { isSupabaseConfigured, supabase } from '../supabase';
-import { ADMIN_CREDENTIALS } from '../constants';
 import { SUPABASE_EDGE_FUNCTIONS } from '../src/lib/supabaseFunctions';
 
 interface LoginProps {
@@ -319,8 +318,7 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
         const hasAdminRole =
           isAdminRole(profile?.role) ||
           isAdminRole(contextRole) ||
-          isAdminRole(existingUser?.role) ||
-          ADMIN_CREDENTIALS.some((adminEmail) => adminEmail.toLowerCase() === (data.user.email || '').toLowerCase());
+          isAdminRole(existingUser?.role);
 
         const normalizedRole = hasAdminRole ? UserRole.ADMIN : UserRole.CLIENT;
 
