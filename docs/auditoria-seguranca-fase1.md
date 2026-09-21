@@ -17,6 +17,7 @@
 | | |
 |---|---|
 | Falhas confirmadas e corrigidas | 2 |
+| Decisões de gestão levantadas | 1 |
 | Verificações passadas | 4 |
 | Pendentes de acesso a produção | 6 |
 
@@ -86,6 +87,41 @@ via `service_role`.
 `constants.ts` mantinha `export const ADMIN_CREDENTIALS: string[] = []`, resíduo da limpeza
 feita em `e8f3e20`. Sem utilizações em todo o código. Removido para que não volte a ser
 preenchido por engano.
+
+---
+
+### V-04 · Repositório público — **DECISÃO DE GESTÃO**
+
+**Severidade:** A decidir pela gestão
+**Recurso:** `github.com/Formando-Valores/sgi-fv-prod`
+
+A API do GitHub devolve `"private": false`. O repositório do SIGA-FV está **acessível a
+qualquer pessoa na internet**.
+
+Não é, em si, uma vulnerabilidade: a verificação `OK-03` confirmou que não há segredos
+commitados, e o modelo de segurança do sistema não depende do código ser secreto. Mas fica
+publicamente legível:
+
+- o esquema completo da base de dados (57 migrations), incluindo todas as policies de RLS —
+  o que permite a um atacante estudar as regras de isolamento offline, sem tentativa e erro;
+- a lógica de pagamentos e o tratamento dos webhooks do Stripe;
+- os nomes das 21 variáveis de ambiente, úteis para um ataque dirigido;
+- a documentação interna em `docs/`, incluindo este relatório de auditoria e o
+  `docs/plano-fecho-v1.md`, que enumera as pendências de segurança ainda por corrigir.
+
+O último ponto é o mais relevante a curto prazo: **enquanto as tarefas `S-01` a `S-10`
+estiverem abertas, publicá-las é divulgar as fraquezas conhecidas do sistema**.
+
+Há ainda uma contradição a registar: o e-mail de transição de 10/09/2026 descreve o SIGA-FV
+como "confidencial e reservado" e o Relatório Mestre está marcado como "Documento
+confidencial e sigiloso", mas o código está público.
+
+**Recomendação:** tornar o repositório privado e conceder acesso por convite. Se a exposição
+pública for intencional — por exemplo, para integração com Abacus.AI ou Vercel sem
+configurar credenciais — deve ser registada como decisão consciente, e este relatório e o
+plano de fecho devem sair do repositório público até as pendências estarem fechadas.
+
+**Estado:** aguarda decisão de Leonardo. Não é corrigível por código.
 
 ---
 
