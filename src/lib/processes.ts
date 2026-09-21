@@ -261,6 +261,8 @@ export interface Process {
   cliente_documento: string | null;
   cliente_contato: string | null;
   cliente_email?: string | null;
+  // Coluna adicionada na migration 015_fix_client_process_visibility.sql
+  cliente_user_id?: string | null;
   responsavel_user_id: string | null;
   data_prazo?: string | null;
   usage_deadline_at?: string | null;
@@ -271,6 +273,15 @@ export interface Process {
   origem_canal?: string | null;
   unidade_atendimento?: string | null;
   org_nome_solicitado?: string | null;
+  // Colunas de pagamento, migration 017_payments_traceability.sql
+  amount?: number | null;
+  currency?: string | null;
+  stripe_checkout_session_id?: string | null;
+  stripe_payment_intent_id?: string | null;
+  paid_at?: string | null;
+  // Colunas do modelo financeiro, migration 028_financial_contributions_model.sql
+  os_value?: number | null;
+  complementary_contribution_amount?: number | null;
   services_selected?: { id: string; name: string; price: number; group: string }[] | null;
   association_fees?: { type: string; name: string; price: number; destination: string }[] | null;
   payment_status?: 'pending' | 'paid' | 'failed' | 'refunded' | 'canceled' | 'released' | 'processing' | 'pending_validation' | 'validated' | 'accepted' | 'rejected' | null;
@@ -560,7 +571,11 @@ export async function listClientPaidProcessesFinance(
     }
 
     const now = new Date();
-    let query = supabase
+    // A lista explícita de colunas faz a inferência de tipos do supabase-js
+    // explodir em profundidade (TS2589) quando combinada com o genérico de
+    // applyScopedProcessFilters. O outro call site usa select('*') e não tem o
+    // problema. O cast limita-se a esta variável local.
+    let query: any = supabase
       .from('processes')
       .select('id,titulo,amount,currency,payment_status,paid_at,data_prazo,usage_deadline_at,process_status')
       .in('payment_status', ['paid', 'released'])
@@ -664,7 +679,8 @@ export async function listClientDashboardProcesses(org_id: string, client_user_i
       return [];
     }
 
-    let query = supabase
+    // Mesma limitação do supabase-js descrita acima (TS2589).
+    let query: any = supabase
       .from('processes')
       .select('*')
       .order('created_at', { ascending: false });

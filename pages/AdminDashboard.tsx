@@ -71,7 +71,10 @@ type AdminDashboardLayoutProps = {
   onSelectSection: (nextSection: string) => void;
   children: React.ReactNode;
   currentOrgName?: string;
-  availableOrgs?: OrgMembership[];
+  // Forma mínima aceite por DashboardSidebar: o layout apenas reencaminha.
+  // Recebe tanto OrgMembership[] (de currentUser) como a lista reduzida
+  // construída a partir de Organization[].
+  availableOrgs?: Array<{ org_id: string; organizations?: { name?: string; is_active?: boolean } }>;
   onSwitchOrg?: (orgId: string) => void;
   activeOrgId?: string | null;
   showRoleSwitcher?: boolean;
@@ -162,7 +165,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
   const currentOrgName = currentUser.availableOrgs?.find(o => o.org_id === activeOrgId)?.organizations?.name
     || currentUser.organizationName
     || 'Selecionar Organização';
-  const [activeTab, setActiveTab] = useState<'users' | 'management' | 'iban' | 'servicos'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'management' | 'iban' | 'servicos' | 'stripe'>('users');
   const [selectedUser, setSelectedUser] = useState<AdminProcessRow | User | null>(null);
   const [selectedUserTab, setSelectedUserTab] = useState<'cadastral' | 'financeiro' | 'documentos' | 'comunicacao'>('cadastral');
   const [editingUser, setEditingUser] = useState<AdminProcessRow | User | null>(null);
@@ -381,7 +384,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
         const userIds: string[] = [];
         const seen = new Set<string>();
         for (const p of typed) {
-          const uid = (p as Record<string, unknown>).cliente_user_id;
+          const uid = p.cliente_user_id;
           if (typeof uid === 'string' && uid && !seen.has(uid)) {
             seen.add(uid);
             userIds.push(uid);
@@ -464,7 +467,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       const resolvedDeadlineDisplay =
         formatDeadlineForDisplay(resolvedDeadline) || (isExternalRequest ? 'Aguardando análise' : '-');
 
-      const pClientUserId = (process as Record<string, unknown>).cliente_user_id;
+      const pClientUserId = process.cliente_user_id;
       const profile = typeof pClientUserId === 'string' && pClientUserId ? profileMap.get(pClientUserId) : null;
       const pEmail = profile?.email as string | undefined;
       const pDocId = profile?.documento_identidade as string | undefined;
@@ -901,9 +904,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
               email: profProfile.email,
               professionalName: profProfile.nome_completo || normalizedServiceManager,
               processProtocol: currentProc?.protocol || '',
-              processTitle: currentProc?.name || currentProc?.title || '',
-              clientName: currentProc?.cliente_nome || currentProc?.name || '',
-              clientContact: currentProc?.cliente_contato || '',
+              // baseProcessRows nao expoe os campos crus da BD (titulo,
+              // cliente_nome, cliente_contato): o nome do cliente e mapeado
+              // para `name` e o contacto para `phone`/`email`. As leituras
+              // anteriores a cliente_contato devolviam sempre string vazia.
+              processTitle: currentProc?.name || '',
+              clientName: currentProc?.name || '',
+              clientContact:
+                currentProc?.phone && currentProc.phone !== '---'
+                  ? currentProc.phone
+                  : currentProc?.email && currentProc.email !== '-'
+                    ? currentProc.email
+                    : '',
               deadline: currentProc?.deadline || '',
               notes: normalizedNotes || '',
             },

@@ -6,24 +6,7 @@ import Badge from '../../ui/Badge';
 import EmptyState from '../../ui/EmptyState';
 import ClientProcessProgressPanel, { type ClientProcessProgressHistoryItem } from '../ClientProcessProgressPanel';
 
-interface AdminProcessRow extends User {
-  processRecordId?: string;
-  profileUserId?: string | null;
-  processType: string;
-  startDate: string;
-  deadlineDate: string;
-  etapaAtual: string;
-  financeiro: string;
-  prioridade: string;
-  valor: number;
-  sourceLabel: string;
-  requestedOrganizationName: string;
-  contractedServiceName: string;
-  paymentStatus?: string | null;
-  osValue?: number | null;
-  servicesSelected?: { id: string; name: string; price: number; group: string }[] | null;
-  associationFees?: { type: string; name: string; price: number; destination: string }[] | null;
-}
+import type { AdminProcessRow } from '../../../types/admin-dashboard';
 
 const statusBadgeVariant = (status: ProcessStatus): 'success' | 'warning' | 'danger' | 'info' | 'neutral' => {
   if (status === ProcessStatus.CONCLUIDO) return 'success';

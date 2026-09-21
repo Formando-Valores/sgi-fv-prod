@@ -9,7 +9,8 @@ const sizeClasses: Record<InputSize, string> = {
   lg: 'px-4 py-3 text-base',
 };
 
-interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+// `size` do design system (sm/md/lg) colide com o atributo HTML size (number).
+interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size'> {
   label?: string;
   error?: string;
   hint?: string;
