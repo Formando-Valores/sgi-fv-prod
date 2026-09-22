@@ -9,24 +9,8 @@ import PaymentProofUploadButton from '../PaymentProofUploadButton';
 import type { ProcessDocument } from '../../../lib/processDocuments';
 import type { PaymentProof } from '../../../lib/paymentProofs';
 
-export interface AdminProcessRow extends User {
-  processRecordId?: string;
-  profileUserId?: string | null;
-  processType: string;
-  startDate: string;
-  deadlineDate: string;
-  etapaAtual: string;
-  financeiro: string;
-  prioridade: string;
-  valor: number;
-  sourceLabel: string;
-  requestedOrganizationName: string;
-  contractedServiceName: string;
-  paymentStatus?: string | null;
-  osValue?: number | null;
-  servicesSelected?: { id: string; name: string; price: number; group: string }[] | null;
-  associationFees?: { name: string; price: number; type: string }[] | null;
-}
+export type { AdminProcessRow } from '../../../types/admin-dashboard';
+import type { AdminProcessRow } from '../../../types/admin-dashboard';
 
 type SelectedUserTab = 'cadastral' | 'financeiro' | 'documentos' | 'comunicacao';
 

@@ -124,7 +124,7 @@ const ProcessDetails: React.FC = () => {
   const handleGoToCheckout = async () => {
     if (!process || !userContext?.org_id || !userContext?.id) return;
 
-    const amount = Number((process as Record<string, unknown>).amount ?? (process as Record<string, unknown>).os_value ?? 0);
+    const amount = Number(process.amount ?? process.os_value ?? 0);
     if (amount <= 0) {
       window.alert('Valor do pagamento não definido para este processo.');
       return;
@@ -134,10 +134,15 @@ const ProcessDetails: React.FC = () => {
       amountBRL: amount,
       processId: process.id,
       clientId: userContext.id,
-      serviceId: String((process as Record<string, unknown>).service_id ?? ''),
+      // ATENÇÃO (P0-01): a tabela `processes` não tem as colunas service_id,
+      // area_id nem sector_id — só service_order_document_checklists as tem.
+      // Estes três campos vão portanto sempre vazios para os metadados da
+      // sessão Stripe. A origem correta é provavelmente `services_selected`.
+      // Confirmar a regra de negócio antes de corrigir.
+      serviceId: '',
       organizationId: userContext.org_id,
-      areaId: String((process as Record<string, unknown>).area_id ?? ''),
-      sectorId: String((process as Record<string, unknown>).sector_id ?? ''),
+      areaId: '',
+      sectorId: '',
       successUrl: `${window.location.origin}/#/payments/success?processId=${process.id}`,
       cancelUrl: `${window.location.origin}/#/payments/cancel?processId=${process.id}`,
     });
