@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    name: Typecheck e build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      # Bloqueante: o repositório está a zero erros de tipos desde o PR que
+      # introduziu este workflow. Qualquer regressão falha o PR.
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build

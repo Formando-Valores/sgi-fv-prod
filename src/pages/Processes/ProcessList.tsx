@@ -18,12 +18,12 @@ import {
 import { CUSTOM_ANALYSIS_FEE, calcAssociationFees, type AssociationFeeItem, formatEuro } from '../../lib/servicesCatalog';
 import { loadServicesCatalog, filterServicesByUnit, filterGroupsByUnit, filterServicesByGroup, type DbCatalogService } from '../../lib/servicesCatalogDb';
 import { uploadPaymentProof } from '../../lib/paymentProofs';
-import type { ServiceUnit } from '../../../types';
+import { ServiceUnit } from '../../../types';
 
 const SERVICE_UNITS: { value: ServiceUnit; label: string }[] = [
-  { value: 'ADMINISTRATIVO', label: 'Administrativo' },
-  { value: 'JURÍDICO / ADVOCACIA', label: 'Jurídico / Advocacia' },
-  { value: 'TECNOLÓGICO / AI', label: 'Tecnológico / AI' },
+  { value: ServiceUnit.ADMINISTRATIVO, label: 'Administrativo' },
+  { value: ServiceUnit.JURIDICO, label: 'Jurídico / Advocacia' },
+  { value: ServiceUnit.TECNOLOGICO, label: 'Tecnológico / AI' },
 ];
 
 const ProcessList: React.FC = () => {

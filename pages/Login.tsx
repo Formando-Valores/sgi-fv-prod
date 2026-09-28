@@ -347,7 +347,7 @@ const Login: React.FC<LoginProps> = ({ setCurrentUser, users }) => {
           availableOrgs: (loginOrgMemberships || []).filter((m: Record<string, unknown>) => {
             const org = m.organizations as Record<string, unknown> | undefined;
             return org?.is_active !== false;
-          }) as OrgMembership[],
+          }) as unknown as OrgMembership[],
         };
 
         console.info('[login] profile carregado, redirecionando para dashboard');

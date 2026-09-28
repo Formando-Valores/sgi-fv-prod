@@ -13,24 +13,7 @@ import Badge from '../../ui/Badge';
 import { CardSkeleton } from '../../ui/Skeleton';
 import CurrencySelectModal, { type CheckoutRequest } from '../../checkout/CurrencySelectModal';
 
-interface AdminProcessRow extends User {
-  processRecordId?: string;
-  profileUserId?: string | null;
-  processType: string;
-  startDate: string;
-  deadlineDate: string;
-  etapaAtual: string;
-  financeiro: string;
-  prioridade: string;
-  valor: number;
-  sourceLabel: string;
-  requestedOrganizationName: string;
-  contractedServiceName: string;
-  paymentStatus?: string | null;
-  osValue?: number | null;
-  servicesSelected?: { id: string; name: string; price: number; group: string }[] | null;
-  associationFees?: { type: string; name: string; price: number; destination: string }[] | null;
-}
+import type { AdminProcessRow } from '../../../types/admin-dashboard';
 
 type ProcessQuickPreset = 'andamento' | 'atencao' | 'novos7d';
 
@@ -61,8 +44,8 @@ const normalizeProcessOptionalFields = (process: Partial<DbProcess>): DbProcess 
   data_prazo: process.data_prazo ?? null,
   gestor_servico: process.gestor_servico ?? null,
   observacoes: process.observacoes ?? null,
-  services_selected: (process as Record<string, unknown>).services_selected ?? null,
-  association_fees: (process as Record<string, unknown>).association_fees ?? null,
+  services_selected: process.services_selected ?? null,
+  association_fees: process.association_fees ?? null,
 });
 
 const hasMissingOptionalProcessColumns = (error: unknown): boolean => {
@@ -1009,7 +992,7 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
                         const value = event.target.value;
                         setNewProcessForm((prev) => ({
                           ...prev,
-                          serviceUnit: value || null,
+                          serviceUnit: (value as ServiceUnit) || null,
                         }));
                         setAdminServiceSearch('');
                         setAdminExpandedGroups({});

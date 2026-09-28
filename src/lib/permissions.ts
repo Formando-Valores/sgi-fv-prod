@@ -258,7 +258,11 @@ export function getNavigationModules(subject?: PermissionSubject | null): Permis
 
 export function getProcessScope(subject?: PermissionSubject | null): DataScope {
   const hierarchy = resolveHierarchyFromSubject(subject);
-  const orgId = ('org_id' in (subject || {}) ? subject?.org_id : null) || ('organizationId' in (subject || {}) ? subject?.organizationId : null) || null;
+  const subjectFields = (subject || {}) as Record<string, unknown>;
+  const orgId =
+    (typeof subjectFields.org_id === 'string' ? subjectFields.org_id : null) ||
+    (typeof subjectFields.organizationId === 'string' ? subjectFields.organizationId : null) ||
+    null;
   const userId = ('id' in (subject || {}) ? subject?.id : null) || null;
 
   return {

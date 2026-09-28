@@ -189,7 +189,7 @@ const ManagementSection: React.FC<ManagementSectionProps> = ({ users, setUsers, 
             .in('id', memberUserIds);
 
           if (!profileQuery.error) {
-            profileMap = new Map((profileQuery.data || []).map((row: Record<string, unknown>) => [row.id as string, row as { nome_completo?: string | null; nome?: string | null; name?: string | null; email?: string | null; role?: string | null }]));
+            profileMap = new Map(((profileQuery.data || []) as unknown as Record<string, unknown>[]).map((row) => [row.id as string, row as { nome_completo?: string | null; nome?: string | null; name?: string | null; email?: string | null; role?: string | null }]));
             break;
           }
         }
