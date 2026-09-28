@@ -9,7 +9,7 @@ export const SIGNED_URL_TTL_SECONDS = 60 * 60;
 /**
  * Normaliza o valor guardado no banco para o caminho do objeto dentro do bucket.
  *
- * Registros criados antes da migração 057 guardam a URL pública completa
+ * Registros criados antes da migração 059 guardam a URL pública completa
  * (`https://<ref>.supabase.co/storage/v1/object/public/<bucket>/<caminho>`);
  * os novos guardam apenas `<caminho>`. Os dois formatos são aceitos aqui.
  */

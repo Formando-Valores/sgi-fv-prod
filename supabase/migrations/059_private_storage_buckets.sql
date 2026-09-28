@@ -1,5 +1,5 @@
 -- ============================================
--- SGI FV - Migration 057: Buckets privados + acesso por URL assinada
+-- SGI FV - Migration 059: Buckets privados + acesso por URL assinada
 -- ============================================
 -- Data: 2026-09-11
 -- Descrição:
