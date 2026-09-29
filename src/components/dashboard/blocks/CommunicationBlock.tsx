@@ -1,7 +1,13 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Send, Paperclip, Loader2, FileText, Image, X, Printer } from 'lucide-react';
 import { supabase } from '../../../../supabase';
-import { listMessages, sendMessage, uploadMessageAttachment, type ProcessMessage } from '../../../lib/processMessages';
+import {
+  listMessages,
+  sendMessage,
+  uploadMessageAttachment,
+  type ProcessMessage,
+  type ProcessMessageAttachment,
+} from '../../../lib/processMessages';
 
 type Props = {
   processId: string;
@@ -35,12 +41,12 @@ const CommunicationBlock: React.FC<Props> = ({ processId, currentUserId, dark })
     if (!text.trim() && files.length === 0) return;
     setSending(true);
 
-    let attachments: { name: string; url: string; size: number }[] = [];
+    let attachments: ProcessMessageAttachment[] = [];
     if (files.length > 0) {
       const uploaded = await Promise.all(
         files.map((f) => uploadMessageAttachment(processId, f))
       );
-      attachments = uploaded.filter(Boolean) as { name: string; url: string; size: number }[];
+      attachments = uploaded.filter(Boolean) as ProcessMessageAttachment[];
     }
 
     const sent = await sendMessage(processId, currentUserId, text.trim(), attachments);
@@ -155,10 +161,13 @@ ${msgs.map(msg => `
                       {msg.attachments.map((att, i) => (
                         <a
                           key={i}
-                          href={att.url}
+                          href={att.signedUrl || undefined}
                           target="_blank"
                           rel="noopener noreferrer"
+                          aria-disabled={!att.signedUrl}
                           className={`flex items-center gap-2 text-xs p-2 rounded-lg transition-all ${
+                            att.signedUrl ? '' : 'opacity-50 pointer-events-none'
+                          } ${
                             isMine ? 'bg-brand-500 text-white hover:bg-brand-400' : dark ? 'bg-slate-600 text-surface-200 hover:bg-slate-500 border border-slate-500' : 'bg-white text-surface-700 hover:bg-surface-50 border border-surface-200'
                           }`}
                         >

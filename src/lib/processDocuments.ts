@@ -1,7 +1,8 @@
 import { supabase } from '../../supabase';
 import { addProcessAttachment } from './processes';
+import { PROCESS_DOCUMENTS_BUCKET, getSignedUrlMap, toStoragePath } from './storage';
 
-const BUCKET = 'process_documents';
+const BUCKET = PROCESS_DOCUMENTS_BUCKET;
 
 export type ProcessDocument = {
   id: string;
@@ -16,6 +17,8 @@ export type ProcessDocument = {
   review_notes: string | null;
   guidance: string | null;
   created_at: string;
+  /** URL assinada temporária resolvida na leitura; o bucket é privado. */
+  signed_url?: string | null;
 };
 
 export async function uploadProcessDocument(
@@ -36,16 +39,13 @@ export async function uploadProcessDocument(
     return { error: `Erro ao fazer upload: ${uploadError.message}` };
   }
 
-  const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
-  const publicUrl = urlData?.publicUrl || '';
-
   try {
     await addProcessAttachment(
       orgId,
       processId,
       {
         document_name: name,
-        file_path: publicUrl,
+        file_path: filePath,
         file_type: file.type || null,
         pending_reason: 'Aguardando validação documental',
       },
@@ -59,7 +59,7 @@ export async function uploadProcessDocument(
   const { data, error } = await supabase
     .from('process_document_attachments')
     .select('*')
-    .eq('file_path', publicUrl)
+    .eq('file_path', filePath)
     .order('created_at', { ascending: false })
     .limit(1);
 
@@ -67,7 +67,8 @@ export async function uploadProcessDocument(
     return { error: 'Documento enviado mas não foi possível confirmar o registro.' };
   }
 
-  return { document: data[0] as ProcessDocument };
+  const [document] = await withSignedUrls([data[0] as ProcessDocument]);
+  return { document };
 }
 
 export async function listProcessDocuments(
@@ -84,7 +85,19 @@ export async function listProcessDocuments(
     return [];
   }
 
-  return (data || []) as ProcessDocument[];
+  return withSignedUrls((data || []) as ProcessDocument[]);
+}
+
+/** Resolve em lote as URLs assinadas dos documentos (bucket privado). */
+async function withSignedUrls(documents: ProcessDocument[]): Promise<ProcessDocument[]> {
+  if (!documents.length) return documents;
+
+  const signedUrls = await getSignedUrlMap(BUCKET, documents.map((doc) => doc.file_path));
+
+  return documents.map((doc) => ({
+    ...doc,
+    signed_url: signedUrls.get(doc.file_path) || null,
+  }));
 }
 
 export async function deleteProcessDocument(
@@ -100,9 +113,9 @@ export async function deleteProcessDocument(
     return { error: `Erro ao remover registro: ${dbError.message}` };
   }
 
-  const fileName = filePath.split('/').pop();
-  if (fileName) {
-    await supabase.storage.from(BUCKET).remove([fileName]);
+  const objectPath = toStoragePath(BUCKET, filePath);
+  if (objectPath) {
+    await supabase.storage.from(BUCKET).remove([objectPath]);
   }
 
   return {};
