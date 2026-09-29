@@ -223,3 +223,83 @@ do tsconfig do browser e adicionar script de `typecheck`) antes de avaliar um a 
 | `docs/auditoria-seguranca-fase1.md` | Este relatório |
 
 Build verificado após as alterações: `npm run build` ✓
+
+---
+
+## Fase 1b — S-03: teste de acesso cruzado (29/09/2026)
+
+Executado contra um projeto Supabase de teste com as 58 migrations aplicadas, duas
+organizações, um utilizador `admin` em cada e uma linha da org B em cada uma das 18
+tabelas. O utilizador da org A tenta ler e escrever dados da org B.
+
+O `scripts/audit-rls-crosstenant.mjs` sozinho **não teria apanhado nada disto**: assume uma
+coluna `org_id` que 6 tabelas não têm (ficavam "inconclusivas") e um "0 linhas" só prova
+alguma coisa se a org B tiver dados nessa tabela.
+
+### V-05 · Qualquer utilizador autenticado pode tornar-se `owner` de qualquer organização — **CORRIGIDO** (CRÍTICA)
+
+A policy `Allow self insert on registration` em `org_members` tinha apenas
+`CHECK (user_id = auth.uid())`. Sem restrição de organização nem de papel, um utilizador
+autenticado (o registo é aberto) inseria-se como `owner` de qualquer organização e passava
+a ler e alterar tudo dela. Reproduzido: `INSERT` aceite com `role = 'owner'` na org B.
+
+Correção (migration 060): `client` continua permitido (fluxo de Login/Register); `owner`
+só se a organização ainda não tem nenhum membro (criação de organização nova).
+
+### V-06 a V-08 · Policies "é staff de *alguma* organização" — **CORRIGIDO**
+
+Três policies verificavam o papel do utilizador sem ligar o registo à organização:
+
+| ID | Tabela | Impacto |
+|---|---|---|
+| V-06 | `payment_proofs` (`staff_select_all_proofs`, `staff_update_proofs`) | Staff/admin de qualquer org lê e valida comprovativos de outras |
+| V-07 | `professional_payment_accounts` (`staff_manage_accounts`, ALL) | Staff de qualquer org lê, **altera e apaga IBAN** de profissionais de outras |
+| V-08 | `financial_audit_events` ("Org admins can view") | Admin de qualquer org lê o log financeiro de todas |
+
+Leitura cruzada reproduzida antes da correção nas três. A escrita cruzada em V-06 e V-07
+foi inferida do texto das policies e só testada depois da correção.
+
+### V-09 a V-14 · Escalada de privilégios e fugas por funções e policies — **CORRIGIDO** (migration 061)
+
+Encontradas ao auditar funções `SECURITY DEFINER`, a vista `v_user_context` e as policies que
+dependem de `profiles.role` ou de `is_default_org_admin`. Todas reproduzidas antes da correção.
+
+| ID | Gravidade | Falha |
+|---|---|---|
+| **V-09** | **Crítica** | `profiles.role` é editável pelo próprio utilizador. `can_manage_entity()` e `org_stripe_config_superadmin_manage` confiavam nesse campo. Um utilizador acabado de registar, sem organização, punha `role = 'admin'` e passava a **ler e alterar a configuração Stripe (chaves cifradas e webhook secret) de todas as organizações**. |
+| **V-10** | **Crítica** | `is_default_org_admin()` aceitava também qualquer org com `padr` no nome. Qualquer utilizador cria organizações: criar uma chamada "Padrão" dava privilégios de admin global. |
+| V-11 | Alta | `v_user_context` (vista de `postgres`, ignora RLS) legível por `anon`: e-mail, nome, papel e organização de todos os utilizadores. |
+| **V-12** | **Crítica** | `organizations`: UPDATE e DELETE verificavam "é admin/owner de *alguma* org". Admin da org A alterava e **apagava a org B, com processos e membros em cascata**. |
+| V-13 | Média | `process_events` e `process_document_attachments` legíveis por qualquer membro, incluindo clientes, para processos de outros clientes. |
+| V-14 | Média | `delete_user_completely` chama `is_org_admin(uuid)`, que a migration 047 substituiu por `(text)`: falha sempre para quem não é admin global. Latente: com um cast simples, utilizadores sem organização escapavam à verificação. |
+
+Correção: `is_default_org_admin` só reconhece a org de slug `default`; trigger em `profiles`
+impede que o utilizador altere o próprio `role`/`org_id`; "admin global" em `can_manage_entity` e
+em `org_stripe_config` exige ser admin da org default; a vista passa a `security_invoker` e perde o
+acesso anónimo; UPDATE/DELETE de `organizations` limitados à própria organização (DELETE só
+owner ou admin global); clientes só veem eventos e anexos dos seus processos; `delete_user_completely`
+corrigida.
+
+### Resultado depois da migration 060
+
+Leitura das 18 tabelas: zero linhas de outra organização. Escrita cruzada (UPDATE, DELETE,
+INSERT) em `processes`, `process_messages`, `payments`, `services_catalog`,
+`org_stripe_config`, `payment_proofs`, `professional_payment_accounts`,
+`financial_audit_events` e `org_members`: bloqueada. Controlos positivos: cada org continua a
+ver os seus próprios dados; o auto-vínculo como `client` e a criação de organização nova
+continuam a funcionar.
+
+### Riscos residuais (não corrigidos)
+
+- **Auto-vínculo como `client` em qualquer organização.** O registo precisa disto; o impacto
+  depende do que o papel `client` consegue ver. A edge function `create-user` já faz o vínculo
+  com service role, pelo que a policy de cliente poderá ser removida no futuro.
+- **`organizations` e `services_catalog` legíveis por qualquer utilizador** (policies
+  `USING (true)`). O catálogo é público por desenho; a exposição das colunas de certificado a
+  outros tenants autenticados fica por decidir (o PR #109 só fecha o acesso anónimo).
+- Um `admin` pode alterar o próprio papel para `owner` dentro da sua organização, e qualquer
+  utilizador pode inserir eventos em `financial_audit_events` com `actor_user_id` próprio.
+- **Criação de organizações aberta a qualquer utilizador autenticado** (`Authenticated users can insert organizations`). Deixou de dar privilégios (V-10), mas permite criar organizações à vontade.
+- `service_order_document_checklists` legível por qualquer membro (configuração do serviço, não dados de processo).
+- **Não auditado:** edge functions.
+- **A produção não foi testada.** O estado real das policies em produção depende de S-07.
