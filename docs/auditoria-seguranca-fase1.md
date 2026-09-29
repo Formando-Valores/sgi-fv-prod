@@ -259,6 +259,27 @@ Três policies verificavam o papel do utilizador sem ligar o registo à organiza
 Leitura cruzada reproduzida antes da correção nas três. A escrita cruzada em V-06 e V-07
 foi inferida do texto das policies e só testada depois da correção.
 
+### V-09 a V-14 · Escalada de privilégios e fugas por funções e policies — **CORRIGIDO** (migration 061)
+
+Encontradas ao auditar funções `SECURITY DEFINER`, a vista `v_user_context` e as policies que
+dependem de `profiles.role` ou de `is_default_org_admin`. Todas reproduzidas antes da correção.
+
+| ID | Gravidade | Falha |
+|---|---|---|
+| **V-09** | **Crítica** | `profiles.role` é editável pelo próprio utilizador. `can_manage_entity()` e `org_stripe_config_superadmin_manage` confiavam nesse campo. Um utilizador acabado de registar, sem organização, punha `role = 'admin'` e passava a **ler e alterar a configuração Stripe (chaves cifradas e webhook secret) de todas as organizações**. |
+| **V-10** | **Crítica** | `is_default_org_admin()` aceitava também qualquer org com `padr` no nome. Qualquer utilizador cria organizações: criar uma chamada "Padrão" dava privilégios de admin global. |
+| V-11 | Alta | `v_user_context` (vista de `postgres`, ignora RLS) legível por `anon`: e-mail, nome, papel e organização de todos os utilizadores. |
+| **V-12** | **Crítica** | `organizations`: UPDATE e DELETE verificavam "é admin/owner de *alguma* org". Admin da org A alterava e **apagava a org B, com processos e membros em cascata**. |
+| V-13 | Média | `process_events` e `process_document_attachments` legíveis por qualquer membro, incluindo clientes, para processos de outros clientes. |
+| V-14 | Média | `delete_user_completely` chama `is_org_admin(uuid)`, que a migration 047 substituiu por `(text)`: falha sempre para quem não é admin global. Latente: com um cast simples, utilizadores sem organização escapavam à verificação. |
+
+Correção: `is_default_org_admin` só reconhece a org de slug `default`; trigger em `profiles`
+impede que o utilizador altere o próprio `role`/`org_id`; "admin global" em `can_manage_entity` e
+em `org_stripe_config` exige ser admin da org default; a vista passa a `security_invoker` e perde o
+acesso anónimo; UPDATE/DELETE de `organizations` limitados à própria organização (DELETE só
+owner ou admin global); clientes só veem eventos e anexos dos seus processos; `delete_user_completely`
+corrigida.
+
 ### Resultado depois da migration 060
 
 Leitura das 18 tabelas: zero linhas de outra organização. Escrita cruzada (UPDATE, DELETE,
@@ -278,6 +299,7 @@ continuam a funcionar.
   outros tenants autenticados fica por decidir (o PR #109 só fecha o acesso anónimo).
 - Um `admin` pode alterar o próprio papel para `owner` dentro da sua organização, e qualquer
   utilizador pode inserir eventos em `financial_audit_events` com `actor_user_id` próprio.
-- **Não auditado:** funções `SECURITY DEFINER` chamáveis por RPC, vistas (`v_user_context`) e
-  edge functions.
+- **Criação de organizações aberta a qualquer utilizador autenticado** (`Authenticated users can insert organizations`). Deixou de dar privilégios (V-10), mas permite criar organizações à vontade.
+- `service_order_document_checklists` legível por qualquer membro (configuração do serviço, não dados de processo).
+- **Não auditado:** edge functions.
 - **A produção não foi testada.** O estado real das policies em produção depende de S-07.
