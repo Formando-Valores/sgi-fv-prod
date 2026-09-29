@@ -223,3 +223,61 @@ do tsconfig do browser e adicionar script de `typecheck`) antes de avaliar um a 
 | `docs/auditoria-seguranca-fase1.md` | Este relatório |
 
 Build verificado após as alterações: `npm run build` ✓
+
+---
+
+## Fase 1b — S-03: teste de acesso cruzado (29/09/2026)
+
+Executado contra um projeto Supabase de teste com as 58 migrations aplicadas, duas
+organizações, um utilizador `admin` em cada e uma linha da org B em cada uma das 18
+tabelas. O utilizador da org A tenta ler e escrever dados da org B.
+
+O `scripts/audit-rls-crosstenant.mjs` sozinho **não teria apanhado nada disto**: assume uma
+coluna `org_id` que 6 tabelas não têm (ficavam "inconclusivas") e um "0 linhas" só prova
+alguma coisa se a org B tiver dados nessa tabela.
+
+### V-05 · Qualquer utilizador autenticado pode tornar-se `owner` de qualquer organização — **CORRIGIDO** (CRÍTICA)
+
+A policy `Allow self insert on registration` em `org_members` tinha apenas
+`CHECK (user_id = auth.uid())`. Sem restrição de organização nem de papel, um utilizador
+autenticado (o registo é aberto) inseria-se como `owner` de qualquer organização e passava
+a ler e alterar tudo dela. Reproduzido: `INSERT` aceite com `role = 'owner'` na org B.
+
+Correção (migration 060): `client` continua permitido (fluxo de Login/Register); `owner`
+só se a organização ainda não tem nenhum membro (criação de organização nova).
+
+### V-06 a V-08 · Policies "é staff de *alguma* organização" — **CORRIGIDO**
+
+Três policies verificavam o papel do utilizador sem ligar o registo à organização:
+
+| ID | Tabela | Impacto |
+|---|---|---|
+| V-06 | `payment_proofs` (`staff_select_all_proofs`, `staff_update_proofs`) | Staff/admin de qualquer org lê e valida comprovativos de outras |
+| V-07 | `professional_payment_accounts` (`staff_manage_accounts`, ALL) | Staff de qualquer org lê, **altera e apaga IBAN** de profissionais de outras |
+| V-08 | `financial_audit_events` ("Org admins can view") | Admin de qualquer org lê o log financeiro de todas |
+
+Leitura cruzada reproduzida antes da correção nas três. A escrita cruzada em V-06 e V-07
+foi inferida do texto das policies e só testada depois da correção.
+
+### Resultado depois da migration 060
+
+Leitura das 18 tabelas: zero linhas de outra organização. Escrita cruzada (UPDATE, DELETE,
+INSERT) em `processes`, `process_messages`, `payments`, `services_catalog`,
+`org_stripe_config`, `payment_proofs`, `professional_payment_accounts`,
+`financial_audit_events` e `org_members`: bloqueada. Controlos positivos: cada org continua a
+ver os seus próprios dados; o auto-vínculo como `client` e a criação de organização nova
+continuam a funcionar.
+
+### Riscos residuais (não corrigidos)
+
+- **Auto-vínculo como `client` em qualquer organização.** O registo precisa disto; o impacto
+  depende do que o papel `client` consegue ver. A edge function `create-user` já faz o vínculo
+  com service role, pelo que a policy de cliente poderá ser removida no futuro.
+- **`organizations` e `services_catalog` legíveis por qualquer utilizador** (policies
+  `USING (true)`). O catálogo é público por desenho; a exposição das colunas de certificado a
+  outros tenants autenticados fica por decidir (o PR #109 só fecha o acesso anónimo).
+- Um `admin` pode alterar o próprio papel para `owner` dentro da sua organização, e qualquer
+  utilizador pode inserir eventos em `financial_audit_events` com `actor_user_id` próprio.
+- **Não auditado:** funções `SECURITY DEFINER` chamáveis por RPC, vistas (`v_user_context`) e
+  edge functions.
+- **A produção não foi testada.** O estado real das policies em produção depende de S-07.
