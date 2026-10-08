@@ -12,12 +12,27 @@ const jsonResponse = (status: number, body: Record<string, unknown>) =>
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 
-async function getImageBase64(relativePath: string): Promise<string> {
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
+// As imagens vivem em public/img (servidas pelo app); a função edge não as empacota.
+async function getImageBase64(appUrl: string, fileName: string): Promise<string> {
+  if (!appUrl) return '';
   try {
-    const filePath = new URL(relativePath, import.meta.url).pathname;
-    const file = await Deno.readFile(filePath);
-    return btoa(String.fromCharCode(...file));
-  } catch {
+    const res = await fetch(`${appUrl.replace(/\/$/, '')}/img/${encodeURIComponent(fileName)}`);
+    if (!res.ok) {
+      console.error('[send-certificate] imagem indisponível:', fileName, res.status);
+      return '';
+    }
+    return bytesToBase64(new Uint8Array(await res.arrayBuffer()));
+  } catch (err) {
+    console.error('[send-certificate] erro ao carregar imagem:', fileName, err);
     return '';
   }
 }
@@ -35,7 +50,7 @@ interface OrgCertificateData {
 
 const DEFAULT_ORG: OrgCertificateData = {
   name: 'Associação contra as Injustiças - AI',
-  certificate_nipc: 'XXXXXXXX',
+  certificate_nipc: '519206550',
   certificate_address: '[Morada da Sede]',
   certificate_city: 'Lisboa – Portugal',
   certificate_body_text: null,
@@ -66,16 +81,12 @@ function generateCertificateHtml(params: {
 }): string {
   const p = params;
   const org = p.org;
-  const nipc = org.certificate_nipc || 'XXXXXXXX';
+  const nipc = org.certificate_nipc && org.certificate_nipc !== 'XXXXXXXX' ? org.certificate_nipc : '519206550';
   const address = org.certificate_address || '[Morada da Sede]';
   const city = org.certificate_city || 'Lisboa – Portugal';
   const signatoryName = org.certificate_signatory_name || 'Leonardo Saraiva Págio';
   const signatoryTitle = org.certificate_signatory_title || 'Advogado';
-  const sealHtml = org.certificate_seal_url
-    ? `<img src="cid:selo_org" alt="Selo" style="width:80px;height:80px;object-fit:contain;" />`
-    : `<div style="width:80px;height:80px;border:2px dashed #d4a843;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:#fefce8;">
-         <span style="color:#d4a843;font-size:10px;font-weight:700;">SELO</span>
-       </div>`;
+  const sealHtml = `<img src="cid:selo_org" alt="Selo" style="width:80px;height:80px;object-fit:contain;" />`;
   const bodyText = org.certificate_body_text
     ? org.certificate_body_text.replace(/{orgName}/g, org.name)
     : `A <strong>${org.name}</strong>, pessoa coletiva n.º ${nipc}, com sede na ${address}, ${city}, certifica para os devidos efeitos que:`;
@@ -357,26 +368,24 @@ Deno.serve(async (request) => {
     };
 
     const certificateHtml = generateCertificateHtml(certParams);
-    const signatureBase64 = await getImageBase64('../../img/assinatura_leonardo_pagio.png');
+    const signatureBase64 = await getImageBase64(appUrl, 'assinatura_leonardo_pagio.png');
     const sealBase64 = orgData.certificate_seal_url
-      ? await getImageBase64(`../../img/${orgData.certificate_seal_url}`)
-      : await getImageBase64('../../img/selo associação.png');
+      ? await getImageBase64(appUrl, orgData.certificate_seal_url)
+      : await getImageBase64(appUrl, 'selo associação.png');
 
     const attachments = [];
     if (signatureBase64) {
       attachments.push({
         filename: 'assinatura.png',
         content: signatureBase64,
-        disposition: 'inline',
-        contentId: 'assinatura_leonardo',
+        content_id: 'assinatura_leonardo',
       });
     }
     if (sealBase64) {
       attachments.push({
         filename: 'selo.png',
         content: sealBase64,
-        disposition: 'inline',
-        contentId: 'selo_org',
+        content_id: 'selo_org',
       });
     }
 

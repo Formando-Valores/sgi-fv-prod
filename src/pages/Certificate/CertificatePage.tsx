@@ -16,7 +16,7 @@ interface OrgCertData {
 
 const DEFAULT_ORG: OrgCertData = {
   name: 'Associação contra as Injustiças - AI',
-  certificate_nipc: 'XXXXXXXX',
+  certificate_nipc: '519206550',
   certificate_address: '[Morada da Sede]',
   certificate_city: 'Lisboa – Portugal',
   certificate_body_text: null,
@@ -160,7 +160,7 @@ const CertificatePage: React.FC = () => {
     );
   }
 
-  const nipc = org.certificate_nipc || 'XXXXXXXX';
+  const nipc = org.certificate_nipc && org.certificate_nipc !== 'XXXXXXXX' ? org.certificate_nipc : '519206550';
   const address = org.certificate_address || '[Morada da Sede]';
   const city = org.certificate_city || 'Lisboa – Portugal';
   const signatoryName = org.certificate_signatory_name || 'Leonardo Saraiva Págio';
