@@ -101,10 +101,13 @@ export const loadOrganizations = async () => {
 
   for (const schema of candidateSchemas) {
     for (const table of candidateTables) {
+      // `anon` só tem GRANT nestas colunas de organizations (migration 058)
+      const selectColumns: string = table === 'organizations' ? 'id, name, slug, is_active' : '*';
+
       const { data, error } = await supabase
         .schema(schema)
         .from(table)
-        .select('*')
+        .select(selectColumns)
         .limit(1000);
 
       if (error) {
@@ -113,7 +116,7 @@ export const loadOrganizations = async () => {
       }
 
       for (const row of data ?? []) {
-        const organization = toOrganization(row as Record<string, unknown>);
+        const organization = toOrganization(row as unknown as Record<string, unknown>);
 
         if (!organization) {
           continue;
