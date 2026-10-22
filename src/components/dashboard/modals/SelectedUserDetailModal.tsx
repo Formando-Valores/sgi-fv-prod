@@ -312,10 +312,14 @@ const SelectedUserDetailModal: React.FC<SelectedUserDetailModalProps> = ({
                               )}
                               {proof.notes && <p className="text-[10px] text-surface-500 mt-1">{proof.notes}</p>}
                             </div>
-                            <a href={proof.file_url} target="_blank" rel="noopener noreferrer"
-                              className="text-xs font-bold text-brand-600 hover:text-brand-800 ml-3 underline">
-                              Ver arquivo
-                            </a>
+                            {proof.signed_url ? (
+                              <a href={proof.signed_url} target="_blank" rel="noopener noreferrer"
+                                className="text-xs font-bold text-brand-600 hover:text-brand-800 ml-3 underline">
+                                Ver arquivo
+                              </a>
+                            ) : (
+                              <span className="text-xs font-bold text-surface-400 ml-3">Arquivo indisponível</span>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -491,11 +495,17 @@ const SelectedUserDetailModal: React.FC<SelectedUserDetailModalProps> = ({
                         {doc.review_notes && (
                           <p className="text-xs text-amber-600 mt-1 font-semibold">Parecer: {doc.review_notes}</p>
                         )}
-                        {doc.file_path && (
-                          <a href={doc.file_path} target="_blank" rel="noopener noreferrer"
+                        {doc.signed_url ? (
+                          <a href={doc.signed_url} target="_blank" rel="noopener noreferrer"
                             className="text-xs text-brand-600 hover:text-brand-800 font-bold mt-1 inline-block">
                             Visualizar arquivo →
                           </a>
+                        ) : (
+                          doc.file_path && (
+                            <span className="text-xs text-surface-400 font-bold mt-1 inline-block">
+                              Arquivo indisponível
+                            </span>
+                          )
                         )}
                       </div>
                       {!isClientScope && doc.validation_status === 'pending' && (

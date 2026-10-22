@@ -1,9 +1,11 @@
 import { supabase } from '../../supabase';
+import { PAYMENT_PROOFS_BUCKET, getSignedUrlMap } from './storage';
 
 export type PaymentProof = {
   id: string;
   process_id: string;
   user_id: string;
+  /** Caminho do objeto no bucket privado (registros antigos guardam a URL pública). */
   file_url: string;
   file_name: string | null;
   amount: number | null;
@@ -12,6 +14,8 @@ export type PaymentProof = {
   validated_by: string | null;
   validated_at: string | null;
   created_at: string;
+  /** URL assinada temporária resolvida na leitura; o bucket é privado. */
+  signed_url?: string | null;
 };
 
 export async function uploadPaymentProof(
@@ -24,22 +28,19 @@ export async function uploadPaymentProof(
   const filePath = `${userId}/${processId}/${Date.now()}_${file.name}`;
 
   const { error: uploadError } = await supabase.storage
-    .from('payment_proofs')
+    .from(PAYMENT_PROOFS_BUCKET)
     .upload(filePath, file);
 
   if (uploadError) {
     return { error: `Erro ao fazer upload: ${uploadError.message}` };
   }
 
-  const { data: urlData } = supabase.storage.from('payment_proofs').getPublicUrl(filePath);
-  const fileUrl = urlData?.publicUrl || '';
-
   const { data, error } = await supabase
     .from('payment_proofs')
     .insert({
       process_id: processId,
       user_id: userId,
-      file_url: fileUrl,
+      file_url: filePath,
       file_name: file.name,
       amount: amount ?? null,
       notes: notes ?? null,
@@ -58,7 +59,8 @@ export async function uploadPaymentProof(
     .update({ payment_status: 'pending_validation' })
     .eq('id', processId);
 
-  return { proof: data as PaymentProof };
+  const [proof] = await withSignedUrls([data as PaymentProof]);
+  return { proof };
 }
 
 export async function validatePaymentProof(
@@ -107,5 +109,17 @@ export async function getPaymentProofs(processId: string): Promise<PaymentProof[
     return [];
   }
 
-  return (data || []) as PaymentProof[];
+  return withSignedUrls((data || []) as PaymentProof[]);
+}
+
+/** Resolve em lote as URLs assinadas dos comprovantes (bucket privado). */
+async function withSignedUrls(proofs: PaymentProof[]): Promise<PaymentProof[]> {
+  if (!proofs.length) return proofs;
+
+  const signedUrls = await getSignedUrlMap(PAYMENT_PROOFS_BUCKET, proofs.map((proof) => proof.file_url));
+
+  return proofs.map((proof) => ({
+    ...proof,
+    signed_url: signedUrls.get(proof.file_url) || null,
+  }));
 }

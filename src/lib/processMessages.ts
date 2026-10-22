@@ -1,11 +1,21 @@
 import { supabase } from '../../supabase';
+import { PROCESS_DOCUMENTS_BUCKET, getSignedUrlMap } from './storage';
+
+export type ProcessMessageAttachment = {
+  name: string;
+  /** Caminho do objeto no bucket privado (registros antigos guardam a URL pública). */
+  url: string;
+  size: number;
+  /** URL assinada temporária resolvida na leitura; o bucket é privado. */
+  signedUrl?: string | null;
+};
 
 export type ProcessMessage = {
   id: string;
   process_id: string;
   sender_id: string;
   message: string;
-  attachments: { name: string; url: string; size: number }[];
+  attachments: ProcessMessageAttachment[];
   created_at: string;
   sender_name?: string;
 };
@@ -30,10 +40,28 @@ export async function listMessages(processId: string): Promise<ProcessMessage[]>
 
   const nameMap = new Map((profiles || []).map((p) => [p.id, p.nome_completo || 'Usuário']));
 
-  return (data || []).map((m) => ({
-    ...m,
-    attachments: m.attachments || [],
-    sender_name: nameMap.get(m.sender_id) || 'Usuário',
+  return withSignedAttachments(
+    (data || []).map((m) => ({
+      ...m,
+      attachments: (m.attachments || []) as ProcessMessageAttachment[],
+      sender_name: nameMap.get(m.sender_id) || 'Usuário',
+    })),
+  );
+}
+
+/** Resolve em lote as URLs assinadas dos anexos (bucket privado). */
+async function withSignedAttachments(messages: ProcessMessage[]): Promise<ProcessMessage[]> {
+  const stored = messages.flatMap((m) => (m.attachments || []).map((att) => att.url));
+  if (!stored.length) return messages;
+
+  const signedUrls = await getSignedUrlMap(PROCESS_DOCUMENTS_BUCKET, stored);
+
+  return messages.map((message) => ({
+    ...message,
+    attachments: (message.attachments || []).map((att) => ({
+      ...att,
+      signedUrl: signedUrls.get(att.url) || null,
+    })),
   }));
 }
 
@@ -41,7 +69,7 @@ export async function sendMessage(
   processId: string,
   senderId: string,
   message: string,
-  attachments?: { name: string; url: string; size: number }[]
+  attachments?: ProcessMessageAttachment[]
 ): Promise<ProcessMessage | null> {
   const { data, error } = await supabase
     .from('process_messages')
@@ -59,18 +87,19 @@ export async function sendMessage(
     return null;
   }
 
-  return { ...data, sender_name: undefined };
+  const [enriched] = await withSignedAttachments([{ ...data, sender_name: undefined } as ProcessMessage]);
+  return enriched;
 }
 
 export async function uploadMessageAttachment(
   processId: string,
   file: File
-): Promise<{ name: string; url: string; size: number } | null> {
+): Promise<ProcessMessageAttachment | null> {
   const ext = file.name.split('.').pop() || 'bin';
   const path = `${processId}/comunicacao/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
   const { error } = await supabase.storage
-    .from('process_documents')
+    .from(PROCESS_DOCUMENTS_BUCKET)
     .upload(path, file);
 
   if (error) {
@@ -78,13 +107,9 @@ export async function uploadMessageAttachment(
     return null;
   }
 
-  const { data: urlData } = supabase.storage
-    .from('process_documents')
-    .getPublicUrl(path);
-
   return {
     name: file.name,
-    url: urlData?.publicUrl || '',
+    url: path,
     size: file.size,
   };
 }
