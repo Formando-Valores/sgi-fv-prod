@@ -92,6 +92,20 @@ export function formatMoney(amountMajor: number, currency: string): string {
   return `${n.toFixed(2).replace('.', ',')} ${String(currency || '').toUpperCase()}`;
 }
 
+/** Domínio atual da aplicação (fallback quando APP_URL não está definido). */
+export const DEFAULT_APP_ORIGIN = 'https://sgi-fv-prod-one.vercel.app';
+
+/**
+ * Origens sempre aceites como retorno do checkout: domínio novo, domínio antigo
+ * (links já enviados) e o site da Associação (vainaai.pt, com e sem www).
+ */
+export const DEFAULT_ALLOWED_CHECKOUT_ORIGINS = [
+  DEFAULT_APP_ORIGIN,
+  'https://sgi-fv-prod.vercel.app',
+  'https://www.vainaai.pt',
+  'https://vainaai.pt',
+];
+
 /**
  * Aceita successUrl/cancelUrl apenas de origens confiáveis (evita redirecionamento
  * aberto a partir de uma página de pagamento legítima). Caso contrário devolve o fallback.

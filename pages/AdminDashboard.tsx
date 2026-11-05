@@ -77,6 +77,7 @@ type AdminDashboardLayoutProps = {
   availableOrgs?: Array<{ org_id: string; organizations?: { name?: string; is_active?: boolean } }>;
   onSwitchOrg?: (orgId: string) => void;
   activeOrgId?: string | null;
+  activeOrgRole?: string | null;
   showRoleSwitcher?: boolean;
   accessLevel?: string;
   onAccessLevelChange?: (level: string) => void;
@@ -97,6 +98,7 @@ const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({
   availableOrgs,
   onSwitchOrg,
   activeOrgId,
+  activeOrgRole,
   showRoleSwitcher,
   accessLevel,
   onAccessLevelChange,
@@ -130,6 +132,8 @@ const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({
         title={<><img src="/icons/icon.svg" alt="SGI FV" className="h-6 w-6 sm:h-8 sm:w-8 inline-block" /> SGI FV - PAINEL ADMINISTRATIVO</>}
         subtitle={`Bem-vindo, ${currentUserName}`}
         onOpenSidebar={() => setSidebarOpen(true)}
+        activeOrgId={activeOrgId}
+        orgRole={activeOrgRole}
       />
     )}
   >
@@ -1123,6 +1127,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, users, set
       availableOrgs={organizations.map(o => ({ org_id: o.id, organizations: { name: o.name, is_active: o.isActive } }))}
       onSwitchOrg={onSwitchOrg}
       activeOrgId={activeOrgId}
+      activeOrgRole={currentUser.availableOrgs?.find((m) => m.org_id === activeOrgId)?.role ?? currentUser.org_role ?? null}
       showRoleSwitcher={realPermissions.isAdminHierarchy}
       accessLevel={impersonatingAccessLevel}
       onAccessLevelChange={(level) => {

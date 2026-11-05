@@ -5,8 +5,11 @@ export const config = {
 };
 
 const ALLOWED_ORIGINS = [
+  'https://sgi-fv-prod-one.vercel.app',
   'https://sgi-fv-prod.vercel.app',
   'https://sgi-fv.vercel.app',
+  'https://www.vainaai.pt',
+  'https://vainaai.pt',
 ];
 
 export default async function handler(req, res) {

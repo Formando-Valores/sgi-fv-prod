@@ -7,9 +7,12 @@ interface DashboardTopbarProps {
   subtitle: string;
   actions?: React.ReactNode;
   onOpenSidebar?: () => void;
+  /** Organização ativa e papel do utilizador nela (controlam o sino de novidades). */
+  activeOrgId?: string | null;
+  orgRole?: string | null;
 }
 
-const DashboardTopbar: React.FC<DashboardTopbarProps> = ({ title, subtitle, actions, onOpenSidebar }) => {
+const DashboardTopbar: React.FC<DashboardTopbarProps> = ({ title, subtitle, actions, onOpenSidebar, activeOrgId, orgRole }) => {
   return (
     <header className="glass border-b border-surface-200/60 px-4 sm:px-6 lg:px-8 no-print">
       <div className="flex items-center gap-3 h-16">
@@ -32,7 +35,7 @@ const DashboardTopbar: React.FC<DashboardTopbarProps> = ({ title, subtitle, acti
           </div>
 
           <div className="flex items-center gap-2">
-            <NotificationsBell />
+            <NotificationsBell activeOrgId={activeOrgId} orgRole={orgRole} />
             {actions && <div className="flex-shrink-0">{actions}</div>}
           </div>
         </div>

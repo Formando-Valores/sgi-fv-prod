@@ -6,6 +6,8 @@ import {
   formatMoney,
   minorToMajor,
   safeRedirectUrl,
+  DEFAULT_ALLOWED_CHECKOUT_ORIGINS,
+  DEFAULT_APP_ORIGIN,
 } from '../../supabase/functions/_shared/pricing';
 import { amountToMinorUnits as frontendAmountToMinorUnits } from '../../src/lib/stripeCurrency';
 
@@ -74,5 +76,21 @@ describe('Checkout · URLs de retorno', () => {
     expect(safeRedirectUrl('https://evil.example/phish', allowed, fallback)).toBe(fallback);
     expect(safeRedirectUrl('javascript:alert(1)', allowed, fallback)).toBe(fallback);
     expect(safeRedirectUrl('', allowed, fallback)).toBe(fallback);
+  });
+});
+
+describe('Checkout · origens permitidas por omissão', () => {
+  it('inclui o domínio novo, o antigo e o site vainaai.pt', () => {
+    expect(DEFAULT_APP_ORIGIN).toBe('https://sgi-fv-prod-one.vercel.app');
+    expect(DEFAULT_ALLOWED_CHECKOUT_ORIGINS).toEqual(expect.arrayContaining([
+      'https://sgi-fv-prod-one.vercel.app',
+      'https://sgi-fv-prod.vercel.app',
+      'https://www.vainaai.pt',
+      'https://vainaai.pt',
+    ]));
+    const fb = `${DEFAULT_APP_ORIGIN}/#/payments/success`;
+    expect(safeRedirectUrl('https://vainaai.pt/obrigado', DEFAULT_ALLOWED_CHECKOUT_ORIGINS, fb)).toBe('https://vainaai.pt/obrigado');
+    expect(safeRedirectUrl('https://sgi-fv-prod-one.vercel.app/#/payments/success?processId=1', DEFAULT_ALLOWED_CHECKOUT_ORIGINS, fb))
+      .toBe('https://sgi-fv-prod-one.vercel.app/#/payments/success?processId=1');
   });
 });

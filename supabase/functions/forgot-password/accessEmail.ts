@@ -43,7 +43,7 @@ export async function sendAccessCredentialsEmail(payload: AccessEmailPayload) {
   }
 
   const recipientName = payload.fullName?.trim() || 'cliente';
-  const loginUrl = payload.loginUrl?.trim() || 'https://sgi-fv-prod.vercel.app/#/login';
+  const loginUrl = payload.loginUrl?.trim() || 'https://sgi-fv-prod-one.vercel.app/#/login';
   const sourceLabel = payload.source?.trim() || 'plataforma SGI FV';
 
   const html = `
@@ -104,7 +104,7 @@ export async function sendPasswordResetEmail(payload: PasswordResetEmailPayload)
   }
 
   const recipientName = payload.fullName?.trim() || 'cliente';
-  const loginUrl = payload.loginUrl?.trim() || 'https://sgi-fv-prod.vercel.app/#/login';
+  const loginUrl = payload.loginUrl?.trim() || 'https://sgi-fv-prod-one.vercel.app/#/login';
   const resetUrl = payload.resetUrl.trim();
 
   const html = `

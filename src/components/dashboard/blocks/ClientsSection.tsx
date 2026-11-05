@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Users, Pencil, Trash2, X, Plus, Check } from 'lucide-react';
+import { Search, Users, Pencil, Trash2, X, Plus, Check, MessageCircle } from 'lucide-react';
 import { User, ServiceUnit, Organization } from '../../../../types';
 import { supabase } from '../../../../supabase';
 import Button from '../../ui/Button';
@@ -15,6 +15,7 @@ import {
   AccessLevel,
 } from '../../../lib/clientUtils';
 import { SUPABASE_EDGE_FUNCTIONS } from '../../../lib/supabaseFunctions';
+import { buildWhatsAppUrl, buildWhatsAppWelcomeMessage, getFrontendLoginUrl } from '../../../lib/memberWhatsApp';
 import { useToast } from '../../../contexts/ToastContext';
 
 interface ClientsSectionProps {
@@ -98,7 +99,7 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
     const userIds = Array.from(new Set(scopedMembers.map((member) => member.user_id)));
     const { data: profileRows, error: profileError } = await supabase
       .from('profiles')
-      .select('id,nome_completo,email,created_at')
+      .select('id,nome_completo,email,phone,created_at')
       .in('id', userIds);
 
     if (profileError) {
@@ -108,7 +109,7 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
       setClientsError('');
     }
 
-    const profileMap = new Map(((profileRows || []) as Array<{ id: string; nome_completo?: string | null; email?: string | null; created_at?: string | null }>).map((row) => [row.id, row]));
+    const profileMap = new Map(((profileRows || []) as Array<{ id: string; nome_completo?: string | null; email?: string | null; phone?: string | null; created_at?: string | null }>).map((row) => [row.id, row]));
 
     const normalizedClients: ClientProfileView[] = scopedMembers.map((member) => {
       const profile = profileMap.get(member.user_id);
@@ -127,6 +128,7 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
         accessLevel: mapOrgRoleToAccessLevel(member.role),
         source: profile ? 'org_members+profiles' : 'org_members_only',
         created_at: profile?.created_at || undefined,
+        phone: sanitizeDisplayValue(profile?.phone) || undefined,
       };
     });
 
@@ -137,6 +139,16 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
   useEffect(() => {
     void fetchClients();
   }, [activeOrgId]);
+
+  /** Abre o WhatsApp com a mensagem de boas-vindas pré-preenchida (envio manual). */
+  const handleOpenWhatsApp = (client: ClientProfileView) => {
+    const message = buildWhatsAppWelcomeMessage({
+      fullName: client.nome,
+      email: client.email,
+      loginUrl: getFrontendLoginUrl(import.meta.env.VITE_APP_URL),
+    });
+    window.open(buildWhatsAppUrl(message, client.phone), '_blank', 'noopener,noreferrer');
+  };
 
   const visibleClients = clientsData
     .filter((client) =>
@@ -560,6 +572,9 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
                       </td>
                       <td className="px-3 sm:px-6 py-2 sm:py-4 text-right whitespace-nowrap">
                         <div className="flex justify-end gap-2">
+                          {client.accessLevel === 'Cliente' && (
+                            <button onClick={() => handleOpenWhatsApp(client)} className="p-2 bg-emerald-50 hover:bg-emerald-100 rounded-md text-emerald-600 transition-colors" title={client.phone ? 'Enviar boas-vindas por WhatsApp' : 'Enviar boas-vindas por WhatsApp (sem telefone registado: escolha o contacto no WhatsApp)'} aria-label="Enviar boas-vindas por WhatsApp"><MessageCircle className="w-4 h-4" /></button>
+                          )}
                           <button onClick={() => void handleStartEditClient(client)} className="p-2 bg-surface-100 hover:bg-surface-200 rounded-md text-surface-500 hover:text-white transition-colors" title="Editar cliente"><Pencil className="w-4 h-4" /></button>
                           <button onClick={() => void handleDeleteClient(client)} className="p-2 bg-red-900/20 hover:bg-red-900/40 rounded-md text-red-500 transition-colors" title="Remover cliente"><Trash2 className="w-4 h-4" /></button>
                         </div>
@@ -578,6 +593,9 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
                       <span className="text-[10px] font-black text-brand-400 uppercase border border-brand-900/50 bg-brand-900/10 px-2 py-0.5 rounded inline-block mt-1">{client.accessLevel}</span>
                     </div>
                     <div className="flex gap-2 shrink-0">
+                      {client.accessLevel === 'Cliente' && (
+                        <button onClick={() => handleOpenWhatsApp(client)} className="p-1.5 bg-emerald-100 hover:bg-emerald-200 rounded-md text-emerald-700" title="Enviar boas-vindas por WhatsApp" aria-label="Enviar boas-vindas por WhatsApp"><MessageCircle className="w-4 h-4" /></button>
+                      )}
                       <button onClick={() => void handleStartEditClient(client)} className="p-1.5 bg-surface-100 hover:bg-surface-200 rounded-md text-surface-600"><Pencil className="w-4 h-4" /></button>
                       <button onClick={() => void handleDeleteClient(client)} className="p-1.5 bg-red-100 hover:bg-red-200 rounded-md text-red-600"><Trash2 className="w-4 h-4" /></button>
                     </div>
