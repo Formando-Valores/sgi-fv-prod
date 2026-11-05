@@ -30,3 +30,25 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  edge-functions:
+    name: Verificação das Edge Functions (Deno)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Verificar funções críticas
+        run: |
+          deno check \
+            supabase/functions/send-access-credentials/index.ts \
+            supabase/functions/create-user/index.ts \
+            supabase/functions/stripe-create-checkout-session/index.ts \
+            supabase/functions/weekly-org-report/index.ts \
+            supabase/functions/create-process-client-user/index.ts \
+            supabase/functions/wix-client-intake/index.ts \
+            supabase/functions/forgot-password/index.ts \
+            supabase/functions/stripe-webhook/index.ts
