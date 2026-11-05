@@ -1,6 +1,7 @@
 import Stripe from 'https://esm.sh/stripe@18.3.0?target=deno';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getOrgStripeConfig } from '../_shared/payments/getOrgStripeConfig.ts';
+import { amountToMinorUnits, computeProcessAmountBRL, safeRedirectUrl } from '../_shared/pricing.ts';
 
 type CheckoutPayload = {
   amount?: number;
@@ -49,11 +50,43 @@ Deno.serve(async (request) => {
   }
 
   const payload = (await request.json().catch(() => ({}))) as CheckoutPayload;
+  const supabase = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
 
-  const amount = Number(payload.amount ?? 0);
-  const organizationId = String(payload.organizationId ?? '').trim();
-  const successUrl = String(payload.successUrl ?? '').trim();
-  const cancelUrl = String(payload.cancelUrl ?? '').trim();
+  const processId = String(payload.processId ?? '').trim();
+  if (!processId) {
+    return jsonResponse(400, { success: false, error: 'processId é obrigatório.' });
+  }
+
+  // MISSÃO 002 / R-05: o processo é a fonte da verdade (org, cliente e VALOR).
+  const { data: process, error: processError } = await supabase
+    .from('processes')
+    .select('id, org_id, cliente_user_id, os_value, amount, payment_status')
+    .eq('id', processId)
+    .maybeSingle();
+
+  if (processError || !process) {
+    return jsonResponse(404, { success: false, error: 'Processo não encontrado.' });
+  }
+
+  const organizationId = String(process.org_id ?? '').trim();
+  const requestedOrg = String(payload.organizationId ?? '').trim();
+  if (requestedOrg && requestedOrg !== organizationId) {
+    return jsonResponse(400, { success: false, error: 'organizationId não corresponde ao processo.' });
+  }
+
+  if (String(process.payment_status ?? '').toLowerCase() === 'paid') {
+    return jsonResponse(409, { success: false, error: 'Este processo já está pago.' });
+  }
+  const { data: existingPayment } = await supabase
+    .from('payments')
+    .select('status')
+    .eq('process_id', processId)
+    .maybeSingle();
+  if (String(existingPayment?.status ?? '').toLowerCase() === 'paid') {
+    return jsonResponse(409, { success: false, error: 'Este processo já está pago.' });
+  }
 
   // Fetch org-specific Stripe config (falls back to env vars)
   const orgConfig = await getOrgStripeConfig(organizationId, supabaseUrl, serviceRoleKey);
@@ -63,16 +96,7 @@ Deno.serve(async (request) => {
     return jsonResponse(500, { success: false, error: 'STRIPE_SECRET_KEY não configurada.' });
   }
 
-  if (!Number.isFinite(amount) || amount <= 0) {
-    return jsonResponse(400, { success: false, error: 'amount deve ser um número positivo (centavos).' });
-  }
-
-  const currency = String(payload.currency ?? orgConfig.defaultCurrency).trim().toLowerCase();
-
-  if (!currency) {
-    return jsonResponse(400, { success: false, error: 'currency é obrigatório.' });
-  }
-
+  const currency = String(payload.currency || orgConfig.defaultCurrency || 'eur').trim().toLowerCase();
   const allowedCurrencies = orgConfig.allowedCurrencies.map((c) => c.toLowerCase());
   if (allowedCurrencies.length > 0 && !allowedCurrencies.includes(currency)) {
     return jsonResponse(400, {
@@ -81,41 +105,39 @@ Deno.serve(async (request) => {
     });
   }
 
-  if (!successUrl || !cancelUrl) {
-    return jsonResponse(400, { success: false, error: 'successUrl e cancelUrl são obrigatórios.' });
+  // Valor calculado no SERVIDOR a partir do processo (BRL) — o "amount" do navegador é ignorado.
+  const amountBRL = computeProcessAmountBRL(process);
+  const amount = amountToMinorUnits(amountBRL, currency);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return jsonResponse(400, { success: false, error: 'Valor do pagamento não definido para este processo.' });
   }
+  const clientAmount = Number(payload.amount ?? 0);
+  if (clientAmount > 0 && Math.round(clientAmount) !== amount) {
+    logAudit('client_amount_ignored', { processId, clientAmount, serverAmount: amount, currency });
+  }
+
+  const appUrl = (Deno.env.get('APP_URL') ?? Deno.env.get('SITE_URL') ?? 'https://sgi-fv-prod.vercel.app').replace(/\/$/, '');
+  const allowedOrigins = [
+    appUrl,
+    Deno.env.get('SITE_URL') ?? '',
+    ...String(Deno.env.get('ALLOWED_CHECKOUT_ORIGINS') ?? '').split(',').map((o) => o.trim()),
+  ].filter(Boolean);
+  const successUrl = safeRedirectUrl(String(payload.successUrl ?? ''), allowedOrigins, `${appUrl}/#/payments/success?processId=${processId}`);
+  const cancelUrl = safeRedirectUrl(String(payload.cancelUrl ?? ''), allowedOrigins, `${appUrl}/#/payments/cancel?processId=${processId}`);
 
   const stripe = new Stripe(resolvedSecretKey, {
     apiVersion: orgConfig.apiVersion as '2025-03-31.basil',
   });
 
-  const supabase = createClient(supabaseUrl, serviceRoleKey);
-
-  const processId = String(payload.processId ?? '').trim();
-  const clientId = String(payload.clientId ?? '').trim();
+  // O pagador é o cliente do processo; clientId do payload só é usado se o processo não tiver cliente.
+  const clientId = String(process.cliente_user_id ?? payload.clientId ?? '').trim();
   const serviceId = String(payload.serviceId ?? '').trim();
 
-  if (!processId || !clientId || !organizationId) {
-    return jsonResponse(400, { success: false, error: 'processId, clientId e organizationId são obrigatórios.' });
+  if (!clientId) {
+    return jsonResponse(400, { success: false, error: 'Processo sem cliente vinculado.' });
   }
 
   try {
-    const { data: process, error: processError } = await supabase
-      .from('processes')
-      .select('id, org_id, responsavel_user_id')
-      .eq('id', processId)
-      .eq('org_id', organizationId)
-      .single();
-
-    if (processError || !process) {
-      throw new Error(processError?.message ?? 'Processo não encontrado para o organizationId informado.');
-    }
-
-    const expectedClientId = process.responsavel_user_id ?? null;
-    if (expectedClientId && expectedClientId !== clientId) {
-      throw new Error('clientId divergente do cliente vinculado ao processo.');
-    }
-
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       customer_creation: 'always',
@@ -124,7 +146,7 @@ Deno.serve(async (request) => {
           quantity: 1,
           price_data: {
             currency,
-            unit_amount: Math.round(amount),
+            unit_amount: amount,
             product_data: {
               name: orgConfig.checkoutProductName,
             },
@@ -140,6 +162,12 @@ Deno.serve(async (request) => {
         organizationId,
         areaId: String(payload.areaId ?? ''),
         sectorId: String(payload.sectorId ?? ''),
+        // valor esperado (unidades mínimas) — conferido pelo stripe-webhook
+        expectedAmount: String(amount),
+        expectedCurrency: currency,
+      },
+      payment_intent_data: {
+        metadata: { processId, organizationId, expectedAmount: String(amount), expectedCurrency: currency },
       },
     });
 
@@ -183,7 +211,9 @@ Deno.serve(async (request) => {
           correlation_checkout_session_id: session.id,
           correlation_stripe_event_id: null,
           event_code: 'checkout_session_created',
+          event_type: 'payment_checkout_created',
           actor_user_id: clientId,
+          metadata: { amount_minor: amount, currency },
         },
         {
           org_id: organizationId,
@@ -194,6 +224,7 @@ Deno.serve(async (request) => {
           correlation_checkout_session_id: session.id,
           correlation_stripe_event_id: null,
           event_code: 'client_redirected',
+          event_type: 'payment_client_redirected',
           actor_user_id: clientId,
         },
       ]);
@@ -202,7 +233,7 @@ Deno.serve(async (request) => {
       logAudit('process_events_insert_failed', { processId, error: eventsError.message });
     }
 
-    logAudit('checkout_created_and_redirect_logged', { processId, checkoutSessionId: session.id, clientId });
+    logAudit('checkout_created_and_redirect_logged', { processId, checkoutSessionId: session.id, clientId, amount, currency });
 
     return jsonResponse(200, {
       success: true,

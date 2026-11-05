@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { getOrgStripeConfig } from '../_shared/payments/getOrgStripeConfig.ts';
+import { resolveCaller, withOrgRole } from '../_shared/auth.ts';
+import { decideCreateUser, uiRoleToOrgRole } from '../_shared/authz.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,19 +26,28 @@ Deno.serve(async (request) => {
   try {
     const { email, password, name, role, org_id, unit, action, source, siteName, documentType, documentId, taxId, phone, maritalStatus, country, address, postalCode, profession, nationality, birthDate, naturalidade, niss, docExpiry } = await request.json();
 
-    // --- DELETE action: remove auth user and cascade ---
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    if (!supabaseUrl || !serviceRoleKey) {
+      return jsonResponse(500, { error: 'Erro de configuração do servidor.' });
+    }
+    const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    // MISSÃO 002 / R-01: identificar quem chama (anónimo = registo público; utilizador; service role)
+    const caller = await withOrgRole(await resolveCaller(request), adminClient, org_id);
+    const requestedRole = uiRoleToOrgRole(role === 'Administrador' ? 'admin' : 'client');
+
+    // --- DELETE action: remove auth user and cascade (apenas admin global / service role) ---
     if (action === 'delete') {
+      const decision = decideCreateUser(caller, { action, requestedRole, userAlreadyExists: true });
+      if (!decision.allowed) {
+        return jsonResponse(decision.status ?? 403, { error: decision.reason });
+      }
       if (!email) {
         return jsonResponse(400, { error: 'Email é obrigatório para exclusão.' });
       }
-      const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-      const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-      if (!supabaseUrl || !serviceRoleKey) {
-        return jsonResponse(500, { error: 'Erro de configuração do servidor.' });
-      }
-      const adminClient = createClient(supabaseUrl, serviceRoleKey, {
-        auth: { autoRefreshToken: false, persistSession: false },
-      });
 
       // Find user in auth
       const { data: usersList } = await adminClient.auth.admin.listUsers();
@@ -65,19 +75,15 @@ Deno.serve(async (request) => {
       return jsonResponse(400, { error: 'Campos obrigatórios: email, password, name, org_id.' });
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-
-    if (!supabaseUrl || !serviceRoleKey) {
-      return jsonResponse(500, { error: 'Erro de configuração do servidor.' });
+    // A organização tem de existir (evita vínculos a org_id arbitrários)
+    const { data: orgRow } = await adminClient.from('organizations').select('id').eq('id', org_id).maybeSingle();
+    if (!orgRow) {
+      return jsonResponse(400, { error: 'Organização inválida.' });
     }
-
-    const adminClient = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
 
     // --- Determine user_id: reuse existing or create new auth user ---
     let userId: string;
+    let userAlreadyExisted = false;
 
     // 1. Check if profile already exists for this email
     const { data: existingProfile } = await adminClient
@@ -86,15 +92,29 @@ Deno.serve(async (request) => {
       .eq('email', email)
       .maybeSingle();
 
-    if (existingProfile?.id) {
-      userId = existingProfile.id;
-      // Reset password for existing auth user
-      const { error: updatePwdError } = await adminClient.auth.admin.updateUserById(userId, { password });
-      if (updatePwdError) {
-        console.error('[create-user] erro ao atualizar senha do usuário existente:', updatePwdError.message);
+    let existingAuthId: string | null = existingProfile?.id ?? null;
+    if (!existingAuthId) {
+      const { data: usersList } = await adminClient.auth.admin.listUsers();
+      existingAuthId = usersList?.users?.find(u => (u.email ?? '').toLowerCase() === String(email).toLowerCase())?.id ?? null;
+    }
+
+    const decision = decideCreateUser(caller, { action, requestedRole, userAlreadyExists: !!existingAuthId });
+    if (!decision.allowed) {
+      return jsonResponse(decision.status ?? 403, { error: decision.reason });
+    }
+
+    if (existingAuthId) {
+      userId = existingAuthId;
+      userAlreadyExisted = true;
+      if (decision.mayResetPassword) {
+        // Só o admin global / service role pode redefinir senha de contas existentes
+        const { error: updatePwdError } = await adminClient.auth.admin.updateUserById(userId, { password });
+        if (updatePwdError) {
+          console.error('[create-user] erro ao atualizar senha do usuário existente:', updatePwdError.message);
+        }
       }
     } else {
-      // 2. Try to create auth user
+      // 2. Create auth user
       const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
         email,
         password,
@@ -106,21 +126,9 @@ Deno.serve(async (request) => {
         console.error('[create-user] auth error:', JSON.stringify(authError));
         const authErrMsg = typeof authError.message === 'string' ? authError.message : JSON.stringify(authError);
         if (authErrMsg?.toLowerCase().includes('already registered')) {
-          const { data: usersList } = await adminClient.auth.admin.listUsers();
-          const found = usersList?.users?.find(u => u.email === email);
-          if (found) {
-            userId = found.id;
-            // Reset password for existing auth user
-            const { error: updatePwdError } = await adminClient.auth.admin.updateUserById(userId, { password });
-            if (updatePwdError) {
-              console.error('[create-user] erro ao atualizar senha do usuário existente:', updatePwdError.message);
-            }
-          } else {
-            return jsonResponse(400, { error: `Usuário já existe mas não foi possível localizá-lo: ${authErrMsg}` });
-          }
-        } else {
-          return jsonResponse(400, { error: `Erro ao criar usuário no Auth: ${authErrMsg}` });
+          return jsonResponse(409, { error: 'Este e-mail já está registado. Utilize "Esqueci a senha" para recuperar o acesso.' });
         }
+        return jsonResponse(400, { error: `Erro ao criar usuário no Auth: ${authErrMsg}` });
       } else if (authData?.user) {
         userId = authData.user.id;
       } else {
@@ -128,10 +136,13 @@ Deno.serve(async (request) => {
       }
     }
 
-    const normalizedRole = role === 'Administrador' ? 'admin' : 'cliente';
+    const effectiveRole = decision.effectiveRole;
+    const normalizedRole = effectiveRole === 'admin' || effectiveRole === 'owner' ? 'admin' : 'cliente';
+    // Contas existentes: o perfil só é sobrescrito pelo admin global / service role
+    const mayWriteProfile = !userAlreadyExisted || decision.mayResetPassword;
 
     // 3. Upsert profile (insert if new, update if exists)
-    const { error: profileError } = await adminClient
+    const { error: profileError } = !mayWriteProfile ? { error: null } : await adminClient
       .from('profiles')
       .upsert({
         id: userId,
@@ -160,7 +171,7 @@ Deno.serve(async (request) => {
     }
 
     // 4. Upsert org_members link
-    const orgRole = role === 'Administrador' ? 'admin' : 'client';
+    const orgRole = effectiveRole;
     const { error: memberError } = await adminClient
       .from('org_members')
       .upsert({
@@ -224,15 +235,6 @@ Deno.serve(async (request) => {
 
         let paymentUrl = '';
         try {
-          let amountMinor = 3000;
-          let currency = 'eur';
-          try {
-            const orgStripe = await getOrgStripeConfig(org_id, supabaseUrl, serviceRoleKey);
-            currency = orgStripe.defaultCurrency || 'eur';
-            amountMinor = currency === 'brl' ? 18000 : Math.round((180 / 6) * 100);
-          } catch {
-            // fallback mantém eur/3000
-          }
           const stripeResponse = await fetch(
             `${supabaseUrl}/functions/v1/stripe-create-checkout-session`,
             {
@@ -240,11 +242,10 @@ Deno.serve(async (request) => {
               headers: {
                 'Content-Type': 'application/json',
                 apikey: supabaseAnonKey,
-                Authorization: `Bearer ${supabaseAnonKey}`,
+                // chamada servidor→servidor: o valor é calculado em stripe-create-checkout-session
+                Authorization: `Bearer ${serviceRoleKey}`,
               },
               body: JSON.stringify({
-                amount: amountMinor,
-                currency,
                 successUrl,
                 cancelUrl,
                 processId,
@@ -276,7 +277,8 @@ Deno.serve(async (request) => {
                 fullName: name,
                 source: 'cadastro_admin',
                 profile: normalizedRole === 'admin' ? 'ADMINISTRADOR' : 'CLIENTE',
-                temporaryPassword: password,
+                // Não enviar uma senha que não foi aplicada (conta existente sem redefinição)
+                ...(!userAlreadyExisted || decision.mayResetPassword ? { temporaryPassword: password } : {}),
                 loginUrl: `${appUrl}/#/login`,
                 ...(paymentUrl ? { paymentUrl } : {}),
               }),
@@ -299,6 +301,7 @@ Deno.serve(async (request) => {
       user_id: userId,
       email,
       name,
+      ...(userAlreadyExisted ? { existing_user: true, password_changed: decision.mayResetPassword } : {}),
     };
     if (processWarning) {
       result.process_warning = processWarning;

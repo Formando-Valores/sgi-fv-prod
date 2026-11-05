@@ -1,4 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { resolveCaller, withOrgRole } from '../_shared/auth.ts';
+import { escapeHtml, isStaffCaller } from '../_shared/authz.ts';
+import { imageUrl, resolveLogoImage, resolveOrgNipc, resolveSealImage } from '../_shared/certificate.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,7 +28,7 @@ function bytesToBase64(bytes: Uint8Array): string {
 async function getImageBase64(appUrl: string, fileName: string): Promise<string> {
   if (!appUrl) return '';
   try {
-    const res = await fetch(`${appUrl.replace(/\/$/, '')}/img/${encodeURIComponent(fileName)}`);
+    const res = await fetch(imageUrl(appUrl, fileName));
     if (!res.ok) {
       console.error('[send-certificate] imagem indisponível:', fileName, res.status);
       return '';
@@ -39,6 +42,8 @@ async function getImageBase64(appUrl: string, fileName: string): Promise<string>
 
 interface OrgCertificateData {
   name: string;
+  slug?: string | null;
+  certificate_logo_url?: string | null;
   certificate_nipc: string | null;
   certificate_address: string | null;
   certificate_city: string | null;
@@ -57,6 +62,7 @@ const DEFAULT_ORG: OrgCertificateData = {
   certificate_signatory_name: 'Leonardo Saraiva Págio',
   certificate_signatory_title: 'Advogado',
   certificate_seal_url: null,
+  certificate_logo_url: null,
 };
 
 function generateCertificateHtml(params: {
@@ -78,18 +84,31 @@ function generateCertificateHtml(params: {
   appUrl: string;
   processId: string;
   org: OrgCertificateData;
+  hasLogo?: boolean;
+  hasSeal?: boolean;
 }): string {
   const p = params;
   const org = p.org;
-  const nipc = org.certificate_nipc && org.certificate_nipc !== 'XXXXXXXX' ? org.certificate_nipc : '519206550';
-  const address = org.certificate_address || '[Morada da Sede]';
-  const city = org.certificate_city || 'Lisboa – Portugal';
-  const signatoryName = org.certificate_signatory_name || 'Leonardo Saraiva Págio';
-  const signatoryTitle = org.certificate_signatory_title || 'Advogado';
-  const sealHtml = `<img src="cid:selo_org" alt="Selo" style="width:80px;height:80px;object-fit:contain;" />`;
+  // MISSÃO 002: NIPC da PRÓPRIA organização (antes todas recebiam o NIPC da Associação)
+  const nipcRaw = resolveOrgNipc(org);
+  const nipc = nipcRaw ? escapeHtml(nipcRaw) : '';
+  const orgName = escapeHtml(org.name);
+  const address = escapeHtml(org.certificate_address || '[Morada da Sede]');
+  const city = escapeHtml(org.certificate_city || 'Lisboa – Portugal');
+  const signatoryName = escapeHtml(org.certificate_signatory_name || 'Leonardo Saraiva Págio');
+  const signatoryTitle = escapeHtml(org.certificate_signatory_title || 'Advogado');
+  const sealHtml = p.hasSeal
+    ? `<img src="cid:selo_org" alt="Selo" style="width:80px;height:80px;object-fit:contain;" />`
+    : '';
+  const logoHtml = p.hasLogo
+    ? `<img src="cid:logo_org" alt="${orgName}" style="max-width:120px;max-height:90px;object-fit:contain;display:block;margin:0 auto 12px;" />`
+    : '';
+  const nipcClause = nipc ? `, pessoa coletiva n.º ${nipc}` : '';
   const bodyText = org.certificate_body_text
-    ? org.certificate_body_text.replace(/{orgName}/g, org.name)
-    : `A <strong>${org.name}</strong>, pessoa coletiva n.º ${nipc}, com sede na ${address}, ${city}, certifica para os devidos efeitos que:`;
+    ? org.certificate_body_text.replace(/{orgName}/g, orgName).replace(/{nipc}/g, nipc)
+    : `A <strong>${orgName}</strong>${nipcClause}, com sede na ${address}, ${city}, certifica para os devidos efeitos que:`;
+  // Escapar todos os dados vindos do perfil do cliente (evita injeção de HTML no e-mail)
+  const e = (v: string) => escapeHtml(v);
 
   return `
 <!DOCTYPE html>
@@ -101,16 +120,17 @@ function generateCertificateHtml(params: {
       <!-- HEADER -->
       <tr>
         <td style="padding:32px 40px 16px;text-align:center;border-bottom:3px double #d4a843;">
+          ${logoHtml}
           <h1 style="color:#1e3a5f;font-size:22px;font-weight:900;text-transform:uppercase;letter-spacing:3px;margin:0 0 4px;">Certificado de Filiação</h1>
-          <p style="color:#d4a843;font-size:12px;font-weight:700;letter-spacing:2px;margin:0 0 4px;">${org.name.toUpperCase()}</p>
-          <p style="color:#6b7280;font-size:11px;margin:0;">NIPC: ${nipc} · Sede: ${address} · ${city}</p>
+          <p style="color:#d4a843;font-size:12px;font-weight:700;letter-spacing:2px;margin:0 0 4px;">${orgName.toUpperCase()}</p>
+          <p style="color:#6b7280;font-size:11px;margin:0;">${nipc ? `NIPC: ${nipc} · ` : ''}Sede: ${address} · ${city}</p>
         </td>
       </tr>
       <!-- CERTIFICATE NUMBER -->
       <tr>
         <td style="padding:24px 40px 0;text-align:center;">
           <p style="color:#9ca3af;font-size:11px;font-weight:700;letter-spacing:2px;margin:0 0 4px;">N.º DE CERTIFICADO</p>
-          <p style="color:#1e3a5f;font-size:18px;font-weight:900;margin:0;">${p.certNumber}</p>
+          <p style="color:#1e3a5f;font-size:18px;font-weight:900;margin:0;">${e(p.certNumber)}</p>
         </td>
       </tr>
       <!-- BODY -->
@@ -123,53 +143,53 @@ function generateCertificateHtml(params: {
             <table width="100%" cellpadding="4" cellspacing="0" style="font-size:13px;color:#374151;">
               <tr>
                 <td width="35%" style="font-weight:600;color:#1e3a5f;padding:3px 8px;">Nome Completo:</td>
-                <td style="font-weight:700;padding:3px 8px;">${p.nome}</td>
+                <td style="font-weight:700;padding:3px 8px;">${e(p.nome)}</td>
               </tr>
               <tr>
                 <td style="font-weight:600;color:#1e3a5f;padding:3px 8px;">Nacionalidade:</td>
-                <td style="padding:3px 8px;">${p.nacionalidade}</td>
+                <td style="padding:3px 8px;">${e(p.nacionalidade)}</td>
               </tr>
               <tr>
                 <td style="font-weight:600;color:#1e3a5f;padding:3px 8px;">Estado Civil:</td>
-                <td style="padding:3px 8px;">${p.estadoCivil}</td>
+                <td style="padding:3px 8px;">${e(p.estadoCivil)}</td>
               </tr>
               <tr>
                 <td style="font-weight:600;color:#1e3a5f;padding:3px 8px;">Data de Nascimento:</td>
-                <td style="padding:3px 8px;">${p.dataNascimento}</td>
+                <td style="padding:3px 8px;">${e(p.dataNascimento)}</td>
               </tr>
               <tr>
                 <td style="font-weight:600;color:#1e3a5f;padding:3px 8px;">Naturalidade:</td>
-                <td style="padding:3px 8px;">${p.naturalidade}</td>
+                <td style="padding:3px 8px;">${e(p.naturalidade)}</td>
               </tr>
               <tr>
                 <td style="font-weight:600;color:#1e3a5f;padding:3px 8px;">Documento:</td>
-                <td style="padding:3px 8px;">${p.docTipo} n.º ${p.documento}${p.validadeDoc ? ` (válido até ${p.validadeDoc})` : ''}</td>
+                <td style="padding:3px 8px;">${e(p.docTipo)} n.º ${e(p.documento)}${p.validadeDoc ? ` (válido até ${e(p.validadeDoc)})` : ''}</td>
               </tr>
               <tr>
                 <td style="font-weight:600;color:#1e3a5f;padding:3px 8px;">NIF:</td>
-                <td style="padding:3px 8px;">${p.nif}</td>
+                <td style="padding:3px 8px;">${e(p.nif)}</td>
               </tr>
               <tr>
                 <td style="font-weight:600;color:#1e3a5f;padding:3px 8px;">NISS:</td>
-                <td style="padding:3px 8px;">${p.niss}</td>
+                <td style="padding:3px 8px;">${e(p.niss)}</td>
               </tr>
               <tr>
                 <td style="font-weight:600;color:#1e3a5f;padding:3px 8px;">Morada:</td>
-                <td style="padding:3px 8px;">${p.morada}</td>
+                <td style="padding:3px 8px;">${e(p.morada)}</td>
               </tr>
               <tr>
                 <td style="font-weight:600;color:#1e3a5f;padding:3px 8px;">Protocolo:</td>
-                <td style="padding:3px 8px;">${p.protocolo}</td>
+                <td style="padding:3px 8px;">${e(p.protocolo)}</td>
               </tr>
               <tr>
                 <td style="font-weight:600;color:#1e3a5f;padding:3px 8px;">Data de Filiação:</td>
-                <td style="padding:3px 8px;">${p.dataFiliacao}</td>
+                <td style="padding:3px 8px;">${e(p.dataFiliacao)}</td>
               </tr>
             </table>
           </div>
           <p style="color:#374151;font-size:14px;line-height:1.8;margin:0;text-align:justify;">
             que o(a) identificado(a) nos termos supra se encontra devidamente registado(a) como
-            <strong>associado(a) efetivo(a)</strong> da ${org.name}, com todos os direitos
+            <strong>associado(a) efetivo(a)</strong> da ${orgName}, com todos os direitos
             e deveres previstos nos Estatutos e no Regulamento Interno.
           </p>
         </td>
@@ -179,7 +199,7 @@ function generateCertificateHtml(params: {
         <td style="padding:0 40px 16px;text-align:center;">
           <div style="background:#f9fafb;border:1px dashed #d1d5db;border-radius:6px;padding:12px;display:inline-block;">
             <p style="color:#6b7280;font-size:10px;font-weight:700;letter-spacing:1px;margin:0 0 4px;">CÓDIGO DE VERIFICAÇÃO</p>
-            <p style="color:#1e3a5f;font-size:14px;font-weight:900;font-family:monospace;margin:0;">${p.verifCode}</p>
+            <p style="color:#1e3a5f;font-size:14px;font-weight:900;font-family:monospace;margin:0;">${e(p.verifCode)}</p>
             <p style="color:#9ca3af;font-size:9px;margin:4px 0 0;">Verifique em: ${p.appUrl}/#/certificate/${p.processId}</p>
           </div>
         </td>
@@ -269,17 +289,30 @@ Deno.serve(async (request) => {
       return jsonResponse(404, { success: false, error: 'Processo não encontrado.' });
     }
 
+    // MISSÃO 002 / R-04: só service role (stripe-webhook), staff da org do processo ou o próprio cliente
+    const caller = await withOrgRole(await resolveCaller(request), supabase, process.org_id);
+    const isStaff = isStaffCaller(caller);
+    const isOwnClient = caller.kind === 'user' && !!caller.userId && caller.userId === process.cliente_user_id;
+    if (caller.kind === 'anonymous') {
+      return jsonResponse(401, { success: false, error: 'Não autenticado.' });
+    }
+    if (!isStaff && !isOwnClient) {
+      return jsonResponse(403, { success: false, error: 'Sem permissão para emitir este certificado.' });
+    }
+
     // Fetch org certificate config
     let orgData: OrgCertificateData = { ...DEFAULT_ORG };
     if (process.org_id) {
       const { data: org } = await supabase
         .from('organizations')
-        .select('name, certificate_nipc, certificate_address, certificate_city, certificate_body_text, certificate_signatory_name, certificate_signatory_title, certificate_seal_url')
+        .select('name, slug, certificate_logo_url, certificate_nipc, certificate_address, certificate_city, certificate_body_text, certificate_signatory_name, certificate_signatory_title, certificate_seal_url')
         .eq('id', process.org_id)
         .maybeSingle();
       if (org) {
         orgData = {
           name: org.name || DEFAULT_ORG.name,
+          slug: org.slug ?? null,
+          certificate_logo_url: org.certificate_logo_url ?? null,
           certificate_nipc: org.certificate_nipc,
           certificate_address: org.certificate_address,
           certificate_city: org.certificate_city,
@@ -307,28 +340,25 @@ Deno.serve(async (request) => {
     }
 
     if (!userEmail && process.cliente_documento) {
-      const doc = process.cliente_documento.trim();
-      const { data: profileByDoc } = await supabase
-        .from('profiles')
-        .select('email')
-        .or(`nif_cpf.eq.${doc},documento_identidade.eq.${doc}`)
-        .limit(1)
-        .maybeSingle();
-      userEmail = profileByDoc?.email || '';
+      // Pesquisa por documento com .eq (sem interpolar no filtro .or → evita injeção de filtros PostgREST)
+      const doc = String(process.cliente_documento).trim();
+      for (const column of ['nif_cpf', 'documento_identidade']) {
+        if (userEmail) break;
+        const { data: profileByDoc } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq(column, doc)
+          .limit(1)
+          .maybeSingle();
+        userEmail = profileByDoc?.email || '';
+      }
     }
 
-    if (!userEmail && process.cliente_nome) {
-      const { data: profileByName } = await supabase
-        .from('profiles')
-        .select('email')
-        .eq('nome_completo', process.cliente_nome.trim())
-        .limit(1)
-        .maybeSingle();
-      userEmail = profileByName?.email || '';
-    }
-
-    if (!userEmail && bodyClientEmail) {
-      userEmail = bodyClientEmail;
+    // Removido o fallback por NOME (podia enviar o certificado a um homónimo).
+    // O e-mail enviado no corpo só é aceite quando quem chama é staff da organização.
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!userEmail && bodyClientEmail && isStaff && emailRegex.test(String(bodyClientEmail))) {
+      userEmail = String(bodyClientEmail).trim();
     }
 
     if (!userEmail) {
@@ -367,11 +397,14 @@ Deno.serve(async (request) => {
       org: orgData,
     };
 
-    const certificateHtml = generateCertificateHtml(certParams);
     const signatureBase64 = await getImageBase64(appUrl, 'assinatura_leonardo_pagio.png');
-    const sealBase64 = orgData.certificate_seal_url
-      ? await getImageBase64(appUrl, orgData.certificate_seal_url)
-      : await getImageBase64(appUrl, 'selo associação.png');
+    const sealFile = resolveSealImage(orgData);
+    const logoFile = resolveLogoImage(orgData);
+    const sealBase64 = sealFile ? await getImageBase64(appUrl, sealFile) : '';
+    const logoBase64 = logoFile
+      ? (logoFile === sealFile ? sealBase64 : await getImageBase64(appUrl, logoFile))
+      : '';
+    const certificateHtml = generateCertificateHtml({ ...certParams, hasLogo: !!logoBase64, hasSeal: !!sealBase64 });
 
     const attachments = [];
     if (signatureBase64) {
@@ -386,6 +419,14 @@ Deno.serve(async (request) => {
         filename: 'selo.png',
         content: sealBase64,
         content_id: 'selo_org',
+      });
+    }
+
+    if (logoBase64) {
+      attachments.push({
+        filename: 'logo.png',
+        content: logoBase64,
+        content_id: 'logo_org',
       });
     }
 
@@ -428,6 +469,8 @@ Deno.serve(async (request) => {
       tipo: 'status_change',
       mensagem: `Certificado de filiação enviado por e-mail para ${userEmail}.`,
       event_code: 'certificate_sent',
+      event_type: 'certificate_sent',
+      actor_user_id: caller.userId ?? process.cliente_user_id,
     });
 
     return jsonResponse(200, { success: true, email: userEmail });

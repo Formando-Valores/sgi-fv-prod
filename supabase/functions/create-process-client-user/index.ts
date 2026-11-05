@@ -1,4 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { resolveCaller, withOrgRole } from '../_shared/auth.ts';
+import { isStaffCaller } from '../_shared/authz.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -46,6 +48,23 @@ Deno.serve(async (request) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
+    // MISSÃO 002 / R-03: só staff autenticado da organização do processo (ou admin global / service role)
+    const caller = await withOrgRole(await resolveCaller(request), adminClient, orgId);
+    if (caller.kind === 'anonymous') {
+      return jsonResponse(401, { error: 'Sessão inválida ou expirada. Inicie sessão novamente.' });
+    }
+    if (!isStaffCaller(caller)) {
+      return jsonResponse(403, { error: 'Sem permissão para criar clientes nesta organização.' });
+    }
+    const { data: processRow } = await adminClient
+      .from('processes')
+      .select('id, org_id')
+      .eq('id', processId)
+      .maybeSingle();
+    if (!processRow || String(processRow.org_id) !== String(orgId)) {
+      return jsonResponse(404, { error: 'Processo não encontrado nesta organização.' });
+    }
+
     let userId: string;
     let isNewUser = false;
     let password = '';
@@ -76,6 +95,9 @@ Deno.serve(async (request) => {
           const found = usersList?.users?.find(u => u.email === email);
           if (found) {
             userId = found.id;
+            // Conta já existia: a senha gerada NÃO foi aplicada, não a enviar por e-mail
+            isNewUser = false;
+            password = '';
           } else {
             return jsonResponse(400, { error: `Usuário já existe mas não foi possível localizá-lo: ${msg}` });
           }
@@ -120,7 +142,8 @@ Deno.serve(async (request) => {
     const { error: updateError } = await adminClient
       .from('processes')
       .update({ cliente_user_id: userId })
-      .eq('id', processId);
+      .eq('id', processId)
+      .eq('org_id', orgId);
 
     if (updateError) {
       console.warn('[create-process-client-user] erro ao vincular cliente ao processo:', updateError.message);

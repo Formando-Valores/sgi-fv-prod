@@ -463,7 +463,8 @@ const ProcessesSection: React.FC<ProcessesSectionProps> = ({
         const anonKey = String(import.meta.env.VITE_SUPABASE_ANON_KEY ?? '').trim();
         await fetch(`${supabaseUrl}/functions/v1/create-process-client-user`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', apikey: anonKey, Authorization: `Bearer ${anonKey}` },
+          // MISSÃO 002: token da sessão (a Edge Function exige staff autenticado da organização)
+          headers: { 'Content-Type': 'application/json', apikey: anonKey, Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token ?? anonKey}` },
           body: JSON.stringify({
             email: clientEmail,
             name: sanitizeDisplayValue(newProcessForm.clientName),

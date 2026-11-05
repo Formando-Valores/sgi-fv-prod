@@ -2,7 +2,8 @@ import { supabase } from '../../supabase';
 import { SUPABASE_EDGE_FUNCTIONS } from './supabaseFunctions';
 
 type CreateCheckoutSessionParams = {
-  amount: number;
+  /** Ignorado pelo servidor desde a MISSÃO 002 (o valor é calculado a partir do processo). */
+  amount?: number;
   currency: string;
   successUrl: string;
   cancelUrl: string;

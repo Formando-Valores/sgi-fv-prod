@@ -1,5 +1,6 @@
 import React from 'react';
-import { Menu, Bell } from 'lucide-react';
+import { Menu } from 'lucide-react';
+import NotificationsBell from './NotificationsBell';
 
 interface DashboardTopbarProps {
   title: React.ReactNode;
@@ -31,10 +32,7 @@ const DashboardTopbar: React.FC<DashboardTopbarProps> = ({ title, subtitle, acti
           </div>
 
           <div className="flex items-center gap-2">
-            <button className="p-2 rounded-xl text-surface-400 hover:bg-surface-100 hover:text-surface-600 transition-colors relative">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white" />
-            </button>
+            <NotificationsBell />
             {actions && <div className="flex-shrink-0">{actions}</div>}
           </div>
         </div>
