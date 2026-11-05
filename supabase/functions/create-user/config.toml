@@ -1,0 +1,3 @@
+# Registo público (associate.html / vainaai.pt) usa a chave publishable (não-JWT).
+# A autorização é feita dentro da função (_shared/auth.ts): anónimo só cria contas novas "client".
+verify_jwt = false

@@ -21,7 +21,7 @@ const TERMO_LINES = [
   '',
   'A Direção da ASSOCIAÇÃO CONTRA AS INJUSTIÇAS – AI',
   'Avenida Dom Dinis, n.º 68 A – Centro Comercial Oceano – Odivelas – Sala 28 – Lisboa – Código Postal 2675-328',
-  'NIPC 518920747',
+  'NIPC 519206550',
   'Sítio eletrónico: vainaai.pt | E-mail: contato@vainaai.pt.',
   'Delegações: Braga - Leiria - Lisboa - Porto',
 ];
