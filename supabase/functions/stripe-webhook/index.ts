@@ -1,11 +1,16 @@
 import Stripe from 'https://esm.sh/stripe@18.3.0?target=deno';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getOrgStripeConfig } from '../_shared/payments/getOrgStripeConfig.ts';
+import { checkPaidAmount, formatMoney, minorToMajor } from '../_shared/pricing.ts';
+import { insertOrgNotification, sendPaymentAlertEmail, type PaymentAlert } from '../_shared/paymentAlerts.ts';
 
 type ProcessRecord = {
   id: string;
   org_id: string;
-  responsavel_user_id?: string | null;
+  cliente_user_id?: string | null;
+  cliente_nome?: string | null;
+  cliente_email?: string | null;
+  protocolo?: string | null;
 };
 
 const corsHeaders = {
@@ -62,9 +67,12 @@ const validateProcessConsistency = (
     throw new Error('Inconsistência entre orgId do metadata e do processo.');
   }
   if (hasTruthyMetadata(metadata.clientId)) {
-    const processClientId = process.responsavel_user_id ?? null;
+    // O pagador é o cliente do processo (antes comparava com responsavel_user_id, que é o staff)
+    const processClientId = process.cliente_user_id ?? null;
     if (processClientId && processClientId !== metadata.clientId) {
-      throw new Error('Inconsistência entre clientId do metadata e do processo.');
+      // Sessões antigas usavam o id de quem iniciou o checkout (ex.: admin). Não bloqueia:
+      // a proteção efetiva é a conferência do valor pago (checkPaidAmount).
+      console.warn('[stripe-webhook] clientId do metadata difere do cliente do processo', metadata.processId);
     }
   }
 };
@@ -166,6 +174,9 @@ Deno.serve(async (request) => {
     let checkoutSessionId: string | null = null;
     const metadata: Record<string, string> = {};
     let stripeCustomerId: string | null = null;
+    let receivedMinor: number | null = null;
+    let receivedCurrency: string | null = null;
+    let sessionPaymentStatus: string | null = null;
 
     if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.expired' || event.type === 'checkout.session.async_payment_failed') {
       const session = event.data.object as Stripe.Checkout.Session;
@@ -174,6 +185,9 @@ Deno.serve(async (request) => {
       checkoutSessionId = session.id;
       stripeCustomerId = typeof session.customer === 'string' ? session.customer : (session.customer as { id?: string } | null)?.id ?? null;
       Object.assign(metadata, session.metadata ?? {});
+      receivedMinor = typeof session.amount_total === 'number' ? session.amount_total : null;
+      receivedCurrency = session.currency ?? null;
+      sessionPaymentStatus = session.payment_status ?? null;
     }
 
     if (event.type === 'payment_intent.succeeded' || event.type === 'payment_intent.payment_failed') {
@@ -184,6 +198,8 @@ Deno.serve(async (request) => {
         || (paymentIntent.payment_details as Record<string, unknown> | null)?.order_reference as string | null
         || null;
       Object.assign(metadata, paymentIntent.metadata ?? {});
+      receivedMinor = typeof paymentIntent.amount_received === 'number' ? paymentIntent.amount_received : null;
+      receivedCurrency = paymentIntent.currency ?? null;
     }
 
     if (event.type === 'charge.refunded' || event.type === 'charge.refund.updated') {
@@ -222,7 +238,7 @@ Deno.serve(async (request) => {
 
     const { data: process, error: processError } = await supabase
       .from('processes')
-      .select('id, org_id, responsavel_user_id')
+      .select('id, org_id, cliente_user_id, cliente_nome, cliente_email, protocolo')
       .eq('id', processId)
       .single();
 
@@ -237,7 +253,7 @@ Deno.serve(async (request) => {
       organizationId: metadata.organizationId,
     });
 
-    const expectedClientId = process.responsavel_user_id ?? null;
+    const expectedClientId = process.cliente_user_id ?? null;
     const metadataClientId = String(metadata.clientId ?? '').trim();
     const validatedClientId = isUuid(metadataClientId)
       ? metadataClientId
@@ -246,6 +262,87 @@ Deno.serve(async (request) => {
         : null;
 
     const now = new Date().toISOString();
+    const actorUserId = (isUuid(process.cliente_user_id) ? process.cliente_user_id : validatedClientId) ?? null;
+
+    // Estado atual do pagamento (valor esperado gravado pelo checkout no servidor)
+    const { data: currentPayment } = await supabase
+      .from('payments')
+      .select('id, status, amount, currency, client_id')
+      .eq('process_id', processId)
+      .maybeSingle();
+
+    let orgName = process.org_id;
+    {
+      const { data: orgRow } = await supabase.from('organizations').select('name').eq('id', process.org_id).maybeSingle();
+      if (orgRow?.name) orgName = orgRow.name;
+    }
+
+    if (actionableStatus === 'paid') {
+      // checkout.session.completed com pagamento assíncrono ainda não pago → não marcar como pago
+      if (event.type === 'checkout.session.completed' && sessionPaymentStatus && sessionPaymentStatus !== 'paid') {
+        logAudit('checkout_completed_not_paid_yet', { processId, eventId: event.id, sessionPaymentStatus });
+        return jsonResponse(200, { success: true, pending: true, eventId: event.id });
+      }
+
+      // Evento duplicado (checkout.session.completed + payment_intent.succeeded): já pago → sem novos efeitos
+      if (String(currentPayment?.status ?? '').toLowerCase() === 'paid') {
+        logAudit('payment_already_paid', { processId, eventId: event.id, eventType: event.type });
+        return jsonResponse(200, { success: true, alreadyPaid: true, eventId: event.id });
+      }
+
+      // MISSÃO 002 / R-05: conferir o valor efetivamente pago contra o valor esperado do servidor
+      const expectedMinor = currentPayment?.amount != null
+        ? Math.round(Number(currentPayment.amount) * 100)
+        : (metadata.expectedAmount ? Number(metadata.expectedAmount) : null);
+      const expectedCurrency = currentPayment?.currency ?? metadata.expectedCurrency ?? null;
+      const check = checkPaidAmount({ expectedMinor, expectedCurrency, receivedMinor, receivedCurrency });
+
+      if (!check.ok) {
+        const alert: PaymentAlert = {
+          kind: 'payment_amount_mismatch',
+          orgId: process.org_id,
+          orgName,
+          processId,
+          protocolo: process.protocolo,
+          clientName: process.cliente_nome,
+          clientEmail: process.cliente_email,
+          amountLabel: formatMoney(minorToMajor(receivedMinor ?? 0), receivedCurrency ?? ''),
+          expectedLabel: expectedMinor != null ? formatMoney(minorToMajor(expectedMinor), expectedCurrency ?? '') : null,
+          stripeEventId: event.id,
+          checkoutSessionId,
+          paymentIntentId,
+        };
+        await supabase.from('payments').update({
+          last_event_type: `${event.type}:amount_mismatch`,
+          last_event_at: now,
+          updated_at: now,
+          stripe_checkout_session_id: checkoutSessionId,
+          stripe_payment_intent_id: paymentIntentId,
+        }).eq('process_id', processId);
+        if (actorUserId) {
+          const { error: mmErr } = await supabase.from('process_events').insert({
+            org_id: process.org_id,
+            process_id: processId,
+            tipo: 'status_change',
+            mensagem: `ALERTA: valor pago (${alert.amountLabel}) diverge do esperado (${alert.expectedLabel ?? '-'}). Motivo: ${check.reason}. Processo NÃO liberado. stripeEventId=${event.id}.`,
+            correlation_process_id: processId,
+            correlation_checkout_session_id: checkoutSessionId,
+            correlation_stripe_event_id: event.id,
+            event_code: 'payment_amount_mismatch',
+            event_type: 'payment_amount_mismatch',
+            actor_user_id: actorUserId,
+            metadata: { reason: check.reason, expected_minor: check.expectedMinor, received_minor: check.receivedMinor, expected_currency: expectedCurrency, received_currency: receivedCurrency },
+          });
+          if (mmErr) logAudit('mismatch_event_insert_failed', { processId, error: mmErr.message });
+        }
+        const nErr = await insertOrgNotification(supabase, alert, { reason: check.reason, stripe_event_id: event.id });
+        if (nErr) logAudit('notification_insert_failed', { processId, error: nErr });
+        const mail = await sendPaymentAlertEmail(alert);
+        logAudit('payment_amount_mismatch', { processId, eventId: event.id, reason: check.reason, expectedMinor, receivedMinor, emailSent: mail.sent, emailError: mail.error ?? null });
+        // 200 para a Stripe não repetir indefinidamente; o caso fica em revisão manual
+        return jsonResponse(200, { success: false, flagged: 'amount_mismatch', reason: check.reason, eventId: event.id });
+      }
+    }
 
     const updateData: Record<string, unknown> = {
       status: actionableStatus,
@@ -290,6 +387,7 @@ Deno.serve(async (request) => {
         .update({
           payment_status: processUpdate.paymentStatus,
           process_status: processUpdate.processStatus,
+          paid_at: now,
           updated_at: now,
         })
         .eq('id', processId);
@@ -326,6 +424,8 @@ Deno.serve(async (request) => {
           correlation_checkout_session_id: checkoutSessionId,
           correlation_stripe_event_id: event.id,
           event_code: 'webhook_received',
+          event_type: 'payment_webhook_received',
+          actor_user_id: actorUserId,
         },
         {
           org_id: process.org_id,
@@ -336,6 +436,8 @@ Deno.serve(async (request) => {
           correlation_checkout_session_id: checkoutSessionId,
           correlation_stripe_event_id: event.id,
           event_code: 'webhook_validated',
+          event_type: 'payment_webhook_validated',
+          actor_user_id: actorUserId,
         },
         {
           org_id: process.org_id,
@@ -346,6 +448,15 @@ Deno.serve(async (request) => {
           correlation_checkout_session_id: checkoutSessionId,
           correlation_stripe_event_id: event.id,
           event_code: mapEventToAuditCode(event.type),
+          // 'payment_received' alimenta o relatório financeiro (src/lib/reports.ts filtra event_type com "payment")
+          event_type: actionableStatus === 'paid' ? 'payment_received' : `payment_${actionableStatus}`,
+          actor_user_id: actorUserId,
+          metadata: {
+            amount_minor: receivedMinor,
+            amount: receivedMinor != null ? minorToMajor(receivedMinor) : null,
+            currency: receivedCurrency ? receivedCurrency.toUpperCase() : null,
+            stripe_event_id: event.id,
+          },
         },
       ]);
 
@@ -365,23 +476,49 @@ Deno.serve(async (request) => {
           correlation_checkout_session_id: checkoutSessionId,
           correlation_stripe_event_id: event.id,
           event_code: 'process_released',
+          event_type: 'process_released',
+          actor_user_id: actorUserId,
         });
 
       if (releaseEventError) {
         logAudit('release_event_insert_failed', { processId, error: releaseEventError.message });
       }
 
+      // MISSÃO 002: alerta de pagamento recebido (e-mail + notificação no painel da organização)
+      const paidAlert: PaymentAlert = {
+        kind: 'payment_received',
+        orgId: process.org_id,
+        orgName,
+        processId,
+        protocolo: process.protocolo,
+        clientName: process.cliente_nome,
+        clientEmail: process.cliente_email,
+        amountLabel: formatMoney(minorToMajor(receivedMinor ?? 0), receivedCurrency ?? ''),
+        stripeEventId: event.id,
+        checkoutSessionId,
+        paymentIntentId,
+      };
+      const notifErr = await insertOrgNotification(supabase, paidAlert, {
+        amount_minor: receivedMinor,
+        currency: receivedCurrency,
+        stripe_event_id: event.id,
+      });
+      if (notifErr) logAudit('notification_insert_failed', { processId, error: notifErr });
+      const alertMail = await sendPaymentAlertEmail(paidAlert);
+      logAudit('payment_alert_email', { processId, sent: alertMail.sent, error: alertMail.error ?? null });
+
       // Send certificate email automatically
       try {
         const sendUrl = `${supabaseUrl}/functions/v1/send-certificate`;
         const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
-        if (anonKey) {
+        if (serviceRoleKey) {
+          // MISSÃO 002 / R-04: chamada servidor→servidor autenticada com a service role
           const certResponse = await fetch(sendUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              apikey: anonKey,
-              Authorization: `Bearer ${anonKey}`,
+              apikey: anonKey || serviceRoleKey,
+              Authorization: `Bearer ${serviceRoleKey}`,
             },
             body: JSON.stringify({ processId }),
           });

@@ -230,7 +230,8 @@ const ClientsSection: React.FC<ClientsSectionProps> = ({ organizations, users, s
         method: 'POST',
         headers: {
           apikey: anonKey,
-          Authorization: `Bearer ${anonKey}`,
+          // MISSÃO 002: token da sessão (a Edge Function exige admin autenticado)
+            Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token ?? anonKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
