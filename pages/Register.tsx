@@ -350,6 +350,9 @@ const Register: React.FC<RegisterProps> = ({ setUsers, setCurrentUser }) => {
                 fullName: formData.name,
                 source: 'registro_direto',
                 profile: 'CLIENTE',
+                orgId: formData.organizationId || undefined,
+                // A senha foi escolhida pela própria pessoa: o e-mail não a repete.
+                passwordDefinedByUser: true,
                 temporaryPassword: formData.password ? formData.password : '********',
                 loginUrl,
                 ...(paymentUrl ? { paymentUrl } : {}),

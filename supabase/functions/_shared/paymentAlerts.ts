@@ -40,7 +40,7 @@ export async function sendPaymentAlertEmail(a: PaymentAlert): Promise<{ sent: bo
   if (!apiKey || !from || to.length === 0) {
     return { sent: false, error: 'RESEND_API_KEY/FROM_EMAIL/PAYMENT_ALERT_EMAIL não configurados.' };
   }
-  const appUrl = (Deno.env.get('APP_URL') ?? Deno.env.get('SITE_URL') ?? 'https://sgi-fv-prod.vercel.app').replace(/\/$/, '');
+  const appUrl = (Deno.env.get('APP_URL') ?? Deno.env.get('SITE_URL') ?? 'https://sgi-fv-prod-one.vercel.app').replace(/\/$/, '');
   const rows: Array<[string, string]> = [
     ['Organização', a.orgName],
     ['Valor recebido (Stripe)', a.amountLabel],

@@ -10,6 +10,7 @@ export interface ClientProfileView {
   accessLevel: AccessLevel;
   source: 'org_members+profiles' | 'org_members_only' | 'local_manual';
   created_at?: string;
+  phone?: string;
 }
 
 export interface NewClientFormState {

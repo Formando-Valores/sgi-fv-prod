@@ -1,0 +1,3 @@
+# Chamado pelo pg_cron (cabeçalho x-cron-secret = CRON_SECRET) ou pela service role.
+# A autorização é feita dentro da função.
+verify_jwt = false

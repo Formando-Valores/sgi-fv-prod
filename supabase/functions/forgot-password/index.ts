@@ -47,7 +47,7 @@ const sendPasswordResetEmail = async (payload: PasswordResetEmailPayload) => {
   }
 
   const recipientName = payload.fullName?.trim() || 'cliente';
-  const loginUrl = payload.loginUrl?.trim() || 'https://sgi-fv-prod.vercel.app/#/login';
+  const loginUrl = payload.loginUrl?.trim() || 'https://sgi-fv-prod-one.vercel.app/#/login';
   const resetUrl = payload.resetUrl.trim();
 
   const html = `
@@ -144,7 +144,7 @@ Deno.serve(async (request) => {
 
   const recoveryRedirectUrl =
     redirectTo ||
-    `${String(Deno.env.get('APP_URL') ?? Deno.env.get('SITE_URL') ?? 'https://sgi-fv-prod.vercel.app').replace(/\/$/, '')}/recovery.html`;
+    `${String(Deno.env.get('APP_URL') ?? Deno.env.get('SITE_URL') ?? 'https://sgi-fv-prod-one.vercel.app').replace(/\/$/, '')}/recovery.html`;
 
   try {
     const { data: profile, error: profileLookupError } = await adminClient

@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { resolveCaller, withOrgRole } from '../_shared/auth.ts';
 import { decideCreateUser, uiRoleToOrgRole } from '../_shared/authz.ts';
+import { getAppUrl } from '../_shared/memberEmails.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -226,7 +227,7 @@ Deno.serve(async (request) => {
 
     // 6. Create Stripe checkout session and send credentials email
     if (processId) {
-      const appUrl = Deno.env.get('APP_URL') ?? Deno.env.get('SITE_URL') ?? 'https://sgi-fv-prod.vercel.app';
+      const appUrl = getAppUrl();
       const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
 
       if (supabaseAnonKey) {
@@ -275,7 +276,10 @@ Deno.serve(async (request) => {
               body: JSON.stringify({
                 email,
                 fullName: name,
-                source: 'cadastro_admin',
+                // Registo público (associate.html / vainaai.pt): a senha foi escolhida pela pessoa.
+                source: caller.kind === 'anonymous' ? String(source || 'associate-page') : 'cadastro_admin',
+                passwordDefinedByUser: caller.kind === 'anonymous',
+                orgId: org_id,
                 profile: normalizedRole === 'admin' ? 'ADMINISTRADOR' : 'CLIENTE',
                 // Não enviar uma senha que não foi aplicada (conta existente sem redefinição)
                 ...(!userAlreadyExisted || decision.mayResetPassword ? { temporaryPassword: password } : {}),

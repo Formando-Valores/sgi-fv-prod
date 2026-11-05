@@ -29,7 +29,7 @@ serve(async (request) => {
 
     const resend = new Resend(resendApiKey);
 
-    const processLink = `${Deno.env.get('APP_URL') ?? Deno.env.get('SITE_URL') ?? 'https://sgi-fv-prod.vercel.app'}/#/dashboard`;
+    const processLink = `${Deno.env.get('APP_URL') ?? Deno.env.get('SITE_URL') ?? 'https://sgi-fv-prod-one.vercel.app'}/#/dashboard`;
 
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">

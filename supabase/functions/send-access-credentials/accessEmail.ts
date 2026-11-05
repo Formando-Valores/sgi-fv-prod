@@ -1,4 +1,6 @@
-import { generateTermoPdf } from './termoPdf.ts';
+import { generateTermoPdf } from '../_shared/termoPdf.ts';
+import { sendMemberWelcomeAndTutorial } from '../_shared/memberEmailSender.ts';
+import { formatFrom, getLoginUrl, isMemberProfile, senderNameForOrg, signupOriginFromSource } from '../_shared/memberEmails.ts';
 
 export type AccessEmailPayload = {
   email: string;
@@ -8,6 +10,10 @@ export type AccessEmailPayload = {
   source?: string;
   profile?: string;
   temporaryPassword?: string;
+  /** Organização do destinatário (define o nome do remetente). */
+  orgId?: string;
+  /** true quando a senha foi escolhida pela própria pessoa (registo/formulário do site). */
+  passwordDefinedByUser?: boolean;
 };
 
 export type PasswordResetEmailPayload = {
@@ -38,6 +44,23 @@ const getEmailConfig = () => {
 };
 
 export async function sendAccessCredentialsEmail(payload: AccessEmailPayload) {
+  // Associado/cliente: E-mail 1 (texto aprovado) + E-mail 2 (guia rápido).
+  if (isMemberProfile(payload.profile)) {
+    const origin = signupOriginFromSource(payload.source);
+    const result = await sendMemberWelcomeAndTutorial({
+      email: payload.email,
+      fullName: payload.fullName,
+      loginUrl: payload.loginUrl?.trim() || getLoginUrl(),
+      paymentUrl: payload.paymentUrl,
+      orgId: payload.orgId,
+      origin,
+      passwordDefinedByUser: payload.passwordDefinedByUser ?? origin !== 'admin',
+      temporaryPassword: payload.temporaryPassword,
+    });
+    return result.ok ? { ok: true, tutorialSent: result.tutorialOk } : { ok: false, error: result.error };
+  }
+
+  // Colaborador/operador: mantém o texto de colaborador.
   const emailConfig = getEmailConfig();
 
   if (!emailConfig) {
@@ -48,7 +71,7 @@ export async function sendAccessCredentialsEmail(payload: AccessEmailPayload) {
   }
 
   const recipientName = payload.fullName?.trim() || 'cliente';
-  const loginUrl = payload.loginUrl?.trim() || 'https://sgi-fv-prod.vercel.app/#/login';
+  const loginUrl = payload.loginUrl?.trim() || getLoginUrl();
   const paymentUrl = payload.paymentUrl?.trim();
   const profileLabel = payload.profile?.trim() || 'USUÁRIO OPERADOR';
   const temporaryPassword = payload.temporaryPassword?.trim() || 'Definida no momento do cadastro';
@@ -152,7 +175,7 @@ export async function sendAccessCredentialsEmail(payload: AccessEmailPayload) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: `Formando Valores <${emailConfig.from}>`,
+      from: formatFrom(senderNameForOrg(payload.orgId), emailConfig.from),
       to: [payload.email],
       reply_to: emailConfig.replyTo || undefined,
       subject: 'Bem-vindo ao SIGA-FV - Dados de acesso',
@@ -191,7 +214,7 @@ export async function sendPasswordResetEmail(payload: PasswordResetEmailPayload)
   }
 
   const recipientName = payload.fullName?.trim() || 'cliente';
-  const loginUrl = payload.loginUrl?.trim() || 'https://sgi-fv-prod.vercel.app/#/login';
+  const loginUrl = payload.loginUrl?.trim() || getLoginUrl();
   const resetUrl = payload.resetUrl.trim();
 
   const html = `

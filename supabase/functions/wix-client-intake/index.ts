@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { sendAccessCredentialsEmail } from './accessEmail.ts';
+import { sendMemberWelcomeAndTutorial } from '../_shared/memberEmailSender.ts';
+import { getLoginUrl } from '../_shared/memberEmails.ts';
 import { CONSENT_TEXT_VERSION } from './consent.ts';
 
 type IntakePayload = {
@@ -285,16 +286,15 @@ Deno.serve(async (request) => {
       ]);
     }
 
-    const appUrl = String(Deno.env.get('APP_URL') ?? Deno.env.get('SITE_URL') ?? 'https://sgi-fv-prod.vercel.app').replace(/\/$/, '');
-    const loginUrl = `${appUrl}/#/login`;
-
-    const emailResult = await sendAccessCredentialsEmail({
+    // E-mail 1 (dados de acesso) + E-mail 2 (guia rápido). A senha foi escolhida no
+    // formulário do site, por isso não é repetida no e-mail.
+    const emailResult = await sendMemberWelcomeAndTutorial({
       email,
       fullName,
-      loginUrl,
-      source: `formulário externo • ${siteName}`,
-      profile: 'USUÁRIO OPERADOR',
-      temporaryPassword: password,
+      loginUrl: getLoginUrl(),
+      orgId,
+      origin: 'site',
+      passwordDefinedByUser: true,
     });
 
     return buildResponse(200, {

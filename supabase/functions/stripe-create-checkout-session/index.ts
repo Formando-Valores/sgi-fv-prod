@@ -1,7 +1,7 @@
 import Stripe from 'https://esm.sh/stripe@18.3.0?target=deno';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getOrgStripeConfig } from '../_shared/payments/getOrgStripeConfig.ts';
-import { amountToMinorUnits, computeProcessAmountBRL, safeRedirectUrl } from '../_shared/pricing.ts';
+import { amountToMinorUnits, computeProcessAmountBRL, DEFAULT_ALLOWED_CHECKOUT_ORIGINS, DEFAULT_APP_ORIGIN, safeRedirectUrl } from '../_shared/pricing.ts';
 
 type CheckoutPayload = {
   amount?: number;
@@ -116,9 +116,10 @@ Deno.serve(async (request) => {
     logAudit('client_amount_ignored', { processId, clientAmount, serverAmount: amount, currency });
   }
 
-  const appUrl = (Deno.env.get('APP_URL') ?? Deno.env.get('SITE_URL') ?? 'https://sgi-fv-prod.vercel.app').replace(/\/$/, '');
+  const appUrl = (Deno.env.get('APP_URL') ?? Deno.env.get('SITE_URL') ?? DEFAULT_APP_ORIGIN).replace(/\/$/, '');
   const allowedOrigins = [
     appUrl,
+    ...DEFAULT_ALLOWED_CHECKOUT_ORIGINS,
     Deno.env.get('SITE_URL') ?? '',
     ...String(Deno.env.get('ALLOWED_CHECKOUT_ORIGINS') ?? '').split(',').map((o) => o.trim()),
   ].filter(Boolean);

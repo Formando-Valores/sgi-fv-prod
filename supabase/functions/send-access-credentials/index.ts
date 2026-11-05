@@ -59,6 +59,8 @@ Deno.serve(async (request) => {
   const source = String(payload.source ?? 'cadastro interno').trim();
   const profile = String(payload.profile ?? 'USUÁRIO OPERADOR').trim();
   const temporaryPassword = String(payload.temporaryPassword ?? '').trim();
+  const orgId = String(payload.orgId ?? '').trim();
+  const passwordDefinedByUser = typeof payload.passwordDefinedByUser === 'boolean' ? payload.passwordDefinedByUser : undefined;
 
   if (!email) {
     return jsonResponse(400, { success: false, error: 'E-mail é obrigatório.' });
@@ -76,6 +78,8 @@ Deno.serve(async (request) => {
     source,
     profile,
     temporaryPassword,
+    orgId: orgId || undefined,
+    passwordDefinedByUser,
   });
 
   if (!emailResult.ok) {
@@ -87,5 +91,7 @@ Deno.serve(async (request) => {
   }
 
   console.info('[send-access-credentials] e-mail enviado com sucesso', { email });
-  return jsonResponse(200, { success: true });
+  // tutorialSent só existe no fluxo de associado/cliente (E-mail 2).
+  const tutorialSent = (emailResult as { tutorialSent?: boolean }).tutorialSent ?? null;
+  return jsonResponse(200, { success: true, tutorialSent });
 });
