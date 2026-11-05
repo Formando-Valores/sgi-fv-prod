@@ -37,13 +37,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Instalar dependências Node para referências de tipos
+        run: npm ci
+
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
 
       - name: Verificar funções críticas
         run: |
-          deno check \
+          deno check --node-modules-dir=auto \
             supabase/functions/send-access-credentials/index.ts \
             supabase/functions/create-user/index.ts \
             supabase/functions/stripe-create-checkout-session/index.ts \
