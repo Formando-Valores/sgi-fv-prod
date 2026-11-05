@@ -39,7 +39,12 @@ Se o valor divergir, o processo é o mesmo, mas com o alerta `payment_amount_mis
 ## 4. Testes automáticos
 
 - `vitest` com 31 testes em `tests/security/` (cálculo de preço, conferência de valor pago, regras de autorização e NIPC/logotipo).
-- Comando: `npm test`. Foi acrescentado à CI (`.github/workflows/ci.yml`).
+- Comando: `npm test`.
+- **CI (passo manual):** a integração da Abacus não tem permissão para alterar workflows do GitHub, por isso o push foi recusado. Para os testes correrem em cada PR, acrescente em `.github/workflows/ci.yml`, logo a seguir ao passo `Typecheck`:
+  ```yaml
+      - name: Testes automáticos
+        run: npm test
+  ```
 - A lógica testada está em módulos puros (`supabase/functions/_shared/authz.ts`, `pricing.ts` e `certificate.ts`), partilhados entre as funções e os testes.
 - Limitação: não há testes de integração com o Stripe/Supabase reais.
 
