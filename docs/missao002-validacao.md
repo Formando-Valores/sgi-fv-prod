@@ -4,6 +4,8 @@ Data: 2026-11-05 · Projeto Supabase de produção · Repositório `main` em `3d
 
 > **Estado:** a validação **não está concluída**. As correções R-01 a R-05 estão ativas em produção e passaram nos testes negativos. Mas a análise do R-07 encontrou uma **vulnerabilidade crítica ativa** em produção: qualquer utilizador autenticado pode tornar-se *owner* de qualquer organização. A correção está proposta neste PR e **ainda não foi aplicada em produção**: aguarda autorização expressa do responsável.
 
+> **⚠️ Regressão ativa (frontend desatualizado):** o site em produção (`sgi-fv-prod.vercel.app`, `version.json` buildTime 22/10/2026) é anterior ao PR #113. Esse frontend ainda envia a chave anónima e não o token da sessão para `create-process-client-user`, `update-user-org-membership` e `create-user` (ecrãs Processos, Clientes e Gestão). As funções corrigidas, já em produção, devolvem **401** a essas chamadas. **Consequência provável:** os admins não conseguem criar clientes em processos nem alterar vínculos até a Vercel publicar a `main`. O deploy deste PR também falhou na Vercel, em poucos segundos (`dpl_EqTuDf3ENqNRYWzp4fpM3Uj16Bbx`). A ligação Vercel ↔ Supabase não resolveu o bloqueio, que é de permissão do autor Git na equipa Vercel. **Ação:** o dono da equipa Vercel faz *Redeploy* da `main` no painel, ou adiciona `germanoreis2024-coder` à equipa. O registo pelo vainaai.pt **não** é afetado.
+
 ## 1. Lista de validação (12 critérios)
 
 | # | Critério | Estado | Evidência |
