@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { sendAccessCredentialsEmail } from './accessEmail.ts';
+import { resolveCaller } from '../_shared/auth.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -34,9 +35,14 @@ Deno.serve(async (request) => {
     return jsonResponse(500, { success: false, error: 'Configuração do Supabase ausente para envio de credenciais.' });
   }
 
+  const caller = await resolveCaller(request);
+  if (caller.kind === 'anonymous') {
+    return jsonResponse(401, { success: false, error: 'Autenticação obrigatória.' });
+  }
+
   let authenticatedEmail: string | null = null;
 
-  if (jwt) {
+  if (caller.kind === 'user' && jwt) {
     const client = createClient(supabaseUrl, anonKey, {
       auth: { autoRefreshToken: false, persistSession: false },
       global: { headers: { Authorization: `Bearer ${jwt}` } },
@@ -66,7 +72,7 @@ Deno.serve(async (request) => {
     return jsonResponse(400, { success: false, error: 'E-mail é obrigatório.' });
   }
 
-  if (authenticatedEmail && email !== authenticatedEmail) {
+  if (caller.kind === 'user' && authenticatedEmail && email !== authenticatedEmail) {
     return jsonResponse(403, { success: false, error: 'Só é permitido enviar credenciais para o próprio cadastro autenticado.' });
   }
 
