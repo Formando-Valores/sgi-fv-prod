@@ -272,6 +272,8 @@ Deno.serve(async (request) => {
               headers: {
                 'Content-Type': 'application/json',
                 apikey: supabaseAnonKey,
+                // Autenticação servidor→servidor; a service role nunca é enviada ao navegador.
+                Authorization: `Bearer ${serviceRoleKey}`,
               },
               body: JSON.stringify({
                 email,
