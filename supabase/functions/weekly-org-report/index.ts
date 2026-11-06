@@ -48,7 +48,19 @@ Deno.serve(async (request) => {
     return jsonResponse(500, { success: false, error: 'Configuração do Supabase ausente.' });
   }
 
-  const cronSecret = Deno.env.get('CRON_SECRET') ?? '';
+  const admin = createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
+
+  // Preferir secret configurado no runtime; fallback para o Vault, acessível apenas
+  // através de RPC reservado à service_role (o cron não depende de secret manual no Edge).
+  let vaultCronSecret = '';
+  try {
+    const { data, error } = await admin.rpc('get_weekly_report_cron_secret');
+    if (!error && typeof data === 'string') vaultCronSecret = data;
+    else if (error) console.warn('[weekly-org-report] não foi possível ler secret do Vault', error.message);
+  } catch (error) {
+    console.warn('[weekly-org-report] falha ao ler secret do Vault', error);
+  }
+  const cronSecret = Deno.env.get('CRON_SECRET')?.trim() || vaultCronSecret;
   const headerSecret = request.headers.get('x-cron-secret') ?? '';
   const cronSecretMatches = cronSecret.length >= 16 && headerSecret.length > 0 && timingSafeEqual(headerSecret, cronSecret);
   const caller = cronSecretMatches ? null : await resolveCaller(request);
@@ -83,8 +95,6 @@ Deno.serve(async (request) => {
   if (recipientOverride && (!dryRun || !orgIdFilter)) {
     return jsonResponse(400, { success: false, error: 'recipient personalizado só é permitido em dry_run para uma organização específica.' });
   }
-
-  const admin = createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
 
   let orgQuery = admin.from('organizations').select('id, name, slug, report_email').order('name');
   if (orgIdFilter) orgQuery = orgQuery.eq('id', orgIdFilter);
