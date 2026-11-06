@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { sendAccessCredentialsEmail } from './accessEmail.ts';
 import { resolveCaller } from '../_shared/auth.ts';
+import { canSendAccessCredentials } from '../_shared/authz.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -72,7 +73,7 @@ Deno.serve(async (request) => {
     return jsonResponse(400, { success: false, error: 'E-mail é obrigatório.' });
   }
 
-  if (caller.kind === 'user' && authenticatedEmail && email !== authenticatedEmail) {
+  if (!canSendAccessCredentials(caller, email, authenticatedEmail)) {
     return jsonResponse(403, { success: false, error: 'Só é permitido enviar credenciais para o próprio cadastro autenticado.' });
   }
 
