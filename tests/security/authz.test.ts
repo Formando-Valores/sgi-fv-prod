@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  canCreateCheckoutForProcess,
+  canSendAccessCredentials,
   decideCreateUser,
   decideMembershipChange,
   escapeHtml,
@@ -99,6 +101,25 @@ describe('R-03/R-04 · staff da organização', () => {
     expect(isStaffCaller(orgAdmin)).toBe(true);
     expect(isStaffCaller(service)).toBe(true);
     expect(isStaffCaller({ kind: 'user', userId: 'x', orgRole: null })).toBe(false);
+  });
+});
+
+describe('R-06 · envio de credenciais e checkout', () => {
+  it('envio de credenciais: apenas service role ou o próprio titular', () => {
+    expect(canSendAccessCredentials(anon, 'a@exemplo.pt')).toBe(false);
+    expect(canSendAccessCredentials(service, 'a@exemplo.pt')).toBe(true);
+    expect(canSendAccessCredentials(client, 'A@EXEMPLO.PT', 'a@exemplo.pt')).toBe(true);
+    expect(canSendAccessCredentials(client, 'b@exemplo.pt', 'a@exemplo.pt')).toBe(false);
+    expect(canSendAccessCredentials(client, 'a@exemplo.pt', null)).toBe(false);
+  });
+
+  it('checkout: titular, staff da organização ou service role; nunca anónimo/outro cliente', () => {
+    expect(canCreateCheckoutForProcess(anon, 'u-cli')).toBe(false);
+    expect(canCreateCheckoutForProcess(service, 'u-cli')).toBe(true);
+    expect(canCreateCheckoutForProcess(client, 'u-cli')).toBe(true);
+    expect(canCreateCheckoutForProcess({ kind: 'user', userId: 'u-other', orgRole: 'client' }, 'u-cli')).toBe(false);
+    expect(canCreateCheckoutForProcess(operador, 'u-cli')).toBe(true);
+    expect(canCreateCheckoutForProcess({ kind: 'user', userId: 'u-other', orgRole: null }, 'u-cli')).toBe(false);
   });
 });
 

@@ -79,6 +79,10 @@ Deno.serve(async (request) => {
   if (recipientOverride && !isValidEmail(recipientOverride)) {
     return jsonResponse(400, { success: false, error: 'recipient inválido.' });
   }
+  // Destinatário arbitrário só é permitido em teste seco, limitado a uma organização.
+  if (recipientOverride && (!dryRun || !orgIdFilter)) {
+    return jsonResponse(400, { success: false, error: 'recipient personalizado só é permitido em dry_run para uma organização específica.' });
+  }
 
   const admin = createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
 

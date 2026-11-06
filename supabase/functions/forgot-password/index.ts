@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { appLoginUrl, resolveAppOrigin, safeRecoveryRedirect } from '../_shared/safeRedirects.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -127,8 +128,7 @@ Deno.serve(async (request) => {
 
   const payload = await request.json().catch(() => ({}));
   const email = String(payload.email ?? '').trim().toLowerCase();
-  const redirectTo = String(payload.redirectTo ?? '').trim();
-  const loginUrl = String(payload.loginUrl ?? '').trim();
+  const requestedRedirectTo = String(payload.redirectTo ?? '').trim();
 
   if (!email) {
     return jsonResponse(400, { success: false, error: 'E-mail é obrigatório.' });
@@ -142,9 +142,10 @@ Deno.serve(async (request) => {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  const recoveryRedirectUrl =
-    redirectTo ||
-    `${String(Deno.env.get('APP_URL') ?? Deno.env.get('SITE_URL') ?? 'https://sgi-fv-prod-one.vercel.app').replace(/\/$/, '')}/recovery.html`;
+  const appOrigin = resolveAppOrigin(Deno.env.get('APP_URL') ?? Deno.env.get('SITE_URL'));
+  const recoveryRedirectUrl = safeRecoveryRedirect(requestedRedirectTo, appOrigin);
+  // Não aceitar um URL de login arbitrário fornecido no pedido (risco de phishing).
+  const loginUrl = appLoginUrl(appOrigin);
 
   try {
     const { data: profile, error: profileLookupError } = await adminClient
@@ -170,7 +171,9 @@ Deno.serve(async (request) => {
     }
 
     const generatedOtpToken = data?.properties?.email_otp || '';
-    const generatedTokenHash = data?.properties?.hashed_token || data?.properties?.token_hash || '';
+    const generatedTokenHash = data?.properties?.hashed_token
+      || (data?.properties as { token_hash?: string } | undefined)?.token_hash
+      || '';
 
     if (!generatedTokenHash && !generatedOtpToken) {
       return jsonResponse(200, { success: true, message: genericMessage });

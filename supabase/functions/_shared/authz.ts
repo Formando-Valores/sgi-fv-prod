@@ -45,6 +45,20 @@ export function isStaffCaller(c: CallerContext): boolean {
   return c.kind === 'user' && (STAFF_ROLES as readonly string[]).includes(String(c.orgRole ?? ''));
 }
 
+/** Credenciais só podem ser enviadas pelo servidor ou pelo próprio titular. */
+export function canSendAccessCredentials(c: CallerContext, recipientEmail: string, callerEmail?: string | null): boolean {
+  if (c.kind === 'service') return true;
+  if (c.kind !== 'user' || !callerEmail) return false;
+  return recipientEmail.trim().toLowerCase() === callerEmail.trim().toLowerCase();
+}
+
+/** Checkout: service role, titular do processo ou staff da organização desse processo. */
+export function canCreateCheckoutForProcess(c: CallerContext, processClientId: string | null | undefined): boolean {
+  if (c.kind === 'service') return true;
+  if (c.kind !== 'user' || !c.userId) return false;
+  return c.userId === String(processClientId ?? '') || isStaffCaller(c);
+}
+
 /**
  * create-user: o que um chamador pode fazer.
  * - anónimo (registo público): só criar conta NOVA com papel client; nunca apagar nem redefinir senha.

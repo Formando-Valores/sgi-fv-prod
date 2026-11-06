@@ -105,10 +105,15 @@ function hexToUint8Array(hex: string): Uint8Array {
   return bytes;
 }
 
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  // Copia para ArrayBuffer próprio (não SharedArrayBuffer), compatível com WebCrypto/Deno 2.
+  return Uint8Array.from(bytes).buffer as ArrayBuffer;
+}
+
 async function getDecryptionKey(hexKey: string): Promise<CryptoKey> {
   return crypto.subtle.importKey(
     'raw',
-    hexToUint8Array(hexKey),
+    toArrayBuffer(hexToUint8Array(hexKey)),
     { name: 'AES-GCM', length: 256 },
     false,
     ['decrypt'],
@@ -119,8 +124,8 @@ async function decryptFromDb(encrypted: string, encKeyHex: string): Promise<stri
   const [ivHex, ctHex] = encrypted.split(':');
   if (!ivHex || !ctHex) throw new Error('Invalid encrypted format');
   const key = await getDecryptionKey(encKeyHex);
-  const iv = hexToUint8Array(ivHex);
-  const ciphertext = hexToUint8Array(ctHex);
+  const iv = toArrayBuffer(hexToUint8Array(ivHex));
+  const ciphertext = toArrayBuffer(hexToUint8Array(ctHex));
   const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
   return new TextDecoder().decode(decrypted);
 }
