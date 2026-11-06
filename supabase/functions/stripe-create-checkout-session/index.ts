@@ -2,7 +2,7 @@ import Stripe from 'https://esm.sh/stripe@18.3.0?target=deno';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getOrgStripeConfig } from '../_shared/payments/getOrgStripeConfig.ts';
 import { resolveCaller, withOrgRole } from '../_shared/auth.ts';
-import { isStaffCaller } from '../_shared/authz.ts';
+import { canCreateCheckoutForProcess } from '../_shared/authz.ts';
 import { amountToMinorUnits, computeProcessAmountBRL, DEFAULT_ALLOWED_CHECKOUT_ORIGINS, DEFAULT_APP_ORIGIN, safeRedirectUrl } from '../_shared/pricing.ts';
 
 type CheckoutPayload = {
@@ -74,8 +74,7 @@ Deno.serve(async (request) => {
 
   const organizationId = String(process.org_id ?? '').trim();
   const caller = await withOrgRole(await resolveCaller(request), supabase, organizationId);
-  const isProcessClient = caller.kind === 'user' && caller.userId === String(process.cliente_user_id ?? '');
-  if (caller.kind !== 'service' && !isProcessClient && !isStaffCaller(caller)) {
+  if (!canCreateCheckoutForProcess(caller, process.cliente_user_id)) {
     return jsonResponse(403, { success: false, error: 'Não tem autorização para criar pagamento neste processo.' });
   }
   const requestedOrg = String(payload.organizationId ?? '').trim();
