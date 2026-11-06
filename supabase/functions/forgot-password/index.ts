@@ -170,7 +170,9 @@ Deno.serve(async (request) => {
     }
 
     const generatedOtpToken = data?.properties?.email_otp || '';
-    const generatedTokenHash = data?.properties?.hashed_token || data?.properties?.token_hash || '';
+    const generatedTokenHash = data?.properties?.hashed_token
+      || (data?.properties as { token_hash?: string } | undefined)?.token_hash
+      || '';
 
     if (!generatedTokenHash && !generatedOtpToken) {
       return jsonResponse(200, { success: true, message: genericMessage });
